@@ -299,7 +299,7 @@ export function TradingViewSuperchart({
             <span className="text-amber-400 font-bold">₿</span>
             <span>{currentSym.symbol}</span>
             <span className="text-[#089981] font-mono text-[11px] ml-1">
-              {dynamicPrice.toLocaleString()} ▲+{currentSym.changePercent}%
+              {dynamicPrice} ▲+{currentSym.changePercent}%
             </span>
             <X className="size-3 text-gray-400 hover:text-white cursor-pointer ml-1" />
           </div>
@@ -855,8 +855,8 @@ export function TradingViewSuperchart({
                       <span className="text-amber-400 font-bold">₿</span>
                       <span className="font-bold text-white">{item.symbol}</span>
                     </div>
-                    <span className={`text-right font-bold ${item.changePercent >= 0 ? "text-[#089981]" : "text-[#f23645]"}`}>
-                      {item.price.toLocaleString()}
+                    <span className="text-right text-gray-200">
+                      {item.price}
                     </span>
                     <span className={`text-right ${item.change >= 0 ? "text-[#089981]" : "text-[#f23645]"}`}>
                       {item.change > 0 ? `+${item.change}` : item.change}
@@ -894,7 +894,7 @@ export function TradingViewSuperchart({
               {/* Big Price Readout */}
               <div className="flex items-baseline gap-2 font-mono">
                 <span className="text-2xl font-black text-white tracking-tight">
-                  {dynamicPrice.toLocaleString()}
+                  {dynamicPrice}
                 </span>
                 <span className="text-xs text-gray-400">{currentSym.currency}</span>
                 <span className="text-xs font-bold text-[#089981]">
@@ -953,7 +953,8 @@ export function TradingViewSuperchart({
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
         {/* 3.4 FAR-RIGHT VERTICAL ACTION STRIP (14 icons) */}
         <div className="flex flex-col items-center justify-between w-11 bg-[#131722] border-l border-[#2a2e39] py-2 text-gray-400 z-10 shrink-0">
