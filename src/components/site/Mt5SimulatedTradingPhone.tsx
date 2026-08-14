@@ -225,29 +225,29 @@ export function Mt5SimulatedTradingPhone({
               </span>
             )}
             <h2
-              className={`mt-4 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] ${
+              className={`mt-4 text-4xl font-black tracking-tight sm:text-5xl md:text-6xl leading-[1.1] ${
                 isDarkTheme ? "text-white" : "text-gray-900"
               }`}
             >
               {title}
             </h2>
             <p
-              className={`mt-4 sm:mt-6 text-sm sm:text-base md:text-lg leading-relaxed font-medium max-w-xl ${
+              className={`mt-6 text-base sm:text-lg leading-relaxed font-medium max-w-xl ${
                 isDarkTheme ? "text-gray-300" : "text-gray-600"
               }`}
             >
               {description}
             </p>
-            <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
+            <div className="mt-8 flex flex-wrap gap-4">
               <Button
                 asChild
-                className={`w-full sm:w-auto rounded-full px-7 sm:px-8 py-3.5 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer hover:scale-105 transition-all justify-center ${
+                className={`rounded-full px-8 py-3.5 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer hover:scale-105 transition-all ${
                   isDarkTheme
                     ? "neon-btn text-[#021a11]"
                     : "bg-[#0d141e] hover:bg-black text-white"
                 }`}
               >
-                <Link to="/robots" className="flex items-center justify-center">
+                <Link to="/robots">
                   <span>{isDarkTheme ? "Ouvrir un Compte Démo" : "DÉCOUVRIR LES STRATÉGIES"}</span>
                   <ArrowRight className="size-4 ml-2" />
                 </Link>
@@ -255,13 +255,13 @@ export function Mt5SimulatedTradingPhone({
               <Button
                 asChild
                 variant="outline"
-                className={`w-full sm:w-auto rounded-full px-7 sm:px-8 py-3.5 text-xs font-black uppercase tracking-wider cursor-pointer hover:scale-105 transition-all justify-center ${
+                className={`rounded-full px-8 py-3.5 text-xs font-black uppercase tracking-wider cursor-pointer hover:scale-105 transition-all ${
                   isDarkTheme
                     ? "border-white/20 bg-white/5 text-white hover:bg-white/10"
                     : "border-gray-300 bg-white hover:bg-gray-100 text-gray-900 shadow-sm"
                 }`}
               >
-                <Link to="/how-it-works" className="flex items-center justify-center">MODE D'EMPLOI MT5</Link>
+                <Link to="/how-it-works">MODE D'EMPLOI MT5</Link>
               </Button>
             </div>
           </div>
@@ -273,7 +273,7 @@ export function Mt5SimulatedTradingPhone({
             }`}
           >
             {/* Phone Outer Container */}
-            <div className="relative z-10 w-full max-w-[310px] xs:max-w-[340px] sm:max-w-[360px] mx-auto">
+            <div className="relative z-10 w-full max-w-[340px] sm:max-w-[360px]">
               
               {/* Notification Toast */}
               {notification && (
@@ -283,7 +283,7 @@ export function Mt5SimulatedTradingPhone({
               )}
 
               {/* iPhone Hardware Outer Frame (Deep Graphite / Titanium) */}
-              <div className="relative rounded-[40px] sm:rounded-[48px] border-[6px] sm:border-[9px] border-[#0f172a] bg-[#030712] p-2 sm:p-2.5 shadow-[0_25px_70px_rgba(0,0,0,0.85),0_0_45px_rgba(0,207,180,0.14)] ring-1 ring-white/10">
+              <div className="relative rounded-[48px] border-[9px] border-[#0f172a] bg-[#030712] p-2.5 shadow-[0_25px_70px_rgba(0,0,0,0.85),0_0_45px_rgba(0,207,180,0.14)] ring-1 ring-white/10">
                 
                 {/* Dynamic Island Speaker Notch */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 h-4 w-22 rounded-full bg-black flex items-center justify-between px-2.5">
