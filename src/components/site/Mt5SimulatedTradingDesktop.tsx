@@ -77,42 +77,40 @@ export function Mt5SimulatedTradingDesktop({
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 size-2 rounded-full bg-gray-800 border border-gray-700" />
 
                 {/* Monitor Display Screen */}
-                <div className="relative h-[420px] sm:h-[470px] w-full rounded-xl bg-[#04090f] overflow-hidden text-white flex flex-col justify-between border border-gray-800/80 select-none">
+                <div className="relative h-[340px] xs:h-[390px] sm:h-[440px] md:h-[470px] w-full rounded-xl bg-[#04090f] overflow-hidden text-white flex flex-col justify-between border border-gray-800/80 select-none">
                   {/* Top MT5 Window Header Bar */}
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-[#0b131d]">
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1.5">
-                        <span className="size-3 rounded-full bg-rose-500/80 inline-block" />
-                        <span className="size-3 rounded-full bg-amber-500/80 inline-block" />
-                        <span className="size-3 rounded-full bg-[#00D084]/80 inline-block" />
+                  <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 sm:py-2 border-b border-gray-800 bg-[#0b131d]">
+                    <div className="flex items-center gap-2 sm:gap-3 truncate">
+                      <div className="flex gap-1.5 shrink-0">
+                        <span className="size-2.5 sm:size-3 rounded-full bg-rose-500/80 inline-block" />
+                        <span className="size-2.5 sm:size-3 rounded-full bg-amber-500/80 inline-block" />
+                        <span className="size-2.5 sm:size-3 rounded-full bg-[#00D084]/80 inline-block" />
                       </div>
-                      <span className="text-xs font-black text-white flex items-center gap-2 font-mono ml-2">
-                        <Monitor className="size-3.5 text-[#00D084]" /> MetaTrader 5 Terminal — Nexium Markets [NVDA, M1]
+                      <span className="text-[10px] sm:text-xs font-black text-white flex items-center gap-1.5 font-mono truncate ml-1">
+                        <Monitor className="size-3 text-[#00D084] shrink-0" /> MT5 [NVDA, M1]
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
-                      <span className="text-[#00D084] font-mono text-[11px]">
-                        Server: Equinix NY4 (0.45ms)
+                    <div className="flex items-center gap-2 sm:gap-4 text-[10px] sm:text-xs font-bold text-gray-400 shrink-0">
+                      <span className="text-[#00D084] font-mono text-[9px] sm:text-[11px]">
+                        NY4 (0.45ms)
                       </span>
-                      <Maximize2 className="size-3.5 hover:text-white cursor-pointer" />
+                      <Maximize2 className="size-3 hover:text-white cursor-pointer" />
                     </div>
                   </div>
 
                   {/* MT5 Sub-Menu Toolbar */}
-                  <div className="flex items-center justify-between px-4 py-1.5 bg-[#070e17] border-b border-gray-800/60 text-[11px] font-semibold text-gray-300">
-                    <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-between px-3 sm:px-4 py-1 bg-[#070e17] border-b border-gray-800/60 text-[10px] sm:text-[11px] font-semibold text-gray-300 overflow-x-auto">
+                    <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
                       <span className="hover:text-white cursor-pointer font-bold">File</span>
                       <span className="hover:text-white cursor-pointer">View</span>
-                      <span className="hover:text-white cursor-pointer">Insert</span>
                       <span className="hover:text-white cursor-pointer font-bold text-[#00D084]">
                         Charts
                       </span>
                       <span className="hover:text-white cursor-pointer">Tools</span>
-                      <span className="hover:text-white cursor-pointer">Expert Advisors</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="bg-[#00D084]/20 text-[#00D084] px-2 py-0.5 rounded font-black text-[10px]">
-                        ● ALGO BOT ACTIVE
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <span className="bg-[#00D084]/20 text-[#00D084] px-1.5 py-0.5 rounded font-black text-[9px] sm:text-[10px]">
+                        ● ACTIVE
                       </span>
                     </div>
                   </div>
@@ -120,7 +118,7 @@ export function Mt5SimulatedTradingDesktop({
                   {/* Main Workstation Screen Layout (Watchlist + Live Chart) */}
                   <div className="flex-1 grid grid-cols-12 bg-[#03070d]">
                     {/* Left Market Watch (3 Cols) */}
-                    <div className="col-span-3 border-r border-gray-800/80 bg-[#060c14] p-3 flex flex-col justify-between hidden sm:flex">
+                    <div className="col-span-3 border-r border-gray-800/80 bg-[#060c14] p-3 flex flex-col justify-between hidden md:flex">
                       <div className="flex flex-col gap-2">
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
                           Market Watch
@@ -128,127 +126,112 @@ export function Mt5SimulatedTradingDesktop({
 
                         {/* NVDA Stock Item */}
                         <div className="rounded-lg bg-[#0c1827] border border-[#00D084]/40 p-2 text-xs">
-                          <div className="flex justify-between font-black">
+                          <div className="flex justify-between font-mono font-bold">
                             <span className="text-white">NVDA</span>
-                            <span className="text-[#00D084] font-mono">${currentPrice}</span>
+                            <span className="text-[#00D084] font-black">+2.45%</span>
                           </div>
-                          <div className="flex justify-between text-[9px] text-gray-400 mt-0.5">
-                            <span>Spread: 0.0</span>
-                            <span className="text-[#00D084] font-bold">+2.45% ▲</span>
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
+                            <span>B: {currentPrice}</span>
+                            <span>A: {currentPrice}</span>
                           </div>
                         </div>
 
                         {/* AMZN Stock Item */}
-                        <div className="rounded-lg bg-[#07111c] border border-gray-800 p-2 text-xs">
-                          <div className="flex justify-between font-extrabold">
-                            <span className="text-gray-300">AMZN</span>
-                            <span className="text-white font-mono">$188.40</span>
+                        <div className="rounded-lg bg-gray-900/50 p-2 text-xs border border-gray-800">
+                          <div className="flex justify-between font-mono font-bold">
+                            <span className="text-white">AMZN</span>
+                            <span className="text-sky-400 font-black">+1.18%</span>
                           </div>
-                          <div className="flex justify-between text-[9px] text-gray-400 mt-0.5">
-                            <span>Spread: 0.1</span>
-                            <span className="text-[#00D084] font-bold">+1.10% ▲</span>
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
+                            <span>B: 188.40</span>
+                            <span>A: 188.40</span>
                           </div>
                         </div>
 
                         {/* AAPL Stock Item */}
-                        <div className="rounded-lg bg-[#07111c] border border-gray-800 p-2 text-xs">
-                          <div className="flex justify-between font-extrabold">
-                            <span className="text-gray-300">AAPL</span>
-                            <span className="text-white font-mono">$224.15</span>
+                        <div className="rounded-lg bg-gray-900/50 p-2 text-xs border border-gray-800">
+                          <div className="flex justify-between font-mono font-bold">
+                            <span className="text-white">AAPL</span>
+                            <span className="text-gray-400 font-black">+0.42%</span>
                           </div>
-                          <div className="flex justify-between text-[9px] text-gray-400 mt-0.5">
-                            <span>Spread: 0.0</span>
-                            <span className="text-[#00D084] font-bold">+0.85% ▲</span>
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
+                            <span>B: 224.15</span>
+                            <span>A: 224.15</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="rounded-lg bg-[#091a10] border border-[#00D084]/30 p-2 text-[10px] text-gray-300 font-semibold">
-                        <span className="text-[#00D084] font-extrabold block">✓ FIX API 4.4</span>
-                        <span>0.00ms latency to NY4</span>
+                      <div className="border-t border-gray-800/80 pt-2 text-[10px] font-mono text-gray-400 flex justify-between">
+                        <span>P&L:</span>
+                        <span className="text-[#00D084] font-bold">+${livePnl.toFixed(2)}</span>
                       </div>
                     </div>
 
-                    {/* Right Chart Area (9 Cols) */}
-                    <div className="col-span-12 sm:col-span-9 relative p-3.5 flex flex-col justify-between bg-gradient-to-b from-[#030910] to-[#05111c]">
-                      {/* Floating PnL Live Badge */}
-                      <div className="absolute top-3 right-4 z-20 rounded-xl bg-[#06200f] border border-[#00D084]/40 px-3 py-1.5 shadow-lg flex items-center gap-2">
-                        <Zap className="size-3.5 text-[#00D084] animate-pulse" />
-                        <div className="flex flex-col text-right leading-none">
-                          <span className="text-[8px] font-bold text-gray-400 uppercase">
-                            Live EA PnL
-                          </span>
-                          <span className="text-xs font-black text-[#00D084] font-mono mt-0.5">
-                            +${livePnl}
-                          </span>
+                    {/* Right Chart Canvas Area (9 Cols or 12 on mobile) */}
+                    <div className="col-span-12 md:col-span-9 p-3 flex flex-col justify-between relative bg-[#04080f]">
+                      {/* Top Symbol Legend Bar */}
+                      <div className="flex items-center justify-between text-[10px] sm:text-xs font-mono border-b border-gray-800 pb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white">NVIDIA CORP · M1 · NEXIUM MT5</span>
+                          <span className="text-[#00D084] font-bold hidden sm:inline">Spread: 0.0</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">Prix:</span>
+                          <span className="font-bold text-white">${currentPrice}</span>
                         </div>
                       </div>
 
-                      {/* Chart Grid Lines */}
-                      <div className="absolute inset-0 p-4 flex flex-col justify-between pointer-events-none opacity-20">
-                        <div className="w-full h-px bg-gray-500" />
-                        <div className="w-full h-px bg-gray-500" />
-                        <div className="w-full h-px bg-gray-500" />
-                        <div className="w-full h-px bg-gray-500" />
-                      </div>
+                      {/* Vector Candlesticks Simulation */}
+                      <div className="relative flex-1 my-2 flex items-end justify-between px-2 gap-1.5 h-36">
+                        {/* Shaded Price Channel Background */}
+                        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
+                          <div className="border-b border-dashed border-gray-700 w-full" />
+                          <div className="border-b border-dashed border-gray-700 w-full" />
+                          <div className="border-b border-dashed border-gray-700 w-full" />
+                        </div>
 
-                      {/* Active Order Line */}
-                      <div className="relative z-10 w-full mt-4 border-t border-dashed border-[#00D084] flex items-center justify-between text-[10px] font-extrabold text-[#00D084] pt-1">
-                        <span className="bg-[#00D084]/20 px-2 py-0.5 rounded border border-[#00D084]/50 font-mono text-[9px]">
-                          BUY 100 NVDA @ ${(currentPrice - 1.2).toFixed(2)}
-                        </span>
-                        <span className="text-[#00D084] font-mono text-[9px]">
-                          TP: ${(currentPrice + 5.5).toFixed(2)}
-                        </span>
-                      </div>
-
-                      {/* Real-Time Desktop High-Res Candlesticks */}
-                      <div className="relative z-10 flex-1 flex items-end justify-between gap-1.5 pt-4 pb-2 px-1">
-                        {ticks.map((t, idx) => (
-                          <div
-                            key={idx}
-                            className="flex-1 flex flex-col items-center justify-end h-full"
-                          >
-                            {/* Candle Wick */}
+                        {ticks.map((tick, index) => (
+                          <div key={index} className="flex-1 flex flex-col items-center justify-end h-full relative group">
+                            {/* Candle Upper/Lower Wick Line */}
                             <div
-                              className={`w-0.5 transition-all duration-700 ${t.isGreen ? "bg-[#00D084]" : "bg-rose-500"}`}
-                              style={{ height: `${t.height + 12}%` }}
-                            />
-                            {/* Candle Body */}
-                            <div
-                              className={`w-full rounded-sm transition-all duration-700 ${
-                                t.isGreen
-                                  ? "bg-[#00D084] shadow-[0_0_8px_rgba(0,208,132,0.6)]"
-                                  : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]"
+                              className={`w-0.5 rounded-full ${
+                                tick.isGreen ? "bg-[#00D084]" : "bg-rose-500"
                               }`}
-                              style={{ height: `${t.height}%` }}
+                              style={{ height: `${Math.min(100, tick.height + 18)}%` }}
+                            />
+                            {/* Candle Real Body */}
+                            <div
+                              className={`w-full max-w-[12px] rounded-sm absolute bottom-2 transition-all duration-300 ${
+                                tick.isGreen
+                                  ? "bg-[#00D084] shadow-[0_0_8px_rgba(0,208,132,0.4)]"
+                                  : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]"
+                              }`}
+                              style={{ height: `${tick.height}%` }}
                             />
                           </div>
                         ))}
                       </div>
 
-                      {/* Bottom Execution Status Overlay */}
-                      <div className="relative z-10 rounded-xl bg-[#091724] border border-gray-800 p-2 flex items-center justify-between text-xs">
+                      {/* Bottom Terminal Order Row */}
+                      <div className="flex items-center justify-between border-t border-gray-800 pt-1.5 text-[9px] sm:text-[10px] font-mono">
                         <div className="flex items-center gap-2">
-                          <ShieldCheck className="size-3.5 text-[#00D084]" />
-                          <span className="font-extrabold text-white text-[11px]">
-                            MT5 EA Algo Engine #12
+                          <span className="bg-[#00D084]/15 text-[#00D084] px-1.5 py-0.5 rounded font-black">
+                            BUY 1.00 NVDA
                           </span>
+                          <span className="text-gray-400 hidden sm:inline">TP: $210.00 · SL: $190.00</span>
                         </div>
-                        <div className="flex items-center gap-3 font-mono text-[10px]">
-                          <span className="text-gray-400">
-                            Position: <strong className="text-white">100 Shares</strong>
-                          </span>
-                          <span className="text-[#00D084] font-bold">STATUS: RUNNING</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400">Profit:</span>
+                          <span className="text-[#00D084] font-black text-xs">+${livePnl.toFixed(2)} USD</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Desktop Workstation Footer Status Bar */}
-                  <div className="h-6 bg-[#070e17] border-t border-gray-800 px-4 flex items-center justify-between text-[9px] text-gray-400 font-mono">
+                  {/* MT5 Bottom Status Footer */}
+                  <div className="flex items-center justify-between px-3 sm:px-4 py-1 bg-[#09111b] border-t border-gray-800 text-[9px] sm:text-[10px] font-mono text-gray-400">
                     <span>Terminal Ready</span>
-                    <span>NVDA: $194.75 | AMZN: $188.40 | AAPL: $224.15</span>
+                    <span className="hidden sm:inline">NVDA: $194.75 | AMZN: $188.40 | AAPL: $224.15</span>
                     <span className="text-[#00D084] font-bold">Connected 100%</span>
                   </div>
                 </div>
@@ -261,7 +244,7 @@ export function Mt5SimulatedTradingDesktop({
             </div>
 
             {/* Connecting Wire + Floating Asset Cards */}
-            <div className="hidden md:flex flex-col gap-3.5 absolute -left-6 lg:-left-12 top-1/2 -translate-y-1/2 z-20">
+            <div className="hidden xl:flex flex-col gap-3.5 absolute -left-6 lg:-left-12 top-1/2 -translate-y-1/2 z-20">
               {/* Connector Wire SVG */}
               <svg className="absolute -right-16 top-1/2 -translate-y-1/2 w-16 h-32 pointer-events-none overflow-visible">
                 <path
@@ -303,21 +286,21 @@ export function Mt5SimulatedTradingDesktop({
 
           {/* Right Text Content Column (5 Cols, lg:order-2) */}
           <div className="lg:col-span-5 lg:order-2 flex flex-col items-start lg:pl-6">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black uppercase tracking-widest text-[#00D084] shadow-sm mb-4">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black uppercase tracking-widest text-[#00D084] shadow-sm mb-3 sm:mb-4">
               ROBOTS MT5 · ACTIONS & INDICES
             </span>
-            <h2 className="text-4xl font-black tracking-tight text-white sm:text-5xl md:text-6xl leading-[1.1]">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.1]">
               {title}
             </h2>
-            <p className="mt-6 text-base sm:text-lg leading-relaxed text-gray-300 font-medium max-w-xl">
+            <p className="mt-4 sm:mt-6 text-sm sm:text-base md:text-lg leading-relaxed text-gray-300 font-medium max-w-xl">
               {description}
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
               <Button
                 asChild
-                className="neon-btn rounded-full px-8 py-3.5 text-xs font-black uppercase tracking-wider text-[#021a11] hover:scale-105 transition-all shadow-lg cursor-pointer"
+                className="neon-btn w-full sm:w-auto rounded-full px-7 sm:px-8 py-3.5 text-xs font-black uppercase tracking-wider text-[#021a11] hover:scale-105 transition-all shadow-lg cursor-pointer justify-center"
               >
-                <Link to="/robots" className="flex items-center gap-2">
+                <Link to="/robots" className="flex items-center justify-center gap-2">
                   <span>DÉCOUVRIR LE TERMINAL MT5</span>
                   <ArrowRight className="size-4" />
                 </Link>
@@ -325,9 +308,9 @@ export function Mt5SimulatedTradingDesktop({
               <Button
                 asChild
                 variant="outline"
-                className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 px-8 py-3.5 text-xs font-black uppercase tracking-wider text-white hover:scale-105 transition-all cursor-pointer"
+                className="w-full sm:w-auto rounded-full border-white/20 bg-white/5 hover:bg-white/10 px-7 sm:px-8 py-3.5 text-xs font-black uppercase tracking-wider text-white hover:scale-105 transition-all cursor-pointer justify-center"
               >
-                <Link to="/how-it-works">MODE D'EMPLOI</Link>
+                <Link to="/how-it-works" className="flex items-center justify-center">MODE D'EMPLOI</Link>
               </Button>
             </div>
           </div>
