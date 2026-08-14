@@ -83,6 +83,7 @@ export function TradingViewSuperchart({
   // Active Symbol State
   const [selectedSymbol, setSelectedSymbol] = useState(initialSymbol);
   const [activeTf, setActiveTf] = useState("1W");
+  const [showRightPanel, setShowRightPanel] = useState(true);
   const [activeRightTab, setActiveRightTab] = useState<
     "watchlist" | "alerts" | "news" | "data" | "hotlists" | "calendar" | "ideas" | "chat" | "notifications" | "order" | "dom" | "tree" | "help"
   >("watchlist");
@@ -769,20 +770,21 @@ export function TradingViewSuperchart({
         </div>
 
         {/* 3.3 RIGHT SIDE WATCHLIST & INSPECTOR PANEL (310px) */}
-        <div className="w-[310px] bg-[#131722] border-l border-[#2a2e39] flex flex-col justify-between shrink-0 overflow-y-auto">
-          {/* Watchlist Header */}
-          <div>
-            <div className="flex items-center justify-between p-3 border-b border-[#2a2e39]">
-              <div className="flex items-center gap-1.5 font-bold text-white text-sm">
-                <span>Watchlist</span>
-                <ChevronDown className="size-3.5 text-gray-400" />
+        {showRightPanel && (
+          <div className="w-[310px] bg-[#131722] border-l border-[#2a2e39] flex flex-col justify-between shrink-0 overflow-y-auto animate-in fade-in duration-200">
+            {/* Watchlist Header */}
+            <div>
+              <div className="flex items-center justify-between p-3 border-b border-[#2a2e39]">
+                <div className="flex items-center gap-1.5 font-bold text-white text-sm">
+                  <span>Watchlist</span>
+                  <ChevronDown className="size-3.5 text-gray-400" />
+                </div>
+                <div className="flex items-center gap-2 text-gray-400">
+                  <button className="p-1 hover:text-white cursor-pointer"><Plus className="size-4" /></button>
+                  <button className="p-1 hover:text-white cursor-pointer"><Clock className="size-4" /></button>
+                  <button onClick={() => setShowRightPanel(false)} className="p-1 hover:text-white cursor-pointer" title="Réduire"><X className="size-4" /></button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-gray-400">
-                <button className="p-1 hover:text-white cursor-pointer"><Plus className="size-4" /></button>
-                <button className="p-1 hover:text-white cursor-pointer"><Clock className="size-4" /></button>
-                <button className="p-1 hover:text-white cursor-pointer"><MoreHorizontal className="size-4" /></button>
-              </div>
-            </div>
 
             {/* Columns Header */}
             <div className="grid grid-cols-[110px_1fr_60px_50px] px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-gray-400 border-b border-[#2a2e39]">
@@ -951,17 +953,20 @@ export function TradingViewSuperchart({
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* 3.4 FAR-RIGHT VERTICAL ACTION STRIP (14 icons) */}
         <div className="flex flex-col items-center justify-between w-11 bg-[#131722] border-l border-[#2a2e39] py-2 text-gray-400 z-10 shrink-0">
           <div className="flex flex-col items-center gap-2">
             <button
-              onClick={() => setActiveRightTab("watchlist")}
+              onClick={() => {
+                setActiveRightTab("watchlist");
+                setShowRightPanel(!showRightPanel);
+              }}
               className={`p-2 rounded cursor-pointer transition ${
-                activeRightTab === "watchlist" ? "bg-[#2962ff] text-white shadow" : "hover:bg-[#1e222d] hover:text-white"
+                showRightPanel && activeRightTab === "watchlist" ? "bg-[#2962ff] text-white shadow" : "hover:bg-[#1e222d] hover:text-white"
               }`}
-              title="Watchlist & Détails"
+              title="Watchlist & Détails (Afficher / Masquer)"
             >
               <Layers className="size-4" />
             </button>
