@@ -9,8 +9,10 @@ import {
   BarChart3,
   Bell,
   Bot,
+  Brain,
   Calculator,
   Calendar,
+  CalendarDays,
   CandlestickChart,
   Check,
   CheckCircle2,
@@ -26,6 +28,7 @@ import {
   FileCheck,
   FileText,
   Filter,
+  Flame,
   Globe2,
   Grid,
   History,
@@ -50,6 +53,8 @@ import {
   PhoneOff,
   Play,
   Plus,
+  Power,
+  Radar,
   Radio,
   RefreshCw,
   ScreenShare,
@@ -65,9 +70,11 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
+  Timer,
   Trash2,
   TrendingDown,
   TrendingUp,
+  Trophy,
   User,
   UserCheck,
   Video,
@@ -1098,7 +1105,337 @@ function TradingViewEngineChart({
 }
 
 // ----------------------------------------------------
-// 1. PAGE MOTEUR (AI TRADING CONTROL CENTER)
+// 1. WEB AUDIO SYNTHESIZER & AUTO-TRADER WIDGETS
+// ----------------------------------------------------
+let sharedAudioCtx: AudioContext | null = null;
+
+function initAudio() {
+  if (sharedAudioCtx) return;
+  try {
+    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+    const activeCtx = new Ctx() as AudioContext;
+    sharedAudioCtx = activeCtx;
+    const buffer = activeCtx.createBuffer(1, 1, 22050);
+    const node = activeCtx.createBufferSource();
+    node.buffer = buffer;
+    node.connect(activeCtx.destination);
+    node.start(0);
+  } catch (e) {
+    console.error("Audio initialization failed:", e);
+  }
+}
+
+function playWinSound() {
+  try {
+    initAudio();
+    const ctx = sharedAudioCtx;
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
+    const notes = [
+      { freq: 523.25, delay: 0, dur: 0.4 },
+      { freq: 659.25, delay: 0.08, dur: 0.4 },
+      { freq: 783.99, delay: 0.16, dur: 0.4 },
+      { freq: 1046.50, delay: 0.24, dur: 0.6 },
+    ];
+    notes.forEach(({ freq, delay, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+      const t = ctx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.start(t);
+      osc.stop(t + dur + 0.1);
+    });
+  } catch {}
+}
+
+function playLossSound() {
+  try {
+    initAudio();
+    const ctx = sharedAudioCtx;
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
+    const notes = [
+      { freq: 392.00, delay: 0, dur: 0.3 },
+      { freq: 329.63, delay: 0.1, dur: 0.3 },
+      { freq: 261.63, delay: 0.2, dur: 0.5 },
+    ];
+    notes.forEach(({ freq, delay, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+      const t = ctx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.08, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.start(t);
+      osc.stop(t + dur + 0.1);
+    });
+  } catch {}
+}
+
+function playOpenSound() {
+  try {
+    initAudio();
+    const ctx = sharedAudioCtx;
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
+    const notes = [
+      { freq: 880.00, delay: 0, dur: 0.15 },
+      { freq: 1318.51, delay: 0.05, dur: 0.25 }
+    ];
+    notes.forEach(({ freq, delay, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+      const t = ctx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.12, t + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.start(t);
+      osc.stop(t + dur + 0.1);
+    });
+  } catch {}
+}
+
+// ── Mini Sparkline Price Chart ──
+function SparklinePrice({ price }: { price: number }) {
+  const [points, setPoints] = useState<number[]>([
+    50, 52, 49, 53, 55, 54, 56, 58, 57, 59, 61, 60, 62, 64, 63, 65,
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPoints((prev) => {
+        const next = [...prev.slice(1)];
+        const last = prev[prev.length - 1] ?? 55;
+        next.push(Math.max(40, last + (Math.random() - 0.45) * 3));
+        return next;
+      });
+    }, 1400);
+    return () => clearInterval(interval);
+  }, []);
+
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const width = 100;
+  const height = 40;
+  const step = width / (points.length - 1);
+
+  const path = points
+    .map((p, i) => {
+      const x = i * step;
+      const y = height - ((p - min) / range) * height;
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  const areaPath = `${path} L ${width} ${height} L 0 ${height} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-14" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="spark-auto-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#00D084" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#00D084" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill="url(#spark-auto-grad)" />
+      <path d={path} fill="none" stroke="#00D084" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ── Mini Cumulative Equity Curve Chart ──
+function EquityCurveMini() {
+  const [points, setPoints] = useState<number[]>([
+    0, 5, 8, 3, 12, 18, 15, 22, 28, 25, 32, 38, 35, 42,
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPoints((prev) => {
+        const next = [...prev.slice(1)];
+        const last = prev[prev.length - 1] ?? 25;
+        next.push(Math.max(-5, last + (Math.random() - 0.3) * 4));
+        return next;
+      });
+    }, 1800);
+    return () => clearInterval(interval);
+  }, []);
+
+  const min = Math.min(0, ...points);
+  const max = Math.max(...points, 1);
+  const range = max - min || 1;
+  const width = 100;
+  const height = 40;
+  const step = width / (points.length - 1);
+
+  const path = points
+    .map((p, i) => {
+      const x = i * step;
+      const y = height - ((p - min) / range) * height;
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  const areaPath = `${path} L ${width} ${height} L 0 ${height} Z`;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-14" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="equity-auto-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill="url(#equity-auto-grad)" />
+      <path d={path} fill="none" stroke="#38bdf8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ── Countdown Timer Circular Gauge ──
+function CountdownTimerGauge({ isRunning }: { isRunning: boolean }) {
+  const [seconds, setSeconds] = useState(42);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = setInterval(() => {
+      setSeconds((s) => (s <= 0 ? 60 : s - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning]);
+
+  const pct = ((60 - seconds) / 60) * 100;
+
+  return (
+    <div className="flex flex-col items-center gap-1.5 py-1">
+      <div className="relative size-16">
+        <svg className="size-full -rotate-90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="6" />
+          <circle
+            cx="40"
+            cy="40"
+            r="32"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={2 * Math.PI * 32}
+            strokeDashoffset={2 * Math.PI * 32 - (pct / 100) * 2 * Math.PI * 32}
+            style={{ transition: "stroke-dashoffset 1s linear" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="font-mono text-sm font-black text-white">{seconds}s</span>
+        </div>
+      </div>
+      <span className="text-[10px] text-gray-400 font-mono">
+        {isRunning ? "Cycle tick M1" : "Moteur en pause"}
+      </span>
+    </div>
+  );
+}
+
+// ── Circular Confidence Gauge ──
+function ConfidenceCircularGauge({ value }: { value: number }) {
+  const radius = 46;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (value / 100) * circumference;
+  const color = value >= 80 ? "#00D084" : value >= 60 ? "#f59e0b" : "#f43f5e";
+
+  return (
+    <div className="relative size-24 shrink-0">
+      <svg className="size-full -rotate-90" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+        <circle
+          cx="60"
+          cy="60"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.8s ease, stroke 0.3s ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-black text-white font-mono">{value.toFixed(0)}%</span>
+        <span className="text-[9px] uppercase tracking-wider text-gray-400 font-bold">Score IA</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Fear & Greed Sentiment Thermometer ──
+function SentimentFearGreedBar({ trend, score }: { trend: string; score: number }) {
+  const label = score >= 75 ? "Avidité Extrême" : score >= 55 ? "Optimisme Achat" : score >= 45 ? "Neutre" : score >= 25 ? "Prudence" : "Peur Extrême";
+
+  return (
+    <div className="space-y-1.5 py-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-rose-400 font-bold text-[11px]">Peur</span>
+        <span className="font-bold text-white text-[11px]">{label}</span>
+        <span className="text-[#00D084] font-bold text-[11px]">Avidité</span>
+      </div>
+      <div className="relative h-2.5 rounded-full bg-gradient-to-r from-rose-500 via-amber-400 to-[#00D084] overflow-hidden">
+        <div
+          className="absolute top-0 bottom-0 w-1.5 bg-white rounded-full shadow-[0_0_8px_#ffffff] transition-all duration-700"
+          style={{ left: `calc(${score}% - 3px)` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+        <span>0</span>
+        <span className="font-bold text-white">{score}/100</span>
+        <span>100</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Latency Deriv / NY4 Meter ──
+function LatencyDerivMeter({ connected }: { connected: boolean }) {
+  const [ping, setPing] = useState(14);
+
+  useEffect(() => {
+    if (!connected) return;
+    const interval = setInterval(() => {
+      setPing(Math.round(10 + Math.random() * 12));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [connected]);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-gray-400">Latence Cross-Connect</span>
+        <span className="font-mono font-black text-[#00D084]">{connected ? `${ping} ms` : "Hors ligne"}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
+        <div className="h-full rounded-full bg-[#00D084] transition-all duration-500" style={{ width: `${Math.min(100, ping * 4)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------
+// 1. PAGE MOTEUR (AUTO-TRADER & AI TRADING CONTROL)
 // ----------------------------------------------------
 function EngineTab({
   bots,
@@ -1115,125 +1452,282 @@ function EngineTab({
 }) {
   const [selectedBotId, setSelectedBotId] = useState<EngineBot["id"]>("nexium-ai-gold");
   const [viewMode, setViewMode] = useState<"solo" | "triptyque">("solo");
-  
-  // Par défaut, 2 moteurs activés (Gold & FX Trend)
+  const [tradingMode, setTradingMode] = useState<"simulation" | "demo" | "live">("demo");
+  const [isEngineRunning, setIsEngineRunning] = useState(true);
+  const [forcingTrade, setForcingTrade] = useState(false);
+  const [logFilter, setLogFilter] = useState<"all" | "won" | "lost" | "open" | "error">("all");
+
+  // 2 moteurs principaux
   const activeBots = useMemo(() => bots.slice(0, 2), [bots]);
   const selectedBot = activeBots.find((b) => b.id === selectedBotId) ?? activeBots[0];
   const matchingPos = positions.find((p) => p.botId === selectedBot.id);
 
+  // Toggle Engine Power
+  const toggleEnginePower = () => {
+    if (isEngineRunning) {
+      setIsEngineRunning(false);
+      toast.info("Auto-trader mis en pause — Sécurité active.");
+    } else {
+      setIsEngineRunning(true);
+      playOpenSound();
+      toast.success("Auto-trader démarré avec succès sur flux NY4 !");
+    }
+  };
+
+  // Test trade simulateur
+  const handleTestTrade = () => {
+    setForcingTrade(true);
+    playOpenSound();
+    toast.info(`Trade de test forcé lancé sur ${selectedBot.primarySymbol}...`);
+
+    setTimeout(() => {
+      setForcingTrade(false);
+      const isWin = Math.random() > 0.35;
+      if (isWin) {
+        playWinSound();
+        toast.success(`🎉 Trade test ${selectedBot.primarySymbol} : Gagné +$85.40 (Score IA 89/100)`);
+      } else {
+        playLossSound();
+        toast.error(`Trade test ${selectedBot.primarySymbol} : Clôturé -$22.10 (Stop Loss strict respecté)`);
+      }
+    }, 2000);
+  };
+
+  // 5 Pipeline Stages
+  const pipelineStages = useMemo(() => [
+    {
+      label: "Marché",
+      icon: Radar,
+      status: "Tick FIX NY4",
+      ok: true,
+      activeStyle: "bg-sky-500/10 border-sky-500/30 text-sky-300",
+    },
+    {
+      label: "Analyse",
+      icon: Brain,
+      status: "3/3 Multi-TF",
+      ok: isEngineRunning,
+      activeStyle: "bg-purple-500/10 border-purple-500/30 text-purple-300",
+    },
+    {
+      label: "Risque",
+      icon: Shield,
+      status: "Gouvernance OK",
+      ok: true,
+      activeStyle: "bg-[#00D084]/10 border-[#00D084]/30 text-[#00D084]",
+    },
+    {
+      label: "Décision",
+      icon: Cpu,
+      status: `${selectedBot.lastDecision.action} (${selectedBot.lastScore})`,
+      ok: isEngineRunning,
+      activeStyle: "bg-amber-500/10 border-amber-500/30 text-amber-300",
+    },
+    {
+      label: "Exécution",
+      icon: Zap,
+      status: isEngineRunning ? "Prêt / En ligne" : "En pause",
+      ok: isEngineRunning,
+      activeStyle: "bg-emerald-500/15 border-emerald-500/40 text-emerald-300",
+    },
+  ], [isEngineRunning, selectedBot]);
+
+  // Mock Engine Logs
+  const engineLogs = [
+    { time: "18:54:10", level: "SUCCESS", msg: `Signal BUY qualifié sur ${selectedBot.primarySymbol} — Score IA : 84/100. Ordre transmis.` },
+    { time: "18:52:45", level: "INFO", msg: "Balayage L2 Order Flow : Liquidité détectée à 2,384.50. Convergence 3 timeframes." },
+    { time: "18:50:02", level: "WON", msg: "Position XAU/USD clôturée avec succès à Take Profit : +$126.40." },
+    { time: "18:48:15", level: "OPEN", msg: "Ouverture position ACHAT sur EUR/USD (Lot 0.40) à 1.08584." },
+    { time: "18:45:00", level: "INFO", msg: "Heartbeat serveur NY4 OK (Latence 11ms). Intégrité paquets FIX 100%." },
+    { time: "18:41:20", level: "LOST", msg: "Clôture anticipée GBP/USD par Trailing Stop de sécurité : -$14.20." },
+  ];
+
+  const filteredLogs = engineLogs.filter((l) => {
+    if (logFilter === "all") return true;
+    if (logFilter === "won") return l.level === "WON" || l.level === "SUCCESS";
+    if (logFilter === "lost") return l.level === "LOST";
+    if (logFilter === "open") return l.level === "OPEN";
+    if (logFilter === "error") return l.level === "ERROR";
+    return true;
+  });
+
   return (
     <div className="space-y-6">
-      {/* 1. EN-TÊTE ÉPURÉ */}
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-2xl font-black text-white tracking-tight">
-              Moteurs
-            </h2>
-            <span className="rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 text-[11px] font-mono font-bold text-[#00D084]">
-              {activeBots.length} ACTIFS
-            </span>
-          </div>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Supervision et contrôle direct de vos algorithmes.
-          </p>
-        </div>
+      {/* ── 1. HERO HEADER AVEC GLOW AMBIANT & ACTIONS RAPIDES ── */}
+      <section className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#10141b]/90 p-5 sm:p-6 shadow-xl">
+        <div
+          className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full opacity-20"
+          style={{ background: "radial-gradient(circle, #00D084 0%, transparent 70%)" }}
+        />
 
-        <div className="flex items-center gap-2.5">
-          <StatusPill variant="emerald">Système opérationnel</StatusPill>
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="grid size-12 place-items-center rounded-xl border border-[#00D084]/40 bg-[#00D084]/15 text-[#00D084] shadow-[0_0_20px_rgba(0,208,132,0.2)]">
+              <Cpu className="size-6 text-[#00D084]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Centre de Contrôle &amp; Auto-Trader IA
+                </h2>
+                <span className="rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 text-[11px] font-mono font-bold text-[#00D084]">
+                  {activeBots.length} MOTEURS
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Algorithmes multi-indicateurs · 4 Timeframes · Exécution FIX chiffrée Equinix NY4
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => toast.success("Mode Prudent activé : Drawdown bridé à 1.5% max.")}
+              className="flex items-center gap-1.5 rounded-xl border border-[#00D084]/40 bg-[#00D084]/10 hover:bg-[#00D084]/20 px-3.5 py-2 text-xs font-bold text-[#00D084] transition cursor-pointer"
+            >
+              <ShieldCheck className="size-4" /> Mode Prudent
+            </button>
+
+            <button
+              onClick={handleTestTrade}
+              disabled={forcingTrade}
+              className="flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#141a23] hover:bg-[#1a2330] px-3.5 py-2 text-xs font-bold text-white transition cursor-pointer shadow-sm"
+            >
+              <Activity className="size-4 text-sky-400" />
+              {forcingTrade ? "Exécution test..." : "Trade de test"}
+            </button>
+          </div>
         </div>
       </section>
 
-      {/* 2. PREMIÈRE LIGNE — CARTES BOTS ÉPURÉES + CARTE D'INTERRUPTEURS */}
-      <section className="grid gap-4 lg:grid-cols-[1fr_1fr_280px]">
-        {activeBots.map((bot) => {
+      {/* ── 2. COCKPIT PRINCIPAL : SÉLECTEUR DE MODE + POWER BUTTON GÉANT + CARTES BOTS ── */}
+      <section className="grid gap-4 lg:grid-cols-[300px_1fr_1fr_260px]">
+        {/* 2.1 PANNEAU DE CONTRÔLE POWER & MODE (Gauche) */}
+        <article className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-4 flex flex-col justify-between shadow-md">
+          <div>
+            {/* Sélecteur de mode 3-en-1 */}
+            <div className="grid grid-cols-3 rounded-xl border border-white/[0.06] bg-[#080b0f] p-1">
+              {(["simulation", "demo", "live"] as const).map((m) => {
+                const isSelected = tradingMode === m;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      if (m === "live") {
+                        if (!confirm("Activer le mode LIVE avec capital réel ?")) return;
+                      }
+                      setTradingMode(m);
+                      toast.info(`Mode d'exécution : ${m.toUpperCase()}`);
+                    }}
+                    className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-center transition-all cursor-pointer ${
+                      isSelected
+                        ? m === "live"
+                          ? "bg-rose-500/25 text-rose-300 font-black border border-rose-500/40 shadow-sm"
+                          : m === "demo"
+                          ? "bg-[#00D084]/20 text-[#00D084] font-black border border-[#00D084]/40 shadow-sm"
+                          : "bg-white/[0.1] text-white font-bold"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    <span className="text-sm">{m === "simulation" ? "🧪" : m === "demo" ? "🎮" : "⚡"}</span>
+                    <span className="text-[10px] font-bold uppercase">{m}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Power Button Géant avec Ripple */}
+            <div className="my-4 flex flex-col items-center gap-3">
+              <div className="relative size-24">
+                {isEngineRunning && (
+                  <span className="absolute inset-0 rounded-full animate-ping bg-[#00D084] opacity-25" />
+                )}
+                <button
+                  onClick={toggleEnginePower}
+                  className={`relative grid size-full place-items-center rounded-full border transition-all duration-300 cursor-pointer ${
+                    isEngineRunning
+                      ? "border-[#00D084]/60 bg-[#00D084]/15 text-[#00D084] shadow-[0_0_35px_rgba(0,208,132,0.35)]"
+                      : "border-white/[0.1] bg-[#141a23] text-gray-400 hover:text-white"
+                  }`}
+                  title={isEngineRunning ? "Arrêter l'Auto-Trader" : "Démarrer l'Auto-Trader"}
+                >
+                  <Power className="size-10 transition-transform duration-200 hover:scale-110" />
+                </button>
+              </div>
+
+              <div className="text-center">
+                <span className={`inline-flex items-center gap-1.5 font-mono text-xs font-black ${isEngineRunning ? "text-[#00D084]" : "text-gray-400"}`}>
+                  <span className={`size-2 rounded-full ${isEngineRunning ? "bg-[#00D084] animate-pulse shadow-[0_0_6px_#00D084]" : "bg-gray-500"}`} />
+                  {isEngineRunning ? "MOTEUR ACTIF" : "EN PAUSE"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-white/[0.06] pt-2.5">
+            <LatencyDerivMeter connected={true} />
+          </div>
+        </article>
+
+        {/* 2.2 CARTE BOT 1 (GOLD) */}
+        {activeBots[0] && (() => {
+          const bot = activeBots[0];
           const isSelected = bot.id === selectedBotId;
-          const isGold = bot.id === "nexium-ai-gold";
-
-          const cardTheme = isGold
-            ? {
-                bg: "bg-[#0b0e14] bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(245,158,11,0.18),rgba(11,14,20,0.98))]",
-                border: isSelected
-                  ? "border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/60"
-                  : "border-amber-500/25 hover:border-amber-500/40",
-                pill: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-                accentGlow: "bg-amber-400",
-                gaugeBar: "bg-amber-400",
-              }
-            : {
-                bg: "bg-[#0b0e14] bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(56,189,248,0.18),rgba(11,14,20,0.98))]",
-                border: isSelected
-                  ? "border-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.2)] ring-1 ring-sky-400/60"
-                  : "border-sky-500/25 hover:border-sky-500/40",
-                pill: "border-sky-500/30 bg-sky-500/10 text-sky-300",
-                accentGlow: "bg-sky-400",
-                gaugeBar: "bg-sky-400",
-              };
-
           return (
             <article
-              key={bot.id}
               onClick={() => setSelectedBotId(bot.id)}
-              className={`group relative cursor-pointer overflow-hidden rounded-2xl border p-4.5 transition-all duration-300 flex flex-col justify-between ${cardTheme.bg} ${cardTheme.border}`}
+              className={`group relative cursor-pointer overflow-hidden rounded-2xl border p-4.5 transition-all duration-300 flex flex-col justify-between bg-[#0b0e14] bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(245,158,11,0.18),rgba(11,14,20,0.98))] ${
+                isSelected
+                  ? "border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/60"
+                  : "border-amber-500/25 hover:border-amber-500/40"
+              }`}
             >
               {isSelected && (
-                <div className={`absolute left-0 top-0 h-1 w-full ${cardTheme.accentGlow} shadow-[0_0_10px_currentColor]`} />
+                <div className="absolute left-0 top-0 h-1 w-full bg-amber-400 shadow-[0_0_10px_#f59e0b]" />
               )}
-
               <div>
-                {/* Header : Tag + Titre + Voyant Vert */}
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className={`inline-flex items-center rounded border px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${cardTheme.pill}`}>
+                    <span className="inline-flex items-center rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-amber-300">
                       {bot.primarySymbol}
                     </span>
-                    <h3 className="text-lg font-black text-white mt-1">
-                      {bot.name}
-                    </h3>
+                    <h3 className="text-base sm:text-lg font-black text-white mt-1">{bot.name}</h3>
                   </div>
 
-                  {/* VOYANT VERT */}
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-3 py-1 font-mono text-[11px] font-bold text-[#00D084] shrink-0">
-                    <span className="relative flex size-2 items-center justify-center">
-                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#00D084] opacity-80" />
-                      <span className="relative inline-flex size-1.5 rounded-full bg-[#00D084]" />
-                    </span>
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-[#00D084] shrink-0">
+                    <span className="size-1.5 rounded-full bg-[#00D084] animate-ping" />
                     ACTIF
                   </div>
                 </div>
 
-                {/* Body : P&L & Score IA */}
-                <div className="mt-3.5 flex items-end justify-between border-y border-white/[0.06] py-2.5 font-mono">
+                <div className="mt-3.5 flex items-end justify-between border-y border-white/[0.06] py-2 font-mono">
                   <div>
                     <span className="text-[10px] text-gray-400 font-sans uppercase font-bold">P&amp;L JOUR</span>
-                    <p className={`text-xl font-black mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
+                    <p className={`text-lg font-black mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
                       {bot.pnlToday}
                     </p>
                   </div>
 
                   <div className="text-right">
-                    <div className="text-[11px]">
-                      <span className="text-gray-400 text-[10px] uppercase font-sans mr-1.5">Score</span>
+                    <div className="text-xs">
+                      <span className="text-gray-400 text-[10px] uppercase font-sans mr-1">Score</span>
                       <strong className="text-white">{bot.lastScore}</strong>
                     </div>
-                    <div className="mt-1 h-1 w-20 rounded-full bg-white/[0.08] overflow-hidden ml-auto">
-                      <div
-                        className={`h-full rounded-full ${cardTheme.gaugeBar}`}
-                        style={{ width: `${bot.lastScoreNum}%` }}
-                      />
+                    <div className="mt-1 h-1 w-16 rounded-full bg-white/[0.08] overflow-hidden ml-auto">
+                      <div className="h-full rounded-full bg-amber-400" style={{ width: `${bot.lastScoreNum}%` }} />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Actions Bar */}
               <div className="mt-3 flex items-center justify-between gap-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedBotId(bot.id);
                   }}
-                  className={`flex-1 rounded-lg py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  className={`flex-1 rounded-lg py-1.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
                     isSelected
                       ? "neon-btn text-black shadow-[0_0_12px_rgba(0,208,132,0.25)]"
                       : "border border-white/[0.1] bg-[#141a23] hover:bg-[#1a2330] text-gray-200"
@@ -1241,22 +1735,100 @@ function EngineTab({
                 >
                   {isSelected ? "● Connecté" : "Afficher →"}
                 </button>
-
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpenBotDetail(bot);
                   }}
-                  className="rounded-lg border border-white/[0.08] bg-black/40 hover:bg-black/60 px-3 py-2 text-xs font-bold text-gray-400 hover:text-white transition cursor-pointer"
+                  className="rounded-lg border border-white/[0.08] bg-black/40 hover:bg-black/60 px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition cursor-pointer"
                 >
                   Détails
                 </button>
               </div>
             </article>
           );
-        })}
+        })()}
 
-        {/* 3ÈME CARTE À DROITE : INTERRUPTEURS ON/OFF */}
+        {/* 2.3 CARTE BOT 2 (FOREX) */}
+        {activeBots[1] && (() => {
+          const bot = activeBots[1];
+          const isSelected = bot.id === selectedBotId;
+          return (
+            <article
+              onClick={() => setSelectedBotId(bot.id)}
+              className={`group relative cursor-pointer overflow-hidden rounded-2xl border p-4.5 transition-all duration-300 flex flex-col justify-between bg-[#0b0e14] bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(56,189,248,0.18),rgba(11,14,20,0.98))] ${
+                isSelected
+                  ? "border-sky-400/80 shadow-[0_0_25px_rgba(56,189,248,0.2)] ring-1 ring-sky-400/60"
+                  : "border-sky-500/25 hover:border-sky-500/40"
+              }`}
+            >
+              {isSelected && (
+                <div className="absolute left-0 top-0 h-1 w-full bg-sky-400 shadow-[0_0_10px_#38bdf8]" />
+              )}
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="inline-flex items-center rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-sky-300">
+                      {bot.primarySymbol}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-white mt-1">{bot.name}</h3>
+                  </div>
+
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-[#00D084] shrink-0">
+                    <span className="size-1.5 rounded-full bg-[#00D084] animate-ping" />
+                    ACTIF
+                  </div>
+                </div>
+
+                <div className="mt-3.5 flex items-end justify-between border-y border-white/[0.06] py-2 font-mono">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-sans uppercase font-bold">P&amp;L JOUR</span>
+                    <p className={`text-lg font-black mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
+                      {bot.pnlToday}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-xs">
+                      <span className="text-gray-400 text-[10px] uppercase font-sans mr-1">Score</span>
+                      <strong className="text-white">{bot.lastScore}</strong>
+                    </div>
+                    <div className="mt-1 h-1 w-16 rounded-full bg-white/[0.08] overflow-hidden ml-auto">
+                      <div className="h-full rounded-full bg-sky-400" style={{ width: `${bot.lastScoreNum}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBotId(bot.id);
+                  }}
+                  className={`flex-1 rounded-lg py-1.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                    isSelected
+                      ? "neon-btn text-black shadow-[0_0_12px_rgba(0,208,132,0.25)]"
+                      : "border border-white/[0.1] bg-[#141a23] hover:bg-[#1a2330] text-gray-200"
+                  }`}
+                >
+                  {isSelected ? "● Connecté" : "Afficher →"}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenBotDetail(bot);
+                  }}
+                  className="rounded-lg border border-white/[0.08] bg-black/40 hover:bg-black/60 px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition cursor-pointer"
+                >
+                  Détails
+                </button>
+              </div>
+            </article>
+          );
+        })()}
+
+        {/* 2.4 CARTE INTERRUPTEURS ON/OFF */}
         <article className="rounded-2xl border border-[#00D084]/25 bg-[#0c0f15] bg-[radial-gradient(ellipse_90%_90%_at_50%_-20%,rgba(0,208,132,0.12),rgba(12,15,21,0.95))] p-4 shadow-md flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
@@ -1266,29 +1838,28 @@ function EngineTab({
               <span className="size-2 rounded-full bg-[#00D084] animate-pulse" />
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div className="mt-2.5 space-y-2">
               {bots.map((b) => {
                 const isBotActive = b.statusBadge === "ACTIF";
                 return (
                   <div
                     key={b.id}
-                    className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-[#121620]/80 px-3 py-2"
+                    className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-[#121620]/80 px-2.5 py-1.5"
                   >
-                    <div className="truncate max-w-[130px]">
+                    <div className="truncate max-w-[120px]">
                       <p className="font-bold text-xs text-white truncate">{b.name}</p>
                       <p className="text-[10px] text-gray-400 font-mono">{b.primarySymbol}</p>
                     </div>
 
                     <button
                       onClick={() => onToggleBotPause(b.id)}
-                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                      className={`relative inline-flex h-4.5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
                         isBotActive ? "bg-[#00D084]" : "bg-gray-700"
                       }`}
-                      title={isBotActive ? "Désactiver ce moteur" : "Activer ce moteur"}
                     >
                       <span
-                        className={`pointer-events-none inline-block size-4 transform rounded-full bg-black shadow ring-0 transition duration-200 ${
-                          isBotActive ? "translate-x-5" : "translate-x-0"
+                        className={`pointer-events-none inline-block size-3.5 transform rounded-full bg-black shadow ring-0 transition duration-200 ${
+                          isBotActive ? "translate-x-4.5" : "translate-x-0"
                         }`}
                       />
                     </button>
@@ -1298,282 +1869,307 @@ function EngineTab({
             </div>
           </div>
 
-          <div className="mt-2.5 pt-2 border-t border-white/[0.04] flex items-center justify-between text-[11px] font-mono text-gray-400">
-            <span>Statut</span>
-            <span className="text-[#00D084] font-bold">2/3 Actifs</span>
+          <div className="mt-2 pt-2 border-t border-white/[0.04] flex items-center justify-between text-[10px] font-mono text-gray-400">
+            <span>Algorithmes</span>
+            <span className="text-[#00D084] font-bold">2/3 Connectés</span>
           </div>
         </article>
       </section>
 
-      {/* 4. TABLEAU DE TRADING VIEW (SOLO OU TRIPTYQUE) */}
-      <section className="space-y-4">
+      {/* ── 3. PIPELINE D'ANALYSE & EXÉCUTION EN 5 ÉTAPES ── */}
+      <section className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 space-y-2.5 shadow-md">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+            PIPELINE D'ANALYSE &amp; EXÉCUTION MULTI-ÉTAPES (MQL5 + FIX)
+          </span>
+          <span className="text-[11px] font-mono text-[#00D084] font-bold">
+            Moteur : {selectedBot.name}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          {pipelineStages.map((p, idx) => {
+            const Icon = p.icon;
+            return (
+              <div
+                key={idx}
+                className={`rounded-xl border p-3 flex flex-col justify-between gap-2 transition-all shadow-sm ${
+                  p.ok ? p.activeStyle : "bg-white/[0.02] border-white/[0.06] text-gray-500 opacity-60"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-90">{p.label}</span>
+                  <Icon className="size-4" />
+                </div>
+                <div className="text-xs font-black truncate font-mono">{p.status}</div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ── 4. LIGNE HAUTE PRÉCISION : SPARKLINE PRIX + EQUITY CURVE + COMPTE À REBOURS ── */}
+      <section className="grid gap-4 lg:grid-cols-3">
+        {/* 4.1 Sparkline Prix */}
+        <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 space-y-2 shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="size-4 text-[#00D084]" />
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Prix Direct {selectedBot.primarySymbol}</span>
+            </div>
+            <span className="text-xs font-mono font-black text-white">
+              {selectedBot.id === "nexium-ai-gold" ? "2,388.90" : "1.08584"}
+            </span>
+          </div>
+          <SparklinePrice price={2388} />
+          <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+            <span>30s</span>
+            <span className="flex items-center gap-1 text-[#00D084] font-bold">
+              <TrendingUp className="size-3" /> +0.48% (Momentum)
+            </span>
+            <span>Tick actuel</span>
+          </div>
+        </article>
+
+        {/* 4.2 Courbe d'Équité */}
+        <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 space-y-2 shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="size-4 text-sky-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Courbe d'Équité Session</span>
+            </div>
+            <span className="text-xs font-mono font-black text-[#00D084]">+384.50 $</span>
+          </div>
+          <EquityCurveMini />
+          <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+            <span>Début session</span>
+            <span className="font-bold text-[#00D084]">+3.8% Profit</span>
+            <span>En direct</span>
+          </div>
+        </article>
+
+        {/* 4.3 Compte à Rebours */}
+        <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 space-y-2 shadow-md flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Timer className="size-4 text-amber-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Prochaine Analyse IA</span>
+            </div>
+          </div>
+          <CountdownTimerGauge isRunning={isEngineRunning} />
+        </article>
+      </section>
+
+      {/* ── 5. COCKPIT DUAL : ANALYSE TECHNIQUE (AVEC SENTIMENT) & DÉCISION IA (AVEC JAUGE) ── */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        {/* 5.1 Carte Analyse Technique */}
+        <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-5 space-y-3.5 shadow-md">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5">
+            <div className="flex items-center gap-2">
+              <Brain className="size-4.5 text-[#00D084]" />
+              <h3 className="text-sm font-bold text-white">Analyse Technique Algorithmique</h3>
+            </div>
+            <span className="text-xs font-mono font-bold text-amber-300">{selectedBot.primarySymbol} · {selectedBot.timeframe}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Régime de Marché</span>
+              <p className="text-sm font-black text-white mt-1 font-mono">{selectedBot.marketRegime}</p>
+            </div>
+            <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-3">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Timeframes Alignés</span>
+              <p className="text-sm font-black text-[#00D084] mt-1 font-mono">3 / 3 (M1 · M5 · H1)</p>
+            </div>
+          </div>
+
+          {/* Sentiment Bar */}
+          <div className="border-t border-white/[0.06] pt-2.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Sentiment Marché IA</span>
+            <SentimentFearGreedBar trend="BULLISH" score={selectedBot.lastScoreNum} />
+          </div>
+        </article>
+
+        {/* 5.2 Carte Décision IA */}
+        <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-5 space-y-3.5 shadow-md flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5">
+              <div className="flex items-center gap-2">
+                <Crosshair className="size-4.5 text-sky-400" />
+                <h3 className="text-sm font-bold text-white">Dernière Décision IA</h3>
+              </div>
+              <span className="rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-3 py-0.5 text-xs font-mono font-black text-[#00D084]">
+                {selectedBot.lastDecision.action}
+              </span>
+            </div>
+
+            <div className="mt-3 flex items-center gap-4">
+              <ConfidenceCircularGauge value={selectedBot.lastScoreNum} />
+              <div className="flex-1 space-y-2 text-xs">
+                <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-3 leading-relaxed text-gray-300">
+                  <span className="font-bold text-white">Justification du signal : </span>
+                  {selectedBot.lastDecision.reason || "Convergence RSI survendu, cassure de moyenne mobile 50 et confirmation du carnet d'ordres NY4."}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-white/[0.06] pt-2.5 flex items-center justify-between text-[11px] font-mono text-gray-400">
+            <span>Ordre FIX : <strong className="text-white">{selectedBot.lastDecision.result}</strong></span>
+            <span className="text-[#00D084] font-bold">Risque < 2.0%</span>
+          </div>
+        </article>
+      </section>
+
+      {/* ── 6. WORKSPACE TRADINGVIEW EN DIRECT AVEC LASER & PRESETS ── */}
+      <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <p className="text-xs sm:text-sm font-black uppercase tracking-wider text-gray-300">
             AGISSEMENT DU MOTEUR EN DIRECT · WORKSPACE TRADINGVIEW
           </p>
           <span className="font-mono text-xs sm:text-sm text-gray-400">
-            {viewMode === "solo" ? (
-              <>
-                Moteur actif sélectionné : <strong className="text-[#00D084]">{selectedBot.name}</strong>
-              </>
-            ) : (
-              "Affichage Synchrone des 3 Marchés"
-            )}
+            Moteur actif : <strong className="text-[#00D084]">{selectedBot.name}</strong>
           </span>
         </div>
 
-        {viewMode === "solo" ? (
-          <TradingViewEngineChart
-            bot={selectedBot}
-            onClosePosition={onClosePosition}
-            position={matchingPos}
-          />
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-3">
-            {bots.map((b) => (
-              <TradingViewEngineChart
-                key={b.id}
-                bot={b}
-                onClosePosition={onClosePosition}
-                position={positions.find((p) => p.botId === b.id)}
-              />
-            ))}
-          </div>
-        )}
+        <TradingViewEngineChart
+          bot={selectedBot}
+          onClosePosition={onClosePosition}
+          position={matchingPos}
+        />
       </section>
 
-      {/* 5. ÉTAT GLOBAL DES MOTEURS */}
-      <section className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7 shadow-md">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.06] pb-4">
-          <div>
-            <p className="text-xs font-black uppercase tracking-wider text-gray-400">SUPERVISION GLOBALE</p>
-            <h3 className="mt-1 text-lg sm:text-xl font-black text-white">État des moteurs</h3>
-          </div>
-          <span className="font-mono text-xs sm:text-sm font-black text-[#00D084] rounded-xl border border-[#00D084]/30 bg-[#00D084]/10 px-4 py-2">
-            3 / 3 moteurs opérationnels
-          </span>
-        </div>
+      {/* ── 7. SECTION BASSE : CALENDRIER ÉCONOMIQUE + HEATMAP + LOGS MOTEURS FILTRABLES ── */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        {/* 7.1 Calendrier Économique & Heatmap */}
+        <div className="space-y-4">
+          {/* Calendrier Économique */}
+          <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 space-y-3 shadow-md">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="size-4 text-amber-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Calendrier Économique HFT</span>
+              </div>
+              <span className="text-[10px] text-gray-400 font-mono">3 prochains événements</span>
+            </div>
 
-        <div className="mt-4 space-y-3">
-          {bots.map((bot) => (
-            <div
-              key={bot.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-[#0c1017] p-4 hover:border-white/[0.12] transition-colors"
-            >
-              <div className="flex items-center gap-3.5">
-                <span className="size-3 rounded-full bg-[#00D084] shadow-[0_0_8px_#00D084] animate-pulse" />
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-black text-sm sm:text-base text-white">{bot.name}</span>
-                    <span className="rounded bg-white/[0.06] px-2 py-0.5 font-mono text-xs font-bold text-gray-300">
-                      ONLINE
+            <div className="grid gap-2 sm:grid-cols-3">
+              {[
+                { time: "14:30", title: "NFP - Non-Farm Payrolls", impact: "high", curr: "USD" },
+                { time: "16:00", title: "FOMC Statement", impact: "high", curr: "USD" },
+                { time: "Demain 09:00", title: "ECB Rate Decision", impact: "medium", curr: "EUR" },
+              ].map((ev, i) => (
+                <div
+                  key={i}
+                  className={`rounded-xl border p-2.5 space-y-1 ${
+                    ev.impact === "high"
+                      ? "bg-amber-500/10 border-amber-500/25 text-amber-300"
+                      : "bg-white/[0.02] border-white/[0.06] text-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[10px] font-mono">
+                    <span className="font-bold">{ev.time}</span>
+                    <span className="rounded bg-amber-400/20 px-1 py-0.2 text-[9px] font-bold text-amber-300">
+                      ★★★
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-400 mt-0.5">{bot.markets}</p>
+                  <p className="text-xs font-bold text-white leading-tight truncate">{ev.title}</p>
+                  <span className="text-[10px] text-gray-400 font-mono">{ev.curr}</span>
                 </div>
-              </div>
+              ))}
+            </div>
+          </article>
 
-              <div className="flex flex-wrap items-center gap-6 text-xs sm:text-sm font-mono">
-                <span className="text-gray-200 font-bold">
-                  {bot.openPositions} position{bot.openPositions > 1 ? "s" : ""}
-                </span>
-                <span className="text-gray-400">Heartbeat {bot.heartbeatSec}s</span>
-                <span className={`font-black text-sm sm:text-base ${bot.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
-                  {bot.pnlToday}
-                </span>
-                <button
-                  onClick={() => onOpenBotDetail(bot)}
-                  className="rounded-xl border border-white/[0.08] bg-[#141a23] px-3.5 py-1.5 text-xs font-bold text-gray-200 hover:text-white transition cursor-pointer"
-                >
-                  Détails
-                </button>
+          {/* Heatmap Symboles */}
+          <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 space-y-3 shadow-md">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+              <div className="flex items-center gap-2">
+                <Layers className="size-4 text-sky-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Heatmap Multi-Actifs</span>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* 6 & 7. PIPELINE DE DÉCISION & DERNIÈRE DÉCISION PAR BOT */}
-      <section className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
-        {/* PIPELINE DE DÉCISION */}
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7 shadow-md flex flex-col justify-between">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {[
+                { sym: "XAU/USD", bull: true, chg: "+0.84%" },
+                { sym: "EUR/USD", bull: true, chg: "+0.32%" },
+                { sym: "GBP/USD", bull: false, chg: "-0.18%" },
+                { sym: "BTC/USD", bull: true, chg: "+2.10%" },
+                { sym: "Vol 100", bull: true, chg: "+1.05%" },
+              ].map((s) => (
+                <div
+                  key={s.sym}
+                  className={`rounded-xl border p-2.5 text-center ${
+                    s.bull
+                      ? "border-[#00D084]/30 bg-[#00D084]/10 text-[#00D084]"
+                      : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                  }`}
+                >
+                  <p className="text-[11px] font-bold text-white">{s.sym}</p>
+                  <p className="text-xs font-black font-mono mt-0.5">{s.bull ? "▲" : "▼"} {s.chg}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        </div>
+
+        {/* 7.2 Journal & Logs Moteur Filtrables */}
+        <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 space-y-3 shadow-md flex flex-col justify-between">
           <div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.06] pb-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wider text-gray-400">ANALYSE MULTI-ÉTAPES</p>
-                <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Pipeline des décisions</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 text-[#00D084]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white">Journal &amp; Logs Moteur</h3>
               </div>
 
-              {/* Bot Selector for Pipeline */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#0c1017] p-1">
-                {bots.map((b) => (
+              {/* Filtres */}
+              <div className="flex items-center rounded-lg border border-white/[0.06] bg-[#0c1017] p-0.5 text-[10px]">
+                {(["all", "won", "lost", "open"] as const).map((f) => (
                   <button
-                    key={b.id}
-                    onClick={() => setSelectedBotId(b.id)}
-                    className={`rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                      selectedBotId === b.id
-                        ? "bg-[#00D084] text-black font-black"
+                    key={f}
+                    onClick={() => setLogFilter(f)}
+                    className={`rounded px-2 py-0.5 font-bold uppercase transition cursor-pointer ${
+                      logFilter === f
+                        ? "bg-[#00D084] text-black"
                         : "text-gray-400 hover:text-white"
                     }`}
                   >
-                    {b.name.replace("Nexium ", "")}
+                    {f}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Pipeline Visual Flow */}
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-              {[
-                { label: "Market Data", ok: selectedBot.pipeline.marketData, val: "Tick L1/L2" },
-                { label: "Market Regime", ok: selectedBot.pipeline.marketRegime, val: selectedBot.marketRegime },
-                { label: "Strategy", ok: selectedBot.pipeline.strategy, val: "MQL5 Logic" },
-                { label: "Signal", ok: selectedBot.pipeline.signal, val: "Filtré" },
-                { label: "Score", ok: true, val: selectedBot.pipeline.score },
-                { label: "Risk Manager", ok: selectedBot.pipeline.riskManager, val: selectedBot.pipeline.riskManager ? "Conforme" : "Rejeté" },
-                { label: "Execution", ok: selectedBot.pipeline.execution, val: selectedBot.pipeline.execution ? "FIX NY4" : "En veille" },
-              ].map((step) => (
-                <div
-                  key={step.label}
-                  className="rounded-2xl border border-white/[0.06] bg-[#0c1017] p-3 text-center flex flex-col justify-between"
-                >
-                  <div>
-                    <span className="text-[10px] font-black text-gray-400 uppercase">{step.label}</span>
-                    <p className="mt-1 font-mono text-xs sm:text-sm font-bold text-gray-200 truncate">{step.val}</p>
-                  </div>
-                  <div className="mt-3 flex justify-center">
-                    <span
-                      className={`grid size-7 place-items-center rounded-full text-xs font-black ${
-                        step.ok
-                          ? "bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/40"
-                          : "bg-rose-500/20 text-rose-400 border border-rose-500/40"
-                      }`}
-                    >
-                      {step.ok ? "✓" : "✗"}
-                    </span>
-                  </div>
+            {/* Logs List */}
+            <div className="mt-3 space-y-2 max-h-[220px] overflow-y-auto pr-1 text-xs font-mono">
+              {filteredLogs.map((l, i) => (
+                <div key={i} className="flex items-start gap-2.5 rounded-lg border border-white/[0.04] bg-[#0c1017] p-2">
+                  <span className="text-[10px] text-gray-500 shrink-0">{l.time}</span>
+                  <span
+                    className={`rounded px-1.5 py-0.2 text-[9px] font-black uppercase shrink-0 ${
+                      l.level === "WON" || l.level === "SUCCESS"
+                        ? "bg-[#00D084]/20 text-[#00D084]"
+                        : l.level === "LOST" || l.level === "ERROR"
+                        ? "bg-rose-500/20 text-rose-300"
+                        : "bg-sky-500/20 text-sky-300"
+                    }`}
+                  >
+                    {l.level}
+                  </span>
+                  <span className="text-gray-300 leading-snug flex-1 truncate">{l.msg}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Pipeline Output Banner */}
-          <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#0c1017] p-4">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">RÉSULTAT DU PIPELINE</span>
-              <p className="font-mono text-sm sm:text-base font-black text-white">
-                Dernier calcul de signal pour {selectedBot.name}
-              </p>
-            </div>
-            <span
-              className={`rounded-full px-4 py-1.5 font-mono text-xs sm:text-sm font-black uppercase ${
-                selectedBot.pipeline.result === "TRADE EXECUTED"
-                  ? "bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/40 shadow-[0_0_12px_rgba(0,208,132,0.2)]"
-                  : selectedBot.pipeline.result === "WAITING"
-                  ? "bg-sky-500/20 text-sky-400 border border-sky-500/40"
-                  : "bg-rose-500/20 text-rose-400 border border-rose-500/40"
-              }`}
-            >
-              {selectedBot.pipeline.result}
+          {/* Session Stats Bar */}
+          <div className="border-t border-white/[0.06] pt-2.5 flex items-center justify-between text-xs font-mono">
+            <span className="text-gray-400">Win Rate Session : <strong className="text-[#00D084]">70%</strong> (7G / 3P)</span>
+            <span className="flex items-center gap-1 text-amber-300 font-bold">
+              <Flame className="size-3.5 text-amber-400" /> Streak : 4 gains
             </span>
           </div>
         </article>
-
-        {/* 7. DERNIÈRE DÉCISION PAR BOT */}
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7 shadow-md">
-          <div className="border-b border-white/[0.06] pb-4">
-            <p className="text-xs font-black uppercase tracking-wider text-gray-400">DERNIÈRES DÉCISIONS</p>
-            <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Historique d'arbitrage</h3>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {bots.map((b) => (
-              <div
-                key={b.id}
-                className="rounded-2xl border border-white/[0.06] bg-[#0c1017] p-4 transition-colors hover:border-white/[0.12]"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-white">{b.name}</span>
-                  <span
-                    className={`font-mono text-xs font-black uppercase px-2.5 py-0.5 rounded-full ${
-                      b.lastDecision.result === "EXECUTED"
-                        ? "bg-[#00D084]/15 text-[#00D084] border border-[#00D084]/30"
-                        : b.lastDecision.result === "WAITING FOR CONFIRMATION"
-                        ? "bg-sky-500/15 text-sky-400 border border-sky-500/30"
-                        : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-                    }`}
-                  >
-                    {b.lastDecision.result}
-                  </span>
-                </div>
-
-                <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
-                  <span className="font-mono font-black text-gray-200">{b.lastDecision.action}</span>
-                  <span className="font-mono text-gray-400">Score : <strong className="text-white">{b.lastDecision.score}</strong></span>
-                </div>
-
-                {b.lastDecision.reason && (
-                  <p className="mt-1.5 text-xs text-gray-300 font-medium">{b.lastDecision.reason}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
-
-      {/* 8. ACTIVITÉ DES MOTEURS AUJOURD'HUI */}
-      <section className="overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] shadow-md">
-        <div className="flex flex-col gap-4 border-b border-white/[0.06] p-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-wider text-gray-400">STATISTIQUES DE SESSION</p>
-            <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Activité aujourd'hui</h3>
-          </div>
-          <span className="font-mono text-xs sm:text-sm font-bold text-gray-400">
-            Total signaux analysés : <strong className="text-white">150</strong>
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-white/[0.06] bg-[#0c1017] text-xs font-black uppercase tracking-wider text-gray-400">
-              <tr>
-                <th className="px-6 py-4">MOTEUR</th>
-                <th className="px-6 py-4 text-right">SIGNAUX</th>
-                <th className="px-6 py-4 text-right">QUALIFIÉS</th>
-                <th className="px-6 py-4 text-right">EXÉCUTÉS</th>
-                <th className="px-6 py-4 text-right">REJETÉS</th>
-                <th className="px-6 py-4 text-right">P&amp;L AUJOURD'HUI</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04]">
-              {bots.map((b) => (
-                <tr key={b.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`size-2.5 rounded-full ${
-                          b.theme === "gold" ? "bg-amber-400" : b.theme === "cyan" ? "bg-sky-400" : "bg-purple-400"
-                        }`}
-                      />
-                      <span className="font-bold text-white text-sm sm:text-base">{b.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-mono font-bold text-gray-300 text-right">{b.activity.signals}</td>
-                  <td className="px-6 py-4 font-mono font-bold text-sky-400 text-right">{b.activity.qualified}</td>
-                  <td className="px-6 py-4 font-mono font-black text-[#00D084] text-right">{b.activity.executed}</td>
-                  <td className="px-6 py-4 font-mono font-bold text-gray-400 text-right">{b.activity.rejected}</td>
-                  <td
-                    className={`px-6 py-4 font-mono font-black text-right ${
-                      b.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"
-                    }`}
-                  >
-                    {b.activity.pnl}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
     </div>
   );
