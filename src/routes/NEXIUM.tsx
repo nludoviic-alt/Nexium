@@ -88,6 +88,7 @@ import {
 } from "lucide-react";
 import { useEffect, useId, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
+import { TradingViewSuperchart } from "@/components/site/TradingViewSuperchart";
 
 export const Route = createFileRoute("/NEXIUM")({
   head: () => ({
@@ -715,9 +716,6 @@ function TradingViewEngineChart({
   onClosePosition?: (pos: PositionItem) => void;
   position?: PositionItem;
 }) {
-  const [activeTf, setActiveTf] = useState("M15");
-  const [showIndicators, setShowIndicators] = useState(true);
-
   // Preset Selection
   const [activePreset, setActivePreset] = useState<
     "BREAKOUT_GOLD" | "TREND_FX" | "SMC_LIQUIDITY" | "MQL5_SCALPING"
@@ -725,17 +723,8 @@ function TradingViewEngineChart({
 
   // Simulation State (Start / Stop)
   const [isTradingActive, setIsTradingActive] = useState(true);
-  const [scanStep, setScanStep] = useState<
-    "SCANNING_L2" | "DETECTING_SETUP" | "VALIDATING_SCORE" | "ORDER_FILLED" | "MANAGING_TRADE" | "STOPPED"
-  >("MANAGING_TRADE");
-  const [scanLaserX, setScanLaserX] = useState(380);
-  const [livePriceOffset, setLivePriceOffset] = useState(0);
-  const [livePnlOffset, setLivePnlOffset] = useState(0);
 
-  // Base price extraction
-  const basePriceNum = parseFloat(bot.chart.price.replace(/\s/g, "")) || 2388.9;
-
-  // Presets definition - Clean, concise & user friendly
+  // Presets definition
   const PRESETS = [
     {
       id: "BREAKOUT_GOLD" as const,
@@ -767,102 +756,27 @@ function TradingViewEngineChart({
     },
   ];
 
-  const selectedPresetObj = PRESETS.find((p) => p.id === activePreset) ?? PRESETS[0];
-
-  // Toggle Start / Stop
   const handleToggleTrading = () => {
     if (isTradingActive) {
       setIsTradingActive(false);
-      setScanStep("STOPPED");
       toast.warning("Moteur et prises d'ordres mis en PAUSE.");
     } else {
       setIsTradingActive(true);
-      setScanStep("SCANNING_L2");
-      setScanLaserX(80);
       toast.success("Moteur et scan IA RÉACTIVÉS en direct !");
     }
   };
 
-  // Trigger Live Scan Sequence upon preset switch
   const handleSelectPreset = (presetId: typeof activePreset) => {
     setActivePreset(presetId);
     setIsTradingActive(true);
-    setScanStep("SCANNING_L2");
-    setScanLaserX(60);
     toast.info(`Preset "${PRESETS.find((p) => p.id === presetId)?.name}" activé.`);
-
-    setTimeout(() => {
-      setScanStep("DETECTING_SETUP");
-      setScanLaserX(280);
-    }, 1000);
-
-    setTimeout(() => {
-      setScanStep("VALIDATING_SCORE");
-      setScanLaserX(520);
-    }, 2000);
-
-    setTimeout(() => {
-      setScanStep("ORDER_FILLED");
-      setScanLaserX(660);
-    }, 3200);
-
-    setTimeout(() => {
-      setScanStep("MANAGING_TRADE");
-    }, 4500);
   };
 
-  // Live Continuous Ticking Simulation
-  useEffect(() => {
-    if (!isTradingActive) return;
-
-    const interval = setInterval(() => {
-      setLivePriceOffset((prev) => {
-        const delta = (Math.random() - 0.45) * 0.35;
-        return parseFloat((prev + delta).toFixed(2));
-      });
-      setLivePnlOffset((prev) => {
-        const delta = (Math.random() - 0.42) * 1.8;
-        return parseFloat((prev + delta).toFixed(2));
-      });
-      if (scanStep === "SCANNING_L2" || scanStep === "DETECTING_SETUP") {
-        setScanLaserX((prev) => (prev > 640 ? 60 : prev + 25));
-      }
-    }, 900);
-    return () => clearInterval(interval);
-  }, [isTradingActive, scanStep]);
-
-  const currentPriceFormatted = (basePriceNum + livePriceOffset).toFixed(2);
-  const currentPnlFormatted = (126.4 + livePnlOffset).toFixed(2);
-
-  // Accent styles according to bot
-  const accentTheme = {
-    gold: {
-      glow: "border-amber-500/40 shadow-[0_0_35px_rgba(245,158,11,0.12)]",
-      badge: "border-amber-500/50 bg-amber-500/20 text-amber-300",
-      line: "#f59e0b",
-      bar: "bg-amber-400",
-    },
-    cyan: {
-      glow: "border-sky-500/40 shadow-[0_0_35px_rgba(56,189,248,0.12)]",
-      badge: "border-sky-500/50 bg-sky-500/20 text-sky-300",
-      line: "#38bdf8",
-      bar: "bg-sky-400",
-    },
-    purple: {
-      glow: "border-purple-500/40 shadow-[0_0_35px_rgba(168,85,247,0.12)]",
-      badge: "border-purple-500/50 bg-purple-500/20 text-purple-300",
-      line: "#c084fc",
-      bar: "bg-purple-400",
-    },
-  }[bot.theme];
-
   return (
-    <div
-      className={`relative overflow-hidden rounded-3xl border bg-[#0d1117] p-5 sm:p-6 transition-all duration-500 ${accentTheme.glow}`}
-    >
-      {/* 1. BARRE DE PRESETS & BOUTON D'ARRÊT D'URGENCE / ACTIVATION */}
-      <div className="border-b border-white/[0.08] pb-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      {/* 1. BARRE DE PRESETS & CONTRÔLE STRATÉGIE */}
+      <div className="rounded-2xl border border-white/[0.08] bg-[#0d1117] p-4 sm:p-5 shadow-lg">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-3.5">
           <div className="flex items-center gap-2.5">
             <span className={`size-2.5 rounded-full ${isTradingActive ? "bg-[#00D084] animate-ping" : "bg-rose-500"}`} />
             <h3 className="text-base sm:text-lg font-black text-white">
@@ -873,7 +787,6 @@ function TradingViewEngineChart({
             </span>
           </div>
 
-          {/* BOUTON GLOBAL : ACTIVER / STOPPER */}
           <button
             onClick={handleToggleTrading}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md ${
@@ -896,7 +809,7 @@ function TradingViewEngineChart({
           </button>
         </div>
 
-        {/* 4 Boutons de Presets Épurés */}
+        {/* Presets Chips */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3.5">
           {PRESETS.map((preset) => {
             const isPresetActive = activePreset === preset.id && isTradingActive;
@@ -926,180 +839,12 @@ function TradingViewEngineChart({
         </div>
       </div>
 
-      {/* 2. Top Header of the TradingView Workspace */}
-      <div className="flex items-center justify-between border-b border-white/[0.06] py-3 text-xs">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-sm sm:text-base font-black text-white">{bot.chart.symbol}</span>
-          <span className="font-mono text-xs text-gray-400">Spread FIX : <strong className="text-white">{bot.chart.spread}</strong></span>
-        </div>
-
-        {/* Timeframe Bar */}
-        <div className="flex items-center rounded-lg border border-white/[0.08] bg-[#080b0f] p-0.5 font-mono text-[11px]">
-          {(["M1", "M5", "M15", "H1", "H4"] as const).map((tf) => (
-            <button
-              key={tf}
-              onClick={() => setActiveTf(tf)}
-              className={`rounded px-2.5 py-1 font-bold transition cursor-pointer ${
-                activeTf === tf ? "bg-[#00D084] text-black font-black" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {tf}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 3. TradingView Chart Area */}
-      <div className="relative mt-3 h-[300px] sm:h-[340px] w-full rounded-2xl border border-white/[0.08] bg-[#07090d] p-4 flex flex-col justify-between overflow-hidden">
-        {/* Background Grid Lines */}
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:40px_30px]" />
-
-        {/* AI Scanner Notification Banner Overlay */}
-        <div className="relative z-20 flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0c1017]/85 px-3 py-2 text-xs font-mono backdrop-blur-md">
-          <div className="flex items-center gap-2 truncate">
-            <span className={`size-2 rounded-full ${isTradingActive ? "bg-[#00D084] animate-ping" : "bg-rose-500"}`} />
-            <span className="text-gray-300 font-sans hidden sm:inline">IA :</span>
-            <span className="font-bold text-white truncate">
-              {!isTradingActive && "⏸ TRADING EN PAUSE (Surveillance inactive)"}
-              {isTradingActive && scanStep === "SCANNING_L2" && "🔍 Scan du carnet d'ordres L2..."}
-              {isTradingActive && scanStep === "DETECTING_SETUP" && "🎯 Détection de liquidité & cassure..."}
-              {isTradingActive && scanStep === "VALIDATING_SCORE" && "⚡ Score validé (88%) · Risque OK"}
-              {isTradingActive && scanStep === "ORDER_FILLED" && "✅ Ordre BUY exécuté (@ marché)"}
-              {isTradingActive && scanStep === "MANAGING_TRADE" && "📊 Position active · TP dynamique"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 font-mono shrink-0 ml-2">
-            <span className="text-gray-400">Cours :</span>
-            <strong className="text-white text-sm font-black">${currentPriceFormatted}</strong>
-          </div>
-        </div>
-
-        {/* Candlesticks & Technical Signals SVG */}
-        <div className="relative z-10 my-auto h-44 w-full">
-          <svg viewBox="0 0 700 160" className="h-full w-full overflow-visible" preserveAspectRatio="none">
-            {/* Moving Average Line */}
-            {showIndicators && (
-              <>
-                <path
-                  d="M 20,130 C 120,125 220,110 350,85 C 480,60 580,48 680,38"
-                  fill="none"
-                  stroke={accentTheme.line}
-                  strokeWidth="2"
-                  strokeDasharray="4 2"
-                  className="opacity-70"
-                />
-                <path
-                  d="M 20,145 C 120,140 220,128 350,105 C 480,85 580,70 680,55"
-                  fill="none"
-                  stroke="#00D084"
-                  strokeWidth="1.5"
-                  className="opacity-50"
-                />
-              </>
-            )}
-
-            {/* AI LASER SCANNER LINE */}
-            {isTradingActive && (
-              <g>
-                <line
-                  x1={scanLaserX}
-                  y1="5"
-                  x2={scanLaserX}
-                  y2="155"
-                  stroke="#00D084"
-                  strokeWidth="2"
-                  strokeDasharray="3 3"
-                />
-                <circle cx={scanLaserX} cy="80" r="4" fill="#00D084" className="animate-ping" />
-              </g>
-            )}
-
-            {/* Simulated Live Order Lines: TP & Entry & SL */}
-            {bot.chart.tradeType !== "NONE" && isTradingActive && (
-              <>
-                {/* Take Profit Line */}
-                <line x1="10" y1="25" x2="690" y2="25" stroke="#00D084" strokeWidth="1.5" strokeDasharray="5 3" />
-                <text x="15" y="20" fill="#00D084" fontSize="11" fontFamily="monospace" fontWeight="bold">
-                  TP : {bot.chart.tpPrice} (+ $210.00)
-                </text>
-
-                {/* Entry Price Line */}
-                <line x1="10" y1="75" x2="690" y2="75" stroke="#38bdf8" strokeWidth="1.5" />
-                <text x="15" y="70" fill="#38bdf8" fontSize="11" fontFamily="monospace" fontWeight="bold">
-                  ENTRÉE : {bot.chart.entryPrice}
-                </text>
-
-                {/* Stop Loss Line */}
-                <line x1="10" y1="135" x2="690" y2="135" stroke="#f43f5e" strokeWidth="1.5" strokeDasharray="5 3" />
-                <text x="15" y="130" fill="#f43f5e" fontSize="11" fontFamily="monospace" fontWeight="bold">
-                  SL : {bot.chart.slPrice} (- $75.00)
-                </text>
-              </>
-            )}
-
-            {/* Candlesticks Rendering */}
-            {[
-              { x: 60, highY: 110, lowY: 155, openY: 145, closeY: 120, up: true },
-              { x: 120, highY: 100, lowY: 140, openY: 120, closeY: 130, up: false },
-              { x: 180, highY: 95, lowY: 135, openY: 130, closeY: 105, up: true },
-              { x: 240, highY: 80, lowY: 125, openY: 105, closeY: 90, up: true },
-              { x: 300, highY: 75, lowY: 115, openY: 90, closeY: 100, up: false },
-              { x: 360, highY: 65, lowY: 105, openY: 100, closeY: 75, up: true },
-              { x: 420, highY: 55, lowY: 95, openY: 75, closeY: 60, up: true },
-              { x: 480, highY: 45, lowY: 85, openY: 60, closeY: 50, up: true },
-              { x: 540, highY: 40, lowY: 75, openY: 50, closeY: 55, up: false },
-              { x: 600, highY: 30, lowY: 65, openY: 55, closeY: 38, up: true },
-              { x: 660, highY: 18, lowY: 50, openY: 38, closeY: Math.max(22, 28 - livePriceOffset * 3), up: true },
-            ].map((c, i) => (
-              <g key={i}>
-                <line
-                  x1={c.x}
-                  y1={c.highY}
-                  x2={c.x}
-                  y2={c.lowY}
-                  stroke={c.up ? "#00D084" : "#f43f5e"}
-                  strokeWidth="2"
-                />
-                <rect
-                  x={c.x - 7}
-                  y={Math.min(c.openY, c.closeY)}
-                  width="14"
-                  height={Math.max(Math.abs(c.closeY - c.openY), 5)}
-                  fill={c.up ? "#00D084" : "#f43f5e"}
-                  rx="1"
-                  className={i === 10 && isTradingActive ? "animate-pulse" : ""}
-                />
-              </g>
-            ))}
-          </svg>
-        </div>
-
-        {/* 4. Bottom Bar: Real-time Live P&L and Execution Data */}
-        <div className="relative z-10 flex items-center justify-between border-t border-white/[0.06] pt-2.5 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400">Preset :</span>
-            <span className="font-bold text-white">{selectedPresetObj.name}</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="font-mono">
-              <span className="text-gray-400">P&amp;L : </span>
-              <strong className="text-sm font-black text-[#00D084]">
-                +${currentPnlFormatted}
-              </strong>
-            </div>
-            {position && onClosePosition && (
-              <button
-                onClick={() => onClosePosition(position)}
-                className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-bold text-rose-300 hover:bg-rose-500/20 transition cursor-pointer"
-              >
-                Clôturer Ticket {position.ticket}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* 2. SUPERCHARTS WORKSTATION TRADINGVIEW PIXEL PAR PIXEL */}
+      <TradingViewSuperchart
+        initialSymbol={bot.id === "nexium-ai-gold" ? "BTCUSD" : "EURUSD"}
+        isTradingActive={isTradingActive}
+        onToggleTrading={handleToggleTrading}
+      />
     </div>
   );
 }
