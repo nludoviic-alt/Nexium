@@ -2016,7 +2016,7 @@ function EngineTab({
 
           <div className="border-t border-white/[0.06] pt-2.5 flex items-center justify-between text-[11px] font-mono text-gray-400">
             <span>Ordre FIX : <strong className="text-white">{selectedBot.lastDecision.result}</strong></span>
-            <span className="text-[#00D084] font-bold">Risque < 2.0%</span>
+            <span className="text-[#00D084] font-bold">Risque &lt; 2.0%</span>
           </div>
         </article>
       </section>
