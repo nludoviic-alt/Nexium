@@ -1944,7 +1944,7 @@ function OverviewTab({
 
         <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7 shadow-md transition-all hover:border-white/[0.15]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-gray-400">MOTEURS EN LIGNE</span>
+            <span className="text-xs font-black uppercase tracking-wider text-gray-400">AUTO-TRADERS EN LIGNE</span>
             <Bot className="size-5 text-sky-400" />
           </div>
           <p className="mt-4 font-mono text-3xl sm:text-4xl font-black text-sky-400">3 / 3</p>
@@ -1973,7 +1973,7 @@ function OverviewTab({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.06] pb-4">
             <div>
               <p className="text-xs font-black uppercase tracking-wider text-gray-400">ÉVOLUTION DE L'EQUITY</p>
-              <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Performance Cumulée des 3 Bots</h3>
+              <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Performance Cumulée des Auto-Traders</h3>
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#0c1017] p-1">
               {(["24H", "7J", "30J", "1A"] as const).map((tf) => (
@@ -2020,14 +2020,14 @@ function OverviewTab({
           <div>
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-wider text-gray-400">MOTEURS OPÉRATIONNELS</p>
+                <p className="text-xs font-black uppercase tracking-wider text-gray-400">AUTO-TRADERS OPÉRATIONNELS</p>
                 <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Supervision Rapide</h3>
               </div>
               <button
                 onClick={onOpenEngine}
                 className="text-xs sm:text-sm font-bold text-[#00D084] hover:underline cursor-pointer flex items-center gap-1"
               >
-                Page Moteur <ChevronRight className="size-4" />
+                Page Auto-Trader <ChevronRight className="size-4" />
               </button>
             </div>
 
@@ -2040,7 +2040,7 @@ function OverviewTab({
                   <div className="flex items-center gap-3">
                     <span
                       className={`size-2.5 rounded-full ${
-                        b.theme === "gold" ? "bg-amber-400" : b.theme === "cyan" ? "bg-sky-400" : "bg-purple-400"
+                        b.statusBadge === "ACTIF" ? "bg-[#00D084] animate-pulse" : "bg-rose-500"
                       }`}
                     />
                     <div>
@@ -2064,7 +2064,7 @@ function OverviewTab({
             className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.1] bg-[#141a23] py-3.5 text-xs sm:text-sm font-bold text-white hover:bg-[#1a2330] transition cursor-pointer"
           >
             <Zap className="size-4 text-[#00D084]" />
-            OUVRIR LE CENTRE DE CONTRÔLE DES BOTS
+            OUVRIR L'AUTO-TRADER &amp; LE SUPERCHART
           </button>
         </article>
       </section>
@@ -2090,9 +2090,9 @@ function StrategiesTab({
             <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
               BIBLIOTHÈQUE STRATÉGIQUE MT5
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white">Moteurs &amp; Algorithmes Certifiés</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white">Auto-Traders &amp; Algorithmes Certifiés</h2>
             <p className="mt-2 text-sm sm:text-base text-gray-300 max-w-2xl font-medium">
-              Chaque moteur est optimisé pour une classe d'actifs dédiée et opère selon un cahier des charges quantitatif institutionnel.
+              Chaque algorithme Auto-Trader est optimisé pour une classe d'actifs dédiée et opère selon un cahier des charges quantitatif institutionnel.
             </p>
           </div>
         </div>
@@ -2107,7 +2107,9 @@ function StrategiesTab({
             <div>
               <div className="flex items-center justify-between">
                 <h3 className="text-xl sm:text-2xl font-black text-white">{b.name}</h3>
-                <StatusPill variant="emerald">{b.statusBadge}</StatusPill>
+                <StatusPill variant={b.statusBadge === "ACTIF" ? "emerald" : "rose"}>
+                  {b.statusBadge}
+                </StatusPill>
               </div>
               <p className="mt-1 font-mono text-xs sm:text-sm text-[#00D084] font-bold">{b.specialty}</p>
               <p className="mt-4 text-xs sm:text-sm text-gray-300 leading-relaxed font-medium">{b.subtitle}</p>
@@ -3552,7 +3554,7 @@ function MessagingTab({
 function NexiumDashboard() {
   const [running, setRunning] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState("Moteur");
+  const [activeNav, setActiveNav] = useState("Auto-Trader");
   const [balance, setBalance] = useState(24860.42);
 
   // States
@@ -3601,7 +3603,7 @@ function NexiumDashboard() {
 
   const navItems: ReadonlyArray<readonly [React.ComponentType<{ className?: string }>, string]> = [
     [LayoutDashboard, "Vue d’ensemble"],
-    [Bot, "Moteur"],
+    [Bot, "Auto-Trader"],
     [CandlestickChart, "Stratégies"],
     [ShieldCheck, "Risque"],
     [Wallet, "Portefeuille"],
@@ -3615,9 +3617,9 @@ function NexiumDashboard() {
     setRunning((prev) => {
       const next = !prev;
       if (next) {
-        toast.success("Moteurs MT5 activés. Les 3 bots surveillent leurs marchés.");
+        toast.success("Auto-Trader activé en direct (Flux FIX Equinix NY4).");
       } else {
-        toast.warning("Moteurs MT5 mis en pause. Aucune nouvelle prise d'ordre.");
+        toast.warning("Auto-Trader mis en pause de sécurité.");
       }
       return next;
     });
@@ -3628,7 +3630,7 @@ function NexiumDashboard() {
       prev.map((b) => {
         if (b.id === botId) {
           const nextState = b.statusBadge === "ACTIF" ? "EN PAUSE" : "ACTIF";
-          toast.info(`Moteur ${b.name} : ${nextState}.`);
+          toast.info(`Auto-Trader ${b.name} : ${nextState}.`);
           return {
             ...b,
             statusBadge: nextState as any,
@@ -3880,7 +3882,7 @@ function NexiumDashboard() {
               </p>
               <h1 className="mt-0.5 text-base sm:text-xl font-black text-white">
                 {activeNav === "Vue d’ensemble" && "Pilotage & Performances Globales"}
-                {activeNav === "Moteur" && "Moteurs de trading · AI Control Center"}
+                {activeNav === "Auto-Trader" && "Auto-Trader · AI Control Center"}
                 {activeNav === "Stratégies" && "Catalogue des Stratégies Certifiées"}
                 {activeNav === "Risque" && "Gouvernance & Coupe-circuit du Risque"}
                 {activeNav === "Portefeuille" && "Gestion Financière & Relevés"}
@@ -3905,7 +3907,10 @@ function NexiumDashboard() {
               )}
             </button>
 
-            <StatusPill variant="emerald">3 BOTS CONNECTÉS</StatusPill>
+            <StatusPill variant={running ? "emerald" : "rose"}>
+              {running ? "AUTO-TRADER ACTIF" : "AUTO-TRADER EN PAUSE"}
+            </StatusPill>
+
             <button
               onClick={() => setDepositOpen(true)}
               className="hidden sm:flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] px-4 py-2 text-sm font-mono font-black text-[#00D084] hover:bg-[#1a2330] transition cursor-pointer"
@@ -3920,7 +3925,7 @@ function NexiumDashboard() {
 
         {/* Tab Body */}
         <main className="flex-1 p-6 sm:p-8 lg:p-10 max-w-[1650px] w-full mx-auto">
-          {activeNav === "Moteur" && (
+          {activeNav === "Auto-Trader" && (
             <EngineTab
               bots={bots}
               positions={positions}
@@ -3940,7 +3945,7 @@ function NexiumDashboard() {
               onClosePosition={handleClosePosition}
               onOpenDeposit={() => setDepositOpen(true)}
               onOpenWithdraw={() => setWithdrawOpen(true)}
-              onOpenEngine={() => setActiveNav("Moteur")}
+              onOpenEngine={() => setActiveNav("Auto-Trader")}
               onOpenRisk={() => setActiveNav("Risque")}
             />
           )}
