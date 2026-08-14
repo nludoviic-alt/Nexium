@@ -1910,57 +1910,57 @@ function OverviewTab({
 
       {/* KPI Cards */}
       <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-3xl border border-[#00D084]/30 bg-[#10141b] p-6 sm:p-7 shadow-md transition-all hover:border-[#00D084]/50">
+        <article className="rounded-2xl sm:rounded-3xl border border-[#00D084]/30 bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-[#00D084]/50">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-gray-400">VALEUR DU COMPTE (EQUITY)</span>
-            <Wallet className="size-5 text-[#00D084]" />
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">VALEUR DU COMPTE (EQUITY)</span>
+            <Wallet className="size-4 sm:size-5 text-[#00D084]" />
           </div>
-          <p className="mt-4 font-mono text-3xl sm:text-4xl font-black text-white">
+          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">
             ${(balance + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="mt-3 flex items-center justify-between text-xs sm:text-sm">
+          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
             <span className="text-gray-400">Solde cash</span>
             <span className="font-mono font-bold text-gray-200">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
           </div>
         </article>
 
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7 shadow-md transition-all hover:border-white/[0.15]">
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-white/[0.15]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-gray-400">P&amp;L LATENT (EN COURS)</span>
-            <TrendingUp className="size-5 text-[#00D084]" />
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">P&amp;L LATENT (EN COURS)</span>
+            <TrendingUp className="size-4 sm:size-5 text-[#00D084]" />
           </div>
           <p
-            className={`mt-4 font-mono text-3xl sm:text-4xl font-black ${
+            className={`mt-3 font-mono text-2xl sm:text-3xl font-black ${
               totalOpenPnl >= 0 ? "text-[#00D084]" : "text-rose-400"
             }`}
           >
             {totalOpenPnl >= 0 ? `+$${totalOpenPnl.toFixed(2)}` : `-$${Math.abs(totalOpenPnl).toFixed(2)}`}
           </p>
-          <div className="mt-3 flex items-center justify-between text-xs sm:text-sm">
+          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
             <span className="text-gray-400">Positions actives</span>
             <span className="font-mono font-bold text-[#00D084]">{positions.length} en direct</span>
           </div>
         </article>
 
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7 shadow-md transition-all hover:border-white/[0.15]">
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-white/[0.15]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-gray-400">AUTO-TRADERS EN LIGNE</span>
-            <Bot className="size-5 text-sky-400" />
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">AUTO-TRADERS EN LIGNE</span>
+            <Bot className="size-4 sm:size-5 text-sky-400" />
           </div>
-          <p className="mt-4 font-mono text-3xl sm:text-4xl font-black text-sky-400">3 / 3</p>
-          <div className="mt-3 flex items-center justify-between text-xs sm:text-sm">
+          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-sky-400">3 / 3</p>
+          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
             <span className="text-gray-400">Equinix NY4</span>
             <span className="font-mono font-bold text-[#00D084]">100% Opérationnel</span>
           </div>
         </article>
 
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7 shadow-md transition-all hover:border-white/[0.15]">
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-white/[0.15]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-gray-400">RISQUE &amp; DRAWDOWN</span>
-            <ShieldCheck className="size-5 text-[#00D084]" />
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">RISQUE &amp; DRAWDOWN</span>
+            <ShieldCheck className="size-4 sm:size-5 text-[#00D084]" />
           </div>
-          <p className="mt-4 font-mono text-3xl sm:text-4xl font-black text-white">0.34%</p>
-          <div className="mt-3 flex items-center justify-between text-xs sm:text-sm">
+          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">0.34%</p>
+          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
             <span className="text-gray-400">Limite max autorisée</span>
             <span className="font-mono font-bold text-amber-400">2.00% / jour</span>
           </div>
@@ -2084,37 +2084,37 @@ function StrategiesTab({
 }) {
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
               BIBLIOTHÈQUE STRATÉGIQUE MT5
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white">Auto-Traders &amp; Algorithmes Certifiés</h2>
-            <p className="mt-2 text-sm sm:text-base text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Auto-Traders &amp; Algorithmes Certifiés</h2>
+            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
               Chaque algorithme Auto-Trader est optimisé pour une classe d'actifs dédiée et opère selon un cahier des charges quantitatif institutionnel.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-3">
+      <section className="grid gap-5 md:grid-cols-3">
         {bots.map((b) => (
           <article
             key={b.id}
-            className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-md flex flex-col justify-between transition-all hover:border-[#00D084]/40"
+            className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md flex flex-col justify-between transition-all hover:border-[#00D084]/40"
           >
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="text-xl sm:text-2xl font-black text-white">{b.name}</h3>
+                <h3 className="text-lg sm:text-xl font-black text-white">{b.name}</h3>
                 <StatusPill variant={b.statusBadge === "ACTIF" ? "emerald" : "rose"}>
                   {b.statusBadge}
                 </StatusPill>
               </div>
               <p className="mt-1 font-mono text-xs sm:text-sm text-[#00D084] font-bold">{b.specialty}</p>
-              <p className="mt-4 text-xs sm:text-sm text-gray-300 leading-relaxed font-medium">{b.subtitle}</p>
+              <p className="mt-3 text-xs sm:text-sm text-gray-300 leading-relaxed font-medium">{b.subtitle}</p>
 
-              <div className="mt-6 space-y-2.5 text-xs sm:text-sm border-t border-white/[0.06] pt-4">
+              <div className="mt-5 space-y-2 text-xs sm:text-sm border-t border-white/[0.06] pt-3.5">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Marchés :</span>
                   <span className="font-mono font-bold text-white">{b.markets}</span>
@@ -2132,7 +2132,7 @@ function StrategiesTab({
 
             <button
               onClick={() => onOpenBotDetail(b)}
-              className="mt-6 w-full rounded-2xl border border-[#00D084]/40 bg-[#00D084]/10 py-3.5 text-xs sm:text-sm font-bold text-[#00D084] hover:bg-[#00D084]/20 transition cursor-pointer"
+              className="mt-5 w-full rounded-xl sm:rounded-2xl border border-[#00D084]/40 bg-[#00D084]/10 py-3 text-xs sm:text-sm font-bold text-[#00D084] hover:bg-[#00D084]/20 transition cursor-pointer"
             >
               VOIR FICHE DÉTAILLÉE
             </button>
@@ -2173,14 +2173,14 @@ function RiskTab({
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl border border-rose-500/30 bg-[#140c10] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-rose-500/30 bg-[#140c10] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/10 px-3.5 py-1 text-xs font-black tracking-wider text-rose-400 uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-rose-400 uppercase mb-2">
               RISK GOVERNOR &amp; SÉCURITÉ DU CAPITAL
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white">Protection Active du Capital</h2>
-            <p className="mt-2 text-sm sm:text-base text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Protection Active du Capital</h2>
+            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
               Le moteur applique un coupe-circuit strict dès que les tolérances de drawdown ou d'exposition sont atteintes.
             </p>
           </div>
@@ -2189,10 +2189,10 @@ function RiskTab({
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-md space-y-6">
-          <div className="border-b border-white/[0.06] pb-4">
-            <p className="text-xs font-black uppercase tracking-wider text-gray-400">RÉGLAGES EN DIRECT</p>
-            <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Seuils de Tolérance Algorithmique</h3>
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-md space-y-5">
+          <div className="border-b border-white/[0.06] pb-3.5">
+            <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">RÉGLAGES EN DIRECT</p>
+            <h3 className="mt-1 text-base sm:text-lg lg:text-xl font-black text-white">Seuils de Tolérance Algorithmique</h3>
           </div>
 
           <div className="space-y-2">
@@ -2245,106 +2245,39 @@ function RiskTab({
 
           <button
             onClick={handleSaveRisk}
-            className="neon-btn w-full rounded-2xl py-4 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer transition-all hover:scale-[1.01]"
+            className="neon-btn w-full rounded-xl sm:rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer transition-all hover:scale-[1.01]"
           >
             ENREGISTRER LES LIMITES DE RISQUE
           </button>
         </article>
 
         {/* Emergency Kill Switch */}
-        <article className="rounded-3xl border border-rose-500/40 bg-rose-500/10 p-6 sm:p-8 shadow-md flex flex-col justify-between">
+        <article className="rounded-2xl sm:rounded-3xl border border-rose-500/40 bg-rose-500/10 p-5 sm:p-7 shadow-md flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 text-rose-400">
-              <ShieldAlert className="size-5" />
-              <p className="text-xs font-black uppercase tracking-wider">INTERRUPTEUR D'URGENCE (KILL SWITCH)</p>
+              <ShieldAlert className="size-4 sm:size-5" />
+              <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider">INTERRUPTEUR D'URGENCE (KILL SWITCH)</p>
             </div>
-            <h3 className="mt-2 text-xl sm:text-2xl font-black text-white">Arrêt d'Urgence Immédiat</h3>
-            <p className="mt-3 text-xs sm:text-sm leading-relaxed text-gray-300 font-medium">
-              En cas d'événement macroéconomique imprévu, activez cet interrupteur pour clôturer immédiatement toutes les positions et suspendre les bots.
+            <h3 className="mt-2 text-lg sm:text-xl font-black text-white">Arrêt d'Urgence Immédiat</h3>
+            <p className="mt-2.5 text-xs sm:text-sm leading-relaxed text-gray-300 font-medium">
+              Coupe instantanément tous les signaux actifs, ferme l'intégralité des positions ouvertes sur MT5 et passe l'ensemble des Auto-Traders en mode sécurisé.
             </p>
           </div>
 
           <button
             onClick={onEmergencyHalt}
-            className="mt-8 w-full rounded-2xl border border-rose-500/60 bg-rose-500/30 py-4 text-xs sm:text-sm font-black uppercase tracking-wider text-white hover:bg-rose-500/50 transition cursor-pointer shadow-lg"
+            className="mt-6 w-full rounded-xl sm:rounded-2xl bg-rose-600 hover:bg-rose-700 py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-white shadow-lg transition-all cursor-pointer"
           >
-            ACTIVER LE COUPE-CIRCUIT D'URGENCE
+            🚨 DÉCLENCHER LE COUPE-CIRCUIT IMMÉDIAT
           </button>
         </article>
-      </section>
-
-      {/* CALCULATEUR DE LOTS ET SIMULATEUR DE POSITION (FONCTIONNALITÉ ADDITIONNELLE) */}
-      <section className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-md space-y-5">
-        <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-2xl bg-[#00D084]/20 text-[#00D084]">
-              <Calculator className="size-5" />
-            </div>
-            <div>
-              <h3 className="text-lg sm:text-xl font-black text-white">Simulateur de Lots &amp; Dimensionnement MT5</h3>
-              <p className="text-xs sm:text-sm text-gray-400">Calculez instantanément la taille de position recommandée selon votre tolérance.</p>
-            </div>
-          </div>
-          <span className="rounded-xl border border-white/[0.1] bg-[#0c1017] px-3.5 py-1.5 font-mono text-xs text-gray-300">
-            ECN Standard
-          </span>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-3">
-          <div>
-            <label className="block text-xs font-black uppercase text-gray-400 mb-1.5">CAPITAL SIMULÉ ($)</label>
-            <input
-              type="number"
-              value={simCapital}
-              onChange={(e) => setSimCapital(parseFloat(e.target.value) || 0)}
-              className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] px-4 py-3 font-mono text-base font-bold text-white outline-none focus:border-[#00D084]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-black uppercase text-gray-400 mb-1.5">RISQUE SOUHAITÉ (%)</label>
-            <input
-              type="number"
-              step="0.1"
-              value={simRiskPercent}
-              onChange={(e) => setSimRiskPercent(parseFloat(e.target.value) || 0)}
-              className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] px-4 py-3 font-mono text-base font-bold text-white outline-none focus:border-[#00D084]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-black uppercase text-gray-400 mb-1.5">DISTANCE STOP-LOSS (PIPS / PTS)</label>
-            <input
-              type="number"
-              value={simStopLossPips}
-              onChange={(e) => setSimStopLossPips(parseFloat(e.target.value) || 1)}
-              className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] px-4 py-3 font-mono text-base font-bold text-white outline-none focus:border-[#00D084]"
-            />
-          </div>
-        </div>
-
-        {/* Results Banner */}
-        <div className="grid gap-4 sm:grid-cols-3 rounded-2xl border border-[#00D084]/30 bg-[#00D084]/10 p-4 font-mono">
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-sans font-bold">MONTANT À RISQUER ($)</span>
-            <p className="text-lg sm:text-xl font-black text-white mt-0.5">${calculatedRiskAmount.toFixed(2)} USD</p>
-          </div>
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-sans font-bold">VOLUME RECOMMANDÉ (LOTS)</span>
-            <p className="text-lg sm:text-xl font-black text-[#00D084] mt-0.5">{calculatedLotSize} lot(s)</p>
-          </div>
-          <div>
-            <span className="text-xs text-gray-400 uppercase font-sans font-bold">VALEUR PAR PIP ESTIMÉE</span>
-            <p className="text-lg sm:text-xl font-black text-sky-400 mt-0.5">${(calculatedLotSize * 10).toFixed(2)} / pip</p>
-          </div>
-        </div>
       </section>
     </div>
   );
 }
 
 // ----------------------------------------------------
-// 5. PORTEFEUILLE VIEW
+// 5. PORTEFEUILLE & HISTORIQUE DES TRANSACTIONS
 // ----------------------------------------------------
 function PortfolioTab({
   balance,
@@ -2376,29 +2309,29 @@ function PortfolioTab({
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
               GESTION FINANCIÈRE &amp; TRÉSORERIE
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white">Portefeuille &amp; Dépôts</h2>
-            <p className="mt-2 text-sm sm:text-base text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Portefeuille &amp; Dépôts</h2>
+            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
               Consultez vos soldes en temps réel, créditez votre compte ou effectuez des retraits sécurisés.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3.5">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={onOpenDeposit}
-              className="neon-btn inline-flex items-center gap-2 rounded-2xl px-6 py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
+              className="neon-btn inline-flex items-center gap-2 rounded-xl sm:rounded-2xl px-5 py-3 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
             >
               <Plus className="size-4" />
               DÉPOSER DES FONDS
             </button>
             <button
               onClick={onOpenWithdraw}
-              className="inline-flex items-center gap-2 rounded-2xl border border-white/[0.12] bg-[#141a23] hover:bg-[#1a2330] px-6 py-3.5 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl sm:rounded-2xl border border-white/[0.12] bg-[#141a23] hover:bg-[#1a2330] px-5 py-3 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer"
             >
               RETIRER DES FONDS
             </button>
@@ -2408,29 +2341,29 @@ function PortfolioTab({
 
       {/* Balances */}
       <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-3xl border border-[#00D084]/30 bg-[#10141b] p-6 sm:p-7">
-          <p className="text-xs font-black uppercase tracking-wider text-[#00D084]">SOLDE CASH DISPONIBLE</p>
-          <p className="mt-4 font-mono text-3xl sm:text-4xl font-black text-white">
+        <article className="rounded-2xl sm:rounded-3xl border border-[#00D084]/30 bg-[#10141b] p-5 sm:p-6">
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-[#00D084]">SOLDE CASH DISPONIBLE</p>
+          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">
             ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
           <p className="mt-2 text-xs sm:text-sm text-gray-400">Compte ECN Principal · USD</p>
         </article>
 
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7">
-          <p className="text-xs font-black uppercase tracking-wider text-gray-400">TOTAL GAINS GÉNERÉS</p>
-          <p className="mt-4 font-mono text-3xl sm:text-4xl font-black text-[#00D084]">+$3 480.20</p>
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6">
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">TOTAL GAINS GÉNERÉS</p>
+          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-[#00D084]">+$3 480.20</p>
           <p className="mt-2 text-xs sm:text-sm text-gray-400">Gains algorithmiques nets</p>
         </article>
 
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7">
-          <p className="text-xs font-black uppercase tracking-wider text-gray-400">RETRAITS EFFECTUÉS</p>
-          <p className="mt-4 font-mono text-3xl sm:text-4xl font-black text-white">$1 200.00</p>
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6">
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">RETRAITS EFFECTUÉS</p>
+          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">$1 200.00</p>
           <p className="mt-2 text-xs sm:text-sm text-gray-400">Virés sans frais</p>
         </article>
 
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-7">
-          <p className="text-xs font-black uppercase tracking-wider text-gray-400">STATUT CONFORMITÉ</p>
-          <p className="mt-4 font-mono text-2xl font-black text-[#00D084]">KYC VALIDÉ</p>
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6">
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">STATUT CONFORMITÉ</p>
+          <p className="mt-3 font-mono text-xl sm:text-2xl font-black text-[#00D084]">KYC VALIDÉ</p>
           <p className="mt-2 text-xs sm:text-sm text-gray-400">Niveau institutionnel illimité</p>
         </article>
       </section>
@@ -2521,14 +2454,14 @@ function TelemetryTab() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
               INFRASTRUCTURE RÉSEAU INSTITUTIONNELLE
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white">Télémétrie FIX &amp; Serveurs MT5</h2>
-            <p className="mt-2 text-sm sm:text-base text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Télémétrie FIX &amp; Serveurs MT5</h2>
+            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
               Monitoring en temps réel de la passerelle FIX 4.4, de la latence de routage et de l'intégrité des flux.
             </p>
           </div>
@@ -2537,18 +2470,18 @@ function TelemetryTab() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-md space-y-6">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-md space-y-5">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3.5">
             <div>
-              <p className="text-xs font-black uppercase tracking-wider text-gray-400">PASSERELLES DISPONIBLES</p>
-              <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Datacenters Financiers</h3>
+              <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">PASSERELLES DISPONIBLES</p>
+              <h3 className="mt-1 text-base sm:text-lg lg:text-xl font-black text-white">Datacenters Financiers</h3>
             </div>
             <button
               onClick={handleTestPing}
               disabled={isPinging}
-              className="inline-flex items-center gap-2 rounded-xl border border-[#00D084]/40 bg-[#00D084]/10 px-4 py-2.5 text-xs sm:text-sm font-bold text-[#00D084] hover:bg-[#00D084]/20 transition cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#00D084]/40 bg-[#00D084]/10 px-3.5 py-2 text-xs sm:text-sm font-bold text-[#00D084] hover:bg-[#00D084]/20 transition cursor-pointer"
             >
-              <RefreshCw className={`size-4 ${isPinging ? "animate-spin" : ""}`} />
+              <RefreshCw className={`size-3.5 ${isPinging ? "animate-spin" : ""}`} />
               TESTER LE PING
             </button>
           </div>
@@ -2562,30 +2495,30 @@ function TelemetryTab() {
               <button
                 key={srv.id}
                 onClick={() => setSelectedServer(srv.id as any)}
-                className={`rounded-2xl border p-5 text-left transition-all cursor-pointer ${
+                className={`rounded-xl sm:rounded-2xl border p-4 sm:p-5 text-left transition-all cursor-pointer ${
                   selectedServer === srv.id
                     ? "border-[#00D084]/60 bg-[#00D084]/10 ring-1 ring-[#00D084]/40"
                     : "border-white/[0.06] bg-[#0c1017] hover:border-white/[0.12]"
                 }`}
               >
-                <p className="font-bold text-sm sm:text-base text-white">{srv.name}</p>
-                <p className="text-xs text-gray-400">{srv.city}</p>
-                <p className="mt-3 font-mono text-xl font-black text-[#00D084]">{srv.ping}</p>
+                <p className="font-bold text-xs sm:text-sm text-white">{srv.name}</p>
+                <p className="text-[11px] text-gray-400">{srv.city}</p>
+                <p className="mt-2.5 font-mono text-lg sm:text-xl font-black text-[#00D084]">{srv.ping}</p>
               </button>
             ))}
           </div>
         </article>
 
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-md">
-          <p className="text-xs font-black uppercase tracking-wider text-gray-400">FLUX DE MESSAGES FIX</p>
-          <div className="mt-4 space-y-3 font-mono text-xs sm:text-sm">
+        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-md">
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">FLUX DE MESSAGES FIX</p>
+          <div className="mt-3.5 space-y-2.5 font-mono text-xs sm:text-sm">
             {[
               "8=FIX.4.4|35=W|55=EURUSD|269=0|270=1.08584|271=50",
               "8=FIX.4.4|35=W|55=XAUUSD|269=1|270=2388.90|271=20",
               "8=FIX.4.4|35=8|39=2|150=2|37=892119|55=XAUUSD|32=0.20",
               "8=FIX.4.4|35=0|112=HEARTBEAT_ACK|NY4_GATEWAY",
             ].map((msg, i) => (
-              <div key={i} className="rounded-xl border border-white/[0.04] bg-[#0c1017] p-3 text-gray-300">
+              <div key={i} className="rounded-xl border border-white/[0.04] bg-[#0c1017] p-2.5 sm:p-3 text-gray-300">
                 <span className="text-[#00D084] font-bold">[{new Date().toLocaleTimeString()}]</span> {msg}
               </div>
             ))}
@@ -2619,21 +2552,21 @@ function JournalTab({ journal }: { journal: JournalEntry[] }) {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
               REGISTRE D'AUDIT ET TRAÇABILITÉ
             </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white">Journal Décisionnel des Algorithmes</h2>
-            <p className="mt-2 text-sm sm:text-base text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Journal Décisionnel des Algorithmes</h2>
+            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
               Historique inaltérable de chaque calcul de signal, contrôle de gouvernance du risque et exécution d'ordre.
             </p>
           </div>
 
           <button
             onClick={handleExportJournal}
-            className="neon-btn inline-flex items-center gap-2 rounded-2xl px-6 py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
+            className="neon-btn inline-flex items-center gap-2 rounded-xl sm:rounded-2xl px-5 py-3 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
           >
             <Download className="size-4" />
             EXPORTER LE JOURNAL (CSV)
@@ -2641,8 +2574,8 @@ function JournalTab({ journal }: { journal: JournalEntry[] }) {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] shadow-md">
-        <div className="p-6 border-b border-white/[0.06]">
+      <section className="overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] shadow-md">
+        <div className="p-5 sm:p-6 border-b border-white/[0.06]">
           <div className="relative max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
             <input
@@ -2656,24 +2589,24 @@ function JournalTab({ journal }: { journal: JournalEntry[] }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-white/[0.06] bg-[#0c1017] text-xs font-black uppercase tracking-wider text-gray-400">
+          <table className="w-full min-w-[760px] text-left text-xs sm:text-sm">
+            <thead className="border-b border-white/[0.06] bg-[#0c1017] text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">
               <tr>
-                <th className="px-6 py-4">HEURE</th>
-                <th className="px-6 py-4">ÉVÉNEMENT</th>
-                <th className="px-6 py-4">SYMBOLE</th>
-                <th className="px-6 py-4">DÉTAIL</th>
-                <th className="px-6 py-4">STATUT</th>
+                <th className="px-5 py-3.5">HEURE</th>
+                <th className="px-5 py-3.5">ÉVÉNEMENT</th>
+                <th className="px-5 py-3.5">SYMBOLE</th>
+                <th className="px-5 py-3.5">DÉTAIL</th>
+                <th className="px-5 py-3.5">STATUT</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {filtered.map((entry) => (
                 <tr key={entry.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-6 py-4 font-mono text-gray-400">{entry.time}</td>
-                  <td className="px-6 py-4 font-mono font-bold text-white">{entry.event}</td>
-                  <td className="px-6 py-4 font-mono text-[#00D084] font-bold">{entry.symbol ?? "—"}</td>
-                  <td className="px-6 py-4 text-gray-200 font-medium">{entry.detail}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-5 py-3.5 font-mono text-gray-400">{entry.time}</td>
+                  <td className="px-5 py-3.5 font-mono font-bold text-white">{entry.event}</td>
+                  <td className="px-5 py-3.5 font-mono text-[#00D084] font-bold">{entry.symbol ?? "—"}</td>
+                  <td className="px-5 py-3.5 text-gray-200 font-medium">{entry.detail}</td>
+                  <td className="px-5 py-3.5">
                     <StatusPill variant={entry.statusVariant}>{entry.status}</StatusPill>
                   </td>
                 </tr>
