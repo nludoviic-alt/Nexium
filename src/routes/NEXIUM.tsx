@@ -13,8 +13,10 @@ import {
   Calculator,
   Calendar,
   CalendarDays,
+  Camera,
   CandlestickChart,
   Check,
+  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -26,12 +28,15 @@ import {
   ExternalLink,
   Eye,
   FileCheck,
+  FileImage,
   FileText,
   Filter,
   Flame,
   Globe2,
   Grid,
+  Headphones,
   History,
+  Image as ImageIcon,
   Inbox,
   Layers,
   LayoutDashboard,
@@ -44,6 +49,7 @@ import {
   Mic,
   MicOff,
   Minimize2,
+  MoreVertical,
   Paperclip,
   Pause,
   Phone,
@@ -57,6 +63,7 @@ import {
   Radar,
   Radio,
   RefreshCw,
+  Reply,
   ScreenShare,
   Search,
   Send,
@@ -68,6 +75,7 @@ import {
   ShieldCheck,
   Sliders,
   SlidersHorizontal,
+  Smile,
   Sparkles,
   Star,
   Timer,
@@ -217,10 +225,19 @@ export interface JournalEntry {
 
 export interface ChatMessage {
   id: string;
-  sender: "user" | "desk" | "system";
+  sender: "user" | "desk" | "system" | "expert" | "ai" | "support";
   senderName: string;
   text: string;
   time: string;
+  avatar?: string;
+  image?: string;
+  imageCaption?: string;
+  isVoice?: boolean;
+  voiceDuration?: string;
+  reactions?: { emoji: string; count: number; byMe?: boolean }[];
+  status?: "sent" | "delivered" | "read";
+  replyTo?: { senderName: string; text: string };
+  contactId?: string;
 }
 
 export interface PriceAlert {
@@ -591,10 +608,43 @@ const INITIAL_JOURNAL: JournalEntry[] = [
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: "m-1",
+    sender: "support",
+    senderName: "Elena V. (Support Client 24/7)",
+    contactId: "support-client",
+    text: "Bonjour Ludovic 👋 Bienvenue sur votre support prioritaire Nexium. Votre compte MT5 ECN #802194 est actif et vérifié. Comment pouvons-nous vous aider aujourd'hui ?",
+    time: "14:10",
+    status: "read",
+  },
+  {
+    id: "m-2",
+    sender: "expert",
+    senderName: "Dr. Antoine R. (Expert Quant)",
+    contactId: "expert-quant",
+    text: "Bonjour Ludovic. La session New York montre un breakout algorithmique de volatilité sur XAUUSD. Le moteur AI Gold a validé le setup à 2 384.20 avec un ratio risque/rendement de 1:2.4. Ci-joint l'analyse graphique du signal.",
+    time: "14:22",
+    image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1000&auto=format&fit=crop",
+    imageCaption: "Graphique Breakout MQL5 — XAUUSD M15 (NY Session)",
+    reactions: [{ emoji: "🚀", count: 2, byMe: true }, { emoji: "📈", count: 1 }],
+    status: "read",
+  },
+  {
+    id: "m-3",
+    sender: "ai",
+    senderName: "Nexium Core IA (Assistant Trading)",
+    contactId: "ai-bot",
+    text: "⚡ Télémétrie en direct :\n• 3 Robots actifs sur serveur Equinix NY4 (Latence : 0.8ms)\n• P&L Journalier cumulé : +$167.30 (+0.67%)\n• Drawdown max enregistré aujourd'hui : 0.34% (Seuil d'alerte : 2.00%)\n\nTous les voyants sont au vert pour la séance.",
+    time: "14:28",
+    reactions: [{ emoji: "⚡", count: 3, byMe: true }, { emoji: "🛡️", count: 1 }],
+    status: "read",
+  },
+  {
+    id: "m-4",
     sender: "desk",
-    senderName: "Nexium Desk Institutionnel",
-    text: "Bonjour Ludovic. Vos 3 moteurs automatisés (AI Gold, FX Trend, Index Reversion) sont connectés et opérationnels sur le serveur Equinix NY4.",
+    senderName: "Desk Conformité & Risque",
+    contactId: "risk-governance",
+    text: "Audit de conformité institutionnelle validé pour votre compte #802194. Vos Stop-Loss sont strictement synchronisés avec le carnet d'ordres ECN.",
     time: "14:30",
+    status: "read",
   },
 ];
 
