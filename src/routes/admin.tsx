@@ -112,9 +112,13 @@ import {
   Wallet,
   Wifi,
   X,
-  Zap,
-} from "lucide-react";
 import { toast } from "sonner";
+import {
+  sendWelcomeEmail,
+  sendDepositConfirmedEmail,
+  sendCustomDeskEmail,
+  isResendConfigured,
+} from "@/lib/resend";
 
 export const Route = createFileRoute("/admin")({
   component: NexiumAdminDashboard,
@@ -1849,6 +1853,16 @@ function NexiumAdminDashboard() {
 
     setClients((prev) => [newCl, ...prev]);
     addAuditLog("CLIENT_CREATED", `Nouveau client créé : ${newClientName}.`, newClientName);
+    
+    // Envoi de l'e-mail de bienvenue via Resend
+    sendWelcomeEmail(newCl.email, newCl.name, newCl.mt5.login)
+      .then((res) => {
+        if (res.success && !res.simulated) {
+          toast.success(`E-mail officiel de bienvenue expédié à ${newCl.email} via Resend.`);
+        }
+      })
+      .catch((err) => console.warn("Resend welcome email warning:", err));
+
     toast.success(`Client ${newClientName} créé avec succès.`);
     setNewClientName("");
     setNewClientEmail("");
@@ -1963,6 +1977,19 @@ function NexiumAdminDashboard() {
         );
 
         addAuditLog("DEPOSIT_CREDITED", `Dépôt de $${deposit.amount} USD validé et crédité pour ${activeClient.name}.`, activeClient.name);
+        
+        // Envoi de la confirmation de dépôt par email via Resend
+        sendDepositConfirmedEmail(
+          activeClient.email,
+          activeClient.name,
+          `$${deposit.amount.toLocaleString("fr-FR")} USD`,
+          activeClient.mt5.login
+        ).then((res) => {
+          if (res.success && !res.simulated) {
+            toast.success(`E-mail de confirmation de dépôt expédié à ${activeClient.email} via Resend.`);
+          }
+        }).catch((err) => console.warn("Resend deposit email warning:", err));
+
         toast.success(`Dépôt de $${deposit.amount.toLocaleString("fr-FR")} USD crédité sur le compte.`);
       }
     );
@@ -2503,6 +2530,18 @@ function NexiumAdminDashboard() {
             messages: [...emailConversationDetail.messages, newMsg],
           });
         }
+
+        // Expédition réelle via Resend
+        sendCustomDeskEmail(
+          emailConversationDetail?.conversation.customerEmail ?? "client@nexium.com",
+          `Re: ${emailConversationDetail?.conversation.subject ?? "Message Officiel Nexium Markets"}`,
+          emailReplyText.trim()
+        ).then((res) => {
+          if (res.success && !res.simulated) {
+            toast.success(`E-mail expédié avec succès via Resend.`);
+          }
+        }).catch((err) => console.warn("Resend email reply warning:", err));
+
         toast.success("E-mail officiel envoyé au client.");
         setEmailReplyText("");
         setEmailPendingAttachments([]);
