@@ -121,6 +121,7 @@ import {
   sendCustomDeskEmail,
   isResendConfigured,
 } from "@/lib/resend";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export const Route = createFileRoute("/admin")({
   component: NexiumAdminDashboard,
@@ -1647,6 +1648,31 @@ function NexiumAdminDashboard() {
 
     setStaffList((prev) => [newStaff, ...prev]);
     addAuditLog("STAFF_CREATED", `Nouveau membre staff (${newStaffRole}) créé : ${newStaffName}.`);
+
+    // Synchronisation avec Supabase Profiles & Resend
+    if (isSupabaseConfigured) {
+      supabase
+        .from("profiles")
+        .upsert({
+          id: crypto.randomUUID ? crypto.randomUUID() : undefined,
+          email: newStaff.email,
+          name: newStaff.name,
+          phone: newStaff.phone,
+          role: newStaff.role,
+          status: "ACTIVE",
+          assigned_advisor: newStaff.department,
+        })
+        .then(() => console.log(`Staff ${newStaff.name} synchronisé dans Supabase.`))
+        .catch((err) => console.warn("Supabase staff sync error:", err));
+    }
+
+    // Envoi de l'e-mail officiel de nomination / invitation
+    sendCustomDeskEmail(
+      newStaff.email,
+      `Accréditation & Accès Desk Nexium Markets — Rôle ${newStaffRole}`,
+      `Bonjour ${newStaffName},\n\nVotre compte collaborateur a été créé avec succès sur le Desk Central de Nexium Markets.\n\nRôle attribué : ${newStaffRole}\nDépartement : ${newStaffDept}\nStatut : Opérationnel & Sécurisé 2FA\n\nVous pouvez vous connecter dès à présent sur https://nexiummarkets.com/login avec votre adresse e-mail professionnelle.`
+    ).catch((err) => console.warn("Resend staff invitation error:", err));
+
     toast.success(`Membre du staff ${newStaffName} (${newStaffRole}) créé avec succès.`);
     setNewStaffName("");
     setNewStaffEmail("");
