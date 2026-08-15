@@ -8,6 +8,8 @@ import {
   RefreshCw,
   Send,
   Smartphone,
+  Globe,
+  Sparkles,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -16,6 +18,7 @@ import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import {
   renderAdminNewClientAlertEmailHtml,
+  renderContactNotificationHtml,
   renderCustomDeskEmailHtml,
   renderDepositConfirmedEmailHtml,
   renderPasswordResetEmailHtml,
@@ -41,26 +44,29 @@ type TemplateKey =
   | "deposit"
   | "withdrawal"
   | "admin-alert"
+  | "contact-alert"
   | "support";
 
 const TEMPLATES: Array<{
   id: TemplateKey;
   label: string;
   badge: string;
-  category: "Client" | "Transaction" | "Sécurité" | "Admin";
+  category: "Client" | "Transaction" | "Sécurité" | "Desk & Admin";
 }> = [
-  { id: "registration", label: "Inscription Reçue", badge: "Client", category: "Client" },
-  { id: "welcome", label: "Compte Activé / Bienvenue", badge: "Client", category: "Client" },
-  { id: "reset-password", label: "Mot de Passe Oublié", badge: "Sécurité", category: "Sécurité" },
-  { id: "deposit", label: "Dépôt Confirmé (+2 500 €)", badge: "Fonds", category: "Transaction" },
-  { id: "withdrawal", label: "Retrait Validé", badge: "Fonds", category: "Transaction" },
-  { id: "admin-alert", label: "Alerte Admin (Nouveau Client)", badge: "Admin", category: "Admin" },
-  { id: "support", label: "Message Support / Desk", badge: "Support", category: "Client" },
+  { id: "registration", label: "1. Inscription Reçue", badge: "Client", category: "Client" },
+  { id: "welcome", label: "2. Compte Activé / Bienvenue", badge: "Client", category: "Client" },
+  { id: "reset-password", label: "3. Mot de Passe Oublié", badge: "Sécurité", category: "Sécurité" },
+  { id: "deposit", label: "4. Dépôt Confirmé (+2 500 €)", badge: "Fonds", category: "Transaction" },
+  { id: "withdrawal", label: "5. Retrait Validé", badge: "Fonds", category: "Transaction" },
+  { id: "admin-alert", label: "6. Alerte Desk (Nouveau Client)", badge: "Desk", category: "Desk & Admin" },
+  { id: "contact-alert", label: "7. Alerte Contact Formulaire", badge: "Desk", category: "Desk & Admin" },
+  { id: "support", label: "8. Message Conseiller Desk", badge: "Desk", category: "Client" },
 ];
 
 function EmailPreviewPage() {
   const [activeTemplate, setActiveTemplate] = useState<TemplateKey>("registration");
   const [deviceMode, setDeviceMode] = useState<"desktop" | "mobile">("desktop");
+  const [emailLang, setEmailLang] = useState<"fr" | "en">("fr");
   const [copied, setCopied] = useState(false);
 
   // Editable sample parameters
@@ -72,26 +78,29 @@ function EmailPreviewPage() {
   const currentHtml = useMemo(() => {
     switch (activeTemplate) {
       case "registration":
-        return renderRegistrationPendingEmailHtml(clientName, "France");
+        return renderRegistrationPendingEmailHtml(clientName, "France", emailLang);
       case "welcome":
-        return renderWelcomeEmailHtml(clientName, mt5Login);
+        return renderWelcomeEmailHtml(clientName, mt5Login, emailLang);
       case "reset-password":
         return renderPasswordResetEmailHtml(
           clientName,
-          "https://nexiummarkets.com/reset-password?token=demo_token_123"
+          "https://nexiummarkets.com/reset-password?token=demo_token_123",
+          emailLang
         );
       case "deposit":
         return renderDepositConfirmedEmailHtml(
           clientName,
           amount,
           mt5Login,
-          "NEX-849201"
+          "NEX-849201",
+          emailLang
         );
       case "withdrawal":
         return renderWithdrawalApprovedEmailHtml(
           clientName,
           amount,
-          "FR76 3000 4012 3456 7890 1234 567"
+          "FR76 3000 4012 3456 7890 1234 567",
+          emailLang
         );
       case "admin-alert":
         return renderAdminNewClientAlertEmailHtml({
@@ -99,204 +108,214 @@ function EmailPreviewPage() {
           email: clientEmail,
           country: "France",
           phone: "+33 6 12 34 56 78",
-          ibCode: "IB-90462",
+          ibCode: "IB-PARIS-09",
+        });
+      case "contact-alert":
+        return renderContactNotificationHtml({
+          fullName: clientName,
+          email: clientEmail,
+          subject: "Demande d'informations sur l'EA Gold Momentum",
+          message: "Bonjour, je souhaite connecter 3 comptes MT5 sous licence Pro. Pouvez-vous me confirmer le temps de latence vers vos serveurs NY4 ?",
+          mt5Account: mt5Login,
+          broker: "IC Markets ECN",
         });
       case "support":
         return renderCustomDeskEmailHtml(
-          "Bonjour Alexandre,\n\nVotre configuration VPS New York NY4 est désormais opérationnelle avec une latence mesurée de 0.8ms.\n\nN'hésitez pas si vous souhaitez ajuster vos paramètres de gestion du risque.",
-          "Marc V. — Desk Institutionnel"
+          "Nous vous confirmons l'allocation du Preset institutionnel AI Gold sur votre compte MT5 #892041. Vos garde-fous de risque ont été validés.",
+          "Marc V. — Desk Institutionnel",
+          emailLang
         );
       default:
         return "";
     }
-  }, [activeTemplate, clientName, clientEmail, amount, mt5Login]);
+  }, [activeTemplate, clientName, clientEmail, amount, mt5Login, emailLang]);
 
-  const handleCopyHtml = () => {
+  const copyHtml = () => {
     navigator.clipboard.writeText(currentHtml);
     setCopied(true);
-    toast.success("Code HTML de l'e-mail copié dans le presse-papier !");
-    setTimeout(() => setCopied(false), 2000);
+    toast.success("Code HTML complet copié dans le presse-papiers !");
+    setTimeout(() => setCopied(false), 2500);
   };
 
   return (
-    <div className="min-h-screen bg-[#05080e] text-slate-100 flex flex-col font-sans">
-      {/* Top Navbar */}
-      <header className="border-b border-slate-800/80 bg-[#080d15]/95 backdrop-blur-xl px-4 sm:px-6 py-3.5 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2 group">
-            <span className="font-mono text-lg font-black tracking-widest text-white uppercase group-hover:text-[#00D084] transition-colors">
-              NEXIUM
-            </span>
-            <span className="h-3.5 w-px bg-slate-700" />
-            <span className="text-[10px] font-black text-[#00D084] uppercase tracking-widest">
-              EMAILS
+    <div className="min-h-screen bg-[#070b12] text-slate-100 flex flex-col">
+      {/* Top Bar */}
+      <header className="border-b border-slate-800 bg-[#0c121d] px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-4">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="text-xl font-black text-white tracking-[0.2em] font-mono">
+              NEXIUM<span className="text-[#00c853]">.</span>MARKETS
             </span>
           </Link>
-          <span className="hidden sm:inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#00D084]/10 text-[#00D084] border border-[#00D084]/30">
-            Design Épuré Transactionnel
+          <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            ★ STUDIO TEMPLATES E-MAIL 680px
           </span>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Device switcher */}
-          <div className="flex items-center rounded-xl bg-slate-900 border border-slate-800 p-0.5">
+          {/* Language Toggle for Template */}
+          <div className="flex items-center gap-1 rounded-xl bg-slate-900 border border-slate-700/80 p-1">
             <button
-              onClick={() => setDeviceMode("desktop")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
-                deviceMode === "desktop"
-                  ? "bg-[#00D084] text-black"
+              onClick={() => setEmailLang("fr")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                emailLang === "fr"
+                  ? "bg-emerald-500 text-black font-extrabold shadow-sm"
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              <Laptop className="size-3.5" />
-              <span className="hidden sm:inline">Desktop</span>
+              FR (Français)
+            </button>
+            <button
+              onClick={() => setEmailLang("en")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                emailLang === "en"
+                  ? "bg-emerald-500 text-black font-extrabold shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              EN (English)
+            </button>
+          </div>
+
+          {/* Device Toggle */}
+          <div className="flex items-center gap-1 rounded-xl bg-slate-900 border border-slate-700/80 p-1">
+            <button
+              onClick={() => setDeviceMode("desktop")}
+              className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                deviceMode === "desktop"
+                  ? "bg-white/10 text-emerald-400"
+                  : "text-slate-400 hover:text-white"
+              }`}
+              title="Vue Desktop (680px)"
+            >
+              <Laptop className="size-4" />
+              <span className="text-xs">Desktop</span>
             </button>
             <button
               onClick={() => setDeviceMode("mobile")}
-              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+              className={`p-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                 deviceMode === "mobile"
-                  ? "bg-[#00D084] text-black"
+                  ? "bg-white/10 text-emerald-400"
                   : "text-slate-400 hover:text-white"
               }`}
+              title="Vue Mobile (380px)"
             >
-              <Smartphone className="size-3.5" />
-              <span className="hidden sm:inline">Mobile</span>
+              <Smartphone className="size-4" />
+              <span className="text-xs">Mobile</span>
             </button>
           </div>
 
           <Button
-            size="sm"
-            onClick={handleCopyHtml}
-            variant="outline"
-            className="border-slate-700 bg-slate-900 text-xs font-bold hover:bg-slate-800 text-white cursor-pointer"
+            onClick={copyHtml}
+            className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs rounded-xl gap-2 shadow-lg shadow-emerald-500/20"
           >
-            {copied ? <Check className="size-3.5 text-[#00D084]" /> : <Copy className="size-3.5" />}
-            <span className="hidden sm:inline ml-1.5">Copier HTML</span>
+            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            {copied ? "Copié !" : "Copier le HTML"}
           </Button>
 
-          <LanguageSelector variant="compact" />
+          <Link
+            to="/desk"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+          >
+            Retour Desk
+          </Link>
         </div>
       </header>
 
-      {/* Main Workspace Layout */}
-      <div className="flex-1 grid lg:grid-cols-12 overflow-hidden">
-        {/* Left Sidebar: Template Picker & Parameters */}
-        <aside className="lg:col-span-4 xl:col-span-3 border-r border-slate-800 bg-[#070b12] p-4 sm:p-5 flex flex-col justify-between gap-6 overflow-y-auto">
-          <div className="space-y-5">
-            <div>
-              <div className="text-[11px] font-black uppercase tracking-widest text-[#00D084] mb-1">
-                Catalogue E-mails
-              </div>
-              <h2 className="text-sm font-bold text-slate-300">
-                Sélectionnez un modèle à visualiser
-              </h2>
-            </div>
-
-            {/* Template List */}
-            <div className="flex flex-col gap-1.5">
-              {TEMPLATES.map((tmpl) => {
-                const isActive = activeTemplate === tmpl.id;
-                return (
-                  <button
-                    key={tmpl.id}
-                    onClick={() => setActiveTemplate(tmpl.id)}
-                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-[#00D084]/15 border border-[#00D084]/50 text-white shadow-[0_0_15px_rgba(0,208,132,0.15)]"
-                        : "bg-slate-900/60 border border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Mail
-                        className={`size-3.5 ${
-                          isActive ? "text-[#00D084]" : "text-slate-500"
-                        }`}
-                      />
-                      <span>{tmpl.label}</span>
-                    </div>
-                    <span
-                      className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                        isActive
-                          ? "bg-[#00D084] text-black font-extrabold"
-                          : "bg-slate-800 text-slate-400"
-                      }`}
-                    >
-                      {tmpl.badge}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Editable Demo Data */}
-            <div className="pt-4 border-t border-slate-800 space-y-3">
-              <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                Variables de test
-              </div>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[10px] text-slate-500 font-semibold block mb-0.5">
-                    Nom du client
-                  </label>
-                  <input
-                    type="text"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-[#00D084] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-slate-500 font-semibold block mb-0.5">
-                    Montant test
-                  </label>
-                  <input
-                    type="text"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-[#00D084] outline-none"
-                  />
-                </div>
-              </div>
+      {/* Main Workspace */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-80 border-r border-slate-800 bg-[#090e17] p-5 space-y-6 overflow-y-auto">
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3">
+              Templates Disponibles ({TEMPLATES.length})
+            </h3>
+            <div className="space-y-1.5">
+              {TEMPLATES.map((tmpl) => (
+                <button
+                  key={tmpl.id}
+                  onClick={() => setActiveTemplate(tmpl.id)}
+                  className={`w-full text-left p-3 rounded-xl border text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                    activeTemplate === tmpl.id
+                      ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300 shadow-sm"
+                      : "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                  }`}
+                >
+                  <span>{tmpl.label}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 border border-white/10">
+                    {tmpl.badge}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-400 space-y-1.5">
-            <div className="font-bold text-white flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-[#00D084]" />
-              Format Transactionnel Pur
+          {/* Live Parameter Editor */}
+          <div className="border-t border-slate-800 pt-5 space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">
+              Paramètres du test
+            </h3>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-400">Nom du client</label>
+              <input
+                type="text"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-400 outline-none"
+              />
             </div>
-            <p className="text-[10px] text-slate-400 leading-relaxed">
-              Design optimisé pour boîte de réception (Gmail, Apple Mail, Outlook). Fini les longs pavés : les informations clés sont directes et claires.
-            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-400">Email client</label>
+              <input
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-400 outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-400">Compte MT5</label>
+              <input
+                type="text"
+                value={mt5Login}
+                onChange={(e) => setMt5Login(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-400 outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-400">Montant transaction</label>
+              <input
+                type="text"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-400 outline-none"
+              />
+            </div>
           </div>
         </aside>
 
-        {/* Right Preview Canvas */}
-        <main className="lg:col-span-8 xl:col-span-9 bg-[#04060a] p-4 sm:p-8 flex items-center justify-center overflow-auto">
+        {/* Live Preview Area */}
+        <main className="flex-1 bg-[#141b26] p-6 flex flex-col items-center justify-start overflow-y-auto">
+          <div className="text-center mb-4">
+            <span className="text-xs text-slate-400 font-mono">
+              Rendu en direct · Format Carte 680px · Standard Responsive Hybride
+            </span>
+          </div>
+
           <div
-            className={`transition-all duration-300 ${
-              deviceMode === "mobile"
-                ? "w-[390px] h-[780px] rounded-[44px] p-4 bg-slate-900 border-4 border-slate-700 shadow-2xl overflow-hidden flex flex-col"
-                : "w-full max-w-[720px] rounded-2xl bg-transparent"
+            className={`transition-all duration-300 rounded-3xl overflow-hidden shadow-2xl border border-slate-700/80 bg-white ${
+              deviceMode === "mobile" ? "w-[380px]" : "w-[680px]"
             }`}
           >
-            {deviceMode === "mobile" && (
-              <div className="w-full flex items-center justify-between px-4 py-1 mb-2 text-slate-400 text-[10px] font-mono">
-                <span>9:41</span>
-                <div className="w-16 h-4 bg-black rounded-full mx-auto" />
-                <span>5G 100%</span>
-              </div>
-            )}
-
-            <div
-              className={`w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-[#05080e]`}
-            >
-              <iframe
-                title="Email Preview"
-                srcDoc={currentHtml}
-                className="w-full h-full min-h-[660px] border-none"
-              />
-            </div>
+            <iframe
+              srcDoc={currentHtml}
+              title="Email Preview"
+              className="w-full min-h-[920px] border-0"
+            />
           </div>
         </main>
       </div>

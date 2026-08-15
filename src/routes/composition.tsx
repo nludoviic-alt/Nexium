@@ -5160,13 +5160,24 @@ function NexiumAdminDashboard({
 
               {/* ── HEADER ── */}
               <div className="border-b border-slate-700/50 pb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
-                  <Mail className="size-6 text-emerald-400" />
-                  <span>E-mails</span>
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-400">
-                  Boîte e-mail partagée. Pour le chat direct avec les clients, voir <strong className="text-slate-300">Messagerie</strong> dans le menu.
-                </p>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                    <Mail className="size-6 text-emerald-400" />
+                    <span>E-mails Institutionnels</span>
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                    Gestion des communications officielles et notifications transactionnelles des clients.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/email-preview"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold text-xs transition shadow-sm"
+                  >
+                    <Sparkles className="size-4 text-emerald-400" />
+                    <span>Studio Templates 680px</span>
+                  </Link>
+                </div>
               </div>
 
               {/* Onglets de filtrage des e-mails */}

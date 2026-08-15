@@ -25,6 +25,8 @@ export const Route = createFileRoute("/contact")({
         content:
           "Contactez nos experts en trading algorithmique MT5 : support technique 24/7, licences de robots, intégration broker et partenariats.",
       },
+    ],
+  }),
   component: ContactPage,
 });
 

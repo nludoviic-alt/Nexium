@@ -1,6 +1,7 @@
 /**
  * Service d'envoi d'e-mails transactionnels ultra-haut de gamme pour Nexium Markets.
- * Design hybride institutionnel généreux et agrandi pour une occupation parfaite de l'espace.
+ * Design hybride institutionnel généreux (680px card, Midnight Blue #0B1623 & Emeraude #00C98D).
+ * Support bilingue complet (Français / Anglais).
  */
 
 const resendApiKey = import.meta.env.VITE_RESEND_API_KEY || "";
@@ -14,18 +15,30 @@ export const isResendConfigured = Boolean(
 );
 
 /* ==========================================================================
-   WRAPPER HTML HYBRIDE INSTITUTIONNEL (TEXTES AGRANDIS & ESPACE OPTIMISÉ)
+   WRAPPER HTML HYBRIDE INSTITUTIONNEL (680px CARD & MIDNIGHT BLUE)
    ========================================================================== */
 
 export function getEmailWrapper(
   title: string,
   preheader: string,
   contentHtml: string,
-  opts?: { kicker?: string }
+  opts?: { kicker?: string; lang?: "fr" | "en" }
 ): string {
   const kicker = opts?.kicker || "NEXIUM MARKETS";
+  const lang = opts?.lang || "fr";
+
+  const footerText =
+    lang === "fr"
+      ? "E-mail officiel sécurisé de gestion de compte · MetaTrader 5 High-Frequency Infrastructure"
+      : "Official verified account management notification · MetaTrader 5 High-Frequency Infrastructure";
+
+  const clientAreaLabel = lang === "fr" ? "Espace Client" : "Client Portal";
+  const supportLabel = lang === "fr" ? "Support 24/7" : "24/7 Support";
+  const termsLabel = lang === "fr" ? "Conditions" : "Terms";
+  const rightsLabel = lang === "fr" ? "Tous droits réservés" : "All rights reserved";
+
   return `<!DOCTYPE html>
-<html lang="fr" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="${lang}" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -116,18 +129,18 @@ export function getEmailWrapper(
                 line-height:1.7;
                 color:#9DAAB7;
               ">
-                E-mail officiel sécurisé de gestion de compte · MetaTrader 5 High-Frequency Infrastructure
+                ${footerText}
               </p>
 
               <p style="
                 margin:0 0 14px;
                 font-size:13px;
               ">
-                <a href="https://nexiummarkets.com/login" style="color:#00C98D;text-decoration:none;margin:0 10px;font-weight:700;">Espace Client</a>
+                <a href="https://nexiummarkets.com/portal" style="color:#00C98D;text-decoration:none;margin:0 10px;font-weight:700;">${clientAreaLabel}</a>
                 <span style="color:#3C4A5A;">•</span>
-                <a href="https://nexiummarkets.com/contact" style="color:#00C98D;text-decoration:none;margin:0 10px;font-weight:700;">Support 24/7</a>
+                <a href="https://nexiummarkets.com/contact" style="color:#00C98D;text-decoration:none;margin:0 10px;font-weight:700;">${supportLabel}</a>
                 <span style="color:#3C4A5A;">•</span>
-                <a href="https://nexiummarkets.com/terms" style="color:#00C98D;text-decoration:none;margin:0 10px;font-weight:700;">Conditions</a>
+                <a href="https://nexiummarkets.com/terms" style="color:#00C98D;text-decoration:none;margin:0 10px;font-weight:700;">${termsLabel}</a>
               </p>
 
               <p style="
@@ -135,7 +148,7 @@ export function getEmailWrapper(
                 font-size:11px;
                 color:#647484;
               ">
-                © ${new Date().getFullYear()} Nexium Markets · Tous droits réservés
+                © ${new Date().getFullYear()} Nexium Markets · ${rightsLabel}
               </p>
 
             </td>
@@ -262,22 +275,31 @@ function renderRecapSection(
   `;
 }
 
-function renderCalloutSection(title: string, message: string): string {
+function renderCalloutSection(title: string, message: string, alertBg = "#EFF6FF", alertBorder = "#BFDBFE", alertColor = "#1D4ED8"): string {
   return `
     <tr>
       <td style="padding:24px 48px 0;">
         <table width="100%" cellpadding="0" cellspacing="0" border="0"
           style="
-            background:#ECFBF6;
-            border-left:5px solid #00C98D;
+            background:${alertBg};
+            border-left:5px solid ${alertBorder};
             border-radius:12px;
           ">
           <tr>
-            <td style="padding:18px 24px;">
-              <div style="font-size:15px;font-weight:800;color:#087656;margin-bottom:6px;">
+            <td style="padding:20px 24px;">
+              <div style="
+                font-size:15px;
+                font-weight:800;
+                color:${alertColor};
+                margin-bottom:6px;
+              ">
                 ${title}
               </div>
-              <div style="font-size:15px;line-height:1.65;color:#4A6B60;">
+              <div style="
+                font-size:15px;
+                line-height:1.65;
+                color:#4B5563;
+              ">
                 ${message}
               </div>
             </td>
@@ -288,28 +310,37 @@ function renderCalloutSection(title: string, message: string): string {
   `;
 }
 
-function renderCtaSection(url: string, label: string, subtext?: string): string {
+function renderCtaSection(url: string, buttonText: string, note?: string): string {
   return `
     <tr>
-      <td align="center" style="padding:38px 36px 46px;">
-        <a href="${url}"
-          style="
-            display:inline-block;
-            background:#00C98D;
-            color:#06271E;
-            text-decoration:none;
-            font-size:17px;
-            font-weight:800;
-            padding:18px 40px;
-            border-radius:12px;
-            letter-spacing:0.4px;
-            box-shadow:0 6px 20px rgba(0,201,141,0.28);
-          ">
-          ${label} &nbsp; →
-        </a>
+      <td align="center" style="padding:40px 48px 48px;">
+        <table cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td align="center"
+              style="
+                background:#00C98D;
+                border-radius:14px;
+                box-shadow:0 8px 24px rgba(0,201,141,0.35);
+              ">
+              <a href="${url}" target="_blank"
+                style="
+                  display:inline-block;
+                  padding:18px 44px;
+                  font-size:16px;
+                  font-weight:900;
+                  color:#0B1623;
+                  text-decoration:none;
+                  letter-spacing:1px;
+                  text-transform:uppercase;
+                ">
+                ${buttonText} ➔
+              </a>
+            </td>
+          </tr>
+        </table>
         ${
-          subtext
-            ? `<p style="margin:18px 0 0;font-size:13px;color:#8B99A7;">${subtext}</p>`
+          note
+            ? `<div style="margin-top:16px;font-size:13px;color:#94A3B8;max-width:440px;line-height:1.5;">${note}</div>`
             : ""
         }
       </td>
@@ -317,183 +348,198 @@ function renderCtaSection(url: string, label: string, subtext?: string): string 
   `;
 }
 
+/* ==========================================================================
+   ENVOI HTTP VIA RESEND API
+   ========================================================================== */
+
 export interface SendEmailResult {
   success: boolean;
-  messageId?: string;
-  simulated?: boolean;
+  id?: string;
   error?: string;
 }
 
-async function sendViaResendHttp(to: string, subject: string, html: string): Promise<SendEmailResult> {
-  try {
-    const relayRes = await fetch("/api/send-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to, subject, html }),
-    });
-    if (relayRes.ok) {
-      const relayData = await relayRes.json();
-      return { success: true, messageId: relayData.id };
-    }
-  } catch (relayErr) {}
-
-  if (resendApiKey) {
-    try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${resendApiKey}`,
-        },
-        body: JSON.stringify({
-          from: defaultFromEmail,
-          to: [to],
-          subject,
-          html,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        return { success: true, messageId: data.id };
-      }
-    } catch (err: any) {
-      console.warn("Direct Resend notice:", err);
-    }
+export async function sendViaResendHttp(
+  to: string,
+  subject: string,
+  html: string,
+  from = defaultFromEmail
+): Promise<SendEmailResult> {
+  if (!isResendConfigured) {
+    console.info(`[Resend Simulated] Destinataire: ${to} | Sujet: ${subject}`);
+    return { success: true, id: `sim-${Date.now()}` };
   }
 
-  return { success: true, simulated: true, messageId: `sim_${Date.now()}` };
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to, subject, html }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data?.message || `HTTP ${res.status}` };
+    }
+
+    return { success: true, id: data?.id };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Erreur réseau inconnue" };
+  }
 }
 
 /* ==========================================================================
-   LES 7 TEMPLATES AGRANDIS & HARMONISÉS
+   LES 8 TEMPLATES TRANSACTIONNELS OFFICIELS
    ========================================================================== */
 
 /**
- * 1. INSCRIPTION EN ATTENTE
+ * 1. INSCRIPTION REÇUE (Confirmation client)
  */
-export function renderRegistrationPendingEmailHtml(clientName: string, country?: string): string {
+export function renderRegistrationPendingEmailHtml(clientName: string, country?: string, lang: "fr" | "en" = "fr"): string {
+  const isFr = lang === "fr";
   const content = `
     ${renderIntroSection(
-      "✓",
-      "Demande d'ouverture enregistrée",
-      `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>nous avons bien reçu votre demande d'ouverture de compte.<br>Votre dossier est maintenant en cours de validation par notre équipe.`
+      "⏳",
+      isFr ? "Demande d'ouverture enregistrée" : "Account Application Received",
+      isFr
+        ? `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>nous avons bien reçu votre demande d'ouverture de compte.<br>Votre dossier est maintenant en cours de validation par notre équipe.`
+        : `Hello <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>we have successfully received your account application.<br>Our compliance team is currently reviewing your profile.`
     )}
 
-    ${renderRecapSection("Récapitulatif de votre demande", [
-      { label: "Titulaire du compte", value: clientName },
-      { label: "Pays de résidence", value: country || "France" },
-      { label: "Statut du dossier", value: "", badge: { text: "EN REVUE", bg: "#E5F9F2", color: "#009B6D" } },
+    ${renderRecapSection(isFr ? "Récapitulatif de votre demande" : "Application Summary", [
+      { label: isFr ? "Titulaire du compte" : "Account Holder", value: clientName },
+      { label: isFr ? "Pays de résidence" : "Country of Residence", value: country || (isFr ? "France" : "United Kingdom") },
+      { label: isFr ? "Statut du dossier" : "File Status", value: "", badge: { text: isFr ? "EN REVUE" : "IN REVIEW", bg: "#E5F9F2", color: "#009B6D" } },
     ])}
 
     ${renderCalloutSection(
-      "Prochaine étape",
-      "Notre équipe examine votre dossier. Vous recevrez automatiquement un e-mail dès que vos accès Nexium Markets seront activés."
+      isFr ? "Prochaine étape" : "Next Step",
+      isFr
+        ? "Notre équipe examine votre dossier. Vous recevrez automatiquement un e-mail dès que vos accès Nexium Markets seront activés."
+        : "Our onboarding desk is verifying your information. You will receive an activation email as soon as your credentials are ready."
     )}
 
     ${renderCtaSection(
-      "https://nexiummarkets.com/login",
-      "Suivre ma demande",
-      "Vous n'avez aucune action à effectuer pour le moment."
+      "https://nexiummarkets.com/portal",
+      isFr ? "Suivre ma demande" : "Track My Status",
+      isFr ? "Vous n'avez aucune action à effectuer pour le moment." : "No further action is required from your side at this stage."
     )}
   `;
 
   return getEmailWrapper(
-    "Nexium Markets — Demande enregistrée",
-    `Bonjour ${clientName}, votre demande d'ouverture a été enregistrée.`,
+    isFr ? "Nexium Markets — Demande enregistrée" : "Nexium Markets — Application Received",
+    isFr ? `Bonjour ${clientName}, votre demande a été enregistrée.` : `Hello ${clientName}, your application has been received.`,
     content,
-    { kicker: "Inscription" }
+    { kicker: isFr ? "Inscription" : "Registration", lang }
   );
 }
 
 export async function sendRegistrationPendingEmail(
   to: string,
   clientName: string,
-  country?: string
+  country?: string,
+  lang: "fr" | "en" = "fr"
 ): Promise<SendEmailResult> {
-  const subject = "⏳ Prise en compte de votre demande d'ouverture — Nexium Markets";
-  const html = renderRegistrationPendingEmailHtml(clientName, country);
+  const subject = lang === "fr"
+    ? "⏳ Prise en compte de votre demande d'ouverture — Nexium Markets"
+    : "⏳ Account Application Received — Nexium Markets";
+  const html = renderRegistrationPendingEmailHtml(clientName, country, lang);
   return sendViaResendHttp(to, subject, html);
 }
 
 /**
  * 2. BIENVENUE & COMPTE ACTIVÉ
  */
-export function renderWelcomeEmailHtml(clientName: string, mt5Login?: string): string {
+export function renderWelcomeEmailHtml(clientName: string, mt5Login?: string, lang: "fr" | "en" = "fr"): string {
+  const isFr = lang === "fr";
   const content = `
     ${renderIntroSection(
       "★",
-      "Compte activé avec succès",
-      `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>votre compte a été validé par notre équipe. Vos accès au portail et à vos robots MetaTrader 5 sont désormais disponibles.`
+      isFr ? "Compte activé avec succès" : "Account Successfully Activated",
+      isFr
+        ? `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>votre compte a été validé par notre équipe. Vos accès au portail et à vos robots MetaTrader 5 sont désormais disponibles.`
+        : `Hello <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>your account has been approved. Your access to the client portal and MT5 Expert Advisors is now fully active.`
     )}
 
-    ${renderRecapSection("Vos Accès MetaTrader 5", [
-      { label: "Serveur d'exécution", value: "Nexium-Live-NY4" },
-      { label: "Compte de trading", value: mt5Login ? `#${mt5Login}` : "#892041" },
-      { label: "Statut des robots", value: "", badge: { text: "ACTIF", bg: "#E5F9F2", color: "#009B6D" } },
+    ${renderRecapSection(isFr ? "Vos Accès MetaTrader 5" : "Your MetaTrader 5 Credentials", [
+      { label: isFr ? "Serveur d'exécution" : "Execution Server", value: "Nexium-Live-NY4 (Equinix)" },
+      { label: isFr ? "Compte de trading" : "Trading Account ID", value: mt5Login ? `#${mt5Login}` : "#892041" },
+      { label: isFr ? "Statut des robots" : "Algorithm Status", value: "", badge: { text: isFr ? "ACTIF" : "ACTIVE", bg: "#E5F9F2", color: "#009B6D" } },
     ])}
 
     ${renderCalloutSection(
-      "Démarrage immédiat",
-      "Connectez-vous dès à présent à votre espace client pour lancer vos stratégies et suivre vos performances en temps réel."
+      isFr ? "Démarrage immédiat" : "Instant Activation",
+      isFr
+        ? "Connectez-vous dès à présent à votre espace client pour lancer vos stratégies et suivre vos performances en temps réel."
+        : "Log in to your executive dashboard to deploy your strategies and monitor live telemetry in real time."
     )}
 
     ${renderCtaSection(
-      "https://nexiummarkets.com/NEXIUM",
-      "Accéder à mon espace client",
-      "Vos paramètres sont pré-configurés pour vos premiers ordres MT5."
+      "https://nexiummarkets.com/portal",
+      isFr ? "Accéder à mon espace client" : "Access My Client Portal",
+      isFr ? "Vos paramètres sont pré-configurés pour vos premiers ordres MT5." : "Your parameters are pre-configured for low-latency MT5 order execution."
     )}
   `;
 
   return getEmailWrapper(
-    "Nexium Markets — Compte activé",
-    `Bonjour ${clientName}, vos accès Nexium Markets sont prêts.`,
+    isFr ? "Nexium Markets — Compte activé" : "Nexium Markets — Account Activated",
+    isFr ? `Bonjour ${clientName}, vos accès Nexium Markets sont prêts.` : `Hello ${clientName}, your Nexium Markets access is ready.`,
     content,
-    { kicker: "Compte Activé" }
+    { kicker: isFr ? "Compte Activé" : "Account Active", lang }
   );
 }
 
-export async function sendWelcomeEmail(to: string, clientName: string, mt5Login?: string): Promise<SendEmailResult> {
-  const subject = "👑 Bienvenue chez Nexium Markets — Votre Compte est Activé";
-  const html = renderWelcomeEmailHtml(clientName, mt5Login);
+export async function sendWelcomeEmail(to: string, clientName: string, mt5Login?: string, lang: "fr" | "en" = "fr"): Promise<SendEmailResult> {
+  const subject = lang === "fr"
+    ? "👑 Bienvenue chez Nexium Markets — Votre Compte est Activé"
+    : "👑 Welcome to Nexium Markets — Your Account is Ready";
+  const html = renderWelcomeEmailHtml(clientName, mt5Login, lang);
   return sendViaResendHttp(to, subject, html);
 }
 
 /**
  * 3. MOT DE PASSE OUBLIÉ
  */
-export function renderPasswordResetEmailHtml(clientName: string, resetUrl: string): string {
+export function renderPasswordResetEmailHtml(clientName: string, resetUrl: string, lang: "fr" | "en" = "fr"): string {
+  const isFr = lang === "fr";
   const content = `
     ${renderIntroSection(
       "🔒",
-      "Réinitialiser le mot de passe",
-      `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>nous avons reçu une demande de réinitialisation de mot de passe pour votre compte Nexium Markets.`
+      isFr ? "Réinitialiser le mot de passe" : "Reset Your Password",
+      isFr
+        ? `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>nous avons reçu une demande de réinitialisation de mot de passe pour votre compte Nexium Markets.`
+        : `Hello <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>we received a password recovery request for your Nexium Markets account.`
     )}
 
     ${renderCalloutSection(
-      "Lien temporaire sécurisé",
-      "Ce lien sécurisé est strictement personnel et expirera automatiquement dans <strong>15 minutes</strong>."
+      isFr ? "Lien temporaire sécurisé" : "Secure Temporary Link",
+      isFr
+        ? "Ce lien sécurisé est strictement personnel et expirera automatiquement dans <strong>15 minutes</strong>."
+        : "This single-use recovery link is cryptographically signed and expires in <strong>15 minutes</strong>."
     )}
 
     ${renderCtaSection(
       resetUrl,
-      "Changer mon mot de passe",
-      "Si vous n'avez pas demandé ce changement, ignorez simplement cet e-mail."
+      isFr ? "Changer mon mot de passe" : "Reset Password Now",
+      isFr ? "Si vous n'avez pas demandé ce changement, ignorez simplement cet e-mail." : "If you did not request this recovery, please safely disregard this email."
     )}
   `;
 
   return getEmailWrapper(
-    "Nexium Markets — Réinitialisation de mot de passe",
-    "Lien sécurisé de réinitialisation de votre mot de passe.",
+    isFr ? "Nexium Markets — Réinitialisation de mot de passe" : "Nexium Markets — Password Reset",
+    isFr ? "Lien sécurisé de réinitialisation de votre mot de passe." : "Secure password reset authorization link.",
     content,
-    { kicker: "Sécurité" }
+    { kicker: isFr ? "Sécurité" : "Security", lang }
   );
 }
 
-export async function sendPasswordResetEmail(to: string, clientName: string, resetUrl: string): Promise<SendEmailResult> {
-  const subject = "🔒 Réinitialisation de votre mot de passe — Nexium Markets";
-  const html = renderPasswordResetEmailHtml(clientName, resetUrl);
+export async function sendPasswordResetEmail(to: string, clientName: string, resetUrl: string, lang: "fr" | "en" = "fr"): Promise<SendEmailResult> {
+  const subject = lang === "fr"
+    ? "🔒 Réinitialisation de votre mot de passe — Nexium Markets"
+    : "🔒 Password Reset Request — Nexium Markets";
+  const html = renderPasswordResetEmailHtml(clientName, resetUrl, lang);
   return sendViaResendHttp(to, subject, html);
 }
 
@@ -504,41 +550,45 @@ export function renderDepositConfirmedEmailHtml(
   clientName: string,
   amountFormatted: string,
   mt5Login: string,
-  txRef?: string
+  txRef?: string,
+  lang: "fr" | "en" = "fr"
 ): string {
+  const isFr = lang === "fr";
   const content = `
     ${renderIntroSection(
       "✓",
-      "Dépôt crédité avec succès",
-      `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>vos fonds ont été réceptionnés et sont immédiatement alloués à votre portefeuille de trading.`
+      isFr ? "Dépôt crédité avec succès" : "Deposit Credited Successfully",
+      isFr
+        ? `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>vos fonds ont été réceptionnés et sont immédiatement alloués à votre portefeuille de trading.`
+        : `Hello <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>your funds have been settled and are immediately allocated to your MT5 portfolio.`
     )}
 
     <tr>
       <td align="center" style="padding:10px 48px 0;">
-        <div style="font-size:38px;font-weight:900;color:#00A978;letter-spacing:-0.5px;">
+        <div style="font-size:40px;font-weight:900;color:#00A978;letter-spacing:-0.5px;">
           +${amountFormatted}
         </div>
       </td>
     </tr>
 
-    ${renderRecapSection("Détails de la transaction", [
-      { label: "Compte MT5 bénéficiaire", value: `#${mt5Login}` },
-      { label: "Référence d'ordre", value: txRef || "NEX-849201" },
-      { label: "Disponibilité des fonds", value: "", badge: { text: "IMMÉDIATE", bg: "#E5F9F2", color: "#009B6D" } },
+    ${renderRecapSection(isFr ? "Détails de la transaction" : "Transaction Breakdown", [
+      { label: isFr ? "Compte MT5 bénéficiaire" : "Destination MT5 Account", value: `#${mt5Login}` },
+      { label: isFr ? "Référence d'ordre" : "Order Reference", value: txRef || "NEX-849201" },
+      { label: isFr ? "Disponibilité des fonds" : "Fund Availability", value: "", badge: { text: isFr ? "IMMÉDIATE" : "IMMEDIATE", bg: "#E5F9F2", color: "#009B6D" } },
     ])}
 
     ${renderCtaSection(
-      "https://nexiummarkets.com/NEXIUM",
-      "Consulter mon solde",
-      "Mise à jour instantanée visible sur votre tableau de bord."
+      "https://nexiummarkets.com/portal",
+      isFr ? "Consulter mon solde" : "View Live Balance",
+      isFr ? "Mise à jour instantanée visible sur votre tableau de bord." : "Real-time telemetry reflects balance updates across all connected algorithms."
     )}
   `;
 
   return getEmailWrapper(
-    `Nexium Markets — Dépôt de +${amountFormatted} confirmé`,
-    `Vos fonds de +${amountFormatted} ont été crédités.`,
+    isFr ? `Nexium Markets — Dépôt de +${amountFormatted} confirmé` : `Nexium Markets — Deposit of +${amountFormatted} confirmed`,
+    isFr ? `Vos fonds de +${amountFormatted} ont été crédités.` : `Your deposit of +${amountFormatted} has been credited.`,
     content,
-    { kicker: "Dépôt Confirmé" }
+    { kicker: isFr ? "Dépôt Confirmé" : "Deposit Confirmed", lang }
   );
 }
 
@@ -547,10 +597,13 @@ export async function sendDepositConfirmedEmail(
   clientName: string,
   amountFormatted: string,
   mt5Login: string,
-  txRef?: string
+  txRef?: string,
+  lang: "fr" | "en" = "fr"
 ): Promise<SendEmailResult> {
-  const subject = `✅ Dépôt confirmé : +${amountFormatted} sur votre compte #${mt5Login}`;
-  const html = renderDepositConfirmedEmailHtml(clientName, amountFormatted, mt5Login, txRef);
+  const subject = lang === "fr"
+    ? `✅ Dépôt confirmé : +${amountFormatted} sur votre compte #${mt5Login}`
+    : `✅ Deposit Confirmed: +${amountFormatted} on account #${mt5Login}`;
+  const html = renderDepositConfirmedEmailHtml(clientName, amountFormatted, mt5Login, txRef, lang);
   return sendViaResendHttp(to, subject, html);
 }
 
@@ -560,45 +613,51 @@ export async function sendDepositConfirmedEmail(
 export function renderWithdrawalApprovedEmailHtml(
   clientName: string,
   amountFormatted: string,
-  destination: string
+  destination: string,
+  lang: "fr" | "en" = "fr"
 ): string {
+  const isFr = lang === "fr";
   const content = `
     ${renderIntroSection(
       "→",
-      "Retrait approuvé & transféré",
-      `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>votre demande de retrait a été validée par notre service financier et le virement a été exécuté.`
+      isFr ? "Retrait approuvé & transféré" : "Withdrawal Approved & Transferred",
+      isFr
+        ? `Bonjour <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>votre demande de retrait a été validée par notre service financier et le virement a été exécuté.`
+        : `Hello <strong style="color:#17212B;font-size:18px;">${clientName}</strong>,<br>your withdrawal request has been approved by finance and the payout has been dispatched.`
     )}
 
     <tr>
       <td align="center" style="padding:10px 48px 0;">
-        <div style="font-size:36px;font-weight:900;color:#0B1623;letter-spacing:-0.5px;">
+        <div style="font-size:38px;font-weight:900;color:#0B1623;letter-spacing:-0.5px;">
           ${amountFormatted}
         </div>
       </td>
     </tr>
 
-    ${renderRecapSection("Détails du transfert bancaire", [
-      { label: "Destination des fonds", value: destination },
-      { label: "Statut d'exécution", value: "", badge: { text: "EXÉCUTÉ", bg: "#EBF5FF", color: "#1D4ED8" } },
+    ${renderRecapSection(isFr ? "Détails du transfert bancaire" : "Transfer Details", [
+      { label: isFr ? "Destination des fonds" : "Destination IBAN / Wallet", value: destination },
+      { label: isFr ? "Statut d'exécution" : "Execution Status", value: "", badge: { text: isFr ? "EXÉCUTÉ" : "DISPATCHED", bg: "#EBF5FF", color: "#1D4ED8" } },
     ])}
 
     ${renderCalloutSection(
-      "Délais bancaires",
-      "Les fonds apparaîtront sur votre compte bancaire selon les délais de compensation habituels de votre banque (24h à 48h)."
+      isFr ? "Délais bancaires" : "Settlement Window",
+      isFr
+        ? "Les fonds apparaîtront sur votre compte bancaire selon les délais de compensation habituels de votre banque (24h à 48h)."
+        : "Funds typically arrive in your account within standard interbank settlement times (24h to 48h)."
     )}
 
     ${renderCtaSection(
-      "https://nexiummarkets.com/NEXIUM",
-      "Accéder à mon espace client",
-      "Relevé de compte mis à jour et disponible au téléchargement."
+      "https://nexiummarkets.com/portal",
+      isFr ? "Accéder à mon espace client" : "Access Client Portal",
+      isFr ? "Relevé de compte mis à jour et disponible au téléchargement." : "Official statement available for export inside your portal."
     )}
   `;
 
   return getEmailWrapper(
-    `Nexium Markets — Retrait de ${amountFormatted} validé`,
-    `Votre virement de ${amountFormatted} a été exécuté.`,
+    isFr ? `Nexium Markets — Retrait de ${amountFormatted} validé` : `Nexium Markets — Withdrawal of ${amountFormatted} processed`,
+    isFr ? `Votre virement de ${amountFormatted} a été exécuté.` : `Your payout of ${amountFormatted} has been executed.`,
     content,
-    { kicker: "Retrait Validé" }
+    { kicker: isFr ? "Retrait Validé" : "Withdrawal Processed", lang }
   );
 }
 
@@ -606,10 +665,13 @@ export async function sendWithdrawalApprovedEmail(
   to: string,
   clientName: string,
   amountFormatted: string,
-  destinationIbanOrWallet: string
+  destinationIbanOrWallet: string,
+  lang: "fr" | "en" = "fr"
 ): Promise<SendEmailResult> {
-  const subject = `💸 Retrait validé : ${amountFormatted}`;
-  const html = renderWithdrawalApprovedEmailHtml(clientName, amountFormatted, destinationIbanOrWallet);
+  const subject = lang === "fr"
+    ? `💸 Retrait validé : ${amountFormatted}`
+    : `💸 Withdrawal Processed: ${amountFormatted}`;
+  const html = renderWithdrawalApprovedEmailHtml(clientName, amountFormatted, destinationIbanOrWallet, lang);
   return sendViaResendHttp(to, subject, html);
 }
 
@@ -642,8 +704,8 @@ export function renderAdminNewClientAlertEmailHtml(clientData: {
     ])}
 
     ${renderCtaSection(
-      "https://nexiummarkets.com/composition",
-      "Ouvrir la console admin",
+      "https://nexiummarkets.com/desk",
+      "Ouvrir la console Desk",
       "Validation requise pour l'activation des flux de trading."
     )}
   `;
@@ -652,7 +714,7 @@ export function renderAdminNewClientAlertEmailHtml(clientData: {
     `[ADMIN] Nouvelle inscription : ${clientData.name}`,
     `Nouvelle inscription : ${clientData.name} (${clientData.email})`,
     content,
-    { kicker: "Alerte Admin" }
+    { kicker: "Alerte Desk" }
   );
 }
 
@@ -663,20 +725,103 @@ export async function sendAdminNewClientAlertEmail(clientData: {
   phone?: string | undefined;
   ibCode?: string | undefined;
 }): Promise<SendEmailResult> {
-  const subject = `🚨 [ADMIN] Nouveau client : ${clientData.name}`;
+  const subject = `🚨 [DESK] Nouveau client à valider : ${clientData.name}`;
   const html = renderAdminNewClientAlertEmailHtml(clientData);
   return sendViaResendHttp("support@nexiummarkets.com", subject, html);
 }
 
 /**
- * 7. MESSAGE DU DESK / SUPPORT
+ * 7. NOTIFICATION ADMIN FORMULAIRE DE CONTACT
  */
-export function renderCustomDeskEmailHtml(bodyText: string, advisorName?: string): string {
+export function renderContactNotificationHtml(params: {
+  fullName: string;
+  email: string;
+  subject: string;
+  message: string;
+  mt5Account?: string;
+  broker?: string;
+}): string {
+  const content = `
+    ${renderIntroSection(
+      "✉",
+      "Nouveau message reçu",
+      `Le formulaire de contact du site vient d'enregistrer une demande de <strong style="color:#0B1623;">${params.fullName}</strong>.`,
+      "#EBF5FF",
+      "#1D4ED8"
+    )}
+
+    ${renderRecapSection("Coordonnées & Demande", [
+      { label: "Nom complet", value: params.fullName },
+      { label: "Adresse email", value: params.email },
+      { label: "Sujet de la demande", value: params.subject },
+      ...(params.mt5Account ? [{ label: "Compte MT5", value: params.mt5Account }] : []),
+      ...(params.broker ? [{ label: "Courtier / Broker", value: params.broker }] : []),
+      { label: "Origine", value: "Page Contact / Anti-Spam Vérifié" },
+    ])}
+
+    <tr>
+      <td style="padding:24px 48px 0;">
+        <div style="
+          background:#F8FAFC;
+          border:1.5px solid #E2E8F0;
+          border-radius:18px;
+          padding:24px 28px;
+          font-size:16px;
+          line-height:1.75;
+          color:#1E293B;
+        ">
+          <div style="font-size:12px;font-weight:800;letter-spacing:1.5px;color:#64748B;margin-bottom:10px;text-transform:uppercase;">
+            Message du client :
+          </div>
+          ${params.message.replace(/\n/g, "<br>")}
+        </div>
+      </td>
+    </tr>
+
+    ${renderCtaSection(
+      "https://nexiummarkets.com/desk",
+      "Répondre depuis le Desk",
+      "Le message a été automatiquement routé vers la file d'attente Messagerie du Desk."
+    )}
+  `;
+
+  return getEmailWrapper(
+    `[CONTACT] Nouveau message : ${params.subject} — ${params.fullName}`,
+    `Demande reçue de ${params.fullName} (${params.email})`,
+    content,
+    { kicker: "Support Contact" }
+  );
+}
+
+export async function sendContactNotificationEmail(params: {
+  fullName: string;
+  email: string;
+  subject: string;
+  message: string;
+  mt5Account?: string;
+  broker?: string;
+}): Promise<SendEmailResult> {
+  const subjectLine = `📨 [CONTACT DESK] ${params.subject} — ${params.fullName}`;
+  const html = renderContactNotificationHtml(params);
+  return sendViaResendHttp("support@nexiummarkets.com", subjectLine, html);
+}
+
+/**
+ * 8. MESSAGE DU CONSEILLER DESK
+ */
+export function renderCustomDeskEmailHtml(
+  bodyText: string,
+  advisorName?: string,
+  lang: "fr" | "en" = "fr"
+): string {
+  const isFr = lang === "fr";
   const content = `
     ${renderIntroSection(
       "💬",
-      "Message de votre Desk",
-      `Votre conseiller vous a transmis une communication officielle relative à votre compte.`
+      isFr ? "Message officiel de votre Desk" : "Official Message from your Desk",
+      isFr
+        ? `Votre conseiller institutionnel vous a transmis une communication officielle relative à votre compte.`
+        : `Your institutional advisor has dispatched an official communication regarding your account.`
     )}
 
     <tr>
@@ -694,7 +839,7 @@ export function renderCustomDeskEmailHtml(bodyText: string, advisorName?: string
           
           <div style="border-top:1px solid #E5EBEF;padding-top:16px;margin-top:20px;">
             <div style="font-size:16px;font-weight:800;color:#0B1623;">
-              ${advisorName || "Marc V. — Desk Institutionnel"}
+              ${advisorName || (isFr ? "Marc V. — Desk Institutionnel" : "Mark V. — Institutional Desk")}
             </div>
             <div style="font-size:12px;font-weight:800;color:#00A978;letter-spacing:1px;margin-top:4px;">
               OPERATIONS & COMPLIANCE DESK
@@ -705,17 +850,17 @@ export function renderCustomDeskEmailHtml(bodyText: string, advisorName?: string
     </tr>
 
     ${renderCtaSection(
-      "https://nexiummarkets.com/login",
-      "Répondre depuis mon espace",
-      "Accès chiffré et sécurisé 24/7."
+      "https://nexiummarkets.com/portal",
+      isFr ? "Accéder à mon espace client" : "Access Client Portal",
+      isFr ? "Accès chiffré et sécurisé 24/7." : "24/7 encrypted secure connection."
     )}
   `;
 
   return getEmailWrapper(
-    "Nexium Markets — Message de votre conseiller",
-    "Message officiel de votre support Nexium Markets",
+    isFr ? "Nexium Markets — Message de votre conseiller" : "Nexium Markets — Advisor Message",
+    isFr ? "Message officiel de votre support Nexium Markets" : "Official notification from Nexium Markets Support",
     content,
-    { kicker: "Support Desk" }
+    { kicker: isFr ? "Support Desk" : "Support Desk", lang }
   );
 }
 
@@ -723,85 +868,9 @@ export async function sendCustomDeskEmail(
   to: string,
   subject: string,
   bodyText: string,
-  advisorName?: string
+  advisorName?: string,
+  lang: "fr" | "en" = "fr"
 ): Promise<SendEmailResult> {
-  const html = renderCustomDeskEmailHtml(bodyText, advisorName);
+  const html = renderCustomDeskEmailHtml(bodyText, advisorName, lang);
   return sendViaResendHttp(to, subject, html);
 }
-
-/**
- * Notification automatique reçue par le support/admin lorsqu'un prospect écrit sur /contact.
- */
-export function renderContactNotificationHtml(params: {
-  fullName: string;
-  email: string;
-  subject: string;
-  message: string;
-  mt5Account?: string;
-  broker?: string;
-}): string {
-  const content = `
-    ${renderHeroSection(
-      "Nouveau message reçu",
-      `Le formulaire de contact du site vient d'enregistrer une demande de <strong style="color:#0B1623;">${params.fullName}</strong>.`,
-      "Nouveau Contact Web"
-    )}
-
-    ${renderDataGridSection("Coordonnées & Informations", [
-      { label: "Nom complet", value: params.fullName, highlight: true },
-      { label: "Adresse e-mail", value: `<a href="mailto:${params.email}" style="color:#00A978;text-decoration:none;font-weight:700;">${params.email}</a>` },
-      { label: "Sujet", value: params.subject },
-      ...(params.mt5Account ? [{ label: "Compte MT5 déclaré", value: `#${params.mt5Account}` }] : []),
-      ...(params.broker ? [{ label: "Courtier partenaire", value: params.broker }] : []),
-    ])}
-
-    <tr>
-      <td style="padding:20px 48px 0;">
-        <div style="
-          background:#F7FAFC;
-          border:1.5px solid #E3E9EE;
-          border-radius:18px;
-          padding:24px 28px;
-          font-size:16px;
-          line-height:1.7;
-          color:#2D3748;
-        ">
-          <div style="font-size:12px;font-weight:800;color:#718096;letter-spacing:1.5px;margin-bottom:10px;text-transform:uppercase;">
-            Message du visiteur :
-          </div>
-          ${params.message.replace(/\n/g, "<br>")}
-        </div>
-      </td>
-    </tr>
-
-    ${renderCtaSection(
-      "https://nexiummarkets.com/composition",
-      "Ouvrir dans l'Admin & Répondre ➔",
-      "Répondez directement depuis la console Desk & Messagerie."
-    )}
-  `;
-
-  return getEmailWrapper(
-    "Nouveau message de contact — Nexium Markets",
-    `Nouveau message de contact de ${params.fullName}`,
-    content,
-    { kicker: "Formulaire de Contact" }
-  );
-}
-
-export async function sendContactNotificationEmail(params: {
-  fullName: string;
-  email: string;
-  subject: string;
-  message: string;
-  mt5Account?: string;
-  broker?: string;
-}): Promise<SendEmailResult> {
-  const html = renderContactNotificationHtml(params);
-  return sendViaResendHttp(
-    "support@nexiummarkets.com",
-    `[Nouveau Contact Web] ${params.subject} — ${params.fullName}`,
-    html
-  );
-}
-

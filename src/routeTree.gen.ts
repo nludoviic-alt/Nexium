@@ -30,6 +30,12 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RiskDisclosureRouteImport } from './routes/risk-disclosure'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminSlugRouteImport } from './routes/admin.$slug'
+import { Route as DeskIndexRouteImport } from './routes/desk.index'
+import { Route as DeskSlugRouteImport } from './routes/desk.$slug'
+import { Route as PortalIndexRouteImport } from './routes/portal.index'
+import { Route as PortalSlugRouteImport } from './routes/portal.$slug'
 import { Route as RobotsIndexRouteImport } from './routes/robots.index'
 import { Route as RobotsSlugRouteImport } from './routes/robots.$slug'
 
@@ -138,6 +144,36 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSlugRoute = AdminSlugRouteImport.update({
+  id: '/admin/$slug',
+  path: '/admin/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeskIndexRoute = DeskIndexRouteImport.update({
+  id: '/desk/',
+  path: '/desk/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeskSlugRoute = DeskSlugRouteImport.update({
+  id: '/desk/$slug',
+  path: '/desk/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/portal/',
+  path: '/portal/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalSlugRoute = PortalSlugRouteImport.update({
+  id: '/portal/$slug',
+  path: '/portal/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RobotsIndexRoute = RobotsIndexRouteImport.update({
   id: '/robots/',
   path: '/robots/',
@@ -171,7 +207,13 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
   '/terms': typeof TermsRoute
+  '/admin/$slug': typeof AdminSlugRoute
+  '/desk/$slug': typeof DeskSlugRoute
+  '/portal/$slug': typeof PortalSlugRoute
   '/robots/$slug': typeof RobotsSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/desk/': typeof DeskIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/robots/': typeof RobotsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -196,7 +238,13 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
   '/terms': typeof TermsRoute
+  '/admin/$slug': typeof AdminSlugRoute
+  '/desk/$slug': typeof DeskSlugRoute
+  '/portal/$slug': typeof PortalSlugRoute
   '/robots/$slug': typeof RobotsSlugRoute
+  '/admin': typeof AdminIndexRoute
+  '/desk': typeof DeskIndexRoute
+  '/portal': typeof PortalIndexRoute
   '/robots': typeof RobotsIndexRoute
 }
 export interface FileRoutesById {
@@ -222,7 +270,13 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
   '/terms': typeof TermsRoute
+  '/admin/$slug': typeof AdminSlugRoute
+  '/desk/$slug': typeof DeskSlugRoute
+  '/portal/$slug': typeof PortalSlugRoute
   '/robots/$slug': typeof RobotsSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/desk/': typeof DeskIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/robots/': typeof RobotsIndexRoute
 }
 export interface FileRouteTypes {
@@ -249,7 +303,13 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/risk-disclosure'
     | '/terms'
+    | '/admin/$slug'
+    | '/desk/$slug'
+    | '/portal/$slug'
     | '/robots/$slug'
+    | '/admin/'
+    | '/desk/'
+    | '/portal/'
     | '/robots/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -274,7 +334,13 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/risk-disclosure'
     | '/terms'
+    | '/admin/$slug'
+    | '/desk/$slug'
+    | '/portal/$slug'
     | '/robots/$slug'
+    | '/admin'
+    | '/desk'
+    | '/portal'
     | '/robots'
   id:
     | '__root__'
@@ -299,7 +365,13 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/risk-disclosure'
     | '/terms'
+    | '/admin/$slug'
+    | '/desk/$slug'
+    | '/portal/$slug'
     | '/robots/$slug'
+    | '/admin/'
+    | '/desk/'
+    | '/portal/'
     | '/robots/'
   fileRoutesById: FileRoutesById
 }
@@ -325,7 +397,13 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   RiskDisclosureRoute: typeof RiskDisclosureRoute
   TermsRoute: typeof TermsRoute
+  AdminSlugRoute: typeof AdminSlugRoute
+  DeskSlugRoute: typeof DeskSlugRoute
+  PortalSlugRoute: typeof PortalSlugRoute
   RobotsSlugRoute: typeof RobotsSlugRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  DeskIndexRoute: typeof DeskIndexRoute
+  PortalIndexRoute: typeof PortalIndexRoute
   RobotsIndexRoute: typeof RobotsIndexRoute
 }
 
@@ -478,6 +556,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/$slug': {
+      id: '/admin/$slug'
+      path: '/admin/$slug'
+      fullPath: '/admin/$slug'
+      preLoaderRoute: typeof AdminSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/desk/': {
+      id: '/desk/'
+      path: '/desk'
+      fullPath: '/desk/'
+      preLoaderRoute: typeof DeskIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/desk/$slug': {
+      id: '/desk/$slug'
+      path: '/desk/$slug'
+      fullPath: '/desk/$slug'
+      preLoaderRoute: typeof DeskSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/': {
+      id: '/portal/'
+      path: '/portal'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/$slug': {
+      id: '/portal/$slug'
+      path: '/portal/$slug'
+      fullPath: '/portal/$slug'
+      preLoaderRoute: typeof PortalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/robots/': {
       id: '/robots/'
       path: '/robots'
@@ -517,7 +637,13 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   RiskDisclosureRoute: RiskDisclosureRoute,
   TermsRoute: TermsRoute,
+  AdminSlugRoute: AdminSlugRoute,
+  DeskSlugRoute: DeskSlugRoute,
+  PortalSlugRoute: PortalSlugRoute,
   RobotsSlugRoute: RobotsSlugRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  DeskIndexRoute: DeskIndexRoute,
+  PortalIndexRoute: PortalIndexRoute,
   RobotsIndexRoute: RobotsIndexRoute,
 }
 export const routeTree = rootRouteImport
