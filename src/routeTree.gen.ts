@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as NEXIUMRouteImport } from './routes/NEXIUM'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
@@ -43,6 +44,11 @@ const NEXIUMRoute = NEXIUMRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BlogRoute = BlogRouteImport.update({
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/NEXIUM': typeof NEXIUMRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/NEXIUM': typeof NEXIUMRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/NEXIUM': typeof NEXIUMRoute
   '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/'
     | '/NEXIUM'
     | '/about'
+    | '/admin'
     | '/blog'
     | '/contact'
     | '/cookies'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/'
     | '/NEXIUM'
     | '/about'
+    | '/admin'
     | '/blog'
     | '/contact'
     | '/cookies'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/'
     | '/NEXIUM'
     | '/about'
+    | '/admin'
     | '/blog'
     | '/contact'
     | '/cookies'
@@ -271,6 +283,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NEXIUMRoute: typeof NEXIUMRoute
   AboutRoute: typeof AboutRoute
+  AdminRoute: typeof AdminRoute
   BlogRoute: typeof BlogRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/blog': {
@@ -439,6 +459,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NEXIUMRoute: NEXIUMRoute,
   AboutRoute: AboutRoute,
+  AdminRoute: AdminRoute,
   BlogRoute: BlogRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
