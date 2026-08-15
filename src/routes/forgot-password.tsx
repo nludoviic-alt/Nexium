@@ -27,7 +27,6 @@ import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
-import { sendPasswordResetEmail } from "@/lib/resend";
 
 function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -45,32 +44,23 @@ function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      // 1. Envoi du template officiel Resend 680px
-      const clientName = email.split("@")[0] || "Client";
-      const resetLink = "https://nexiummarkets.com/reset-password";
-      
-      try {
-        await sendPasswordResetEmail(
-          email,
-          clientName,
-          resetLink,
-          language as "fr" | "en"
-        );
-      } catch (mailErr) {
-        console.warn("Notice Resend reset password:", mailErr);
-      }
-
+      // Un seul e-mail, un seul lien réel : Supabase génère le jeton de
+      // récupération et l'envoie via le SMTP personnalisé Resend (configuré
+      // dans le dashboard Supabase → Auth → SMTP Settings), avec le template
+      // "Reset password" à la charte Nexium Markets. On n'envoie plus de
+      // second e-mail Resend en parallèle — celui-ci n'avait jamais de jeton
+      // réel et son lien ne fonctionnait jamais.
       if (isSupabaseConfigured) {
         await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: resetLink,
+          redirectTo: "https://nexiummarkets.com/reset-password",
         });
       }
 
       setSubmitted(true);
       toast.success(
         language === "fr"
-          ? "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé via Resend."
-          : "If an account exists for this address, a reset email was just dispatched via Resend."
+          ? "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé."
+          : "If an account exists for this address, a reset email was just sent."
       );
     } catch (err: any) {
       console.warn("Notice resetPassword Supabase:", err);
