@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AdminPanel, AdminBadge, AdminToggle, AdminDataTable, AdminStatTile, AdminSidebarNav, AdminDropdown, useTableQuery, downloadCsv } from "@/components/admin";
 import {
   emailApi,
@@ -129,11 +129,85 @@ import {
   approvePresetActivation,
   assignAdvisorToClient,
   getAllClientProfiles,
+  getUserProfile,
 } from "@/lib/supabase";
 
-export const Route = createFileRoute("/admin")({
-  component: NexiumAdminDashboard,
+export const Route = createFileRoute("/composition")({
+  component: CompositionAccessGate,
 });
+
+const ADMIN_CONSOLE_ROLES: ReadonlyArray<string> = ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
+
+/**
+ * Garde d'accès de /composition. Le build étant statique (pas de serveur pour
+ * vérifier la session par requête), c'est le meilleur contrôle possible :
+ * rien du contenu du dashboard n'est rendu tant que la session + le rôle
+ * n'ont pas été vérifiés auprès de Supabase, et tout échec redirige vers
+ * /login au lieu de laisser passer par défaut.
+ */
+function CompositionAccessGate() {
+  const navigate = useNavigate();
+  const [state, setState] = useState<"checking" | "authorized" | "denied">("checking");
+  const [sessionRole, setSessionRole] = useState<AdminSystemRole | null>(null);
+  const [isPrimaryOwner, setIsPrimaryOwner] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function verify() {
+      if (!isSupabaseConfigured) {
+        if (!cancelled) setState("denied");
+        return;
+      }
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (userError || !userData.user) {
+        setState("denied");
+        return;
+      }
+
+      const profile = await getUserProfile(userData.user.id);
+      if (cancelled) return;
+
+      const role = profile?.role;
+      const blockedStatuses = ["REVOKED", "BANNED", "SUSPENDED"];
+      if (!profile || !role || !ADMIN_CONSOLE_ROLES.includes(role) || blockedStatuses.includes(profile.status)) {
+        setState("denied");
+        return;
+      }
+
+      setSessionRole(role as AdminSystemRole);
+      setIsPrimaryOwner(Boolean(profile.is_primary_owner));
+      setState("authorized");
+    }
+
+    verify();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (state === "denied") {
+      toast.error("Accès refusé — connexion administrateur requise.");
+      navigate({ to: "/login" });
+    }
+  }, [state, navigate]);
+
+  if (state !== "authorized" || !sessionRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0b0d10]">
+        <div className="flex items-center gap-3 text-sm font-semibold text-emerald-400">
+          <Loader2 className="size-5 animate-spin" />
+          Vérification des accès…
+        </div>
+      </div>
+    );
+  }
+
+  return <NexiumAdminDashboard initialSessionRole={sessionRole} isPrimaryOwner={isPrimaryOwner} />;
+}
 
 /* ========================================================================= */
 /* TYPES & MODÈLES DE DONNÉES                                                */
@@ -296,6 +370,8 @@ interface StaffAdministrator {
   email: string;
   phone: string;
   role: AdminSystemRole;
+  /** Vrai uniquement pour le compte Super Owner protégé — verrouillé pour tout le monde, y compris lui-même, depuis cette interface. */
+  isPrimaryOwner?: boolean;
   department: "Direction Générale" | "Desk Support & Conseillers" | "Recherche Quantitative" | "Gestion Financière" | "Conformité & Risque";
   status: AccountStatus;
   twoFactorEnabled: boolean;
@@ -630,6 +706,7 @@ const INITIAL_STAFF: StaffAdministrator[] = [
     email: "owner@nexiummarkets.com",
     phone: "+41 22 819 00 01",
     role: "OWNER",
+    isPrimaryOwner: true,
     department: "Direction Générale",
     status: "ACTIVE",
     twoFactorEnabled: true,
@@ -1245,14 +1322,22 @@ const DEMO_EMAIL_AGENTS: EmailAgentSummary[] = [
 /* COMPOSANT PRINCIPAL : ADMINISTRATION NEXIUM                               */
 /* ========================================================================= */
 
-function NexiumAdminDashboard() {
+function NexiumAdminDashboard({
+  initialSessionRole,
+  isPrimaryOwner,
+}: {
+  initialSessionRole: AdminSystemRole;
+  /** Vrai si le compte connecté est LE Super Owner protégé (au plus un seul, imposé côté DB). */
+  isPrimaryOwner: boolean;
+}) {
   // Navigation
   const [activeSection, setActiveSection] = useState<
     "administrators" | "users" | "user-detail" | "create-user" | "messaging" | "emails" | "engines" | "finances" | "gateways" | "security" | "news-guard" | "perf-fees" | "logs" | "impersonation"
   >("users");
 
-  // Rôle Admin Session
-  const [currentSessionRole, setCurrentSessionRole] = useState<AdminSystemRole>("SUPER_ADMIN");
+  // Rôle Admin Session — dérivé de la session Supabase réelle par CompositionAccessGate,
+  // plus jamais codé en dur (auparavant fixé à "SUPER_ADMIN" pour n'importe quel visiteur).
+  const [currentSessionRole, setCurrentSessionRole] = useState<AdminSystemRole>(initialSessionRole);
 
   // Palette de Couleurs Active (Émeraude Institutionnelle & Obsidian par défaut)
   const [adminPalette, setAdminPalette] = useState<"sapphire" | "emerald">("emerald");
@@ -1830,8 +1915,8 @@ function NexiumAdminDashboard() {
       return;
     }
 
-    if (newStaffRole === "OWNER" && currentSessionRole !== "OWNER") {
-      toast.error("Seul le Fondateur actuel peut désigner ou créer un rôle OWNER.");
+    if (newStaffRole === "OWNER" && !isPrimaryOwner) {
+      toast.error("Seul le Super Owner peut désigner ou créer un rôle OWNER.");
       return;
     }
 
@@ -1933,9 +2018,22 @@ function NexiumAdminDashboard() {
     e.preventDefault();
     if (!editingStaffMember) return;
 
+    // Verrou Super Owner : ce compte est protégé pour tout le monde depuis
+    // l'app, y compris pour lui-même — seul un accès base de données direct
+    // peut le modifier (miroir du trigger Postgres protect_privileged_profile_fields).
+    if (editingStaffMember.isPrimaryOwner) {
+      toast.error("Compte Super Owner protégé : non modifiable depuis cette interface.");
+      return;
+    }
+
     // Protection Souveraineté : Seul le OWNER peut modifier un compte OWNER
     if (editingStaffMember.role === "OWNER" && currentSessionRole !== "OWNER") {
       toast.error("Action refusée : Seul le Propriétaire (OWNER) peut modifier le compte Fondateur.");
+      return;
+    }
+
+    if (editStaffRole === "OWNER" && editStaffRole !== editingStaffMember.role && !isPrimaryOwner) {
+      toast.error("Seul le Super Owner peut promouvoir un membre du staff au rôle OWNER.");
       return;
     }
 
@@ -1978,6 +2076,10 @@ function NexiumAdminDashboard() {
   };
 
   const handleToggleStaffStatus = (st: StaffAdministrator) => {
+    if (st.isPrimaryOwner) {
+      toast.error("Compte Super Owner protégé : impossible de le suspendre ou de le révoquer, y compris pour vous-même.");
+      return;
+    }
     if (st.role === "OWNER") {
       toast.error("Impossible de suspendre ou révoquer le compte Propriétaire (OWNER).");
       return;
@@ -1989,11 +2091,19 @@ function NexiumAdminDashboard() {
   };
 
   const handleResetStaff2FA = (st: StaffAdministrator) => {
+    if (st.isPrimaryOwner) {
+      toast.error("Compte Super Owner protégé : sa double authentification ne peut pas être réinitialisée depuis cette interface.");
+      return;
+    }
     setStaffList((prev) => prev.map((s) => (s.id === st.id ? { ...s, twoFactorEnabled: false } : s)));
     toast.success(`Double authentification 2FA réinitialisée pour ${st.name}.`);
   };
 
   const handleDeleteStaffMember = (st: StaffAdministrator) => {
+    if (st.isPrimaryOwner) {
+      toast.error("Compte Super Owner protégé : suppression impossible, y compris pour vous-même.");
+      return;
+    }
     if (st.role === "OWNER") {
       toast.error("Action impossible : Le compte Propriétaire (OWNER) ne peut être supprimé.");
       return;
@@ -4913,6 +5023,11 @@ function NexiumAdminDashboard() {
                           <AdminBadge variant={editStaffStatus === "ACTIVE" ? "emerald" : "amber"}>
                             {editStaffStatus}
                           </AdminBadge>
+                          {editingStaffMember.isPrimaryOwner && (
+                            <AdminBadge variant="amber" dot={true}>
+                              🔒 Super Owner protégé
+                            </AdminBadge>
+                          )}
                         </div>
                         <p className="text-xs sm:text-sm text-slate-300 mt-1.5 font-mono">
                           ID : <strong className="text-white">{editingStaffMember.id}</strong> · Département : <strong className="text-emerald-300">{editingStaffMember.department}</strong> · Statut : <span className="text-emerald-400 font-semibold">{editingStaffMember.lastLogin}</span>
@@ -5002,7 +5117,10 @@ function NexiumAdminDashboard() {
                               <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">RÔLE SYSTÈME</label>
                               <AdminDropdown
                                 value={editStaffRole}
-                                disabled={editingStaffMember.role === "OWNER" && currentSessionRole !== "OWNER"}
+                                disabled={
+                                  editingStaffMember.isPrimaryOwner ||
+                                  (editingStaffMember.role === "OWNER" && currentSessionRole !== "OWNER")
+                                }
                                 onChange={(r) => setEditStaffRole(r)}
                                 options={STAFF_ROLE_OPTIONS}
                               />
@@ -5196,15 +5314,21 @@ function NexiumAdminDashboard() {
 
                         <button
                           type="button"
+                          disabled={editingStaffMember.isPrimaryOwner}
                           onClick={() => handleResetStaff2FA(editingStaffMember)}
-                          className="rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2.5 text-xs sm:text-sm font-bold text-amber-300 transition cursor-pointer flex items-center gap-2 w-fit"
+                          className="rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-amber-500/10 px-4 py-2.5 text-xs sm:text-sm font-bold text-amber-300 transition cursor-pointer flex items-center gap-2 w-fit"
                         >
                           <Key className="size-4" />
                           <span>Réinitialiser 2FA Collaborateur</span>
                         </button>
                       </div>
 
-                      {editingStaffMember.role !== "OWNER" ? (
+                      {editingStaffMember.isPrimaryOwner ? (
+                        <p className="text-xs text-amber-300/80 pt-2 flex items-center gap-2">
+                          <ShieldCheck className="size-4 shrink-0" />
+                          Compte Super Owner protégé : suspension, révocation et suppression indisponibles depuis cette interface, y compris pour vous-même.
+                        </p>
+                      ) : editingStaffMember.role !== "OWNER" ? (
                         <div className="flex flex-wrap items-center gap-3 pt-2">
                           {editStaffStatus === "ACTIVE" ? (
                             <button

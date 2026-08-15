@@ -49,6 +49,8 @@ export interface SupabaseUserProfile {
   role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
   status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "BANNED" | "REVOKED";
   kyc_status: "VERIFIED" | "PENDING" | "REJECTED" | "NOT_SUBMITTED";
+  /** Vrai uniquement pour le compte Super Owner protégé (au plus un seul profil, imposé côté DB). */
+  is_primary_owner?: boolean;
   license_status?: "NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE" | "EXPIRED";
   requested_preset?: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION" | string;
   active_preset?: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION" | string;

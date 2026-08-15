@@ -28,6 +28,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sendRegistrationPendingEmail, sendAdminNewClientAlertEmail } from "@/lib/resend";
+import { passwordIssue } from "@/lib/password";
 import { useLanguage } from "@/context/LanguageContext";
 
 function RegisterPage() {
@@ -36,6 +37,7 @@ function RegisterPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [country, setCountry] = useState("France");
   const [hasIb, setHasIb] = useState(true);
   const [ibCode, setIbCode] = useState("90462");
@@ -48,6 +50,16 @@ function RegisterPage() {
     e.preventDefault();
     if (!email || !password || !firstName) {
       toast.error(language === "fr" ? "Veuillez remplir tous les champs obligatoires." : "Please fill in all required fields.");
+      return;
+    }
+
+    const issue = passwordIssue(password);
+    if (issue) {
+      toast.error(issue);
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error(language === "fr" ? "Les deux mots de passe ne correspondent pas." : "The two passwords do not match.");
       return;
     }
 
@@ -68,6 +80,11 @@ function RegisterPage() {
               country,
               ib_code: hasIb ? ibCode : null,
             },
+            // Sans ceci, Supabase retombe sur le "Site URL" configuré dans le
+            // tableau de bord (Authentication → URL Configuration) pour tout
+            // le lien de confirmation — s'il est resté sur localhost, l'e-mail
+            // envoyé pointe vers localhost quel que soit ce paramètre côté code.
+            emailRedirectTo: "https://nexiummarkets.com/login",
           },
         });
 
@@ -106,14 +123,19 @@ function RegisterPage() {
           console.warn("Notice enregistrement profil Supabase:", profileErr);
         }
 
-        // 3. Écriture immédiate dans le journal d'audit
+        // 3. Écriture immédiate dans le journal d'audit. Colonnes alignées sur
+        // le schéma réel (audit_logs n'a pas de colonne `client_id`, et
+        // `admin_id` est NOT NULL) ; pas d'IP fabriquée — un build statique
+        // sans backend n'a aucun moyen fiable de connaître l'IP réelle du
+        // client, donc on ne prétend pas en avoir une.
         try {
           await supabase.from("audit_logs").insert({
+            admin_id: createdUserId,
             admin_name: "Système Inscription",
             action: "CLIENT_REGISTERED",
+            target_user_id: createdUserId,
+            target_user_email: email,
             details: `Nouvelle demande d'ouverture de compte reçue pour ${fullName} (${email}) — Résidence : ${country}`,
-            client_id: createdUserId,
-            ip_address: "149.56.97.158 (Front-End Gateway)",
           });
         } catch (logErr) {
           console.warn("Notice audit log:", logErr);
@@ -478,7 +500,7 @@ function RegisterPage() {
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Mot de passe sécurisé (min. 6 caractères)"
+                          placeholder="Mot de passe sécurisé (min. 8 caractères, 1 chiffre)"
                           className="rounded-xl border-gray-300 bg-white px-4 py-3.5 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                         />
                         <button
@@ -489,6 +511,25 @@ function RegisterPage() {
                           {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                         </button>
                       </div>
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="confirmPassword"
+                        className="text-xs sm:text-sm font-extrabold text-gray-800"
+                      >
+                        Confirmer le Mot de Passe *
+                      </label>
+                      <Input
+                        id="confirmPassword"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Ressaisissez le mot de passe"
+                        className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                      />
                     </div>
 
                     {/* Checkbox Introducing Broker */}

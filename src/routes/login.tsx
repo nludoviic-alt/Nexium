@@ -65,7 +65,7 @@ function LoginPage() {
           // Vérification du rôle Administrateur
           if (profile?.role && ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role)) {
             toast.success(`Connexion Desk confirmée. Bienvenue, ${profile.name || data.user.email} !`);
-            navigate({ to: "/admin" });
+            navigate({ to: "/composition" });
             return;
           }
 
@@ -92,13 +92,10 @@ function LoginPage() {
         }
       }
 
-      // 2. Mode Démo / Accès direct si Supabase non configuré
-      toast.success("Connexion réussie. Bienvenue sur votre Dashboard Nexium.");
-      if (email.toLowerCase().includes("admin") || email.toLowerCase().includes("owner")) {
-        navigate({ to: "/admin" });
-      } else {
-        navigate({ to: "/NEXIUM" });
-      }
+      // Supabase non configuré : aucune identité ne peut être vérifiée, donc
+      // aucun accès n'est accordé (l'ancien comportement connectait n'importe
+      // qui automatiquement, y compris en admin si l'e-mail contenait "admin").
+      toast.error("Service d'authentification indisponible. Contactez le support.");
     } catch (err: any) {
       toast.error(err.message || "Impossible de se connecter.");
     } finally {

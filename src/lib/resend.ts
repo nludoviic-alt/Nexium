@@ -16,7 +16,8 @@ export const isResendConfigured = Boolean(
    WRAPPER HTML INSTITUTIONNEL NEXIUM MARKETS (DARK LUXURY & EMERALD)
    ========================================================================== */
 
-function getEmailWrapper(title: string, preheader: string, contentHtml: string): string {
+function getEmailWrapper(title: string, preheader: string, contentHtml: string, opts?: { kicker?: string }): string {
+  const kicker = opts?.kicker || "INSTITUTIONAL QUANTITATIVE TRADING";
   return `
 <!DOCTYPE html>
 <html lang="fr" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -24,6 +25,8 @@ function getEmailWrapper(title: string, preheader: string, contentHtml: string):
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="color-scheme" content="dark light">
+  <meta name="supported-color-schemes" content="dark light">
   <title>${title}</title>
   <!--[if mso]>
   <noscript>
@@ -39,22 +42,37 @@ function getEmailWrapper(title: string, preheader: string, contentHtml: string):
     table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
     img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
     body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #03060a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #E2E8F0; }
-    .email-container { max-width: 600px; margin: 0 auto; background-color: #080d16; border-radius: 24px; border: 1px solid rgba(0, 229, 153, 0.28); overflow: hidden; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9); }
-    .header-bar { background: linear-gradient(135deg, #07101c 0%, #031c12 50%, #060c14 100%); padding: 40px 32px 32px; text-align: center; border-bottom: 1px solid rgba(0, 229, 153, 0.2); position: relative; }
-    .brand-logo { font-size: 28px; font-weight: 900; letter-spacing: 6px; color: #FFFFFF; font-family: 'Courier New', monospace; text-transform: uppercase; margin: 0; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #0a0f16; border-radius: 20px; border: 1px solid rgba(0, 229, 153, 0.22); overflow: hidden; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.85); }
+    .top-stripe { height: 4px; line-height: 4px; font-size: 0; background-color: #00E599; }
+    .header-bar { background: linear-gradient(160deg, #081019 0%, #04160f 55%, #060b12 100%); padding: 36px 32px 28px; text-align: center; border-bottom: 1px solid rgba(0, 229, 153, 0.16); }
+    .brand-mark { display: inline-block; width: 9px; height: 9px; background: #00E599; transform: rotate(45deg); margin: 0 10px 3px 0; box-shadow: 0 0 10px rgba(0, 229, 153, 0.7); }
+    .brand-logo { display: inline-block; font-size: 22px; font-weight: 800; letter-spacing: 5px; color: #FFFFFF; font-family: 'Courier New', monospace; text-transform: uppercase; margin: 0; vertical-align: middle; }
     .brand-accent { color: #00E599; }
-    .brand-tag { display: inline-block; background: rgba(0, 229, 153, 0.12); border: 1px solid rgba(0, 229, 153, 0.4); border-radius: 9999px; padding: 5px 16px; font-size: 10px; font-weight: 800; letter-spacing: 2.5px; color: #00E599; text-transform: uppercase; margin-top: 12px; }
-    .content-body { padding: 38px 34px; font-size: 15px; line-height: 1.7; color: #CBD5E1; }
-    .h1-title { font-size: 24px; font-weight: 900; color: #FFFFFF; margin: 0 0 16px 0; letter-spacing: -0.5px; line-height: 1.3; }
-    .card-box { background: linear-gradient(180deg, rgba(14, 22, 36, 0.9) 0%, rgba(10, 16, 26, 0.95) 100%); border: 1px solid rgba(0, 229, 153, 0.28); border-radius: 16px; padding: 24px; margin: 24px 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
-    .card-label { font-size: 11px; font-weight: 800; color: #00E599; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
-    .btn-primary { display: inline-block; background: linear-gradient(135deg, #00E599 0%, #00B377 100%); color: #02160d !important; font-weight: 900; font-size: 14px; letter-spacing: 0.5px; text-decoration: none; padding: 15px 36px; border-radius: 14px; text-align: center; box-shadow: 0 10px 25px rgba(0, 229, 153, 0.35); margin: 24px 0 12px; }
-    .security-badge { display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px; font-size: 11px; color: #94A3B8; margin-top: 28px; font-family: monospace; }
-    .footer-section { background-color: #04070d; padding: 30px 32px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px; color: #64748B; line-height: 1.6; }
-    .footer-links a { color: #00E599; text-decoration: none; margin: 0 10px; font-weight: 600; }
+    .brand-tag { display: inline-block; background: rgba(0, 229, 153, 0.1); border: 1px solid rgba(0, 229, 153, 0.35); border-radius: 9999px; padding: 6px 18px; font-size: 10px; font-weight: 700; letter-spacing: 2.2px; color: #00E599; text-transform: uppercase; margin-top: 16px; }
+    .content-body { padding: 40px 36px 12px; font-size: 15px; line-height: 1.7; color: #CBD5E1; }
+    .eyebrow { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 1.8px; text-transform: uppercase; margin-bottom: 14px; padding: 5px 14px; border-radius: 9999px; }
+    .h1-title { font-size: 23px; font-weight: 800; color: #FFFFFF; margin: 0 0 16px 0; letter-spacing: -0.3px; line-height: 1.35; }
+    .body-text { margin: 0 0 16px 0; }
+    .card-box { background: linear-gradient(180deg, rgba(16, 24, 38, 0.9) 0%, rgba(10, 16, 26, 0.95) 100%); border: 1px solid rgba(0, 229, 153, 0.22); border-radius: 14px; padding: 22px 24px; margin: 22px 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+    .card-label { font-size: 11px; font-weight: 800; color: #00E599; text-transform: uppercase; letter-spacing: 1.8px; margin-bottom: 12px; }
+    .kv-row td { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-family: 'Courier New', monospace; font-size: 13px; }
+    .kv-row:last-child td { border-bottom: none; }
+    .kv-label { color: #8291A6; }
+    .kv-value { color: #FFFFFF; font-weight: 700; text-align: right; }
+    .kv-value-accent { color: #00E599; font-weight: 700; text-align: right; }
+    .btn-primary { display: inline-block; background-color: #00E599; background-image: linear-gradient(135deg, #00E599 0%, #00B377 100%); color: #02160d; font-weight: 800; font-size: 14px; letter-spacing: 0.3px; text-decoration: none; padding: 15px 34px; border-radius: 12px; text-align: center; box-shadow: 0 12px 26px rgba(0, 229, 153, 0.3); }
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0 0; }
+    .footnote { font-size: 13px; color: #8291A6; margin-top: 18px; }
+    .footer-section { background-color: #060a10; padding: 28px 32px; border-top: 1px solid rgba(255, 255, 255, 0.06); font-size: 12px; color: #64748B; line-height: 1.7; }
+    .footer-links a { color: #00E599; text-decoration: none; margin: 0 8px; font-weight: 600; }
+    @media only screen and (max-width: 620px) {
+      .content-body { padding: 32px 22px 8px !important; }
+      .header-bar { padding: 30px 20px 24px !important; }
+      .footer-section { padding: 24px 20px !important; }
+    }
   </style>
 </head>
-<body style="margin: 0; padding: 32px 12px; background-color: #03060a;">
+<body style="margin: 0; padding: 28px 12px; background-color: #03060a;">
   <!-- Preheader text for inbox preview -->
   <div style="display: none; font-size: 1px; color: #03060a; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
     ${preheader}
@@ -64,36 +82,33 @@ function getEmailWrapper(title: string, preheader: string, contentHtml: string):
     <tr>
       <td align="center">
         <div class="email-container">
-          
+
+          <div class="top-stripe">&nbsp;</div>
+
           <!-- Header Branding -->
           <div class="header-bar">
-            <h1 class="brand-logo">NEXIUM<span class="brand-accent">.</span>MARKETS</h1>
-            <div class="brand-tag">INSTITUTIONAL QUANTITATIVE TRADING</div>
+            <span class="brand-mark"></span><h1 class="brand-logo">NEXIUM<span class="brand-accent">.</span>MARKETS</h1>
+            <div><div class="brand-tag">${kicker}</div></div>
           </div>
 
           <!-- Main Content -->
           <div class="content-body">
             ${contentHtml}
-            
-            <!-- Security Footprint Stamp -->
-            <div class="security-badge">
-              🔒 <strong>256-Bit TLS End-to-End</strong> &bull; Equinix NY4 Cross-Connect &bull; Nexium FIX 4.4 Bridge
-            </div>
           </div>
 
           <!-- Footer Information -->
           <div class="footer-section">
             <p style="margin: 0 0 12px 0; text-align: center; color: #94A3B8;">
-              <strong>Nexium Markets Inc.</strong> &bull; Datacentre Equinix NY4 &bull; Global Operations Desk
+              <strong>Nexium Markets</strong> &bull; Global Operations Desk
             </p>
             <p style="margin: 0 0 16px 0; text-align: center;" class="footer-links">
               <a href="https://nexiummarkets.com/NEXIUM">Espace Client</a> •
-              <a href="https://nexiummarkets.com/login">Connexion Sécurisée</a> •
-              <a href="https://nexiummarkets.com/contact">Support Desk 24/7</a> •
-              <a href="https://nexiummarkets.com/terms">Régulation & Risque</a>
+              <a href="https://nexiummarkets.com/login">Connexion</a> •
+              <a href="https://nexiummarkets.com/contact">Support</a> •
+              <a href="https://nexiummarkets.com/terms">Conditions</a>
             </p>
             <p style="margin: 0; font-size: 11px; text-align: center; color: #475569;">
-              Cet e-mail institutionnel vous est adressé dans le cadre de la gestion de votre compte de trading algorithmique. Ne partagez jamais vos identifiants ou clés de sécurité.
+              Cet e-mail vous est adressé dans le cadre de la gestion de votre compte Nexium Markets. Ne partagez jamais vos identifiants ou codes de sécurité.
             </p>
           </div>
 
@@ -104,6 +119,32 @@ function getEmailWrapper(title: string, preheader: string, contentHtml: string):
 </body>
 </html>
   `.trim();
+}
+
+function eyebrow(text: string, color: string, bg: string, border: string): string {
+  return `<div style="text-align:center;"><span class="eyebrow" style="color:${color}; background:${bg}; border:1px solid ${border};">${text}</span></div>`;
+}
+
+function kvTable(rows: Array<{ label: string; value: string; accent?: boolean }>): string {
+  const trs = rows
+    .map(
+      (r) =>
+        `<tr class="kv-row"><td class="kv-label">${r.label}</td><td class="${r.accent ? "kv-value-accent" : "kv-value"}">${r.value}</td></tr>`
+    )
+    .join("");
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-top: 6px;">${trs}</table>`;
+}
+
+function ctaButton(url: string, label: string): string {
+  return `
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 26px auto 8px;">
+      <tr>
+        <td align="center" bgcolor="#00E599" style="border-radius: 12px;">
+          <a href="${url}" class="btn-primary" target="_blank">${label}</a>
+        </td>
+      </tr>
+    </table>
+  `;
 }
 
 export interface SendEmailResult {
@@ -167,67 +208,43 @@ export async function sendRegistrationPendingEmail(
     subject,
     preheader,
     `
-      <div style="text-align: center; margin-bottom: 24px;">
-        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 9999px; padding: 6px 18px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #FBBF24; text-transform: uppercase;">
-          ⏳ DOSSIER EN COURS DE VALIDATION
-        </div>
-      </div>
+      ${eyebrow("Dossier en cours de validation", "#FBBF24", "rgba(245, 158, 11, 0.1)", "rgba(245, 158, 11, 0.3)")}
 
-      <h2 class="h1-title" style="text-align: center;">Demande d'Ouverture Enregistrée</h2>
-      
-      <p style="text-align: center; font-size: 16px; color: #E2E8F0; margin-bottom: 28px;">
+      <h2 class="h1-title" style="text-align: center;">Demande d'ouverture enregistrée</h2>
+
+      <p class="body-text" style="text-align: center; font-size: 16px; color: #E2E8F0;">
         Bonjour <strong>${clientName}</strong>,<br/>
-        Nous vous confirmons la bonne prise en compte de votre inscription sur la plateforme institutionnelle <strong>Nexium Markets</strong>.
+        Nous vous confirmons la bonne prise en compte de votre inscription sur la plateforme <strong>Nexium Markets</strong>.
       </p>
 
       <div class="card-box">
-        <div class="card-label">📋 Récapitulatif de votre Dossier</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 14px; margin-top: 8px;">
-          <tr>
-            <td style="padding: 8px 0; color: #94A3B8; border-bottom: 1px solid rgba(255,255,255,0.06);">Titulaire du Compte :</td>
-            <td style="padding: 8px 0; color: #FFFFFF; font-weight: bold; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.06);">${clientName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #94A3B8; border-bottom: 1px solid rgba(255,255,255,0.06);">Pays de Résidence :</td>
-            <td style="padding: 8px 0; color: #FFFFFF; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.06);">${country || "France 🇫🇷"}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #94A3B8; border-bottom: 1px solid rgba(255,255,255,0.06);">Statut Réglementaire :</td>
-            <td style="padding: 8px 0; color: #F59E0B; font-weight: bold; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.06);">⏳ Attente Revue Conformité</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #94A3B8;">Passerelle Allouée :</td>
-            <td style="padding: 8px 0; color: #00E599; font-weight: bold; text-align: right;">Equinix NY4 Direct Cross-Connect</td>
-          </tr>
-        </table>
+        <div class="card-label">Récapitulatif de votre dossier</div>
+        ${kvTable([
+          { label: "Titulaire du compte", value: clientName },
+          { label: "Pays de résidence", value: country || "France" },
+          { label: "Statut du dossier", value: "En attente de revue", accent: true },
+        ])}
       </div>
 
-      <div style="background: linear-gradient(135deg, rgba(0, 229, 153, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%); border: 1px solid rgba(0, 229, 153, 0.25); border-radius: 14px; padding: 20px; margin: 24px 0;">
-        <h4 style="margin: 0 0 8px 0; color: #00E599; font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
-          ⚡ Prochaines étapes
-        </h4>
+      <div class="card-box" style="border-color: rgba(0, 229, 153, 0.28);">
+        <div class="card-label">Prochaines étapes</div>
         <p style="margin: 0; font-size: 13px; color: #CBD5E1; line-height: 1.6;">
-          Un administrateur de notre <strong>Desk de Supervision & Risque</strong> procède actuellement aux vérifications d'usage. Dès validation de votre compte, vous recevrez un e-mail officiel d'activation avec vos accès complets et le déverrouillage de votre Dashboard de trading algorithmique.
+          Un membre de notre équipe procède actuellement aux vérifications d'usage. Dès validation de votre compte, vous recevrez un e-mail d'activation avec vos accès complets.
         </p>
       </div>
 
-      <div style="text-align: center; margin: 32px 0 16px;">
-        <a href="https://nexiummarkets.com/login" class="btn-primary">
-          🔐 Accéder au Portail de Connexion ➔
-        </a>
+      <div style="text-align: center;">
+        ${ctaButton("https://nexiummarkets.com/login", "Accéder au portail de connexion")}
       </div>
 
-      <p style="text-align: center; margin-top: 20px; font-size: 13px; color: #94A3B8;">
-        Besoin d'aide immédiate ? Contactez votre Desk Support 24/7 à <a href="mailto:support@nexiummarkets.com" style="color: #00E599; font-weight: bold; text-decoration: underline;">support@nexiummarkets.com</a>.
+      <p class="footnote" style="text-align: center;">
+        Besoin d'aide ? Contactez notre support à <a href="mailto:support@nexiummarkets.com" style="color: #00E599; font-weight: bold; text-decoration: underline;">support@nexiummarkets.com</a>.
       </p>
-    `
+    `,
+    { kicker: "Confirmation d'inscription" }
   );
 
-  return sendResendEmail({
-    to,
-    subject,
-    html,
-  });
+  return sendViaResendHttp(to, subject, html);
 }
 
 /**
@@ -248,55 +265,30 @@ export async function sendAdminNewClientAlertEmail(clientData: {
     subject,
     preheader,
     `
-      <div style="display: inline-block; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 9999px; padding: 4px 14px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #F87171; text-transform: uppercase; margin-bottom: 12px;">
-        NOTIFICATION DIRECTION & CONFORMITÉ
-      </div>
-      <h2 class="h1-title" style="color: #FFFFFF;">Nouveau Client en Attente d'Approbation</h2>
-      <p>Un nouvel utilisateur vient de compléter son formulaire d'inscription sur la plateforme <strong>Nexium Markets</strong> et requiert une validation par l'administration.</p>
+      ${eyebrow("Notification Direction & Conformité", "#F87171", "rgba(239, 68, 68, 0.12)", "rgba(239, 68, 68, 0.35)")}
+      <h2 class="h1-title">Nouveau client en attente d'approbation</h2>
+      <p class="body-text">Un nouvel utilisateur vient de compléter son formulaire d'inscription sur la plateforme <strong>Nexium Markets</strong> et requiert une validation par l'administration.</p>
 
-      <div class="card-box" style="border-color: rgba(245, 158, 11, 0.4);">
-        <div class="card-label" style="color: #F59E0B;">👤 Fiche d'Inscription Client</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 14px; margin-top: 8px;">
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Nom & Prénom :</td>
-            <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold; text-align: right;">${clientData.name}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Adresse E-mail :</td>
-            <td style="padding: 6px 0; color: #00E599; font-weight: bold; text-align: right;">${clientData.email}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Pays de Résidence :</td>
-            <td style="padding: 6px 0; color: #FFFFFF; text-align: right;">${clientData.country || "Non renseigné"}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Téléphone :</td>
-            <td style="padding: 6px 0; color: #FFFFFF; text-align: right;">${clientData.phone || "Non renseigné"}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Code IB / Parrain :</td>
-            <td style="padding: 6px 0; color: #E2E8F0; text-align: right;">${clientData.ibCode || "Aucun"}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Statut Actuel :</td>
-            <td style="padding: 6px 0; color: #F59E0B; font-weight: bold; text-align: right;">PENDING_APPROVAL</td>
-          </tr>
-        </table>
+      <div class="card-box" style="border-color: rgba(245, 158, 11, 0.35);">
+        <div class="card-label" style="color: #F59E0B;">Fiche d'inscription client</div>
+        ${kvTable([
+          { label: "Nom & prénom", value: clientData.name },
+          { label: "Adresse e-mail", value: clientData.email, accent: true },
+          { label: "Pays de résidence", value: clientData.country || "Non renseigné" },
+          { label: "Téléphone", value: clientData.phone || "Non renseigné" },
+          { label: "Code IB / parrain", value: clientData.ibCode || "Aucun" },
+          { label: "Statut actuel", value: "PENDING_APPROVAL" },
+        ])}
       </div>
 
-      <div style="text-align: center; margin: 28px 0 16px;">
-        <a href="https://nexiummarkets.com/admin" class="btn-primary" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
-          👑 Ouvrir la Console Admin pour Valider le Compte ➔
-        </a>
+      <div style="text-align: center;">
+        ${ctaButton("https://nexiummarkets.com/composition", "Ouvrir la console admin")}
       </div>
-    `
+    `,
+    { kicker: "Alerte nouvelle inscription" }
   );
 
-  return sendResendEmail({
-    to: "support@nexiummarkets.com",
-    subject,
-    html,
-  });
+  return sendViaResendHttp("support@nexiummarkets.com", subject, html);
 }
 
 /**
@@ -310,39 +302,25 @@ export async function sendWelcomeEmail(to: string, clientName: string, mt5Login?
     subject,
     preheader,
     `
-      <h2 class="h1-title">Bienvenue au sein de l'écosystème, ${clientName}</h2>
-      <p>Votre compte institutionnel **Nexium Markets** a été activé avec succès. Vous bénéficiez d'une infrastructure de pointe avec connexion directe aux liquidités bancaires tierce-1 (NY4 Equinix).</p>
+      <h2 class="h1-title">Bienvenue, ${clientName}</h2>
+      <p class="body-text">Votre compte <strong>Nexium Markets</strong> a été activé avec succès. Vous avez désormais accès à votre tableau de bord et à votre passerelle de trading MT5.</p>
 
       <div class="card-box">
-        <div class="card-label">📡 Passerelle MT5 ECN Directe</div>
-        <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 14px; margin-top: 8px;">
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Serveur Institutionnel :</td>
-            <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold; text-align: right;">Nexium-Live-NY4</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Identifiant Compte :</td>
-            <td style="padding: 6px 0; color: #00E599; font-weight: bold; text-align: right;">#${mt5Login || "Attribution en cours"}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Pont Liquidité :</td>
-            <td style="padding: 6px 0; color: #FFFFFF; text-align: right;">Fibre Optique FIX 4.4 (&lt; 1.2ms)</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Protection du Capital :</td>
-            <td style="padding: 6px 0; color: #00E599; font-weight: bold; text-align: right;">RiskGuard™ Actif 24/7</td>
-          </tr>
-        </table>
+        <div class="card-label">Accès MT5</div>
+        ${kvTable([
+          { label: "Serveur", value: "Nexium-Live-NY4" },
+          { label: "Identifiant de compte", value: `#${mt5Login || "Attribution en cours"}`, accent: true },
+          { label: "Statut du compte", value: "Actif", accent: true },
+        ])}
       </div>
 
-      <p style="margin-top: 20px;">Vous pouvez dès à présent consulter votre tableau de bord, activer les stratégies IA et suivre vos télémesures de performance en direct.</p>
+      <p class="body-text">Vous pouvez dès à présent consulter votre tableau de bord, activer vos stratégies et suivre vos performances en direct.</p>
 
-      <div style="text-align: center; margin: 28px 0 16px;">
-        <a href="https://nexiummarkets.com/NEXIUM" class="btn-primary">
-          🚀 Accéder à Mon Espace Investisseur ➔
-        </a>
+      <div style="text-align: center;">
+        ${ctaButton("https://nexiummarkets.com/NEXIUM", "Accéder à mon espace")}
       </div>
-    `
+    `,
+    { kicker: "Compte activé" }
   );
 
   return sendViaResendHttp(to, subject, html);
@@ -365,39 +343,27 @@ export async function sendDepositConfirmedEmail(
     subject,
     preheader,
     `
-      <h2 class="h1-title">Confirmation de Crédit de Fonds</h2>
-      <p>Bonjour ${clientName},</p>
-      <p>Nous vous confirmons la bonne exécution de votre dépôt. Le montant a été crédité et alloué à votre compte de trading avec succès.</p>
+      <h2 class="h1-title">Confirmation de crédit de fonds</h2>
+      <p class="body-text">Bonjour ${clientName},</p>
+      <p class="body-text">Nous vous confirmons la bonne exécution de votre dépôt. Le montant a été crédité sur votre compte de trading.</p>
 
-      <div class="card-box" style="border-color: rgba(0, 229, 153, 0.4);">
-        <div class="card-label">💰 Détails de la Transaction</div>
-        <div style="font-size: 28px; font-weight: 900; color: #00E599; font-family: monospace; margin: 10px 0;">
+      <div class="card-box" style="border-color: rgba(0, 229, 153, 0.35);">
+        <div class="card-label">Détails de la transaction</div>
+        <div style="font-size: 28px; font-weight: 800; color: #00E599; font-family: 'Courier New', monospace; margin: 4px 0 14px;">
           +${amountFormatted}
         </div>
-        <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 13px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Compte MT5 Bénéficiaire :</td>
-            <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold; text-align: right;">#${mt5Login}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Référence Transaction :</td>
-            <td style="padding: 6px 0; color: #CBD5E1; text-align: right;">${txRef || "NEX-" + Math.floor(100000 + Math.random() * 900000)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Disponibilité :</td>
-            <td style="padding: 6px 0; color: #00E599; font-weight: bold; text-align: right;">Immédiate</td>
-          </tr>
-        </table>
+        ${kvTable([
+          { label: "Compte MT5 bénéficiaire", value: `#${mt5Login}` },
+          { label: "Référence transaction", value: txRef || "NEX-" + Math.floor(100000 + Math.random() * 900000) },
+          { label: "Disponibilité", value: "Immédiate", accent: true },
+        ])}
       </div>
 
-      <p>Vos stratégies quantitatives actives bénéficient désormais de cette marge supplémentaire pour optimiser les prises de position.</p>
-
-      <div style="text-align: center; margin: 28px 0 16px;">
-        <a href="https://nexiummarkets.com/NEXIUM" class="btn-primary">
-          Consulter Mon Solde en Temps Réel ➔
-        </a>
+      <div style="text-align: center;">
+        ${ctaButton("https://nexiummarkets.com/NEXIUM", "Consulter mon solde")}
       </div>
-    `
+    `,
+    { kicker: "Dépôt confirmé" }
   );
 
   return sendViaResendHttp(to, subject, html);
@@ -414,27 +380,26 @@ export async function sendPasswordResetEmail(to: string, clientName: string, res
     subject,
     preheader,
     `
-      <h2 class="h1-title">Demande de Réinitialisation de Mot de Passe</h2>
-      <p>Bonjour ${clientName},</p>
-      <p>Nous avons reçu une demande de réinitialisation d'accès pour votre compte **Nexium Markets**.</p>
+      <h2 class="h1-title">Réinitialisation de mot de passe</h2>
+      <p class="body-text">Bonjour ${clientName},</p>
+      <p class="body-text">Nous avons reçu une demande de réinitialisation d'accès pour votre compte <strong>Nexium Markets</strong>.</p>
 
       <div class="card-box">
-        <div class="card-label">🛡️ Procédure de Sécurité</div>
+        <div class="card-label">Procédure de sécurité</div>
         <p style="margin: 0; font-size: 14px; color: #CBD5E1;">
-          Cliquez sur le bouton ci-dessous pour choisir votre nouveau mot de passe. Ce lien est temporaire et expirera dans <strong>15 minutes</strong> pour des raisons de sécurité institutionnelle.
+          Cliquez sur le bouton ci-dessous pour choisir votre nouveau mot de passe. Ce lien est temporaire et expirera dans <strong>15 minutes</strong>.
         </p>
       </div>
 
-      <div style="text-align: center; margin: 28px 0 20px;">
-        <a href="${resetUrl}" class="btn-primary">
-          🔑 Réinitialiser Mon Mot de Passe ➔
-        </a>
+      <div style="text-align: center;">
+        ${ctaButton(resetUrl, "Réinitialiser mon mot de passe")}
       </div>
 
-      <p style="font-size: 13px; color: #94A3B8; margin-top: 20px;">
-        Si vous n'êtes pas à l'origine de cette demande, veuillez ignorer cet e-mail. Votre mot de passe actuel reste inchangé et sécurisé.
+      <p class="footnote">
+        Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail — votre mot de passe actuel reste inchangé.
       </p>
-    `
+    `,
+    { kicker: "Sécurité du compte" }
   );
 
   return sendViaResendHttp(to, subject, html);
@@ -456,39 +421,28 @@ export async function sendWithdrawalApprovedEmail(
     subject,
     preheader,
     `
-      <h2 class="h1-title">Validation de votre Retrait</h2>
-      <p>Bonjour ${clientName},</p>
-      <p>Nous vous informons que votre demande de retrait a été validée par notre Desk Financier et le virement a été émis.</p>
+      <h2 class="h1-title">Validation de votre retrait</h2>
+      <p class="body-text">Bonjour ${clientName},</p>
+      <p class="body-text">Nous vous informons que votre demande de retrait a été validée et le virement a été émis.</p>
 
-      <div class="card-box" style="border-color: rgba(59, 130, 246, 0.4);">
-        <div class="card-label" style="color: #60A5FA;">💳 Ordre de Virement Émis</div>
-        <div style="font-size: 26px; font-weight: 900; color: #FFFFFF; font-family: monospace; margin: 10px 0;">
+      <div class="card-box" style="border-color: rgba(59, 130, 246, 0.35);">
+        <div class="card-label" style="color: #60A5FA;">Ordre de virement émis</div>
+        <div style="font-size: 26px; font-weight: 800; color: #FFFFFF; font-family: 'Courier New', monospace; margin: 4px 0 14px;">
           ${amountFormatted}
         </div>
-        <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 13px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px;">
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Destination des Fonds :</td>
-            <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold; text-align: right;">${destinationIbanOrWallet}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Réseau Bancaire :</td>
-            <td style="padding: 6px 0; color: #00E599; font-weight: bold; text-align: right;">SEPA Instant / SWIFT Direct</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #94A3B8;">Statut :</td>
-            <td style="padding: 6px 0; color: #60A5FA; font-weight: bold; text-align: right;">Traité &amp; Exécuté</td>
-          </tr>
-        </table>
+        ${kvTable([
+          { label: "Destination des fonds", value: destinationIbanOrWallet },
+          { label: "Statut", value: "Traité & exécuté", accent: true },
+        ])}
       </div>
 
-      <p>Les fonds apparaîtront sur votre compte bancaire selon les délais habituels de votre établissement.</p>
+      <p class="body-text">Les fonds apparaîtront sur votre compte selon les délais habituels de votre établissement.</p>
 
-      <div style="text-align: center; margin: 28px 0 16px;">
-        <a href="https://nexiummarkets.com/NEXIUM" class="btn-primary">
-          Accéder à Mon Espace Client ➔
-        </a>
+      <div style="text-align: center;">
+        ${ctaButton("https://nexiummarkets.com/NEXIUM", "Accéder à mon espace client")}
       </div>
-    `
+    `,
+    { kicker: "Retrait approuvé" }
   );
 
   return sendViaResendHttp(to, subject, html);
@@ -513,21 +467,19 @@ export async function sendCustomDeskEmail(to: string, subject: string, bodyText:
         ${formattedContent}
       </div>
 
-      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-        <p style="margin: 0; font-size: 14px; font-weight: bold; color: #FFFFFF;">
-          ${advisorName || "Le Desk d'Opérations & Gestion de Compte"}
-        </p>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #00E599; font-family: monospace;">
-          Nexium Markets Institutional Division
-        </p>
-      </div>
+      <hr class="divider" />
+      <p style="margin: 18px 0 0 0; font-size: 14px; font-weight: 700; color: #FFFFFF;">
+        ${advisorName || "Le Desk d'opérations & gestion de compte"}
+      </p>
+      <p style="margin: 4px 0 0 0; font-size: 12px; color: #00E599; font-family: 'Courier New', monospace;">
+        Nexium Markets
+      </p>
 
-      <div style="text-align: center; margin: 28px 0 10px;">
-        <a href="https://nexiummarkets.com/login" class="btn-primary">
-          Répondre depuis mon Espace Client ➔
-        </a>
+      <div style="text-align: center;">
+        ${ctaButton("https://nexiummarkets.com/login", "Répondre depuis mon espace client")}
       </div>
-    `
+    `,
+    { kicker: "Message de votre conseiller" }
   );
 
   return sendViaResendHttp(to, subject, html);

@@ -12,8 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as NEXIUMRouteImport } from './routes/NEXIUM'
 import { Route as AboutRouteImport } from './routes/about'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as BlogRouteImport } from './routes/blog'
+import { Route as CompositionRouteImport } from './routes/composition'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -26,6 +26,7 @@ import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RiskDisclosureRouteImport } from './routes/risk-disclosure'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as RobotsIndexRouteImport } from './routes/robots.index'
@@ -46,14 +47,14 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const BlogRoute = BlogRouteImport.update({
   id: '/blog',
   path: '/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompositionRoute = CompositionRouteImport.update({
+  id: '/composition',
+  path: '/composition',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -116,6 +117,11 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RiskDisclosureRoute = RiskDisclosureRouteImport.update({
   id: '/risk-disclosure',
   path: '/risk-disclosure',
@@ -141,8 +147,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/NEXIUM': typeof NEXIUMRoute
   '/about': typeof AboutRoute
-  '/admin': typeof AdminRoute
   '/blog': typeof BlogRoute
+  '/composition': typeof CompositionRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
   '/terms': typeof TermsRoute
   '/robots/$slug': typeof RobotsSlugRoute
@@ -164,8 +171,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/NEXIUM': typeof NEXIUMRoute
   '/about': typeof AboutRoute
-  '/admin': typeof AdminRoute
   '/blog': typeof BlogRoute
+  '/composition': typeof CompositionRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
   '/terms': typeof TermsRoute
   '/robots/$slug': typeof RobotsSlugRoute
@@ -188,8 +196,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/NEXIUM': typeof NEXIUMRoute
   '/about': typeof AboutRoute
-  '/admin': typeof AdminRoute
   '/blog': typeof BlogRoute
+  '/composition': typeof CompositionRoute
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/register': typeof RegisterRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
   '/terms': typeof TermsRoute
   '/robots/$slug': typeof RobotsSlugRoute
@@ -213,8 +222,8 @@ export interface FileRouteTypes {
     | '/'
     | '/NEXIUM'
     | '/about'
-    | '/admin'
     | '/blog'
+    | '/composition'
     | '/contact'
     | '/cookies'
     | '/dashboard'
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/register'
+    | '/reset-password'
     | '/risk-disclosure'
     | '/terms'
     | '/robots/$slug'
@@ -236,8 +246,8 @@ export interface FileRouteTypes {
     | '/'
     | '/NEXIUM'
     | '/about'
-    | '/admin'
     | '/blog'
+    | '/composition'
     | '/contact'
     | '/cookies'
     | '/dashboard'
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/register'
+    | '/reset-password'
     | '/risk-disclosure'
     | '/terms'
     | '/robots/$slug'
@@ -259,8 +270,8 @@ export interface FileRouteTypes {
     | '/'
     | '/NEXIUM'
     | '/about'
-    | '/admin'
     | '/blog'
+    | '/composition'
     | '/contact'
     | '/cookies'
     | '/dashboard'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/pricing'
     | '/privacy'
     | '/register'
+    | '/reset-password'
     | '/risk-disclosure'
     | '/terms'
     | '/robots/$slug'
@@ -283,8 +295,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NEXIUMRoute: typeof NEXIUMRoute
   AboutRoute: typeof AboutRoute
-  AdminRoute: typeof AdminRoute
   BlogRoute: typeof BlogRoute
+  CompositionRoute: typeof CompositionRoute
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
   DashboardRoute: typeof DashboardRoute
@@ -297,6 +309,7 @@ export interface RootRouteChildren {
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   RegisterRoute: typeof RegisterRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   RiskDisclosureRoute: typeof RiskDisclosureRoute
   TermsRoute: typeof TermsRoute
   RobotsSlugRoute: typeof RobotsSlugRoute
@@ -326,18 +339,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/blog': {
       id: '/blog'
       path: '/blog'
       fullPath: '/blog'
       preLoaderRoute: typeof BlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/composition': {
+      id: '/composition'
+      path: '/composition'
+      fullPath: '/composition'
+      preLoaderRoute: typeof CompositionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/risk-disclosure': {
       id: '/risk-disclosure'
       path: '/risk-disclosure'
@@ -459,8 +479,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NEXIUMRoute: NEXIUMRoute,
   AboutRoute: AboutRoute,
-  AdminRoute: AdminRoute,
   BlogRoute: BlogRoute,
+  CompositionRoute: CompositionRoute,
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
   DashboardRoute: DashboardRoute,
@@ -473,6 +493,7 @@ const rootRouteChildren: RootRouteChildren = {
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   RegisterRoute: RegisterRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   RiskDisclosureRoute: RiskDisclosureRoute,
   TermsRoute: TermsRoute,
   RobotsSlugRoute: RobotsSlugRoute,

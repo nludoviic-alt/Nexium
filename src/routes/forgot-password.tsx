@@ -25,7 +25,6 @@ import { Globe, Loader2, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { sendPasswordResetEmail } from "@/lib/resend";
 import { useLanguage } from "@/context/LanguageContext";
 
 function ForgotPasswordPage() {
@@ -45,27 +44,32 @@ function ForgotPasswordPage() {
 
     try {
       if (isSupabaseConfigured) {
-        try {
-          await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: "https://nexiummarkets.com/login",
-          });
-        } catch (supabaseErr) {
-          console.warn("Notice resetPassword Supabase:", supabaseErr);
-        }
+        // Seul le lien envoyé par Supabase contient un jeton réel, vérifiable
+        // côté serveur — /reset-password le consomme via detectSessionInUrl.
+        // (L'ancienne version envoyait en parallèle un second e-mail Resend
+        // avec un jeton fabriqué côté client, jamais stocké ni vérifiable :
+        // ce lien ne pouvait jamais fonctionner.)
+        await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: "https://nexiummarkets.com/reset-password",
+        });
       }
 
-      // Envoi garanti de l'e-mail officiel avec le superbe template HTML Resend
-      const resetLink = `https://nexiummarkets.com/login?reset_token=${Math.random().toString(36).substring(2)}`;
-      await sendPasswordResetEmail(email, email.split("@")[0], resetLink);
-
+      // On affiche toujours un succès, que l'adresse existe ou non, pour ne
+      // pas permettre à un tiers de deviner quels e-mails sont enregistrés.
       setSubmitted(true);
       toast.success(
         language === "fr"
-          ? "Instructions de réinitialisation envoyées à votre adresse e-mail."
-          : "Password reset instructions sent to your email."
+          ? "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé."
+          : "If an account exists for this address, a reset email was just sent."
       );
     } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'envoi.");
+      console.warn("Notice resetPassword Supabase:", err);
+      setSubmitted(true);
+      toast.success(
+        language === "fr"
+          ? "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé."
+          : "If an account exists for this address, a reset email was just sent."
+      );
     } finally {
       setLoading(false);
     }
