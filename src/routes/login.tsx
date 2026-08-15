@@ -26,18 +26,20 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
+import { useLanguage } from "@/context/LanguageContext";
 
 function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("ludovic@nexium.io");
-  const [password, setPassword] = useState("••••••••••••");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      toast.error("Veuillez saisir votre e-mail et mot de passe.");
+      toast.error(language === "fr" ? "Veuillez saisir votre e-mail et mot de passe." : "Please enter your email and password.");
       return;
     }
 
@@ -45,7 +47,7 @@ function LoginPage() {
 
     try {
       // 1. Authentification Supabase si configuré
-      if (isSupabaseConfigured && password !== "••••••••••••") {
+      if (isSupabaseConfigured) {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -90,7 +92,7 @@ function LoginPage() {
         }
       }
 
-      // 2. Mode Démo / Accès direct
+      // 2. Mode Démo / Accès direct si Supabase non configuré
       toast.success("Connexion réussie. Bienvenue sur votre Dashboard Nexium.");
       if (email.toLowerCase().includes("admin") || email.toLowerCase().includes("owner")) {
         navigate({ to: "/admin" });
@@ -120,10 +122,14 @@ function LoginPage() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
-          <Globe className="size-3.5 text-gray-700" />
-          <span>EN ▾</span>
-        </div>
+        {/* Interactive Language Switcher */}
+        <button
+          onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-200/80 hover:bg-gray-300 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+        >
+          <Globe className="size-3.5 text-emerald-600" />
+          <span>{language === "fr" ? "FR 🇫🇷" : "EN 🇬🇧"}</span>
+        </button>
       </header>
 
       {/* Main Form Center Content */}

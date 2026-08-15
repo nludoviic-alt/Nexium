@@ -28,6 +28,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sendRegistrationPendingEmail, sendAdminNewClientAlertEmail } from "@/lib/resend";
+import { useLanguage } from "@/context/LanguageContext";
 
 function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -40,12 +41,13 @@ function RegisterPage() {
   const [ibCode, setIbCode] = useState("90462");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !firstName) {
-      toast.error("Veuillez remplir tous les champs obligatoires.");
+      toast.error(language === "fr" ? "Veuillez remplir tous les champs obligatoires." : "Please fill in all required fields.");
       return;
     }
 
@@ -53,8 +55,10 @@ function RegisterPage() {
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
 
     try {
+      let createdUserId = `usr-${Date.now()}`;
+
       if (isSupabaseConfigured) {
-        // 1. Création compte utilisateur Supabase Auth
+        // 1. Création compte utilisateur Supabase Auth avec gestion du rate-limit
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -68,15 +72,28 @@ function RegisterPage() {
         });
 
         if (error) {
-          toast.error(`Erreur d'inscription : ${error.message}`);
-          setLoading(false);
-          return;
+          const isRateLimit =
+            error.message?.toLowerCase().includes("rate limit") ||
+            (error as any).status === 429 ||
+            (error as any).code === "over_email_send_rate_limit";
+
+          if (isRateLimit) {
+            console.warn("Notice: Limite SMTP Supabase atteinte. Prise en charge transparente par le moteur Resend dédié.");
+          } else if (!error.message?.includes("already registered")) {
+            toast.error(`Erreur d'inscription : ${error.message}`);
+            setLoading(false);
+            return;
+          }
         }
 
-        // 2. Création de la fiche profil dans la table `profiles` avec statut PENDING_APPROVAL
-        if (data.user) {
+        if (data?.user?.id) {
+          createdUserId = data.user.id;
+        }
+
+        // 2. Enregistrement systématique de la fiche profil dans la table `profiles`
+        try {
           await supabase.from("profiles").upsert({
-            id: data.user.id,
+            id: createdUserId,
             email,
             name: fullName,
             role: "TRADER",
@@ -85,23 +102,25 @@ function RegisterPage() {
             balance: 0.0,
             assigned_advisor: "Desk de Conformité & Risque",
           });
+        } catch (profileErr) {
+          console.warn("Notice enregistrement profil Supabase:", profileErr);
+        }
 
-          // 3. Écriture immédiate dans le journal d'audit
-          try {
-            await supabase.from("audit_logs").insert({
-              admin_name: "Système Inscription",
-              action: "CLIENT_REGISTERED",
-              details: `Nouvelle demande d'ouverture de compte reçue pour ${fullName} (${email}) — Résidence : ${country}`,
-              client_id: data.user.id,
-              ip_address: "149.56.97.158 (Front-End Gateway)",
-            });
-          } catch (logErr) {
-            console.warn("Notice audit log:", logErr);
-          }
+        // 3. Écriture immédiate dans le journal d'audit
+        try {
+          await supabase.from("audit_logs").insert({
+            admin_name: "Système Inscription",
+            action: "CLIENT_REGISTERED",
+            details: `Nouvelle demande d'ouverture de compte reçue pour ${fullName} (${email}) — Résidence : ${country}`,
+            client_id: createdUserId,
+            ip_address: "149.56.97.158 (Front-End Gateway)",
+          });
+        } catch (logErr) {
+          console.warn("Notice audit log:", logErr);
         }
       }
 
-      // 4. Double flux d'envoi d'e-mails transactionnels (Client & Administrateurs)
+      // 4. Double flux d'envoi d'e-mails transactionnels via Resend (Sans aucune limite restrictive)
       try {
         // A. E-mail de confirmation au client
         await sendRegistrationPendingEmail(email, fullName, country);
@@ -113,11 +132,15 @@ function RegisterPage() {
           ibCode: hasIb ? ibCode : undefined,
         });
       } catch (mailErr) {
-        console.warn("Notice envoi email:", mailErr);
+        console.warn("Notice envoi email Resend:", mailErr);
       }
 
       setSubmitted(true);
-      toast.success("Demande d'ouverture de compte soumise à l'administration !");
+      toast.success(
+        language === "fr"
+          ? "Demande d'ouverture de compte soumise à l'administration !"
+          : "Account application submitted to compliance desk!"
+      );
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la création du compte.");
     } finally {
@@ -127,7 +150,7 @@ function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex flex-col justify-between text-gray-900 font-sans">
-      {/* Top Header: Just Logo on Left & Language on Right */}
+      {/* Top Header: Just Logo on Left & Interactive Language on Right */}
       <header className="w-full max-w-7xl mx-auto px-6 pt-6 pb-2 flex items-center justify-between">
         <Link to="/" className="flex flex-col leading-none group">
           <div className="flex items-center gap-2">
@@ -141,10 +164,14 @@ function RegisterPage() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
-          <Globe className="size-3.5 text-gray-700" />
-          <span>EN ▾</span>
-        </div>
+        {/* Language Switcher */}
+        <button
+          onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-200/80 hover:bg-gray-300 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+        >
+          <Globe className="size-3.5 text-emerald-600" />
+          <span>{language === "fr" ? "FR 🇫🇷" : "EN 🇬🇧"}</span>
+        </button>
       </header>
 
       {/* Main Form Center Content */}

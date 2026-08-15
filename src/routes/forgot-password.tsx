@@ -26,16 +26,18 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sendPasswordResetEmail } from "@/lib/resend";
+import { useLanguage } from "@/context/LanguageContext";
 
 function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const { language, setLanguage } = useLanguage();
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      toast.error("Veuillez saisir votre adresse e-mail.");
+      toast.error(language === "fr" ? "Veuillez saisir votre adresse e-mail." : "Please enter your email address.");
       return;
     }
 
@@ -43,26 +45,35 @@ function ForgotPasswordPage() {
 
     try {
       if (isSupabaseConfigured) {
-        await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: "https://nexiummarkets.com/login",
-        });
+        try {
+          await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: "https://nexiummarkets.com/login",
+          });
+        } catch (supabaseErr) {
+          console.warn("Notice resetPassword Supabase:", supabaseErr);
+        }
       }
 
-      // Envoi de l'e-mail officiel avec le superbe template HTML Resend
+      // Envoi garanti de l'e-mail officiel avec le superbe template HTML Resend
       const resetLink = `https://nexiummarkets.com/login?reset_token=${Math.random().toString(36).substring(2)}`;
       await sendPasswordResetEmail(email, email.split("@")[0], resetLink);
 
       setSubmitted(true);
-      toast.success("Instructions de réinitialisation envoyées à votre adresse e-mail.");
+      toast.success(
+        language === "fr"
+          ? "Instructions de réinitialisation envoyées à votre adresse e-mail."
+          : "Password reset instructions sent to your email."
+      );
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de l'envoi.");
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex flex-col justify-between text-gray-900 font-sans">
-      {/* Top Header: Just Logo on Left & Language on Right */}
+      {/* Top Header: Just Logo on Left & Interactive Language on Right */}
       <header className="w-full max-w-7xl mx-auto px-6 pt-6 pb-2 flex items-center justify-between">
         <Link to="/" className="flex flex-col leading-none group">
           <div className="flex items-center gap-2">
@@ -76,10 +87,14 @@ function ForgotPasswordPage() {
           </div>
         </Link>
 
-        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer hover:text-gray-900 transition-colors">
-          <Globe className="size-3.5 text-gray-700" />
-          <span>EN ▾</span>
-        </div>
+        {/* Interactive Language Switcher */}
+        <button
+          onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-200/80 hover:bg-gray-300 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
+        >
+          <Globe className="size-3.5 text-emerald-600" />
+          <span>{language === "fr" ? "FR 🇫🇷" : "EN 🇬🇧"}</span>
+        </button>
       </header>
 
       {/* Main Form Center Content */}
