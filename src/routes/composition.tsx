@@ -835,11 +835,12 @@ function NexiumAdminDashboard({
     return staffMember?.deskSignature ?? `Conseiller Desk (${currentSessionRole}) — Nexium Markets`;
   }, [staffList, currentSessionRole]);
 
-  // Identifiant email-service du collaborateur connecté — même id que staffList (voir
-  // email-service/src/db/seed.ts), le temps qu'une vraie session serveur existe.
-  const currentEmailAgentId = useMemo(() => {
-    return staffList.find((s) => s.role === currentSessionRole)?.id ?? "adm-owner";
-  }, [staffList, currentSessionRole]);
+  // Identifiant email-service du collaborateur connecté — l'id Supabase réel
+  // de la session, identique à l'id agent seedé côté email-service (voir
+  // email-service/seed_real_agents.mjs). Auparavant cherchait le premier
+  // membre du staffList ayant le même rôle : incorrect dès que deux personnes
+  // partagent un rôle, et retombait sur un id de démo fictif sinon.
+  const currentEmailAgentId = sessionUser.id;
 
   // Contacts filtrés pour la messagerie
   const filteredContacts = useMemo(() => {
