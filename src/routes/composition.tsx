@@ -150,6 +150,7 @@ function CompositionAccessGate() {
   const [state, setState] = useState<"checking" | "authorized" | "denied">("checking");
   const [sessionRole, setSessionRole] = useState<AdminSystemRole | null>(null);
   const [isPrimaryOwner, setIsPrimaryOwner] = useState(false);
+  const [sessionUser, setSessionUser] = useState<{ name: string; email: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,6 +180,7 @@ function CompositionAccessGate() {
 
       setSessionRole(role as AdminSystemRole);
       setIsPrimaryOwner(Boolean(profile.is_primary_owner));
+      setSessionUser({ name: profile.name || userData.user.email || "Administrateur", email: profile.email });
       setState("authorized");
     }
 
@@ -195,7 +197,7 @@ function CompositionAccessGate() {
     }
   }, [state, navigate]);
 
-  if (state !== "authorized" || !sessionRole) {
+  if (state !== "authorized" || !sessionRole || !sessionUser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0b0d10]">
         <div className="flex items-center gap-3 text-sm font-semibold text-emerald-400">
@@ -206,7 +208,13 @@ function CompositionAccessGate() {
     );
   }
 
-  return <NexiumAdminDashboard initialSessionRole={sessionRole} isPrimaryOwner={isPrimaryOwner} />;
+  return (
+    <NexiumAdminDashboard
+      initialSessionRole={sessionRole}
+      isPrimaryOwner={isPrimaryOwner}
+      sessionUser={sessionUser}
+    />
+  );
 }
 
 /* ========================================================================= */
@@ -520,429 +528,12 @@ const INDEX_PRESETS = [
   { id: "idx-range", name: "Range Consolidation SPX (0.25% risque)", maxLot: 0.25, minScore: 85 },
 ];
 
-/* ========================================================================= */
-/* DONNÉES INITIALES                                                         */
-/* ========================================================================= */
-
-const INITIAL_CLIENTS: UserProfile[] = [
-  {
-    id: "usr-101",
-    name: "Alexandre Dupuis",
-    email: "a.dupuis@pro-capital.fr",
-    phone: "+33 6 42 19 88 01",
-    country: "France 🇫🇷",
-    status: "ACTIVE",
-    createdAt: "2026-01-20",
-    lastActive: "En ligne",
-    ip: "82.65.120.4 (Paris, FR)",
-    twoFactorEnabled: true,
-    forcePasswordReset: false,
-    balance: 45200.0,
-    bonusCredit: 2500.0,
-    equity: 48950.0,
-    
-    kycStatus: "VERIFIED",
-    kycDocuments: {
-      idCardName: "Passeport_Francais_ADupuis.pdf",
-      proofOfAddressName: "Facture_EDF_Paris_ADupuis.pdf",
-      submittedDate: "2026-01-21",
-    },
-    maxDailyLossPercent: 3.0,
-    maxSimultaneousTrades: 3,
-    riskGuardAutoStop: true,
-    referralCode: "PRO-PARIS-2026",
-    referrerName: "Club Forex Paris",
-    assignedAdvisor: "Elena Rostova (Desk Support)",
-    
-    withdrawalRequests: [
-      { id: "w-101", date: "Aujourd'hui à 14:15", amount: 5000, method: "SEPA_IBAN", destination: "FR76 3000 4000 5000 6000 7000 890", status: "PENDING", note: "Retrait des bénéfices du mois de Juillet" },
-      { id: "w-102", date: "2026-07-15", amount: 3200, method: "SEPA_IBAN", destination: "FR76 3000 4000 5000 6000 7000 890", status: "APPROVED", processedBy: "Super Admin", note: "Virement SEPA exécuté" },
-    ],
-    depositRequests: [
-      { id: "dep-201", date: "Aujourd'hui à 13:40", amount: 10000, method: "VIREMENT_BANCAIRE", reference: "NEX-DEP-991823", status: "PENDING", note: "Virement reçu sur compte BNP Paribas" },
-      { id: "dep-202", date: "2026-01-20", amount: 35200, method: "CARD", reference: "CARD-ECN-11029", status: "CREDITED", creditedBy: "Elena Rostova", note: "Dépôt d'ouverture de compte" },
-    ],
-
-    sessions: [
-      { id: "s-1", device: "MacBook Pro (Chrome macOS)", ip: "82.65.120.4", location: "Paris, France 🇫🇷", lastActive: "En direct", current: true },
-      { id: "s-2", device: "iPhone 15 Pro (Safari iOS)", ip: "82.65.120.4", location: "Paris, France 🇫🇷", lastActive: "Il y a 2h", current: false },
-    ],
-    crmNotes: [
-      { id: "n-1", author: "Elena Rostova", date: "2026-08-10", text: "Client très satisfait des résultats du robot Gold. Préfère les alertes par SMS." },
-    ],
-
-    grossProfitTotal: 14850.0,
-    grossLossTotal: 3400.0,
-    bestTradePnl: 1850.0,
-    worstTradePnl: -420.0,
-    todayGrossGain: 1450.0,
-    todayGrossLoss: -200.0,
-    todayPnl: 1250.0,
-    totalNetPnl: 11450.0,
-    winRatePercent: 78.4,
-    profitFactor: 4.36,
-    maxDrawdownPercent: 3.8,
-    tradesCount: 142,
-    winningTradesCount: 111,
-    losingTradesCount: 31,
-    highWaterMark: 45200.0,
-    performanceFeeRate: 20,
-    pendingPerfFee: 2290.0,
-    engines: {
-      aiGold: { active: true, preset: "Équilibré (0.50% risque / SL 1.5 ATR)", maxLot: 0.4, minScore: 78, riskCapPercent: 2.0 },
-      fxTrend: { active: true, preset: "London Breakout Scalp (0.25% risque)", maxLot: 0.4, minScore: 80, riskCapPercent: 1.0 },
-      indexReversion: { active: false, preset: "Mean Reversion 15M (US30 / NAS100)", maxLot: 0.2, minScore: 82, riskCapPercent: 2.0 },
-    },
-    mt5: {
-      login: "549102",
-      broker: "Pepperstone ECN",
-      server: "Pepperstone-Edge02",
-      investorPass: "InvPepper2026!",
-      pingMs: 14,
-      status: "ONLINE",
-    },
-    licenseKey: "NX-PRO-5491-0211-DUAL-290",
-    licenseExpires: "2026-10-15",
-    transactions: [
-      { id: "tx-1", date: "2026-07-28", type: "DEPOSIT", amount: 45200, status: "COMPLETED", method: "Carte Bancaire ECN" },
-      { id: "tx-2", date: "2026-07-28", type: "BONUS", amount: 2500, status: "COMPLETED", method: "Bonus Bienvenue Pro" },
-    ],
-    trades: [
-      { id: "tr-1", ticket: "889101", symbol: "XAUUSD", type: "BUY", lots: 0.35, openPrice: 2412.5, closePrice: 2421.8, pnl: 651.0, openTime: "Aujourd'hui 09:15", closeTime: "Aujourd'hui 11:20", engine: "Nexium AI Gold", status: "CLOSED" },
-      { id: "tr-2", ticket: "889102", symbol: "EURUSD", type: "SELL", lots: 0.4, openPrice: 1.0882, closePrice: 1.0845, pnl: 296.0, openTime: "Aujourd'hui 10:05", closeTime: "Aujourd'hui 13:45", engine: "Nexium FX Trend", status: "CLOSED" },
-      { id: "tr-3", ticket: "889103", symbol: "XAUUSD", type: "BUY", lots: 0.3, openPrice: 2419.0, pnl: 303.0, openTime: "Aujourd'hui 14:10", engine: "Nexium AI Gold", status: "OPEN" },
-    ],
-    notes: ["Client Pro Trader actif."],
-  },
-  {
-    id: "usr-102",
-    name: "Sarah Benali",
-    email: "sarah.benali@geneva-capital.ch",
-    phone: "+41 22 780 11 99",
-    country: "Suisse 🇨🇭",
-    status: "ACTIVE",
-    createdAt: "2026-04-10",
-    lastActive: "En ligne",
-    ip: "185.142.18.91 (Genève, CH)",
-    twoFactorEnabled: true,
-    forcePasswordReset: false,
-    balance: 125000.0,
-    bonusCredit: 10000.0,
-    equity: 139420.0,
-
-    kycStatus: "VERIFIED",
-    kycDocuments: {
-      idCardName: "ID_Suisse_SBenali.pdf",
-      proofOfAddressName: "Banque_Cantonale_Geneve.pdf",
-      submittedDate: "2026-04-11",
-    },
-    maxDailyLossPercent: 2.5,
-    maxSimultaneousTrades: 4,
-    riskGuardAutoStop: true,
-    referralCode: "GENEVA-INST-01",
-    referrerName: "Gestion Privée Genève",
-    assignedAdvisor: "Dr. Antoine Reynaud (Quant)",
-
-    withdrawalRequests: [
-      { id: "w-201", date: "2026-07-20", amount: 15000, method: "SEPA_IBAN", destination: "CH93 0076 2011 6238 5291 1", status: "APPROVED", processedBy: "Super Admin", note: "Virement Banque Cantonale" },
-    ],
-    depositRequests: [
-      { id: "dep-301", date: "2026-04-10", amount: 125000, method: "VIREMENT_BANCAIRE", reference: "BCGE-GEN-9901", status: "CREDITED", creditedBy: "Super Admin", note: "Dépôt initial institutionnel" },
-    ],
-
-    sessions: [
-      { id: "s-3", device: "iMac 27 (Safari macOS)", ip: "185.142.18.91", location: "Genève, Suisse 🇨🇭", lastActive: "En direct", current: true },
-    ],
-    crmNotes: [
-      { id: "n-3", author: "Dr. Antoine Reynaud", date: "2026-08-05", text: "Compte institutionnel. Volume surveillé par le desk quantitatif." },
-    ],
-
-    grossProfitTotal: 42300.0,
-    grossLossTotal: 7500.0,
-    bestTradePnl: 4800.0,
-    worstTradePnl: -850.0,
-    todayGrossGain: 4720.0,
-    todayGrossLoss: -300.0,
-    todayPnl: 4420.0,
-    totalNetPnl: 34800.0,
-    winRatePercent: 82.1,
-    profitFactor: 5.64,
-    maxDrawdownPercent: 2.9,
-    tradesCount: 310,
-    winningTradesCount: 254,
-    losingTradesCount: 56,
-    highWaterMark: 125000.0,
-    performanceFeeRate: 25,
-    pendingPerfFee: 8700.0,
-    engines: {
-      aiGold: { active: true, preset: "PropFirm Safe (Max Drawdown 0.30%)", maxLot: 0.8, minScore: 84, riskCapPercent: 1.5 },
-      fxTrend: { active: true, preset: "Triple EMA Momentum Standard (0.30% risque)", maxLot: 1.0, minScore: 75, riskCapPercent: 1.5 },
-      indexReversion: { active: true, preset: "Mean Reversion 15M (US30 / NAS100)", maxLot: 0.5, minScore: 82, riskCapPercent: 2.0 },
-    },
-    mt5: {
-      login: "880192",
-      broker: "IC Markets SC",
-      server: "ICMarketsSC-Live04",
-      investorPass: "InvIC2026!",
-      pingMs: 18,
-      status: "ONLINE",
-    },
-    licenseKey: "NX-INST-8801-9210-TRIO-990",
-    licenseExpires: "2027-01-01",
-    transactions: [
-      { id: "tx-4", date: "2026-08-01", type: "DEPOSIT", amount: 125000, status: "COMPLETED", method: "Virement SEPA Banque Cantonale" },
-    ],
-    trades: [
-      { id: "tr-4", ticket: "991044", symbol: "US30", type: "BUY", lots: 0.5, openPrice: 39850, closePrice: 40120, pnl: 2700.0, openTime: "Aujourd'hui 08:30", closeTime: "Aujourd'hui 12:00", engine: "Nexium Index Reversion", status: "CLOSED" },
-    ],
-    notes: ["Compte institutionnel haute priorité."],
-  },
-];
-
-const INITIAL_STAFF: StaffAdministrator[] = [
-  {
-    id: "adm-owner",
-    name: "Marc-Aurèle V.",
-    email: "owner@nexiummarkets.com",
-    phone: "+41 22 819 00 01",
-    role: "OWNER",
-    isPrimaryOwner: true,
-    department: "Direction Générale",
-    status: "ACTIVE",
-    twoFactorEnabled: true,
-    createdAt: "2025-01-01",
-    lastLogin: "En ligne maintenant",
-    lastIp: "185.142.18.1 (Genève, CH)",
-    ipWhitelist: "Toutes les adresses IP (Accès Maître)",
-    allowedHours: "24/7 (Souveraineté Absolue)",
-    deskSignature: "Marc-Aurèle V. — Fondateur & Propriétaire @ Nexium Markets",
-    assignedAccountsCount: 520,
-    assignedTraders: ["Alexandre Dupuis", "Sophie Laurent", "Elena Rostova", "Club Forex Paris"],
-    permissions: {
-      canChatWithClients: true,
-      canSendEmails: true,
-      canTakePhoneCalls: true,
-      canApproveFinances: true,
-      canManageEngines: true,
-      canAdjustPnl: true,
-      canUseKillSwitch: true,
-      canManageStaff: true,
-      canViewTreasury: true,
-    },
-  },
-  {
-    id: "adm-1",
-    name: "Ludovic Moreau",
-    email: "ludovic.moreau@trading-fund.ch",
-    phone: "+41 22 819 44 20",
-    role: "SUPER_ADMIN",
-    department: "Direction Générale",
-    status: "ACTIVE",
-    twoFactorEnabled: true,
-    createdAt: "2025-10-01",
-    lastLogin: "Aujourd'hui à 14:45",
-    lastIp: "185.142.18.91 (Genève, CH)",
-    ipWhitelist: "185.142.18.91, 194.67.12.8",
-    allowedHours: "24/7 (Accès Illimité)",
-    deskSignature: "Ludovic Moreau — Super Administrateur & COO @ Nexium",
-    assignedAccountsCount: 240,
-    assignedTraders: ["Alexandre Dupuis", "Marc Albarran"],
-    permissions: {
-      canChatWithClients: true,
-      canSendEmails: true,
-      canTakePhoneCalls: true,
-      canApproveFinances: true,
-      canManageEngines: true,
-      canAdjustPnl: true,
-      canUseKillSwitch: true,
-      canManageStaff: true,
-      canViewTreasury: true,
-    },
-  },
-  {
-    id: "adm-conseiller-1",
-    name: "Julien Cassel",
-    email: "julien.c@nexiummarkets.com",
-    phone: "+41 22 990 12 77",
-    role: "CONSEILLER",
-    department: "Desk Support & Conseillers",
-    status: "ACTIVE",
-    twoFactorEnabled: true,
-    createdAt: "2026-01-15",
-    lastLogin: "Aujourd'hui à 15:10",
-    lastIp: "185.142.18.45 (Genève, CH)",
-    ipWhitelist: "185.142.18.45, 185.142.18.99",
-    allowedHours: "Lundi-Samedi 08:00 - 20:00",
-    deskSignature: "Julien Cassel — Conseiller Privé & Gestionnaire de Portefeuilles @ Nexium",
-    assignedAccountsCount: 75,
-    assignedTraders: ["Alexandre Dupuis", "David Benhamou"],
-    permissions: {
-      canChatWithClients: true,
-      canSendEmails: true,
-      canTakePhoneCalls: true,
-      canApproveFinances: false,
-      canManageEngines: true,
-      canAdjustPnl: false,
-      canUseKillSwitch: false,
-      canManageStaff: false,
-      canViewTreasury: false,
-    },
-  },
-  {
-    id: "adm-2",
-    name: "Elena Rostova",
-    email: "elena.r@nexiummarkets.com",
-    phone: "+41 22 990 12 34",
-    role: "SUPPORT",
-    department: "Desk Support & Conseillers",
-    status: "ACTIVE",
-    twoFactorEnabled: true,
-    createdAt: "2026-02-10",
-    lastLogin: "Aujourd'hui à 14:50",
-    lastIp: "185.142.18.99 (Genève, CH)",
-    ipWhitelist: "185.142.18.99",
-    allowedHours: "Lundi-Vendredi 08:00 - 19:00",
-    deskSignature: "Elena Rostova — Conseillère Support Clientèle @ Nexium",
-    assignedAccountsCount: 180,
-    assignedTraders: ["Alexandre Dupuis"],
-    permissions: {
-      canChatWithClients: true,
-      canSendEmails: true,
-      canTakePhoneCalls: true,
-      canApproveFinances: false,
-      canManageEngines: false,
-      canAdjustPnl: false,
-      canUseKillSwitch: false,
-      canManageStaff: false,
-      canViewTreasury: false,
-    },
-  },
-  {
-    id: "adm-3",
-    name: "Marc Albarran",
-    email: "marc.a@nexiummarkets.com",
-    phone: "+41 22 990 12 55",
-    role: "FINANCE",
-    department: "Gestion Financière",
-    status: "ACTIVE",
-    twoFactorEnabled: true,
-    createdAt: "2026-03-01",
-    lastLogin: "Aujourd'hui à 11:20",
-    lastIp: "194.67.12.8",
-    ipWhitelist: "194.67.12.8",
-    allowedHours: "08:00 - 18:00 (Heure Suisse)",
-    deskSignature: "Marc Albarran — Responsable Desk Financier @ Nexium",
-    assignedAccountsCount: 95,
-    assignedTraders: [],
-    permissions: {
-      canChatWithClients: true,
-      canSendEmails: true,
-      canTakePhoneCalls: false,
-      canApproveFinances: true,
-      canManageEngines: false,
-      canAdjustPnl: true,
-      canUseKillSwitch: false,
-      canManageStaff: false,
-      canViewTreasury: true,
-    },
-  },
-  {
-    id: "adm-quant-1",
-    name: "Dr. Antoine Reynaud",
-    email: "reynaud.quant@nexiummarkets.com",
-    phone: "+41 22 990 12 88",
-    role: "QUANT",
-    department: "Recherche Quantitative",
-    status: "ACTIVE",
-    twoFactorEnabled: true,
-    createdAt: "2025-11-15",
-    lastLogin: "Hier à 18:30",
-    lastIp: "82.65.120.4",
-    ipWhitelist: "82.65.120.4, 185.142.18.91",
-    allowedHours: "24/7",
-    deskSignature: "Dr. Antoine Reynaud — Lead Quantitative Strategist",
-    assignedAccountsCount: 60,
-    assignedTraders: [],
-    permissions: {
-      canChatWithClients: false,
-      canSendEmails: false,
-      canTakePhoneCalls: false,
-      canApproveFinances: false,
-      canManageEngines: true,
-      canAdjustPnl: true,
-      canUseKillSwitch: true,
-      canManageStaff: false,
-      canViewTreasury: false,
-    },
-  },
-];
-
-const INITIAL_GATEWAYS: BrokerGateway[] = [
-  { id: "gw-1", broker: "Nexium Prime ECN (NY4)", server: "Nexium-NY4-Equinix", ip: "198.51.100.24", latencyMs: 1.8, status: "OPTIMAL", connectedAccounts: 1420, ticksPerSec: 340 },
-  { id: "gw-2", broker: "Nexium London LD4 Bridge", server: "Nexium-LD4-Interbank", ip: "195.66.224.12", latencyMs: 2.4, status: "OPTIMAL", connectedAccounts: 980, ticksPerSec: 290 },
-  { id: "gw-3", broker: "Nexium Chicago CME Feed", server: "Nexium-CME-Direct", ip: "199.168.1.18", latencyMs: 3.1, status: "OPTIMAL", connectedAccounts: 760, ticksPerSec: 310 },
-  { id: "gw-4", broker: "Nexium Tokyo TY3 Asian", server: "Nexium-TY3-Tokyo", ip: "203.0.113.88", latencyMs: 4.2, status: "OPTIMAL", connectedAccounts: 540, ticksPerSec: 220 },
-];
-
-const INITIAL_VPN_ACCOUNTS: VpnAccount[] = [
-  { id: "vpn-1", peerName: "owner-macbook", assignedTo: "Marc-Aurèle V.", role: "OWNER", device: "MacBook Pro 16\" — Genève HQ", status: "ONLINE", vpnIp: "10.8.0.2", publicIp: "185.142.18.1", location: "Genève, CH", lastHandshake: "Il y a 18 sec", dataTransferred: "2.4 GB", twoFactorEnabled: true, createdAt: "2025-01-01" },
-  { id: "vpn-2", peerName: "ludovic-macbook", assignedTo: "Ludovic Moreau", role: "SUPER_ADMIN", device: "MacBook Pro 14\" — Genève HQ", status: "ONLINE", vpnIp: "10.8.0.3", publicIp: "185.142.18.91", location: "Genève, CH", lastHandshake: "Il y a 42 sec", dataTransferred: "3.1 GB", twoFactorEnabled: true, createdAt: "2025-10-01" },
-  { id: "vpn-3", peerName: "julien-laptop", assignedTo: "Julien Cassel", role: "CONSEILLER", device: "ThinkPad X1 — Home Office", status: "ONLINE", vpnIp: "10.8.0.4", publicIp: "84.226.11.40", location: "Lausanne, CH", lastHandshake: "Il y a 1 min", dataTransferred: "980 MB", twoFactorEnabled: true, createdAt: "2026-01-15" },
-  { id: "vpn-4", peerName: "elena-laptop", assignedTo: "Elena Rostova", role: "SUPPORT", device: "MacBook Air — Desk Support", status: "ONLINE", vpnIp: "10.8.0.5", publicIp: "5.180.44.12", location: "Zürich, CH", lastHandshake: "Il y a 25 sec", dataTransferred: "1.2 GB", twoFactorEnabled: true, createdAt: "2026-02-01" },
-  { id: "vpn-5", peerName: "marc-albarran-pc", assignedTo: "Marc Albarran", role: "FINANCE", device: "Dell XPS — Desk Financier", status: "OFFLINE", vpnIp: "10.8.0.6", publicIp: "82.66.14.203", location: "Paris, FR", lastHandshake: "Il y a 3h", dataTransferred: "645 MB", twoFactorEnabled: true, createdAt: "2026-01-20" },
-  { id: "vpn-6", peerName: "antoine-workstation", assignedTo: "Dr. Antoine Reynaud", role: "QUANT", device: "Workstation Linux — Lab Quant", status: "OFFLINE", vpnIp: "10.8.0.7", publicIp: "146.70.22.18", location: "Bruxelles, BE", lastHandshake: "Il y a 1 jour", dataTransferred: "5.8 GB", twoFactorEnabled: true, createdAt: "2026-02-10" },
-  { id: "vpn-7", peerName: "camille-laptop", assignedTo: "Camille Fontaine", role: "CONSEILLER", device: "MacBook Air — Home Office", status: "ONLINE", vpnIp: "10.8.0.8", publicIp: "90.12.44.78", location: "Annecy, FR", lastHandshake: "Il y a 55 sec", dataTransferred: "412 MB", twoFactorEnabled: true, createdAt: "2026-03-01" },
-  { id: "vpn-8", peerName: "yanis-laptop", assignedTo: "Yanis Belkacem", role: "SUPPORT", device: "ThinkPad T14 — Shift de Nuit", status: "OFFLINE", vpnIp: "10.8.0.9", publicIp: "197.230.12.4", location: "Casablanca, MA", lastHandshake: "Il y a 6h", dataTransferred: "220 MB", twoFactorEnabled: false, createdAt: "2026-03-12" },
-  { id: "vpn-9", peerName: "nadia-laptop", assignedTo: "Nadia Cherif", role: "SUPPORT", device: "MacBook Air — Desk Support", status: "OFFLINE", vpnIp: "10.8.0.10", publicIp: "197.230.9.51", location: "Casablanca, MA", lastHandshake: "Il y a 8h", dataTransferred: "310 MB", twoFactorEnabled: true, createdAt: "2026-03-12" },
-  { id: "vpn-10", peerName: "thomas-devops", assignedTo: "Thomas Girard", role: "SUPER_ADMIN", device: "Linux Desktop — Infra & DevOps", status: "ONLINE", vpnIp: "10.8.0.11", publicIp: "51.15.88.202", location: "Paris, FR", lastHandshake: "Il y a 8 sec", dataTransferred: "7.2 GB", twoFactorEnabled: true, createdAt: "2025-11-05" },
-  { id: "vpn-11", peerName: "sophie-pc", assignedTo: "Sophie Bernard", role: "FINANCE", device: "Dell Latitude — Desk Financier", status: "OFFLINE", vpnIp: "10.8.0.12", publicIp: "82.66.19.87", location: "Paris, FR", lastHandshake: "Il y a 2 jours", dataTransferred: "180 MB", twoFactorEnabled: true, createdAt: "2026-04-01" },
-  { id: "vpn-12", peerName: "karim-workstation", assignedTo: "Karim Haddad", role: "QUANT", device: "Workstation Linux — Lab Quant", status: "OFFLINE", vpnIp: "10.8.0.13", publicIp: "197.230.15.9", location: "Casablanca, MA", lastHandshake: "Il y a 4h", dataTransferred: "3.4 GB", twoFactorEnabled: true, createdAt: "2026-04-15" },
-  { id: "vpn-13", peerName: "lucas-devlaptop", assignedTo: "Lucas Meunier", role: "ADMIN", device: "MacBook Pro — Équipe Produit", status: "ONLINE", vpnIp: "10.8.0.14", publicIp: "90.15.66.21", location: "Lyon, FR", lastHandshake: "Il y a 1 min", dataTransferred: "1.9 GB", twoFactorEnabled: true, createdAt: "2026-05-02" },
-  { id: "vpn-14", peerName: "chloe-laptop", assignedTo: "Chloé Dubois", role: "CONSEILLER", device: "MacBook Air — Home Office", status: "OFFLINE", vpnIp: "10.8.0.15", publicIp: "88.174.22.10", location: "Genève, CH", lastHandshake: "Il y a 45 min", dataTransferred: "560 MB", twoFactorEnabled: true, createdAt: "2026-05-10" },
-  { id: "vpn-15", peerName: "rachid-laptop", assignedTo: "Rachid Amrani", role: "SUPPORT", device: "ThinkPad T14 — Shift de Nuit", status: "OFFLINE", vpnIp: "10.8.0.16", publicIp: "197.230.9.88", location: "Casablanca, MA", lastHandshake: "Il y a 10h", dataTransferred: "290 MB", twoFactorEnabled: false, createdAt: "2026-05-20" },
-  { id: "vpn-16", peerName: "emma-pc", assignedTo: "Emma Vogel", role: "FINANCE", device: "Dell XPS — Desk Financier", status: "OFFLINE", vpnIp: "10.8.0.17", publicIp: "82.66.31.44", location: "Paris, FR", lastHandshake: "Il y a 5 jours", dataTransferred: "95 MB", twoFactorEnabled: true, createdAt: "2026-06-01" },
-  { id: "vpn-17", peerName: "david-workstation", assignedTo: "David Cohen", role: "QUANT", device: "Workstation Linux — Lab Quant", status: "OFFLINE", vpnIp: "10.8.0.18", publicIp: "146.70.30.5", location: "Bruxelles, BE", lastHandshake: "Il y a 30 min", dataTransferred: "2.1 GB", twoFactorEnabled: true, createdAt: "2026-06-15" },
-  { id: "vpn-18", peerName: "lea-laptop", assignedTo: "Léa Petit", role: "CONSEILLER", device: "MacBook Air — Home Office", status: "ONLINE", vpnIp: "10.8.0.19", publicIp: "90.18.77.62", location: "Annecy, FR", lastHandshake: "Il y a 33 sec", dataTransferred: "340 MB", twoFactorEnabled: true, createdAt: "2026-06-20" },
-  { id: "vpn-19", peerName: "hugo-devlaptop", assignedTo: "Hugo Lambert", role: "ADMIN", device: "MacBook Pro — Équipe Produit", status: "DISABLED", vpnIp: "10.8.0.20", publicIp: "90.20.14.33", location: "Lyon, FR", lastHandshake: "Il y a 12 jours", dataTransferred: "1.1 GB", twoFactorEnabled: true, createdAt: "2026-02-20" },
-  { id: "vpn-20", peerName: "ines-laptop", assignedTo: "Inès Roux", role: "SUPPORT", device: "MacBook Air — Ancien Poste", status: "DISABLED", vpnIp: "10.8.0.21", publicIp: "88.174.9.5", location: "Genève, CH", lastHandshake: "Il y a 41 jours", dataTransferred: "18 MB", twoFactorEnabled: false, createdAt: "2025-12-01" },
-];
-
-const INITIAL_ECONOMIC_EVENTS: EconomicEvent[] = [
-  { id: "ev-1", time: "14:30", currency: "USD", event: "US Non-Farm Payrolls (NFP)", impact: "HIGH", forecast: "185K", previous: "206K", actionRequired: true },
-  { id: "ev-2", time: "16:00", currency: "USD", event: "ISM Services PMI", impact: "HIGH", forecast: "51.4", previous: "48.8", actionRequired: false },
-  { id: "ev-3", time: "20:00", currency: "USD", event: "FOMC Meeting Minutes", impact: "HIGH", forecast: "-", previous: "-", actionRequired: true },
-];
-
-const INITIAL_MESSAGES: ChatMessage[] = [
-  { id: "msg-1", clientId: "usr-101", sender: "CLIENT", authorName: "Alexandre Dupuis", channel: "CHAT", text: "Bonjour, je souhaitais savoir si le robot Gold prendra des positions avant le NFP de 14h30 ?", timestamp: "14:10", isRead: true },
-  { id: "msg-2", clientId: "usr-101", sender: "ADMIN", authorName: "Elena Rostova (Desk Support)", channel: "CHAT", text: "Bonjour Alexandre, le système News Guard Macro met automatiquement le robot en pause 15 minutes avant et après l'annonce pour sécuriser votre capital et éviter tout slippage de spread.", timestamp: "14:12", isRead: true },
-  { id: "msg-3", clientId: "usr-101", sender: "CLIENT", authorName: "Alexandre Dupuis", channel: "CHAT", text: "Parfait merci ! Et concernant ma demande de retrait de $5,000 USD, vous avez pu la valider ?", timestamp: "14:18", isRead: true },
-  { id: "msg-4", clientId: "usr-101", sender: "ADMIN", authorName: "Marc Albarran (Finance Desk)", channel: "CHAT", text: "La demande a été reçue et est en cours d'examen par le service financier. Le virement SEPA sera validé sous peu.", timestamp: "14:20", isRead: true },
-  { id: "msg-email-1", clientId: "usr-101", sender: "CLIENT", authorName: "Alexandre Dupuis", channel: "EMAIL", subject: "Demande d'attestation fiscale de trading 2026", text: "Bonjour l'équipe Nexium,\n\nPourriez-vous me transmettre l'attestation fiscale annuelle récapitulant mes plus-values nettes réalisées sur mon compte MT5 #992140 ?\n\nBien cordialement,\nAlexandre Dupuis", timestamp: "09:20", isRead: true },
-  { id: "msg-email-2", clientId: "usr-101", sender: "ADMIN", authorName: "Desk Financier @ Nexium", channel: "EMAIL", subject: "Re: Demande d'attestation fiscale de trading 2026", text: "Bonjour Alexandre,\n\nVotre attestation fiscale certifiée pour l'exercice 2026 est disponible en pièce jointe avec le détail mensuel de vos gains nets (+$11,450 USD).\n\nRestant à votre entière disposition,\nLe Desk Financier", timestamp: "10:15", isRead: true },
-  { id: "msg-5", clientId: "usr-102", sender: "CLIENT", authorName: "Sarah Benali", channel: "EMAIL", subject: "Augmentation du plafond de lot sur US30", text: "Bonjour,\n\nNous souhaiterions passer le lot max du robot Index Reversion à 1.5 lot sur notre compte institutionnel.\n\nMerci d'avance pour votre retour.", timestamp: "11:45", isRead: false },
-  { id: "msg-6", clientId: "usr-102", sender: "ADMIN", authorName: "Dr. Antoine Reynaud (Quant)", channel: "EMAIL", subject: "Re: Augmentation du plafond de lot sur US30", text: "Bonjour Sarah,\n\nL'ajustement du lot max à 1.5 lot a été appliqué sur votre compte MT5 #993201. La marge requise reste sous le seuil de 2.9% de drawdown maximum autorisé.\n\nCordialement,\nDr. Antoine Reynaud", timestamp: "12:00", isRead: true },
-];
-
-const INITIAL_CALL_LOGS: CallLog[] = [
-  { id: "call-1", clientId: "usr-101", clientName: "Alexandre Dupuis", advisorName: "Elena Rostova", date: "Aujourd'hui à 10:30", duration: "04 min 12 sec", outcome: "RÉSOLU", notes: "Point sur les performances mensuelles de l'algorithme AI Gold (+11.4%). Client satisfait." },
-  { id: "call-2", clientId: "usr-102", clientName: "Sarah Benali", advisorName: "Dr. Antoine Reynaud", date: "Hier à 16:15", duration: "12 min 40 sec", outcome: "RÉSOLU", notes: "Revue institutionnelle sur la stratégie Index Reversion et point de latence VPS Genève." },
-];
-
 const CANNED_RESPONSES = [
   { title: "🛡️ News Guard NFP / FOMC", text: "Bonjour,\n\nConformément à nos règles de gestion du risque, les robots de trading sont automatiquement mis en pause 15 minutes avant et après les annonces macro-économiques majeures afin d'éviter tout décalage de spread." },
   { title: "💳 Procédure de Retrait SEPA", text: "Bonjour,\n\nVotre demande de retrait a bien été enregistrée par notre desk financier. Le virement vers votre compte bancaire enregistré est exécuté sous un délai standard de 24h ouvrées." },
   { title: "🤖 Optimisation Moteur Gold", text: "Bonjour,\n\nLe preset Conservateur sur Nexium AI Gold a été calibré avec un stop-loss basé sur l'ATR 1.2 pour préserver votre capital en période de forte volatilité de l'Or." },
   { title: "📄 Confirmation KYC & Pièces", text: "Bonjour,\n\nNous vous confirmons la bonne réception et validation de vos pièces justificatives de conformité. Vos plafonds de compte sont désormais débloqués." },
 ];
-
-const EMAIL_STATUS_META: Record<"NON_ASSIGNE" | "EN_COURS" | "EN_ATTENTE" | "RESOLU", { label: string; variant: "amber" | "emerald" | "rose" | "slate" }> = {
-  NON_ASSIGNE: { label: "Non assigné", variant: "rose" },
-  EN_COURS: { label: "En cours", variant: "emerald" },
-  EN_ATTENTE: { label: "En attente", variant: "amber" },
-  RESOLU: { label: "Résolu", variant: "slate" },
-};
-
 const EMAIL_NAV_ITEMS: { key: EmailConversationFilter; label: string; icon: typeof Inbox; countKey: "inbox" | "mine" | "unassigned" | "inProgress" | "waiting" | "resolved" | null }[] = [
   { key: "inbox", label: "Boîte de réception", icon: Inbox, countKey: "inbox" },
   { key: "mine", label: "Mes conversations", icon: User, countKey: "mine" },
@@ -951,7 +542,6 @@ const EMAIL_NAV_ITEMS: { key: EmailConversationFilter; label: string; icon: type
   { key: "waiting", label: "En attente", icon: Clock, countKey: "waiting" },
   { key: "resolved", label: "Résolus", icon: Check, countKey: null },
 ];
-
 function matchesClient(c: UserProfile, q: string) {
   return (
     c.name.toLowerCase().includes(q) ||
@@ -960,7 +550,6 @@ function matchesClient(c: UserProfile, q: string) {
     c.mt5.broker.toLowerCase().includes(q)
   );
 }
-
 function matchesStaff(s: StaffAdministrator, q: string) {
   return (
     s.name.toLowerCase().includes(q) ||
@@ -969,7 +558,6 @@ function matchesStaff(s: StaffAdministrator, q: string) {
     s.role.toLowerCase().includes(q)
   );
 }
-
 function matchesVpnAccount(v: VpnAccount, q: string) {
   return (
     v.assignedTo.toLowerCase().includes(q) ||
@@ -980,13 +568,6 @@ function matchesVpnAccount(v: VpnAccount, q: string) {
     v.location.toLowerCase().includes(q)
   );
 }
-
-function formatAttachmentSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} o`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-}
-
 function formatEmailTimestamp(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -996,7 +577,6 @@ function formatEmailTimestamp(iso: string): string {
     ? d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
     : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
-
 function matchesAuditEntry(l: AuditEntry, q: string) {
   return (
     l.admin.toLowerCase().includes(q) ||
@@ -1005,7 +585,6 @@ function matchesAuditEntry(l: AuditEntry, q: string) {
     l.details.toLowerCase().includes(q)
   );
 }
-
 const STAFF_ROLE_OPTIONS: DropdownOption<AdminSystemRole>[] = [
   { value: "OWNER", label: "Owner (Propriétaire / Fondateur)" },
   { value: "SUPER_ADMIN", label: "Super Administrateur (Gouvernance & Direction)" },
@@ -1015,7 +594,6 @@ const STAFF_ROLE_OPTIONS: DropdownOption<AdminSystemRole>[] = [
   { value: "FINANCE", label: "Gestionnaire Financier & Trésorerie" },
   { value: "QUANT", label: "Analyste Quantitatif & Stratégies MT5" },
 ];
-
 const STAFF_DEPT_OPTIONS: DropdownOption<any>[] = [
   { value: "Direction Générale", label: "Direction Générale" },
   { value: "Desk Support & Conseillers", label: "Desk Support & Conseillers" },
@@ -1023,299 +601,10 @@ const STAFF_DEPT_OPTIONS: DropdownOption<any>[] = [
   { value: "Recherche Quantitative", label: "Recherche Quantitative & Algorithmes" },
   { value: "Conformité & Risque", label: "Conformité & Risque (Compliance)" },
 ];
-
 const KYC_STATUS_OPTIONS: DropdownOption<KycStatus>[] = [
   { value: "VERIFIED", label: "Vérifié (Conforme)" },
   { value: "PENDING_REVIEW", label: "En attente de revue" },
   { value: "REJECTED", label: "Non conforme / Rejeté" },
-];
-
-const BROADCAST_AUDIENCE_OPTIONS: DropdownOption<"ALL" | "ACTIVE_ONLY" | "GOLD_USERS">[] = [
-  { value: "ALL", label: "Tous les utilisateurs inscrits" },
-  { value: "ACTIVE_ONLY", label: "Comptes actifs uniquement" },
-  { value: "GOLD_USERS", label: "Utilisateurs du robot AI Gold" },
-];
-
-/* ========================================================================= */
-/* DONNÉES DE DÉMONSTRATION E-MAILS (SIMULATION VISUELLE RICHE)              */
-/* ========================================================================= */
-
-const DEMO_EMAIL_CONVERSATIONS: EmailConversationListItem[] = [
-  {
-    id: "conv-demo-1",
-    subject: "Demande de validation KYC & Relevé MT5 #802194",
-    customerName: "Ludovic M.",
-    customerEmail: "ludovic.m@investisseur-nexium.com",
-    status: "EN_COURS",
-    assignedUserId: "agent-1",
-    assignedAgentName: "Dr. Antoine R.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-    lastMessagePreview: "Bonjour, pourriez-vous vérifier si mon justificatif de domicile et mon KYC sont bien validés pour mon compte ECN ?",
-    attachmentCount: 1,
-    unread: true,
-  },
-  {
-    id: "conv-demo-2",
-    subject: "Ajustement du Take Profit sur l'algorithme Nexium AI Gold",
-    customerName: "Marc Delacroix",
-    customerEmail: "marc.delacroix@quant-fund.ch",
-    status: "EN_ATTENTE",
-    assignedUserId: null,
-    assignedAgentName: null,
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 48).toISOString(),
-    lastMessagePreview: "J'aimerais passer mon ratio R:R de 1:2.0 à 1:3.0 sur les sessions de Londres. Quelle est la volatilité recommandée ?",
-    attachmentCount: 0,
-    unread: true,
-  },
-  {
-    id: "conv-demo-3",
-    subject: "Confirmation du dépôt SEPA 50,000 € · Crédit Immédiat",
-    customerName: "Sophie Benali",
-    customerEmail: "sophie.b@geneva-capital.com",
-    status: "RESOLU",
-    assignedUserId: "agent-1",
-    assignedAgentName: "Elena V.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
-    lastMessagePreview: "Le virement SEPA instantané de 50 000 EUR a bien été crédité sur la balance de votre compte #802194.",
-    attachmentCount: 2,
-    unread: false,
-  },
-  {
-    id: "conv-demo-4",
-    subject: "Question technique : Latence du pont FIX Equinix NY4 (11ms)",
-    customerName: "Alexandre Moreau",
-    customerEmail: "alex.moreau@trading-pro.fr",
-    status: "EN_COURS",
-    assignedUserId: "agent-1",
-    assignedAgentName: "Dr. Antoine R.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    lastMessagePreview: "Pouvez-vous confirmer que la passerelle L2 utilise bien le cross-connect fibre optique sur le datacentre NY4 ?",
-    attachmentCount: 0,
-    unread: false,
-  },
-  {
-    id: "conv-demo-5",
-    subject: "Rapport mensuel de performance & Performance Fees (Q3)",
-    customerName: "David Steinberg",
-    customerEmail: "d.steinberg@nyse-algo.com",
-    status: "RESOLU",
-    assignedUserId: "agent-1",
-    assignedAgentName: "Dr. Antoine R.",
-    lastMessageAt: new Date(Date.now() - 1000 * 60 * 1440).toISOString(),
-    lastMessagePreview: "Ci-joint l'audit comptable et le relevé des commissions de performance sous le principe High-Water Mark.",
-    attachmentCount: 1,
-    unread: false,
-  },
-];
-
-const DEMO_EMAIL_DETAILS_MAP: Record<string, EmailConversationDetail> = {
-  "conv-demo-1": {
-    conversation: {
-      ...DEMO_EMAIL_CONVERSATIONS[0],
-      accountId: "acc-1",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-    },
-    messages: [
-      {
-        id: "msg-1",
-        conversationId: "conv-demo-1",
-        messageId: "m-1",
-        direction: "INBOUND",
-        fromEmail: "ludovic.m@investisseur-nexium.com",
-        fromName: "Ludovic M.",
-        toEmail: "support-vip@nexiummarkets.com",
-        subject: "Demande de validation KYC & Relevé MT5 #802194",
-        bodyHtml: null,
-        bodyText: "Bonjour l'équipe Nexium,\n\nJe viens de déposer mon justificatif de domicile récent et ma pièce d'identité pour le compte ECN #802194. Pourriez-vous me confirmer que mon dossier est bien complet pour débloquer les plafonds de retraits SEPA ?\n\nMerci d'avance pour votre réactivité.\n\nBien cordialement,\nLudovic M.",
-        sentByUserId: null,
-        sendStatus: null,
-        receivedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-      },
-      {
-        id: "msg-2",
-        conversationId: "conv-demo-1",
-        messageId: "m-2",
-        direction: "OUTBOUND",
-        fromEmail: "support-vip@nexiummarkets.com",
-        fromName: "Elena V. (Support VIP)",
-        toEmail: "ludovic.m@investisseur-nexium.com",
-        subject: "Re: Demande de validation KYC & Relevé MT5 #802194",
-        bodyHtml: null,
-        bodyText: "Bonjour Monsieur M.,\n\nNous vous confirmons la bonne réception de vos justificatifs. Votre compte ECN #802194 est désormais certifié au Niveau 3 (Tier Institutional).\n\nVos limites de dépôts et de retraits sont entièrement débloquées avec exécution prioritaire sous 2 heures ouvrées.\n\nRestant à votre entière disposition,\nElena V. — Nexium Desk Support",
-        sentByUserId: "agent-1",
-        sendStatus: "SENT",
-        receivedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-      },
-    ],
-    notes: [
-      {
-        id: "note-1",
-        conversationId: "conv-demo-1",
-        userId: "agent-1",
-        authorName: "Elena V.",
-        content: "Client VIP Tier Institutional validé. Traitement prioritaire accordé sur les flux SEPA et pont MT5.",
-        createdAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
-      },
-    ],
-    attachments: [
-      {
-        id: "att-1",
-        messageId: "msg-1",
-        filename: "justificatif_domicile_2026.pdf",
-        mimeType: "application/pdf",
-        size: 1024 * 420,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-      },
-    ],
-  },
-  "conv-demo-2": {
-    conversation: {
-      ...DEMO_EMAIL_CONVERSATIONS[1],
-      accountId: "acc-2",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 48).toISOString(),
-    },
-    messages: [
-      {
-        id: "msg-201",
-        conversationId: "conv-demo-2",
-        messageId: "m-201",
-        direction: "INBOUND",
-        fromEmail: "marc.delacroix@quant-fund.ch",
-        fromName: "Marc Delacroix",
-        toEmail: "desk-quant@nexiummarkets.com",
-        subject: "Ajustement du Take Profit sur l'algorithme Nexium AI Gold",
-        bodyHtml: null,
-        bodyText: "Bonjour Antoine,\n\nSur la paire XAUUSD, nous observons de fortes extensions de range lors des sessions de Londres (08h00 - 11h00 GMT). Pensez-vous qu'un R:R de 1:3.0 avec Trailing Stop dynamique à 15 pips soit optimal par rapport au backtest de l'algorithme ?\n\nMerci,\nMarc",
-        sentByUserId: null,
-        sendStatus: null,
-        receivedAt: new Date(Date.now() - 1000 * 60 * 48).toISOString(),
-      },
-    ],
-    notes: [],
-    attachments: [],
-  },
-  "conv-demo-3": {
-    conversation: {
-      ...DEMO_EMAIL_CONVERSATIONS[2],
-      accountId: "acc-3",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
-    },
-    messages: [
-      {
-        id: "msg-301",
-        conversationId: "conv-demo-3",
-        messageId: "m-301",
-        direction: "INBOUND",
-        fromEmail: "sophie.b@geneva-capital.com",
-        fromName: "Sophie Benali",
-        toEmail: "finance@nexiummarkets.com",
-        subject: "Confirmation du dépôt SEPA 50,000 € · Crédit Immédiat",
-        bodyHtml: null,
-        bodyText: "Bonjour,\n\nVeuillez trouver ci-joint l'ordre de virement SEPA instantané de 50 000,00 EUR émis ce matin depuis notre compte UBS Geneva.\n\nMerci de bien vouloir créditer le sous-compte MT5 #802194 dès réception.\n\nCordialement,\nSophie Benali",
-        sentByUserId: null,
-        sendStatus: null,
-        receivedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-      },
-      {
-        id: "msg-302",
-        conversationId: "conv-demo-3",
-        messageId: "m-302",
-        direction: "OUTBOUND",
-        fromEmail: "finance@nexiummarkets.com",
-        fromName: "Desk Trésorerie Nexium",
-        toEmail: "sophie.b@geneva-capital.com",
-        subject: "Re: Confirmation du dépôt SEPA 50,000 € · Crédit Immédiat",
-        bodyHtml: null,
-        bodyText: "Chère Madame Benali,\n\nNous vous confirmons la bonne réception des fonds. La somme de 50 000,00 EUR a été créditée avec succès sur votre compte de trading MT5 #802194.\n\nLe solde disponible est immédiatement utilisable par vos algorithmes.\n\nCordialement,\nLe Desk Trésorerie",
-        sentByUserId: "agent-finance",
-        sendStatus: "SENT",
-        receivedAt: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
-      },
-    ],
-    notes: [
-      {
-        id: "note-301",
-        conversationId: "conv-demo-3",
-        userId: "agent-finance",
-        authorName: "Trésorerie",
-        content: "Dépôt validé et rapproché avec succès sur le compte séquestre ECN.",
-        createdAt: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
-      },
-    ],
-    attachments: [
-      {
-        id: "att-301",
-        messageId: "msg-301",
-        filename: "preuve_virement_ubs_50k.pdf",
-        mimeType: "application/pdf",
-        size: 1024 * 580,
-        createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-      },
-    ],
-  },
-  "conv-demo-4": {
-    conversation: {
-      ...DEMO_EMAIL_CONVERSATIONS[3],
-      accountId: "acc-4",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    },
-    messages: [
-      {
-        id: "msg-401",
-        conversationId: "conv-demo-4",
-        messageId: "m-401",
-        direction: "INBOUND",
-        fromEmail: "alex.moreau@trading-pro.fr",
-        fromName: "Alexandre Moreau",
-        toEmail: "support-vip@nexiummarkets.com",
-        subject: "Question technique : Latence du pont FIX Equinix NY4 (11ms)",
-        bodyHtml: null,
-        bodyText: "Bonjour,\n\nJ'ai déployé un bot sur EURUSD et je constate des exécutions quasi instantanées. Pouvez-vous me confirmer les specs de votre connecteur FIX L2 ?\n\nBien à vous,\nAlexandre",
-        sentByUserId: null,
-        sendStatus: null,
-        receivedAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-      },
-    ],
-    notes: [],
-    attachments: [],
-  },
-  "conv-demo-5": {
-    conversation: {
-      ...DEMO_EMAIL_CONVERSATIONS[4],
-      accountId: "acc-5",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 1440).toISOString(),
-    },
-    messages: [
-      {
-        id: "msg-501",
-        conversationId: "conv-demo-5",
-        messageId: "m-501",
-        direction: "INBOUND",
-        fromEmail: "d.steinberg@nyse-algo.com",
-        fromName: "David Steinberg",
-        toEmail: "finance@nexiummarkets.com",
-        subject: "Rapport mensuel de performance & Performance Fees (Q3)",
-        bodyHtml: null,
-        bodyText: "Bonjour,\n\nPourriez-vous me transmettre l'attestation de performance certifiée pour la clôture trimestrielle de notre fonds ?\n\nMerci,\nDavid",
-        sentByUserId: null,
-        sendStatus: null,
-        receivedAt: new Date(Date.now() - 1000 * 60 * 1440).toISOString(),
-      },
-    ],
-    notes: [],
-    attachments: [],
-  },
-};
-
-const DEMO_EMAIL_AGENTS: EmailAgentSummary[] = [
-  { id: "agent-1", name: "Dr. Antoine R.", email: "desk-quant@nexiummarkets.com", role: "Recherche Quantitative", availability: "DISPONIBLE", canTransfer: true, activeConversations: 2 },
-  { id: "agent-2", name: "Elena V.", email: "support-vip@nexiummarkets.com", role: "Support Client VIP", availability: "DISPONIBLE", canTransfer: true, activeConversations: 1 },
-  { id: "agent-3", name: "Marc T.", email: "finance@nexiummarkets.com", role: "Trésorerie & Marges", availability: "DISPONIBLE", canTransfer: true, activeConversations: 2 },
 ];
 
 /* ========================================================================= */
@@ -1325,11 +614,22 @@ const DEMO_EMAIL_AGENTS: EmailAgentSummary[] = [
 function NexiumAdminDashboard({
   initialSessionRole,
   isPrimaryOwner,
+  sessionUser,
 }: {
   initialSessionRole: AdminSystemRole;
   /** Vrai si le compte connecté est LE Super Owner protégé (au plus un seul, imposé côté DB). */
   isPrimaryOwner: boolean;
+  sessionUser: { name: string; email: string };
 }) {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
+    navigate({ to: "/login" });
+  };
+
   // Navigation
   const [activeSection, setActiveSection] = useState<
     "administrators" | "users" | "user-detail" | "create-user" | "messaging" | "emails" | "engines" | "finances" | "gateways" | "security" | "news-guard" | "perf-fees" | "logs" | "impersonation"
@@ -1343,38 +643,39 @@ function NexiumAdminDashboard({
   const [adminPalette, setAdminPalette] = useState<"sapphire" | "emerald">("emerald");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Données
-  const [clients, setClients] = useState<UserProfile[]>(INITIAL_CLIENTS);
-  const [selectedUserId, setSelectedUserId] = useState<string>("usr-101");
-  const [staffList, setStaffList] = useState<StaffAdministrator[]>(INITIAL_STAFF);
-  const [gateways, setGateways] = useState<BrokerGateway[]>(INITIAL_GATEWAYS);
-  const [vpnAccounts, setVpnAccounts] = useState<VpnAccount[]>(INITIAL_VPN_ACCOUNTS);
+  // Données — plus aucun jeu de données de démonstration : tout démarre vide
+  // en attendant le branchement sur les vraies tables Supabase.
+  const [clients, setClients] = useState<UserProfile[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [staffList, setStaffList] = useState<StaffAdministrator[]>([]);
+  const [gateways, setGateways] = useState<BrokerGateway[]>([]);
+  const [vpnAccounts, setVpnAccounts] = useState<VpnAccount[]>([]);
   const [vpnOnlyAdminAccess, setVpnOnlyAdminAccess] = useState<boolean>(true);
-  const [economicEvents, setEconomicEvents] = useState<EconomicEvent[]>(INITIAL_ECONOMIC_EVENTS);
+  const [economicEvents, setEconomicEvents] = useState<EconomicEvent[]>([]);
   const [newsGuardActive, setNewsGuardActive] = useState<boolean>(true);
 
   // Messagerie State (chat uniquement — les e-mails vivent dans le module "E-mails")
   const [channelFilter, setChannelFilter] = useState<"ALL" | "CHAT" | "EMAIL">("ALL");
-  const [messagesList, setMessagesList] = useState<ChatMessage[]>(INITIAL_MESSAGES);
-  const [callLogs, setCallLogs] = useState<CallLog[]>(INITIAL_CALL_LOGS);
+  const [messagesList, setMessagesList] = useState<ChatMessage[]>([]);
+  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [chatReplyInput, setChatReplyInput] = useState("");
   const [searchContactQuery, setSearchContactQuery] = useState("");
   const [broadcastSubject, setBroadcastSubject] = useState("");
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [broadcastAudience, setBroadcastAudience] = useState<"ALL" | "ACTIVE_ONLY" | "GOLD_USERS">("ALL");
 
-  // Module E-mails — boîte collaborative unique via email-service (avec données de démonstration interactives)
+  // Module E-mails — boîte collaborative unique via email-service
   const [emailFilter, setEmailFilter] = useState<EmailConversationFilter>("inbox");
   const [emailSearch, setEmailSearch] = useState("");
-  const [emailConversationsList, setEmailConversationsList] = useState<EmailConversationListItem[]>(DEMO_EMAIL_CONVERSATIONS);
-  const [emailCounts, setEmailCounts] = useState({ inbox: 5, mine: 2, unassigned: 1, inProgress: 2, waiting: 1, resolved: 2 });
-  const [selectedEmailConversationId, setSelectedEmailConversationId] = useState<string | null>("conv-demo-1");
-  const [emailConversationDetail, setEmailConversationDetail] = useState<EmailConversationDetail | null>(DEMO_EMAIL_DETAILS_MAP["conv-demo-1"] ?? null);
+  const [emailConversationsList, setEmailConversationsList] = useState<EmailConversationListItem[]>([]);
+  const [emailCounts, setEmailCounts] = useState({ inbox: 0, mine: 0, unassigned: 0, inProgress: 0, waiting: 0, resolved: 0 });
+  const [selectedEmailConversationId, setSelectedEmailConversationId] = useState<string | null>(null);
+  const [emailConversationDetail, setEmailConversationDetail] = useState<EmailConversationDetail | null>(null);
   const [emailComposerMode, setEmailComposerMode] = useState<"REPLY" | "NOTE">("REPLY");
   const [emailReplyText, setEmailReplyText] = useState("");
   const [emailNoteText, setEmailNoteText] = useState("");
   const [emailPendingAttachments, setEmailPendingAttachments] = useState<{ id: string; filename: string; mimeType: string; size: number }[]>([]);
-  const [emailAgentsList, setEmailAgentsList] = useState<EmailAgentSummary[]>(DEMO_EMAIL_AGENTS);
+  const [emailAgentsList, setEmailAgentsList] = useState<EmailAgentSummary[]>([]);
   const [emailListLoading, setEmailListLoading] = useState(false);
   const [emailDetailLoading, setEmailDetailLoading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
@@ -1448,10 +749,7 @@ function NexiumAdminDashboard({
   const [newClientServer, setNewClientServer] = useState("");
 
   // Audit Logs
-  const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([
-    { id: "a-1", timestamp: "14:55:02", admin: "Super Admin", action: "PROFILE_OPENED", targetUser: "Alexandre Dupuis", details: "Consultation du profil client." },
-    { id: "a-2", timestamp: "14:50:12", admin: "Elena Rostova", action: "MESSAGE_SENT", targetUser: "Alexandre Dupuis", details: "Réponse sur support direct News Guard." },
-  ]);
+  const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
 
   // Détection des privilèges Super Admin et Conseiller
   const isSuperAdmin = currentSessionRole === "SUPER_ADMIN" || currentSessionRole === "OWNER";
@@ -2651,7 +1949,7 @@ function NexiumAdminDashboard({
 
   const refreshEmailCounts = useCallback(async () => {
     if (!emailConfigured) {
-      setEmailCounts({ inbox: 5, mine: 2, unassigned: 1, inProgress: 2, waiting: 1, resolved: 2 });
+      setEmailCounts({ inbox: 0, mine: 0, unassigned: 0, inProgress: 0, waiting: 0, resolved: 0 });
       return;
     }
     try {
@@ -2664,28 +1962,7 @@ function NexiumAdminDashboard({
 
   const refreshEmailList = useCallback(async () => {
     if (!emailConfigured) {
-      let filtered = [...DEMO_EMAIL_CONVERSATIONS];
-      if (emailFilter === "mine") {
-        filtered = filtered.filter((c) => c.assignedUserId === "agent-1");
-      } else if (emailFilter === "unassigned") {
-        filtered = filtered.filter((c) => !c.assignedUserId);
-      } else if (emailFilter === "in_progress") {
-        filtered = filtered.filter((c) => c.status === "EN_COURS");
-      } else if (emailFilter === "waiting") {
-        filtered = filtered.filter((c) => c.status === "EN_ATTENTE");
-      } else if (emailFilter === "resolved") {
-        filtered = filtered.filter((c) => c.status === "RESOLU");
-      }
-      if (emailSearch.trim()) {
-        const q = emailSearch.toLowerCase();
-        filtered = filtered.filter(
-          (c) =>
-            c.subject.toLowerCase().includes(q) ||
-            (c.customerName && c.customerName.toLowerCase().includes(q)) ||
-            c.customerEmail.toLowerCase().includes(q)
-        );
-      }
-      setEmailConversationsList(filtered);
+      setEmailConversationsList([]);
       return;
     }
 
@@ -2704,10 +1981,7 @@ function NexiumAdminDashboard({
   const refreshEmailDetail = useCallback(
     async (conversationId: string) => {
       if (!emailConfigured) {
-        const mockDetail = DEMO_EMAIL_DETAILS_MAP[conversationId];
-        if (mockDetail) {
-          setEmailConversationDetail(mockDetail);
-        }
+        setEmailConversationDetail(null);
         return;
       }
 
@@ -2734,7 +2008,7 @@ function NexiumAdminDashboard({
       const interval = setInterval(refreshEmailCounts, 20_000);
       return () => clearInterval(interval);
     } else {
-      setEmailAgentsList(DEMO_EMAIL_AGENTS);
+      setEmailAgentsList([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emailConfigured, currentEmailAgentId]);
@@ -2770,18 +2044,7 @@ function NexiumAdminDashboard({
   const handleAssignEmailConversation = async (targetUserId: string) => {
     if (!selectedEmailConversationId || !targetUserId) return;
     if (!emailConfigured) {
-      const agent = DEMO_EMAIL_AGENTS.find((a) => a.id === targetUserId);
-      toast.success(`Conversation assignée à ${agent?.name ?? "l'agent"}.`);
-      if (emailConversationDetail) {
-        setEmailConversationDetail({
-          ...emailConversationDetail,
-          conversation: {
-            ...emailConversationDetail.conversation,
-            assignedUserId: targetUserId,
-            assignedAgentName: agent?.name ?? null,
-          },
-        });
-      }
+      toast.error("Service e-mail non configuré.");
       return;
     }
     try {
@@ -2803,16 +2066,7 @@ function NexiumAdminDashboard({
   const handleSetEmailStatus = async (status: EmailConversationDetail["conversation"]["status"]) => {
     if (!selectedEmailConversationId) return;
     if (!emailConfigured) {
-      toast.success(`Statut mis à jour : ${EMAIL_STATUS_META[status].label}`);
-      if (emailConversationDetail) {
-        setEmailConversationDetail({
-          ...emailConversationDetail,
-          conversation: {
-            ...emailConversationDetail.conversation,
-            status,
-          },
-        });
-      }
+      toast.error("Service e-mail non configuré.");
       return;
     }
     try {
@@ -2830,14 +2084,7 @@ function NexiumAdminDashboard({
     setEmailUploadingAttachment(true);
     try {
       if (!emailConfigured) {
-        const mockAtt = {
-          id: `att-local-${Date.now()}`,
-          filename: file.name,
-          mimeType: file.type || "application/octet-stream",
-          size: file.size,
-        };
-        setEmailPendingAttachments((prev) => [...prev, mockAtt]);
-        toast.success(`Pièce jointe ajoutée : ${file.name}`);
+        toast.error("Service e-mail non configuré.");
         return;
       }
       const uploaded = await emailApi.uploadAttachment(currentEmailAgentId, selectedEmailConversationId, file);
@@ -2851,7 +2098,7 @@ function NexiumAdminDashboard({
 
   const handleDownloadEmailAttachment = async (attachmentId: string, filename: string) => {
     if (!emailConfigured) {
-      toast.info(`Téléchargement de la pièce jointe : ${filename}`);
+      toast.error("Service e-mail non configuré.");
       return;
     }
     try {
@@ -2867,43 +2114,7 @@ function NexiumAdminDashboard({
     setEmailSending(true);
     try {
       if (!emailConfigured) {
-        const newMsg: EmailMessage = {
-          id: `msg-rep-${Date.now()}`,
-          conversationId: selectedEmailConversationId,
-          messageId: `m-${Date.now()}`,
-          direction: "OUTBOUND",
-          fromEmail: "support-vip@nexiummarkets.com",
-          fromName: "Vous (Desk Nexium)",
-          toEmail: emailConversationDetail?.conversation.customerEmail ?? "client@nexium.com",
-          subject: `Re: ${emailConversationDetail?.conversation.subject ?? "Message"}`,
-          bodyHtml: null,
-          bodyText: emailReplyText.trim(),
-          sentByUserId: currentEmailAgentId,
-          sendStatus: "SENT",
-          receivedAt: new Date().toISOString(),
-        };
-
-        if (emailConversationDetail) {
-          setEmailConversationDetail({
-            ...emailConversationDetail,
-            messages: [...emailConversationDetail.messages, newMsg],
-          });
-        }
-
-        // Expédition réelle via Resend
-        sendCustomDeskEmail(
-          emailConversationDetail?.conversation.customerEmail ?? "client@nexium.com",
-          `Re: ${emailConversationDetail?.conversation.subject ?? "Message Officiel Nexium Markets"}`,
-          emailReplyText.trim()
-        ).then((res) => {
-          if (res.success && !res.simulated) {
-            toast.success(`E-mail expédié avec succès via Resend.`);
-          }
-        }).catch((err) => console.warn("Resend email reply warning:", err));
-
-        toast.success("E-mail officiel envoyé au client.");
-        setEmailReplyText("");
-        setEmailPendingAttachments([]);
+        toast.error("Service e-mail non configuré.");
         return;
       }
 
@@ -2931,23 +2142,7 @@ function NexiumAdminDashboard({
     setEmailSending(true);
     try {
       if (!emailConfigured) {
-        const newNote: EmailNote = {
-          id: `note-${Date.now()}`,
-          conversationId: selectedEmailConversationId,
-          userId: currentEmailAgentId,
-          authorName: "Vous (Agent)",
-          content: emailNoteText.trim(),
-          createdAt: new Date().toISOString(),
-        };
-
-        if (emailConversationDetail) {
-          setEmailConversationDetail({
-            ...emailConversationDetail,
-            notes: [...emailConversationDetail.notes, newNote],
-          });
-        }
-        toast.success("Note interne ajoutée au dossier.");
-        setEmailNoteText("");
+        toast.error("Service e-mail non configuré.");
         return;
       }
 
@@ -2964,8 +2159,7 @@ function NexiumAdminDashboard({
 
   const handleTriggerEmailSync = async () => {
     if (!emailConfigured) {
-      toast.success("Synchronisation effectuée : 5 conversations à jour.");
-      refreshEmailList();
+      toast.error("Service e-mail non configuré.");
       return;
     }
     try {
@@ -3112,12 +2306,25 @@ function NexiumAdminDashboard({
             </div>
             <div className="text-left hidden sm:block">
               <div className="flex items-center gap-1.5 leading-tight">
-                <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">Ludovic M.</span>
+                <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">{sessionUser.name}</span>
                 <span className="size-1.5 rounded-full bg-emerald-400"></span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400 block">Propriétaire (Owner)</span>
+              <span className="text-[10px] font-mono text-slate-400 block">
+                {isPrimaryOwner ? "Super Owner" : currentSessionRole.replace("_", " ")}
+              </span>
             </div>
             <ShieldCheck className="size-4 text-slate-400 group-hover:text-emerald-400 transition-colors ml-1" />
+          </button>
+
+          {/* Déconnexion */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-rose-500/10 hover:border-rose-500/40 px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-rose-300 transition cursor-pointer shadow-sm"
+            title="Se déconnecter"
+          >
+            <LogOut className="size-4" />
+            <span className="hidden sm:inline">Déconnexion</span>
           </button>
 
           {/* Lien direct vers le portail client */}
