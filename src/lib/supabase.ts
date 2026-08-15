@@ -184,6 +184,58 @@ export async function assignAdvisorToClient(userId: string, advisorName: string)
   });
 }
 
+/**
+ * Récupère tous les profils du staff (tout rôle hors TRADER) depuis Supabase.
+ */
+export async function getAllStaffProfiles(): Promise<SupabaseUserProfile[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .neq("role", "TRADER")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Erreur récupération profils staff:", error);
+    return [];
+  }
+  return data as SupabaseUserProfile[];
+}
+
+/**
+ * Recherche un profil existant par e-mail (utilisé pour promouvoir un compte
+ * déjà inscrit vers un rôle staff, plutôt que de fabriquer un profil orphelin
+ * non relié à un compte auth.users réel).
+ */
+export async function findProfileByEmail(email: string): Promise<SupabaseUserProfile | null> {
+  if (!isSupabaseConfigured) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("email", email.trim().toLowerCase())
+    .maybeSingle();
+
+  if (error) {
+    console.error("Erreur recherche profil par e-mail:", error);
+    return null;
+  }
+  return data as SupabaseUserProfile | null;
+}
+
+/**
+ * Supprime définitivement un profil (staff ou client) de Supabase.
+ * Bloqué côté DB par la policy `profiles_delete` pour le Super Owner.
+ */
+export async function deleteProfile(userId: string) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const { error } = await supabase.from("profiles").delete().eq("id", userId);
+  if (error) {
+    console.error("Erreur suppression profil Supabase:", error);
+    return { success: false, error };
+  }
+  return { success: true };
+}
+
 /* ==========================================================================
    HELPERS LOGS D'AUDIT & SÉCURITÉ
    ========================================================================== */
@@ -215,6 +267,90 @@ export async function recordAuditLog(entry: Omit<SupabaseAuditLog, "id" | "creat
     return { success: false, error };
   }
   return { success: true };
+}
+
+/**
+ * Récupère le journal d'audit le plus récent (réservé OWNER / SUPER_ADMIN côté RLS).
+ */
+export async function getAuditLogs(limit = 200): Promise<SupabaseAuditLog[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Erreur chargement audit logs Supabase:", error);
+    return [];
+  }
+  return data as SupabaseAuditLog[];
+}
+
+/* ==========================================================================
+   HELPERS TRANSACTIONS (Dépôts, Retraits, Ajustements)
+   ========================================================================== */
+
+export interface SupabaseTransaction {
+  id?: string;
+  user_id: string;
+  type: "DEPOSIT" | "WITHDRAWAL" | "PERF_FEE" | "TRADE_PROFIT" | "BONUS" | "DEBIT" | "PROFIT_SHARE" | "PNL_ADJUST";
+  amount: number;
+  currency?: string;
+  status: "COMPLETED" | "PENDING" | "CANCELLED" | "REJECTED";
+  method?: string;
+  reference_tx?: string;
+  created_at?: string;
+}
+
+/**
+ * Récupère toutes les transactions (Finance/Direction uniquement côté RLS).
+ */
+export async function getAllTransactions(): Promise<SupabaseTransaction[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Erreur chargement transactions Supabase:", error);
+    return [];
+  }
+  return data as SupabaseTransaction[];
+}
+
+/**
+ * Enregistre une nouvelle transaction (dépôt manuel, retrait validé, ajustement...).
+ */
+export async function recordTransaction(entry: Omit<SupabaseTransaction, "id" | "created_at">) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const { data, error } = await supabase.from("transactions").insert([entry]).select().single();
+  if (error) {
+    console.error("Erreur enregistrement transaction Supabase:", error);
+    return { success: false, error };
+  }
+  return { success: true, data: data as SupabaseTransaction };
+}
+
+/**
+ * Met à jour le statut d'une transaction existante (validation/rejet d'un retrait).
+ */
+export async function updateTransactionStatus(txId: string, status: SupabaseTransaction["status"]) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const { error } = await supabase.from("transactions").update({ status }).eq("id", txId);
+  if (error) {
+    console.error("Erreur mise à jour statut transaction Supabase:", error);
+    return { success: false, error };
+  }
+  return { success: true };
+}
+
+/**
+ * Met à jour le solde d'un client (crédit/débit manuel, validation dépôt/retrait).
+ */
+export async function updateClientBalance(userId: string, newBalance: number) {
+  return updateUserProfile(userId, { balance: newBalance });
 }
 
 /* ==========================================================================

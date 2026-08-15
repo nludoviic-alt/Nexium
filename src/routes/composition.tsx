@@ -138,6 +138,16 @@ import {
   assignAdvisorToClient,
   getAllClientProfiles,
   getUserProfile,
+  updateUserProfile,
+  recordAuditLog,
+  getAuditLogs,
+  getAllStaffProfiles,
+  findProfileByEmail,
+  deleteProfile,
+  getAllTransactions,
+  recordTransaction,
+  updateTransactionStatus,
+  updateClientBalance,
 } from "@/lib/supabase";
 
 export const Route = createFileRoute("/composition")({
@@ -158,7 +168,7 @@ export function CompositionAccessGate({ customAdminSlug }: { customAdminSlug?: s
   const [state, setState] = useState<"checking" | "authorized" | "denied">("checking");
   const [sessionRole, setSessionRole] = useState<AdminSystemRole | null>(null);
   const [isPrimaryOwner, setIsPrimaryOwner] = useState(false);
-  const [sessionUser, setSessionUser] = useState<{ name: string; email: string } | null>(null);
+  const [sessionUser, setSessionUser] = useState<{ id: string; name: string; email: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,7 +198,7 @@ export function CompositionAccessGate({ customAdminSlug }: { customAdminSlug?: s
 
       setSessionRole(role as AdminSystemRole);
       setIsPrimaryOwner(Boolean(profile.is_primary_owner));
-      setSessionUser({ name: profile.name || userData.user.email || "Administrateur", email: profile.email });
+      setSessionUser({ id: userData.user.id, name: profile.name || userData.user.email || "Administrateur", email: profile.email });
       setState("authorized");
 
       // Si l'administrateur arrive sur /composition générique, le rediriger vers son URL avec son prénom
@@ -637,7 +647,7 @@ function NexiumAdminDashboard({
   initialSessionRole: AdminSystemRole;
   /** Vrai si le compte connecté est LE Super Owner protégé (au plus un seul, imposé côté DB). */
   isPrimaryOwner: boolean;
-  sessionUser: { name: string; email: string };
+  sessionUser: { id: string; name: string; email: string };
 }) {
   const navigate = useNavigate();
 
@@ -898,13 +908,41 @@ function NexiumAdminDashboard({
     const entry: AuditEntry = {
       id: `audit-${Date.now()}`,
       timestamp: new Date().toLocaleTimeString("fr-FR"),
-      admin: `Admin (${currentSessionRole})`,
+      admin: `${sessionUser.name} (${currentSessionRole})`,
       action,
-      targetUser,
+      ...(targetUser ? { targetUser } : {}),
       details,
     };
     setAuditLogs((prev) => [entry, ...prev]);
+
+    if (isSupabaseConfigured) {
+      recordAuditLog({
+        admin_id: sessionUser.id,
+        admin_name: sessionUser.name,
+        action,
+        ...(targetUser ? { target_user_email: targetUser } : {}),
+        details,
+      }).catch((err) => console.warn("Notice persistance audit log:", err));
+    }
   };
+
+  // Chargement du journal d'audit réel depuis Supabase (réservé OWNER / SUPER_ADMIN)
+  useEffect(() => {
+    if (!isSupabaseConfigured || (currentSessionRole !== "OWNER" && currentSessionRole !== "SUPER_ADMIN")) return;
+    getAuditLogs().then((logs) => {
+      setAuditLogs((prev) => [
+        ...prev,
+        ...logs.map((l): AuditEntry => ({
+          id: l.id || `audit-${l.created_at}`,
+          timestamp: l.created_at ? new Date(l.created_at).toLocaleTimeString("fr-FR") : "",
+          admin: l.admin_name,
+          action: l.action,
+          ...(l.target_user_email ? { targetUser: l.target_user_email } : {}),
+          details: typeof l.details === "string" ? l.details : JSON.stringify(l.details ?? ""),
+        })),
+      ]);
+    });
+  }, [currentSessionRole]);
 
   const requestConfirmation = (
     title: string,
@@ -961,8 +999,27 @@ function NexiumAdminDashboard({
     setActiveSection("user-detail");
   };
 
-  const handleSaveClientProfile = () => {
+  const handleSaveClientProfile = async () => {
     if (!activeClient) return;
+
+    // Seuls les champs avec une colonne réelle dans `profiles` sont persistés
+    // (nom, téléphone, statut, KYC, login/broker MT5). Les presets moteurs,
+    // le risk management et le mot de passe MT5 n'ont pas encore de table
+    // dédiée côté base — ils restent gérés localement pour l'instant.
+    if (isSupabaseConfigured) {
+      const result = await updateUserProfile(activeClient.id, {
+        name: editName,
+        phone: editPhone,
+        status: editStatus,
+        kyc_status: editKycStatus === "PENDING_REVIEW" ? "PENDING" : editKycStatus,
+        mt5_login: mt5Login,
+        mt5_broker: mt5Broker,
+      });
+      if (!result.success) {
+        toast.error("Échec de l'enregistrement du profil côté base de données.");
+        return;
+      }
+    }
 
     setClients((prev) =>
       prev.map((c) => {
@@ -997,7 +1054,7 @@ function NexiumAdminDashboard({
       })
     );
 
-    addAuditLog("CLIENT_PROFILE_UPDATED", `Profil et paramètres enregistrés pour ${editName}.`, editName);
+    addAuditLog("CLIENT_PROFILE_UPDATED", `Profil et paramètres enregistrés pour ${editName}.`, activeClient.email);
     toast.success(`Profil, presets et règles enregistrés pour ${editName}.`);
   };
 
@@ -1076,6 +1133,104 @@ function NexiumAdminDashboard({
       });
     });
   }, []);
+
+  // Synchronisation du staff réel depuis Supabase (tout profil hors rôle TRADER)
+  const staffDepartmentForRole = (role: AdminSystemRole): StaffAdministrator["department"] => {
+    if (role === "OWNER" || role === "SUPER_ADMIN") return "Direction Générale";
+    if (role === "FINANCE") return "Gestion Financière";
+    if (role === "QUANT") return "Recherche Quantitative";
+    if (role === "CONSEILLER" || role === "SUPPORT") return "Desk Support & Conseillers";
+    return "Conformité & Risque";
+  };
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    getAllStaffProfiles().then((profiles) => {
+      if (!profiles || profiles.length === 0) return;
+      setStaffList(
+        profiles.map((p): StaffAdministrator => ({
+          id: p.id,
+          name: p.name,
+          email: p.email,
+          phone: p.phone || "-",
+          role: p.role as AdminSystemRole,
+          isPrimaryOwner: Boolean(p.is_primary_owner),
+          department: staffDepartmentForRole(p.role as AdminSystemRole),
+          status: p.status as AccountStatus,
+          twoFactorEnabled: false,
+          createdAt: p.created_at ? p.created_at.split("T")[0] : "",
+          lastLogin: "-",
+          lastIp: "-",
+          ipWhitelist: "Toutes les adresses IP",
+          allowedHours: "24/7",
+          deskSignature: `${p.name} — @ Nexium Markets`,
+          assignedAccountsCount: 0,
+          assignedTraders: [],
+          permissions: {
+            canChatWithClients: true,
+            canSendEmails: true,
+            canTakePhoneCalls: true,
+            canApproveFinances: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
+            canManageEngines: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "QUANT",
+            canAdjustPnl: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
+            canUseKillSwitch: p.role === "OWNER" || p.role === "SUPER_ADMIN",
+            canManageStaff: p.role === "OWNER" || p.role === "SUPER_ADMIN",
+            canViewTreasury: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
+          },
+        }))
+      );
+    });
+  }, []);
+
+  // Synchronisation des transactions réelles depuis Supabase, fusionnées dans
+  // chaque client (retraits/dépôts en attente + historique).
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    getAllTransactions().then((txs) => {
+      if (!txs || txs.length === 0) return;
+
+      setClients((prev) =>
+        prev.map((c) => {
+          const clientTxs = txs.filter((t) => t.user_id === c.id);
+          if (clientTxs.length === 0) return c;
+
+          const withdrawalRequests: ClientWithdrawal[] = clientTxs
+            .filter((t) => t.type === "WITHDRAWAL")
+            .map((t) => ({
+              id: t.id || `tx-${t.created_at}`,
+              date: (t.created_at ? t.created_at.split("T")[0] : "") ?? "",
+              amount: t.amount,
+              method: (t.method as ClientWithdrawal["method"]) || "SEPA_IBAN",
+              destination: t.reference_tx || "-",
+              status: (t.status === "PENDING" ? "PENDING" : t.status === "COMPLETED" ? "APPROVED" : "REJECTED") as ClientWithdrawal["status"],
+            }));
+
+          const depositRequests: ClientDeposit[] = clientTxs
+            .filter((t) => t.type === "DEPOSIT")
+            .map((t) => ({
+              id: t.id || `tx-${t.created_at}`,
+              date: (t.created_at ? t.created_at.split("T")[0] : "") ?? "",
+              amount: t.amount,
+              method: (t.method as ClientDeposit["method"]) || "VIREMENT_BANCAIRE",
+              reference: t.reference_tx || "-",
+              status: (t.status === "PENDING" ? "PENDING" : t.status === "COMPLETED" ? "CREDITED" : "REJECTED") as ClientDeposit["status"],
+            }));
+
+          const transactions: UserTransaction[] = clientTxs.map((t) => ({
+            id: t.id || `tx-${t.created_at}`,
+            date: (t.created_at ? t.created_at.split("T")[0] : "") ?? "",
+            type: t.type as UserTransaction["type"],
+            amount: t.amount,
+            status: (t.status === "COMPLETED" ? "COMPLETED" : t.status === "PENDING" ? "PENDING" : "REJECTED") as UserTransaction["status"],
+            method: t.method || "-",
+            note: t.reference_tx ?? "",
+          }));
+
+          return { ...c, withdrawalRequests, depositRequests, transactions };
+        })
+      );
+    });
+  }, [clients.length > 0]);
 
   // Validation & Activation d'un compte client par l'Administrateur
   const handleApprovePendingClient = async (client: UserProfile) => {
@@ -1277,7 +1432,13 @@ function NexiumAdminDashboard({
   };
 
   // Création d'un Membre du Staff / Conseiller / Admin
-  const handleCreateStaffMember = (e: React.FormEvent) => {
+  // Nomination d'un membre du staff. Un compte de connexion (auth.users) ne peut être
+  // créé que par la personne elle-même via /register — cette console statique n'a pas
+  // accès à une clé service_role pour provisionner un compte à sa place. On promeut donc
+  // ici un profil déjà inscrit (rôle TRADER) vers un rôle staff, plutôt que de fabriquer
+  // un profil orphelin non relié à un vrai compte (l'ancien code faisait un upsert avec un
+  // UUID aléatoire : la contrainte FK profiles.id -> auth.users.id le rejetait toujours).
+  const handleCreateStaffMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName || !newStaffEmail) {
       toast.error("Veuillez renseigner au minimum le nom et l'e-mail.");
@@ -1289,17 +1450,43 @@ function NexiumAdminDashboard({
       return;
     }
 
+    if (!isSupabaseConfigured) {
+      toast.error("Supabase n'est pas configuré — impossible de nommer un membre du staff.");
+      return;
+    }
+
+    const existing = await findProfileByEmail(newStaffEmail);
+    if (!existing) {
+      toast.error(
+        `Aucun compte trouvé pour ${newStaffEmail}. La personne doit d'abord créer son compte sur /register, puis vous pourrez la promouvoir ici.`
+      );
+      return;
+    }
+
+    const result = await updateUserProfile(existing.id, {
+      name: newStaffName,
+      phone: newStaffPhone || existing.phone || "-",
+      role: newStaffRole,
+      status: "ACTIVE",
+      assigned_advisor: newStaffDept,
+    });
+
+    if (!result.success) {
+      toast.error("Échec de la promotion du membre du staff (droits insuffisants ou compte protégé).");
+      return;
+    }
+
     const newStaff: StaffAdministrator = {
-      id: `adm-${Date.now()}`,
+      id: existing.id,
       name: newStaffName,
       email: newStaffEmail,
-      phone: newStaffPhone || "+41 22 000 00 00",
+      phone: newStaffPhone || existing.phone || "-",
       role: newStaffRole,
       department: newStaffDept,
       status: "ACTIVE",
-      twoFactorEnabled: true,
-      createdAt: new Date().toISOString().split("T")[0],
-      lastLogin: "Jamais connecté",
+      twoFactorEnabled: false,
+      createdAt: existing.created_at ? existing.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+      lastLogin: "-",
       lastIp: "-",
       ipWhitelist: newStaffIpWhitelist || "Toutes les adresses IP",
       allowedHours: newStaffHours || "24/7",
@@ -1319,36 +1506,17 @@ function NexiumAdminDashboard({
       },
     };
 
-    setStaffList((prev) => [newStaff, ...prev]);
-    addAuditLog("STAFF_CREATED", `Nouveau membre staff (${newStaffRole}) créé : ${newStaffName}.`);
+    setStaffList((prev) => [newStaff, ...prev.filter((s) => s.id !== existing.id)]);
+    addAuditLog("STAFF_CREATED", `${newStaffName} (${existing.email}) promu au rôle ${newStaffRole}.`, existing.email);
 
-    // Synchronisation avec Supabase Profiles & Resend
-    if (isSupabaseConfigured) {
-      supabase
-        .from("profiles")
-        .upsert({
-          id: crypto.randomUUID ? crypto.randomUUID() : undefined,
-          email: newStaff.email,
-          name: newStaff.name,
-          phone: newStaff.phone,
-          role: newStaff.role,
-          status: "ACTIVE",
-          assigned_advisor: newStaff.department,
-        })
-        .then(
-          () => console.log(`Staff ${newStaff.name} synchronisé dans Supabase.`),
-          (err: any) => console.warn("Supabase staff sync error:", err)
-        );
-    }
-
-    // Envoi de l'e-mail officiel de nomination / invitation
+    // Envoi de l'e-mail officiel de nomination
     sendCustomDeskEmail(
       newStaff.email,
       `Accréditation & Accès Desk Nexium Markets — Rôle ${newStaffRole}`,
-      `Bonjour ${newStaffName},\n\nVotre compte collaborateur a été créé avec succès sur le Desk Central de Nexium Markets.\n\nRôle attribué : ${newStaffRole}\nDépartement : ${newStaffDept}\nStatut : Opérationnel & Sécurisé 2FA\n\nVous pouvez vous connecter dès à présent sur https://nexiummarkets.com/login avec votre adresse e-mail professionnelle.`
+      `Bonjour ${newStaffName},\n\nVotre compte collaborateur a été activé avec succès sur le Desk Central de Nexium Markets.\n\nRôle attribué : ${newStaffRole}\nDépartement : ${newStaffDept}\n\nVous pouvez vous connecter dès à présent sur https://nexiummarkets.com/login avec votre adresse e-mail.`
     ).catch((err) => console.warn("Resend staff invitation error:", err));
 
-    toast.success(`Membre du staff ${newStaffName} (${newStaffRole}) créé avec succès.`);
+    toast.success(`${newStaffName} promu au rôle ${newStaffRole} avec succès.`);
     setNewStaffName("");
     setNewStaffEmail("");
     setNewStaffPhone("");
@@ -1383,7 +1551,7 @@ function NexiumAdminDashboard({
     }
   };
 
-  const handleSaveEditStaff = (e: React.FormEvent) => {
+  const handleSaveEditStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaffMember) return;
 
@@ -1404,6 +1572,20 @@ function NexiumAdminDashboard({
     if (editStaffRole === "OWNER" && editStaffRole !== editingStaffMember.role && !isPrimaryOwner) {
       toast.error("Seul le Super Owner peut promouvoir un membre du staff au rôle OWNER.");
       return;
+    }
+
+    if (isSupabaseConfigured) {
+      const result = await updateUserProfile(editingStaffMember.id, {
+        name: editStaffName,
+        phone: editStaffPhone,
+        role: editStaffRole,
+        status: editStaffStatus,
+        assigned_advisor: editStaffDept,
+      });
+      if (!result.success) {
+        toast.error("Échec de l'enregistrement — droits insuffisants ou compte protégé côté base de données.");
+        return;
+      }
     }
 
     setStaffList((prev) =>
@@ -1436,7 +1618,7 @@ function NexiumAdminDashboard({
       })
     );
 
-    addAuditLog("STAFF_UPDATED", `Mise à jour des privilèges et du profil staff : ${editStaffName} (${editStaffRole}).`);
+    addAuditLog("STAFF_UPDATED", `Mise à jour des privilèges et du profil staff : ${editStaffName} (${editStaffRole}).`, editStaffEmail);
     toast.success(`Modifications enregistrées pour ${editStaffName}.`);
     setEditingStaffMember(null);
     if (typeof window !== "undefined") {
@@ -1444,7 +1626,7 @@ function NexiumAdminDashboard({
     }
   };
 
-  const handleToggleStaffStatus = (st: StaffAdministrator) => {
+  const handleToggleStaffStatus = async (st: StaffAdministrator) => {
     if (st.isPrimaryOwner) {
       toast.error("Compte Super Owner protégé : impossible de le suspendre ou de le révoquer, y compris pour vous-même.");
       return;
@@ -1454,8 +1636,17 @@ function NexiumAdminDashboard({
       return;
     }
     const newStatus: AccountStatus = st.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+
+    if (isSupabaseConfigured) {
+      const result = await updateUserProfile(st.id, { status: newStatus });
+      if (!result.success) {
+        toast.error("Échec de la mise à jour du statut côté base de données.");
+        return;
+      }
+    }
+
     setStaffList((prev) => prev.map((s) => (s.id === st.id ? { ...s, status: newStatus } : s)));
-    addAuditLog("STAFF_STATUS_CHANGE", `Statut du compte staff ${st.name} basculé vers ${newStatus}.`);
+    addAuditLog("STAFF_STATUS_CHANGE", `Statut du compte staff ${st.name} basculé vers ${newStatus}.`, st.email);
     toast.info(`Statut de ${st.name} mis à jour : ${newStatus}`);
   };
 
@@ -1482,9 +1673,16 @@ function NexiumAdminDashboard({
       `Cette action révoquera définitivement tous les accès de ${st.name} (${st.role}) à la plateforme d'administration Nexium.`,
       "Supprimer Définitivement",
       "CRITICAL",
-      () => {
+      async () => {
+        if (isSupabaseConfigured) {
+          const result = await deleteProfile(st.id);
+          if (!result.success) {
+            toast.error("Échec de la suppression côté base de données.");
+            return;
+          }
+        }
         setStaffList((prev) => prev.filter((s) => s.id !== st.id));
-        addAuditLog("STAFF_DELETED", `Compte staff ${st.name} (${st.role}) supprimé.`);
+        addAuditLog("STAFF_DELETED", `Compte staff ${st.name} (${st.role}) supprimé.`, st.email);
         toast.success(`Le compte de ${st.name} a été supprimé.`);
       }
     );
@@ -1604,38 +1802,38 @@ function NexiumAdminDashboard({
       `Êtes-vous certain de vouloir approuver ce retrait pour ${activeClient.name} ? Le solde MT5 sera débité de $${withdrawal.amount.toLocaleString("fr-FR")} USD.`,
       "Valider & Débiter les Fonds",
       "WARNING",
-      () => {
+      async () => {
+        const newBalance = Math.max(0, activeClient.balance - withdrawal.amount);
+
+        if (isSupabaseConfigured) {
+          const [txResult, balResult] = await Promise.all([
+            updateTransactionStatus(withdrawal.id, "COMPLETED"),
+            updateClientBalance(activeClient.id, newBalance),
+          ]);
+          if (!txResult.success || !balResult.success) {
+            toast.error("Échec de la validation du retrait côté base de données.");
+            return;
+          }
+        }
+
         setClients((prev) =>
           prev.map((c) => {
             if (c.id === activeClient.id) {
-              const newBalance = Math.max(0, c.balance - withdrawal.amount);
               const updatedWithdrawals = c.withdrawalRequests.map((w) =>
                 w.id === withdrawal.id ? { ...w, status: "APPROVED" as const, processedBy: `Admin (${currentSessionRole})` } : w
               );
-
-              const newTx: UserTransaction = {
-                id: `tx-w-${Date.now()}`,
-                date: new Date().toISOString().split("T")[0],
-                type: "WITHDRAWAL",
-                amount: withdrawal.amount,
-                status: "COMPLETED",
-                method: withdrawal.method,
-                note: `Retrait validé vers ${withdrawal.destination}`,
-              };
-
               return {
                 ...c,
                 balance: newBalance,
                 equity: newBalance + c.bonusCredit,
                 withdrawalRequests: updatedWithdrawals,
-                transactions: [newTx, ...c.transactions],
               };
             }
             return c;
           })
         );
 
-        addAuditLog("WITHDRAWAL_APPROVED", `Retrait de $${withdrawal.amount} USD validé pour ${activeClient.name}.`, activeClient.name);
+        addAuditLog("WITHDRAWAL_APPROVED", `Retrait de $${withdrawal.amount} USD validé pour ${activeClient.name}.`, activeClient.email);
         toast.success(`Retrait de $${withdrawal.amount.toLocaleString("fr-FR")} USD validé avec succès.`);
       }
     );
@@ -1647,7 +1845,15 @@ function NexiumAdminDashboard({
       `Cette demande de retrait pour ${activeClient.name} sera rejetée.`,
       "Rejeter la Demande",
       "CRITICAL",
-      () => {
+      async () => {
+        if (isSupabaseConfigured) {
+          const result = await updateTransactionStatus(withdrawal.id, "REJECTED");
+          if (!result.success) {
+            toast.error("Échec du rejet du retrait côté base de données.");
+            return;
+          }
+        }
+
         setClients((prev) =>
           prev.map((c) => {
             if (c.id === activeClient.id) {
@@ -1660,7 +1866,7 @@ function NexiumAdminDashboard({
           })
         );
 
-        addAuditLog("WITHDRAWAL_REJECTED", `Demande de retrait de $${withdrawal.amount} USD rejetée pour ${activeClient.name}.`, activeClient.name);
+        addAuditLog("WITHDRAWAL_REJECTED", `Demande de retrait de $${withdrawal.amount} USD rejetée pour ${activeClient.name}.`, activeClient.email);
         toast.error(`Demande de retrait rejetée.`);
       }
     );
@@ -1673,39 +1879,39 @@ function NexiumAdminDashboard({
       `Créditer immédiatement $${deposit.amount.toLocaleString("fr-FR")} USD sur le compte de ${activeClient.name} ?`,
       "Créditer les Fonds",
       "WARNING",
-      () => {
+      async () => {
+        const newBalance = activeClient.balance + deposit.amount;
+
+        if (isSupabaseConfigured) {
+          const [txResult, balResult] = await Promise.all([
+            updateTransactionStatus(deposit.id, "COMPLETED"),
+            updateClientBalance(activeClient.id, newBalance),
+          ]);
+          if (!txResult.success || !balResult.success) {
+            toast.error("Échec de la validation du dépôt côté base de données.");
+            return;
+          }
+        }
+
         setClients((prev) =>
           prev.map((c) => {
             if (c.id === activeClient.id) {
-              const newBalance = c.balance + deposit.amount;
               const updatedDeposits = c.depositRequests.map((d) =>
                 d.id === deposit.id ? { ...d, status: "CREDITED" as const, creditedBy: `Admin (${currentSessionRole})` } : d
               );
-
-              const newTx: UserTransaction = {
-                id: `tx-d-${Date.now()}`,
-                date: new Date().toISOString().split("T")[0],
-                type: "DEPOSIT",
-                amount: deposit.amount,
-                status: "COMPLETED",
-                method: deposit.method,
-                note: `Dépôt validé (Réf: ${deposit.reference})`,
-              };
-
               return {
                 ...c,
                 balance: newBalance,
                 equity: newBalance + c.bonusCredit,
                 depositRequests: updatedDeposits,
-                transactions: [newTx, ...c.transactions],
               };
             }
             return c;
           })
         );
 
-        addAuditLog("DEPOSIT_CREDITED", `Dépôt de $${deposit.amount} USD validé et crédité pour ${activeClient.name}.`, activeClient.name);
-        
+        addAuditLog("DEPOSIT_CREDITED", `Dépôt de $${deposit.amount} USD validé et crédité pour ${activeClient.name}.`, activeClient.email);
+
         // Envoi de la confirmation de dépôt par email via Resend
         sendDepositConfirmedEmail(
           activeClient.email,
@@ -1739,27 +1945,50 @@ function NexiumAdminDashboard({
       `Cette action va impacter le solde du compte de ${activeClient.name}.`,
       "Valider l'Opération",
       "WARNING",
-      () => {
+      async () => {
+        let newBalance = activeClient.balance;
+        let newBonus = activeClient.bonusCredit;
+
+        if (creditType === "DEPOSIT") newBalance += amount;
+        if (creditType === "BONUS") newBonus += amount;
+        if (creditType === "DEBIT") newBalance = Math.max(0, newBalance - amount);
+
+        const method = creditType === "DEPOSIT" ? "Dépôt Réel Desk" : creditType === "BONUS" ? "Bonus Commercial" : "Débit Administratif";
+        let newTxId = `tx-${Date.now()}`;
+
+        if (isSupabaseConfigured) {
+          const [txResult, balResult] = await Promise.all([
+            recordTransaction({
+              user_id: activeClient.id,
+              type: creditType,
+              amount,
+              status: "COMPLETED",
+              method,
+              ...(creditNote ? { reference_tx: creditNote } : {}),
+            }),
+            // Le bonus n'a pas de colonne dédiée en base — seul le solde balance impacte la persistance.
+            creditType !== "BONUS" ? updateClientBalance(activeClient.id, newBalance) : Promise.resolve({ success: true }),
+          ]);
+          if (!txResult.success || !balResult.success) {
+            toast.error("Échec de l'opération financière côté base de données.");
+            return;
+          }
+          if (txResult.data?.id) newTxId = txResult.data.id;
+        }
+
+        const newTx: UserTransaction = {
+          id: newTxId,
+          date: new Date().toISOString().split("T")[0],
+          type: creditType,
+          amount,
+          status: "COMPLETED",
+          method,
+          note: creditNote || "Ajustement Desk",
+        };
+
         setClients((prev) =>
           prev.map((c) => {
             if (c.id === activeClient.id) {
-              let newBalance = c.balance;
-              let newBonus = c.bonusCredit;
-
-              if (creditType === "DEPOSIT") newBalance += amount;
-              if (creditType === "BONUS") newBonus += amount;
-              if (creditType === "DEBIT") newBalance = Math.max(0, newBalance - amount);
-
-              const newTx: UserTransaction = {
-                id: `tx-${Date.now()}`,
-                date: new Date().toISOString().split("T")[0],
-                type: creditType,
-                amount,
-                status: "COMPLETED",
-                method: creditType === "DEPOSIT" ? "Dépôt Réel Desk" : creditType === "BONUS" ? "Bonus Commercial" : "Débit Administratif",
-                note: creditNote || "Ajustement Desk",
-              };
-
               return {
                 ...c,
                 balance: newBalance,
@@ -1772,7 +2001,7 @@ function NexiumAdminDashboard({
           })
         );
 
-        addAuditLog("FINANCIAL_OP", `${actionText} $${amount} USD appliqué à ${activeClient.name}.`, activeClient.name);
+        addAuditLog("FINANCIAL_OP", `${actionText} $${amount} USD appliqué à ${activeClient.name}.`, activeClient.email);
         toast.success(`Opération financière effectuée.`);
         setCreditAmountInput("");
         setCreditNote("");
@@ -1844,15 +2073,27 @@ function NexiumAdminDashboard({
   };
 
   // Gouvernance Rapide
+  const persistClientStatus = async (status: AccountStatus): Promise<boolean> => {
+    if (!isSupabaseConfigured) return true;
+    const result = await updateUserProfile(activeClient.id, { status });
+    if (!result.success) {
+      toast.error("Échec de la mise à jour du statut côté base de données.");
+      return false;
+    }
+    return true;
+  };
+
   const handleRevokeClient = () => {
     requestConfirmation(
       `Révoquer les accès de ${activeClient.name}`,
       `Cette action va révoquer la clé de licence MT5 et verrouiller l'accès.`,
       "Révoquer le Compte",
       "CRITICAL",
-      () => {
+      async () => {
+        if (!(await persistClientStatus("REVOKED"))) return;
         setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, status: "REVOKED" } : c)));
         setEditStatus("REVOKED");
+        addAuditLog("CLIENT_REVOKED", `Accès révoqués pour ${activeClient.name}.`, activeClient.email);
         toast.error(`Accès de ${activeClient.name} révoqués.`);
       }
     );
@@ -1864,9 +2105,11 @@ function NexiumAdminDashboard({
       `Cette action met en pause les 3 moteurs.`,
       "Suspendre le Compte",
       "WARNING",
-      () => {
+      async () => {
+        if (!(await persistClientStatus("SUSPENDED"))) return;
         setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, status: "SUSPENDED" } : c)));
         setEditStatus("SUSPENDED");
+        addAuditLog("CLIENT_SUSPENDED", `Compte suspendu pour ${activeClient.name}.`, activeClient.email);
         toast.warning(`Compte de ${activeClient.name} suspendu.`);
       }
     );
@@ -1878,17 +2121,21 @@ function NexiumAdminDashboard({
       `Cette action bannit le client et coupe toute exécution.`,
       "Bannir Définitivement",
       "CRITICAL",
-      () => {
+      async () => {
+        if (!(await persistClientStatus("BANNED"))) return;
         setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, status: "BANNED" } : c)));
         setEditStatus("BANNED");
+        addAuditLog("CLIENT_BANNED", `Client banni : ${activeClient.name}.`, activeClient.email);
         toast.error(`Client ${activeClient.name} banni.`);
       }
     );
   };
 
-  const handleReactivateClient = () => {
+  const handleReactivateClient = async () => {
+    if (!(await persistClientStatus("ACTIVE"))) return;
     setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, status: "ACTIVE" } : c)));
     setEditStatus("ACTIVE");
+    addAuditLog("CLIENT_REACTIVATED", `Compte réactivé pour ${activeClient.name}.`, activeClient.email);
     toast.success(`Compte de ${activeClient.name} réactivé.`);
   };
 
@@ -1898,9 +2145,19 @@ function NexiumAdminDashboard({
       `Toutes les données de ${activeClient.name} seront supprimées.`,
       "Supprimer Définitivement",
       "CRITICAL",
-      () => {
+      async () => {
+        if (isSupabaseConfigured) {
+          const result = await deleteProfile(activeClient.id);
+          if (!result.success) {
+            toast.error("Échec de la suppression côté base de données.");
+            return;
+          }
+        }
+        const clientName = activeClient.name;
+        const clientEmail = activeClient.email;
         setClients((prev) => prev.filter((c) => c.id !== activeClient.id));
-        toast.error(`Compte ${activeClient.name} supprimé.`);
+        addAuditLog("CLIENT_DELETED", `Compte supprimé : ${clientName}.`, clientEmail);
+        toast.error(`Compte ${clientName} supprimé.`);
         setActiveSection("users");
       }
     );

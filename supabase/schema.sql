@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS public.mt5_accounts (
 CREATE TABLE IF NOT EXISTS public.transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    type TEXT NOT NULL CHECK (type IN ('DEPOSIT', 'WITHDRAWAL', 'PERF_FEE', 'TRADE_PROFIT', 'BONUS')),
+    type TEXT NOT NULL CHECK (type IN ('DEPOSIT', 'WITHDRAWAL', 'PERF_FEE', 'TRADE_PROFIT', 'BONUS', 'DEBIT', 'PROFIT_SHARE', 'PNL_ADJUST')),
     amount NUMERIC(14, 2) NOT NULL,
     currency TEXT NOT NULL DEFAULT 'USD',
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('COMPLETED', 'PENDING', 'CANCELLED', 'REJECTED')),
@@ -79,6 +79,12 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     reference_tx TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Élargissement du type autorisé après la mise en production initiale : la
+-- console /composition envoie aussi des ajustements manuels DEBIT/PROFIT_SHARE/PNL_ADJUST.
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS transactions_type_check;
+ALTER TABLE public.transactions ADD CONSTRAINT transactions_type_check
+    CHECK (type IN ('DEPOSIT', 'WITHDRAWAL', 'PERF_FEE', 'TRADE_PROFIT', 'BONUS', 'DEBIT', 'PROFIT_SHARE', 'PNL_ADJUST'));
 
 -- 5. TABLE : LIVE_CHAT_THREADS (Routeur Chatbot & File d'attente Prospects)
 CREATE TABLE IF NOT EXISTS public.live_chat_threads (
