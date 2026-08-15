@@ -22,12 +22,11 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
-import { Check, ChevronDown, Eye, EyeOff, Globe, Loader2 } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, Globe, Loader2, Clock, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { sendWelcomeEmail } from "@/lib/resend";
 
 function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -39,6 +38,7 @@ function RegisterPage() {
   const [hasIb, setHasIb] = useState(true);
   const [ibCode, setIbCode] = useState("90462");
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -72,28 +72,23 @@ function RegisterPage() {
           return;
         }
 
-        // 2. Création de la fiche profil dans la table `profiles`
+        // 2. Création de la fiche profil dans la table `profiles` avec statut PENDING_APPROVAL
         if (data.user) {
           await supabase.from("profiles").upsert({
             id: data.user.id,
             email,
             name: fullName,
             role: "TRADER",
-            status: "ACTIVE",
-            kyc_status: "NOT_SUBMITTED",
-            balance: 10000.0, // Solde de démonstration institutionnel
-            assigned_advisor: "Dr. Antoine R.",
+            status: "PENDING_APPROVAL", // En attente de validation par l'administrateur
+            kyc_status: "PENDING",
+            balance: 0.0,
+            assigned_advisor: "Desk de Conformité & Risque",
           });
-
-          // 3. Envoi e-mail officiel de bienvenue via Resend
-          sendWelcomeEmail(email, fullName, "Nexium-Live-NY4").catch((err) =>
-            console.warn("Resend email error:", err)
-          );
         }
       }
 
-      toast.success("Compte créé avec succès ! Bienvenue sur Nexium Markets.");
-      navigate({ to: "/NEXIUM" });
+      setSubmitted(true);
+      toast.success("Demande d'ouverture de compte soumise à l'administration !");
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la création du compte.");
     } finally {
@@ -180,168 +175,222 @@ function RegisterPage() {
           {/* Right Column: White Clean Registration Form */}
           <div className="lg:col-span-7 bg-white p-8 lg:p-10 text-gray-900 flex flex-col justify-between">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                Créer Votre Compte
-              </h1>
+              {submitted ? (
+                <div className="space-y-6 py-4">
+                  <div className="size-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500">
+                    <Clock className="size-8 animate-pulse" />
+                  </div>
 
-              <form
-                className="mt-6 space-y-4 sm:space-y-5"
-                onSubmit={handleRegister}
-              >
-                {/* Country of Residence */}
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="country"
-                    className="text-xs sm:text-sm font-extrabold text-gray-800"
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs font-bold uppercase tracking-wider mb-2">
+                      <ShieldCheck className="size-3.5" /> En attente de validation
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                      Dossier Transmis à la Conformité
+                    </h2>
+                    <p className="mt-3 text-sm text-gray-600 leading-relaxed font-medium">
+                      Votre demande d'ouverture de compte institutionnel pour <strong>{email}</strong> a été enregistrée avec succès.
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-gray-50 border border-gray-200 text-sm space-y-3">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-gray-900 block font-bold">Vérification Réglementaire</strong>
+                        <span className="text-gray-600 text-xs">Un administrateur du Desk examine vos informations et attribue votre passerelle MT5.</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-gray-900 block font-bold">Notification par E-mail</strong>
+                        <span className="text-gray-600 text-xs">Dès validation par la Direction, vous recevrez un e-mail officiel d'activation avec vos accès.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-col gap-3">
+                    <Link
+                      to="/login"
+                      className="w-full text-center rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-4 text-sm tracking-wide transition-all shadow-md"
+                    >
+                      Accéder à la Page de Connexion
+                    </Link>
+                    <Link
+                      to="/"
+                      className="w-full text-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3.5 text-sm transition-all"
+                    >
+                      Retourner au Site Principal
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+                    Créer Votre Compte
+                  </h1>
+
+                  <form
+                    className="mt-6 space-y-4 sm:space-y-5"
+                    onSubmit={handleRegister}
                   >
-                    Pays de Résidence
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="country"
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00ff66] focus:outline-none focus:ring-2 focus:ring-[#00ff66]/20 cursor-pointer"
-                    >
-                      <option value="Canada">Canada 🇨🇦</option>
-                      <option value="France">France 🇫🇷</option>
-                      <option value="United Kingdom">Royaume-Uni 🇬🇧</option>
-                      <option value="Switzerland">Suisse 🇨🇭</option>
-                      <option value="United States">États-Unis 🇺🇸</option>
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-4 top-4 size-4 text-gray-600" />
-                  </div>
-                </div>
+                    {/* Country of Residence */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="country"
+                        className="text-xs sm:text-sm font-extrabold text-gray-800"
+                      >
+                        Pays de Résidence
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="country"
+                          value={country}
+                          onChange={(e) => setCountry(e.target.value)}
+                          className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00ff66] focus:outline-none focus:ring-2 focus:ring-[#00ff66]/20 cursor-pointer"
+                        >
+                          <option value="Canada">Canada 🇨🇦</option>
+                          <option value="France">France 🇫🇷</option>
+                          <option value="United Kingdom">Royaume-Uni 🇬🇧</option>
+                          <option value="Switzerland">Suisse 🇨🇭</option>
+                          <option value="United States">États-Unis 🇺🇸</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-4 top-4 size-4 text-gray-600" />
+                      </div>
+                    </div>
 
-                {/* First Name & Last Name */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="firstName"
-                      className="text-xs sm:text-sm font-extrabold text-gray-800"
-                    >
-                      Prénom *
-                    </label>
-                    <Input
-                      id="firstName"
-                      required
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Prénom"
-                      className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="lastName"
-                      className="text-xs sm:text-sm font-extrabold text-gray-800"
-                    >
-                      Nom
-                    </label>
-                    <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Nom"
-                      className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
-                    />
-                  </div>
-                </div>
+                    {/* First Name & Last Name */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="firstName"
+                          className="text-xs sm:text-sm font-extrabold text-gray-800"
+                        >
+                          Prénom *
+                        </label>
+                        <Input
+                          id="firstName"
+                          required
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Prénom"
+                          className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="lastName"
+                          className="text-xs sm:text-sm font-extrabold text-gray-800"
+                        >
+                          Nom
+                        </label>
+                        <Input
+                          id="lastName"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Nom"
+                          className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                        />
+                      </div>
+                    </div>
 
-                {/* Email Address */}
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="email"
-                    className="text-xs sm:text-sm font-extrabold text-gray-800"
-                  >
-                    Adresse E-mail *
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Adresse e-mail"
-                    className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
-                  />
-                </div>
-
-                {/* Password with Eye Toggle */}
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="password"
-                    className="text-xs sm:text-sm font-extrabold text-gray-800"
-                  >
-                    Mot de Passe *
-                  </label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Mot de passe sécurisé (min. 6 caractères)"
-                      className="rounded-xl border-gray-300 bg-white px-4 py-3.5 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Checkbox Introducing Broker */}
-                <div className="pt-2">
-                  <label className="flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm font-bold text-gray-800">
-                    <input
-                      type="checkbox"
-                      checked={hasIb}
-                      onChange={(e) => setHasIb(e.target.checked)}
-                      className="size-4 rounded border-gray-300 text-black focus:ring-black accent-black"
-                    />
-                    <span>J'ai été parrainé(e) par un partenaire</span>
-                  </label>
-
-                  {hasIb && (
-                    <div className="mt-2">
+                    {/* Email Address */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="email"
+                        className="text-xs sm:text-sm font-extrabold text-gray-800"
+                      >
+                        Adresse E-mail *
+                      </label>
                       <Input
-                        value={ibCode}
-                        onChange={(e) => setIbCode(e.target.value)}
-                        placeholder="Code de parrainage"
-                        className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm font-mono text-gray-900 focus:border-[#00ff66]"
+                        id="email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Adresse e-mail"
+                        className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                       />
                     </div>
-                  )}
-                </div>
 
-                {/* Legal Policy Links */}
-                <p className="text-xs sm:text-sm leading-relaxed text-gray-600 font-medium pt-1">
-                  En continuant, vous confirmez avoir lu et accepté nos{" "}
-                  <Link to="/terms" className="font-extrabold text-gray-900 underline">
-                    Conditions Générales
-                  </Link>{" "}
-                  et notre{" "}
-                  <Link to="/privacy" className="font-extrabold text-gray-900 underline">
-                    Politique de Confidentialité
-                  </Link>
-                  .
-                </p>
+                    {/* Password with Eye Toggle */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="password"
+                        className="text-xs sm:text-sm font-extrabold text-gray-800"
+                      >
+                        Mot de Passe *
+                      </label>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Mot de passe sécurisé (min. 6 caractères)"
+                          className="rounded-xl border-gray-300 bg-white px-4 py-3.5 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Create Account Black Pill Button */}
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full mt-3 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
-                  <span>{loading ? "Création en cours..." : "Créer Mon Compte"}</span>
-                </Button>
-              </form>
+                    {/* Checkbox Introducing Broker */}
+                    <div className="pt-2">
+                      <label className="flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm font-bold text-gray-800">
+                        <input
+                          type="checkbox"
+                          checked={hasIb}
+                          onChange={(e) => setHasIb(e.target.checked)}
+                          className="size-4 rounded border-gray-300 text-black focus:ring-black accent-black"
+                        />
+                        <span>J'ai été parrainé(e) par un partenaire</span>
+                      </label>
+
+                      {hasIb && (
+                        <div className="mt-2">
+                          <Input
+                            value={ibCode}
+                            onChange={(e) => setIbCode(e.target.value)}
+                            placeholder="Code de parrainage"
+                            className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm font-mono text-gray-900 focus:border-[#00ff66]"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Legal Policy Links */}
+                    <p className="text-xs sm:text-sm leading-relaxed text-gray-600 font-medium pt-1">
+                      En continuant, vous confirmez avoir lu et accepté nos{" "}
+                      <Link to="/terms" className="font-extrabold text-gray-900 underline">
+                        Conditions Générales
+                      </Link>{" "}
+                      et notre{" "}
+                      <Link to="/privacy" className="font-extrabold text-gray-900 underline">
+                        Politique de Confidentialité
+                      </Link>
+                      .
+                    </p>
+
+                    {/* Create Account Black Pill Button */}
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full mt-3 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
+                      <span>{loading ? "Création en cours..." : "Créer Mon Compte"}</span>
+                    </Button>
+                  </form>
+                </>
+              )}
             </div>
 
             {/* Bottom Switch Link */}

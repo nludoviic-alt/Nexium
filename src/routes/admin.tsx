@@ -121,7 +121,13 @@ import {
   sendCustomDeskEmail,
   isResendConfigured,
 } from "@/lib/resend";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import {
+  supabase,
+  isSupabaseConfigured,
+  approveClientAccount,
+  rejectClientAccount,
+  getAllClientProfiles,
+} from "@/lib/supabase";
 
 export const Route = createFileRoute("/admin")({
   component: NexiumAdminDashboard,
@@ -132,8 +138,8 @@ export const Route = createFileRoute("/admin")({
 /* ========================================================================= */
 
 type AdminSystemRole = "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
-type AccountStatus = "ACTIVE" | "SUSPENDED" | "REVOKED" | "BANNED";
-type KycStatus = "VERIFIED" | "PENDING_REVIEW" | "REJECTED";
+type AccountStatus = "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "REVOKED" | "BANNED";
+type KycStatus = "VERIFIED" | "PENDING_REVIEW" | "REJECTED" | "NOT_SUBMITTED";
 
 interface EngineAssignment {
   active: boolean;
@@ -1551,6 +1557,130 @@ function NexiumAdminDashboard() {
     toast.success(`Profil, presets et règles enregistrés pour ${editName}.`);
   };
 
+  // Synchronisation des clients réels depuis Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    getAllClientProfiles().then((supabaseProfiles) => {
+      if (!supabaseProfiles || supabaseProfiles.length === 0) return;
+      setClients((prev) => {
+        const existingIds = new Set(prev.map((c) => c.id));
+        const newMapped: UserProfile[] = supabaseProfiles
+          .filter((p) => !existingIds.has(p.id))
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            email: p.email,
+            phone: p.phone || "+33 6 00 00 00 00",
+            country: "France 🇫🇷",
+            status: p.status as AccountStatus,
+            createdAt: p.created_at ? p.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+            lastActive: "Nouveau compte",
+            ip: "127.0.0.1",
+            twoFactorEnabled: false,
+            forcePasswordReset: false,
+            balance: p.balance || 0,
+            bonusCredit: 0,
+            equity: p.balance || 0,
+            kycStatus: p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW",
+            kycDocuments: {
+              idCardName: "En cours d'examen",
+              proofOfAddressName: "En cours d'examen",
+              submittedDate: "Aujourd'hui",
+            },
+            maxDailyLossPercent: 3.5,
+            maxSimultaneousTrades: 3,
+            riskGuardAutoStop: true,
+            assignedAdvisor: p.assigned_advisor || "Dr. Antoine R.",
+            sessions: [],
+            crmNotes: [],
+            withdrawalRequests: [],
+            depositRequests: [],
+            grossProfitTotal: p.gross_profit_total || 0,
+            grossLossTotal: p.gross_loss_total || 0,
+            bestTradePnl: 0,
+            worstTradePnl: 0,
+            todayGrossGain: 0,
+            todayGrossLoss: 0,
+            todayPnl: 0,
+            totalNetPnl: (p.gross_profit_total || 0) - (p.gross_loss_total || 0),
+            winRatePercent: 68.4,
+            profitFactor: 2.14,
+            maxDrawdownPercent: 3.8,
+            tradesCount: 0,
+            winningTradesCount: 0,
+            losingTradesCount: 0,
+            highWaterMark: p.balance || 0,
+            lastFundingDate: "Nouveau compte",
+            engines: {
+              aiGold: { active: true, preset: "EQUINIX_NY4_DIRECT", maxLot: 1.0, minScore: 82, riskCapPercent: 2.0 },
+              fxTrend: { active: true, preset: "INSTITUTIONAL_ALPHA", maxLot: 1.0, minScore: 78, riskCapPercent: 2.0 },
+              indexReversion: { active: false, preset: "CONSERVATIVE_CORE", maxLot: 0.5, minScore: 85, riskCapPercent: 1.5 },
+            },
+            mt5: {
+              login: p.mt5_login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`,
+              broker: p.mt5_broker || "Nexium Prime ECN",
+              server: "Nexium-NY4-Equinix",
+            },
+            tradingHistory: [],
+            livePositions: [],
+          }));
+
+        return [...newMapped, ...prev];
+      });
+    });
+  }, []);
+
+  // Validation & Activation d'un compte client par l'Administrateur
+  const handleApprovePendingClient = async (client: UserProfile) => {
+    const assignedMt5 = client.mt5.login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // 1. Mise à jour Supabase
+    if (isSupabaseConfigured) {
+      await approveClientAccount(client.id, assignedMt5);
+    }
+
+    // 2. Mise à jour de l'état local
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id === client.id) {
+          return {
+            ...c,
+            status: "ACTIVE",
+            kycStatus: "VERIFIED",
+            mt5: {
+              ...c.mt5,
+              login: assignedMt5,
+            },
+          };
+        }
+        return c;
+      })
+    );
+
+    // 3. Envoi e-mail officiel de bienvenue & d'activation avec Resend
+    sendWelcomeEmail(client.email, client.name, assignedMt5).catch((err) =>
+      console.warn("Resend activation error:", err)
+    );
+
+    // 4. Audit Log
+    addAuditLog("CLIENT_APPROVED", `Compte de ${client.name} (${client.email}) validé et activé par la Direction.`, client.name);
+    toast.success(`Le compte de ${client.name} est maintenant ACTIF. E-mail officiel d'activation envoyé !`);
+  };
+
+  // Rejet d'un compte client
+  const handleRejectPendingClient = async (client: UserProfile) => {
+    if (isSupabaseConfigured) {
+      await rejectClientAccount(client.id);
+    }
+
+    setClients((prev) =>
+      prev.map((c) => (c.id === client.id ? { ...c, status: "REVOKED", kycStatus: "REJECTED" } : c))
+    );
+
+    addAuditLog("CLIENT_REJECTED", `Demande de compte de ${client.name} (${client.email}) refusée.`, client.name);
+    toast.error(`La demande de compte de ${client.name} a été refusée.`);
+  };
+
   // Envoi d'un message dans le chat desk
   // Messagerie = chat uniquement (les e-mails vivent dans leur propre module, voir
   // activeSection "emails" — boîte OVH séparée, gérée par email-service).
@@ -2965,6 +3095,25 @@ function NexiumAdminDashboard() {
                 </div>
               </div>
 
+              {/* ── BANNIÈRE COMPTES EN ATTENTE DE VALIDATION ── */}
+              {clients.some((c) => c.status === "PENDING_APPROVAL") && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in">
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-xl bg-amber-500/20 text-amber-400 grid place-items-center shrink-0">
+                      <ShieldCheck className="size-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-amber-300">
+                        {clients.filter((c) => c.status === "PENDING_APPROVAL").length} Compte(s) en Attente d'Approbation Réglementaire
+                      </h3>
+                      <p className="text-xs text-slate-300">
+                        Les investisseurs ci-dessous ont créé leur compte et attendent votre validation pour accéder à leur Dashboard MT5.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Tableau Clients */}
               <AdminDataTable
                 columns={[
@@ -2984,8 +3133,19 @@ function NexiumAdminDashboard() {
                     header: "STATUT",
                     render: (c: UserProfile) => (
                       <div className="space-y-1">
-                        <AdminBadge variant={c.status === "ACTIVE" ? "emerald" : c.status === "SUSPENDED" ? "amber" : "rose"} dot={false}>
-                          {c.status}
+                        <AdminBadge
+                          variant={
+                            c.status === "ACTIVE"
+                              ? "emerald"
+                              : c.status === "PENDING_APPROVAL"
+                              ? "amber"
+                              : c.status === "SUSPENDED"
+                              ? "amber"
+                              : "rose"
+                          }
+                          dot={false}
+                        >
+                          {c.status === "PENDING_APPROVAL" ? "⏳ EN ATTENTE" : c.status}
                         </AdminBadge>
                         <span className="text-[11px] text-indigo-300 font-mono block">KYC : {c.kycStatus}</span>
                       </div>
@@ -3018,13 +3178,33 @@ function NexiumAdminDashboard() {
                     header: "ACTION",
                     align: "right",
                     render: (c: UserProfile) => (
-                      <button
-                        onClick={() => handleOpenClientProfile(c)}
-                        className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-bold py-1.5 px-3.5 transition cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
-                      >
-                        <span>Ouvrir Fiche</span>
-                        <ChevronRight className="size-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {c.status === "PENDING_APPROVAL" ? (
+                          <>
+                            <button
+                              onClick={() => handleApprovePendingClient(c)}
+                              className="rounded-xl border border-emerald-500 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black py-1.5 px-3 transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                            >
+                              <CheckCircle2 className="size-3.5" />
+                              <span>Valider &amp; Activer</span>
+                            </button>
+                            <button
+                              onClick={() => handleRejectPendingClient(c)}
+                              className="rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold py-1.5 px-2.5 transition cursor-pointer"
+                            >
+                              Refuser
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenClientProfile(c)}
+                            className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-bold py-1.5 px-3.5 transition cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                          >
+                            <span>Ouvrir Fiche</span>
+                            <ChevronRight className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
                     ),
                   },
                 ]}

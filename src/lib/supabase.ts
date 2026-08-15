@@ -47,11 +47,13 @@ export interface SupabaseUserProfile {
   name: string;
   phone?: string;
   role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
-  status: "ACTIVE" | "SUSPENDED" | "BANNED" | "REVOKED";
+  status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "BANNED" | "REVOKED";
   kyc_status: "VERIFIED" | "PENDING" | "REJECTED" | "NOT_SUBMITTED";
   mt5_login?: string;
   mt5_broker?: string;
   balance?: number;
+  gross_profit_total?: number;
+  gross_loss_total?: number;
   assigned_advisor?: string;
   created_at?: string;
 }
@@ -104,6 +106,46 @@ export async function updateUserProfile(userId: string, updates: Partial<Supabas
     return { success: false, error };
   }
   return { success: true, data };
+}
+
+/**
+ * Récupère tous les profils de clients depuis Supabase.
+ */
+export async function getAllClientProfiles(): Promise<SupabaseUserProfile[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("role", "TRADER")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Erreur récupération profils clients:", error);
+    return [];
+  }
+  return data as SupabaseUserProfile[];
+}
+
+/**
+ * Approuve et active le compte d'un client.
+ */
+export async function approveClientAccount(userId: string, customLogin?: string) {
+  const mt5Login = customLogin || `${Math.floor(100000 + Math.random() * 900000)}`;
+  return updateUserProfile(userId, {
+    status: "ACTIVE",
+    kyc_status: "VERIFIED",
+    mt5_login: mt5Login,
+  });
+}
+
+/**
+ * Rejette ou révoque le compte d'un client.
+ */
+export async function rejectClientAccount(userId: string) {
+  return updateUserProfile(userId, {
+    status: "REVOKED",
+    kyc_status: "REJECTED",
+  });
 }
 
 /* ==========================================================================

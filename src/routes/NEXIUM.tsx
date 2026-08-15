@@ -98,6 +98,7 @@ import {
 import { useEffect, useId, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { TradingViewSuperchart } from "@/components/site/TradingViewSuperchart";
+import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
 
 export const Route = createFileRoute("/NEXIUM")({
   head: () => ({
@@ -5228,6 +5229,27 @@ function NexiumDashboard() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("Auto-Trader");
   const [balance, setBalance] = useState(24860.42);
+  const [clientName, setClientName] = useState("Ludovic M.");
+  const [clientEmail, setClientEmail] = useState("ludovic@nexium.io");
+  const [mt5AccountNumber, setMt5AccountNumber] = useState("802194");
+  const [assignedAdvisor, setAssignedAdvisor] = useState("Dr. Antoine R. (Quant Desk)");
+
+  // Chargement dynamique du profil client connecté depuis Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) {
+        setClientEmail(user.email || "investisseur@nexiummarkets.com");
+        const profile = await getUserProfile(user.id);
+        if (profile) {
+          if (profile.name) setClientName(profile.name);
+          if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
+          if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
+          if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
+        }
+      }
+    });
+  }, []);
 
   // States
   const [bots, setBots] = useState<EngineBot[]>(INITIAL_BOTS);
@@ -5611,11 +5633,16 @@ function NexiumDashboard() {
                 title="Menu profil"
               >
                 <div className="grid size-7 sm:size-8 place-items-center rounded-lg bg-[#00D084]/15 border border-[#00D084]/30 text-xs sm:text-sm font-black text-[#00D084]">
-                  LM
+                  {clientName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
                 </div>
                 <div className="hidden md:flex flex-col text-left leading-none">
-                  <span className="text-xs font-black text-white">Ludovic M.</span>
-                  <span className="text-[10px] font-mono text-gray-400">#802194</span>
+                  <span className="text-xs font-black text-white">{clientName}</span>
+                  <span className="text-[10px] font-mono text-gray-400">#{mt5AccountNumber}</span>
                 </div>
                 <ChevronDown className="size-3 text-gray-400" />
               </button>
@@ -5623,8 +5650,8 @@ function NexiumDashboard() {
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-white/[0.1] bg-[#10141b] p-2 shadow-2xl z-50 backdrop-blur-xl">
                   <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
-                    <p className="text-xs font-bold text-white">Ludovic M.</p>
-                    <p className="text-[10px] font-mono text-[#00D084]">Compte MT5 #802194</p>
+                    <p className="text-xs font-bold text-white">{clientName}</p>
+                    <p className="text-[10px] font-mono text-[#00D084]">Compte MT5 #{mt5AccountNumber}</p>
                   </div>
                   <button
                     onClick={() => {
@@ -5646,11 +5673,18 @@ function NexiumDashboard() {
                   </Link>
                   <div className="my-1 border-t border-white/[0.06]" />
                   <button
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/15 transition cursor-pointer"
+                    onClick={async () => {
+                      setUserMenuOpen(false);
+                      if (isSupabaseConfigured) {
+                        await supabase.auth.signOut();
+                      }
+                      toast.info("Déconnexion réussie.");
+                      navigate({ to: "/login" });
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
                   >
-                    <LogOut className="size-3.5 text-rose-400" />
-                    Déconnexion
+                    <LogOut className="size-3.5" />
+                    Se déconnecter
                   </button>
                 </div>
               )}
