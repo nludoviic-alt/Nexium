@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Activity,
   AlertCircle,
@@ -41,6 +41,7 @@ import {
   Layers,
   LayoutDashboard,
   Lock,
+  LogOut,
   Mail,
   Maximize2,
   Menu,
@@ -115,7 +116,7 @@ export const Route = createFileRoute("/NEXIUM")({
 // ----------------------------------------------------
 // TYPES & DATA STRUCTURES
 // ----------------------------------------------------
-export interface EngineBot {
+interface EngineBot {
   id: "nexium-ai-gold" | "nexium-fx-trend" | "nexium-index-reversion";
   name: string;
   specialty: string;
@@ -184,7 +185,7 @@ export interface EngineBot {
   uptime: string;
 }
 
-export interface PositionItem {
+interface PositionItem {
   id: string;
   ticket: string;
   side: "BUY" | "SELL";
@@ -201,7 +202,7 @@ export interface PositionItem {
   botId: "nexium-ai-gold" | "nexium-fx-trend" | "nexium-index-reversion";
 }
 
-export interface TransactionItem {
+interface TransactionItem {
   id: string;
   date: string;
   type: "Dépôt validé" | "Retrait traité" | "Gain trading MT5" | "Clôture position";
@@ -213,7 +214,7 @@ export interface TransactionItem {
   color: string;
 }
 
-export interface JournalEntry {
+interface JournalEntry {
   id: string;
   time: string;
   event: string;
@@ -223,7 +224,7 @@ export interface JournalEntry {
   statusVariant: "emerald" | "sky" | "purple" | "amber" | "slate";
 }
 
-export interface ChatMessage {
+interface ChatMessage {
   id: string;
   sender: "user" | "desk" | "system" | "expert" | "ai" | "support";
   senderName: string;
@@ -240,7 +241,7 @@ export interface ChatMessage {
   contactId?: string | undefined;
 }
 
-export interface PriceAlert {
+interface PriceAlert {
   id: string;
   symbol: string;
   targetPrice: number;
@@ -659,7 +660,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   },
 ];
 
-export interface EmailItem {
+interface EmailItem {
   id: string;
   from: string;
   fromName: string;
@@ -817,43 +818,56 @@ function TradingViewEngineChart({
     },
   ];
 
-  const handleToggleTrading = () => {
-    if (isTradingActive) {
-      setIsTradingActive(false);
-      toast.warning("Moteur et prises d'ordres mis en PAUSE.");
-    } else {
-      setIsTradingActive(true);
-      toast.success("Moteur et scan IA RÉACTIVÉS en direct !");
-    }
+  // Confirmation Modals State
+  const [confirmPreset, setConfirmPreset] = useState<typeof PRESETS[0] | null>(null);
+  const [confirmTradingToggle, setConfirmTradingToggle] = useState<boolean>(false);
+
+  const requestSelectPreset = (preset: typeof PRESETS[0]) => {
+    setConfirmPreset(preset);
   };
 
-  const handleSelectPreset = (presetId: typeof activePreset) => {
-    setActivePreset(presetId);
+  const handleConfirmPreset = () => {
+    if (!confirmPreset) return;
+    setActivePreset(confirmPreset.id);
     setIsTradingActive(true);
-    toast.info(`Preset "${PRESETS.find((p) => p.id === presetId)?.name}" activé.`);
+    playOpenSound();
+    toast.success(`Preset "${confirmPreset.name}" activé avec succès sur ${bot.chart.symbol}.`);
+    setConfirmPreset(null);
+  };
+
+  const handleConfirmTradingToggle = () => {
+    const next = !isTradingActive;
+    setIsTradingActive(next);
+    if (next) {
+      playOpenSound();
+      toast.success(`Trading IA activé sur ${bot.chart.symbol} !`);
+    } else {
+      toast.warning(`Trading IA suspendu sur ${bot.chart.symbol}.`);
+    }
+    setConfirmTradingToggle(false);
   };
 
   return (
     <div className="space-y-4">
       {/* 1. BARRE DE PRESETS & CONTRÔLE STRATÉGIE */}
-      <div className="rounded-2xl border border-white/[0.08] bg-[#0d1117] p-4 sm:p-5 shadow-lg">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-3.5">
+      <div className="admin-card p-4 sm:p-5 shadow-lg space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-700/50 pb-3.5">
           <div className="flex items-center gap-2.5">
-            <span className={`size-2.5 rounded-full ${isTradingActive ? "bg-[#00D084] animate-ping" : "bg-rose-500"}`} />
-            <h3 className="text-base sm:text-lg font-black text-white">
+            <span className={`size-2.5 rounded-full ${isTradingActive ? "bg-emerald-400 animate-ping" : "bg-rose-500"}`} />
+            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
               Stratégie &amp; Presets IA
             </h3>
-            <span className="rounded-md bg-white/[0.06] px-2 py-0.5 font-mono text-[10px] font-bold text-gray-300">
+            <span className="rounded-md border border-slate-700/60 bg-[#121a2d] px-2 py-0.5 font-mono text-[10px] font-bold text-slate-300">
               {bot.chart.symbol}
             </span>
           </div>
 
           <button
-            onClick={handleToggleTrading}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md ${
+            onClick={() => setConfirmTradingToggle(true)}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md ${
               isTradingActive
                 ? "border border-rose-500/50 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30"
-                : "neon-btn text-black shadow-[0_0_15px_rgba(0,208,132,0.3)]"
+                : "admin-btn-primary shadow-[0_0_15px_rgba(16,185,129,0.3)]"
             }`}
           >
             {isTradingActive ? (
@@ -871,28 +885,28 @@ function TradingViewEngineChart({
         </div>
 
         {/* Presets Chips */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {PRESETS.map((preset) => {
             const isPresetActive = activePreset === preset.id && isTradingActive;
             return (
               <button
                 key={preset.id}
-                onClick={() => handleSelectPreset(preset.id)}
-                className={`rounded-xl border p-2.5 text-left transition-all cursor-pointer ${
+                onClick={() => requestSelectPreset(preset)}
+                className={`p-2.5 text-left transition-all cursor-pointer rounded-xl ${
                   isPresetActive
-                    ? "border-[#00D084] bg-[#00D084]/15 text-white shadow-[0_0_15px_rgba(0,208,132,0.15)] ring-1 ring-[#00D084]"
-                    : "border-white/[0.08] bg-[#0c1017] text-gray-300 hover:border-white/[0.2] hover:text-white"
+                    ? "admin-card-emerald border-emerald-400 text-white shadow-[0_0_15px_rgba(16,185,129,0.25)] ring-1 ring-emerald-400"
+                    : "admin-subcard text-slate-300 hover:border-slate-500/50 hover:text-white"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs truncate">{preset.name}</span>
                   {isPresetActive && (
-                    <span className="size-1.5 rounded-full bg-[#00D084] animate-ping" />
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
                   )}
                 </div>
-                <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] text-gray-400">
+                <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] text-slate-400">
                   <span>R:R {preset.riskReward}</span>
-                  <span className="text-[#00D084] font-bold">{preset.expectedScore}</span>
+                  <span className="text-emerald-400 font-bold">{preset.expectedScore}</span>
                 </div>
               </button>
             );
@@ -900,11 +914,112 @@ function TradingViewEngineChart({
         </div>
       </div>
 
-      {/* 2. SUPERCHARTS WORKSTATION TRADINGVIEW PIXEL PAR PIXEL */}
+      {/* MODALE DE CONFIRMATION DU PRESET STRATÉGIQUE (SIMPLIFIÉE) */}
+      {confirmPreset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-sm admin-card p-5 sm:p-6 shadow-2xl space-y-4 border border-emerald-500/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                  <ShieldCheck className="size-4.5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-white">Appliquer le Preset ?</h3>
+                  <p className="text-xs text-emerald-400 font-mono font-bold">{confirmPreset.name} · {bot.chart.symbol}</p>
+                </div>
+              </div>
+              <button onClick={() => setConfirmPreset(null)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="admin-subcard p-2.5 flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-400">R:R : <strong className="text-white">{confirmPreset.riskReward}</strong></span>
+              <span className="text-slate-400">Score IA : <strong className="text-amber-300">{confirmPreset.expectedScore}</strong></span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmPreset(null)}
+                className="flex-1 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-2.5 text-xs font-bold text-slate-300 transition cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPreset}
+                className="flex-1 admin-btn-primary py-2.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE DE CONFIRMATION ACTIVATION / PAUSE DU GRAPHIQUE (SIMPLIFIÉE) */}
+      {confirmTradingToggle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className={`w-full max-w-sm admin-card p-5 sm:p-6 shadow-2xl space-y-4 border ${
+            isTradingActive ? "border-rose-500/40" : "border-emerald-500/40"
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`grid size-9 place-items-center rounded-xl border font-mono ${
+                  isTradingActive
+                    ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                    : "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                }`}>
+                  {isTradingActive ? <AlertTriangle className="size-4.5" /> : <Play className="size-4.5" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-white">
+                    {isTradingActive ? `Stopper ${bot.chart.symbol} ?` : `Activer ${bot.chart.symbol} ?`}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">{bot.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setConfirmTradingToggle(false)} className="text-slate-400 hover:text-white p-1 cursor-pointer">
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              {isTradingActive
+                ? "Suspendre la prise d'ordres sur cet actif."
+                : "Activer la détection de signaux et l'exécution automatique."}
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmTradingToggle(false)}
+                className="flex-1 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-2.5 text-xs font-bold text-slate-300 transition cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTradingToggle}
+                className={`flex-1 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  isTradingActive
+                    ? "bg-rose-600 hover:bg-rose-700 text-white"
+                    : "admin-btn-primary"
+                }`}
+              >
+                {isTradingActive ? "Stopper" : "Activer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. GRAPHIQUE INSTITUTIONNEL EN TEMPS RÉEL (SIMPLIFIÉ & ÉPURÉ) */}
       <TradingViewSuperchart
-        initialSymbol={bot.id === "nexium-ai-gold" ? "BTCUSD" : "EURUSD"}
+        initialSymbol={bot.primarySymbol || (bot.id === "nexium-ai-gold" ? "XAUUSD" : "EURUSD")}
         isTradingActive={isTradingActive}
-        onToggleTrading={handleToggleTrading}
+        onToggleTrading={() => setConfirmTradingToggle(true)}
       />
     </div>
   );
@@ -1263,21 +1378,195 @@ function EngineTab({
   const [activeBottomTab, setActiveBottomTab] = useState<"decision" | "metrics" | "journal">("decision");
   const [logFilter, setLogFilter] = useState<"all" | "won" | "lost" | "open">("all");
 
-  // 2 moteurs principaux
-  const activeBots = useMemo(() => bots.slice(0, 2), [bots]);
-  const selectedBot = activeBots.find((b) => b.id === selectedBotId) ?? activeBots[0];
+  // Trade Sizing & Risk Parameters State
+  const [sizingMode, setSizingMode] = useState<"fixed_lot" | "risk_percent" | "fixed_usd">("fixed_lot");
+  const [lotSize, setLotSize] = useState<number>(0.20);
+  const [riskPercentPerTrade, setRiskPercentPerTrade] = useState<number>(0.50);
+  const [fixedUsdPerTrade, setFixedUsdPerTrade] = useState<number>(100);
+  const [leverage, setLeverage] = useState<string>("1:100");
+
+  // Stop Loss & Take Profit Settings
+  const [stopLossPips, setStopLossPips] = useState<number>(25);
+  const [takeProfitRatio, setTakeProfitRatio] = useState<number>(2.5); // 1:2.5
+  const [trailingStopEnabled, setTrailingStopEnabled] = useState<boolean>(true);
+  const [trailingStopDistance, setTrailingStopDistance] = useState<number>(15);
+  const [breakEvenEnabled, setBreakEvenEnabled] = useState<boolean>(true);
+  const [partialCloseEnabled, setPartialCloseEnabled] = useState<boolean>(true);
+
+  // Execution & Governor Filters
+  const [maxSlippagePips, setMaxSlippagePips] = useState<number>(0.8);
+  const [maxAllowedSpread, setMaxAllowedSpread] = useState<number>(1.2);
+  const [executionType, setExecutionType] = useState<"MARKET_FIX" | "LIMIT_PULLBACK" | "STOP_BREAKOUT">("MARKET_FIX");
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(true);
+
+  // 3 moteurs institutionnels (Gold, FX, Index)
+  const activeBots = useMemo(() => bots, [bots]);
+  const selectedBot: EngineBot = (activeBots.find((b) => b.id === selectedBotId) ?? activeBots[0] ?? bots[0])!;
   const matchingPos = positions.find((p) => p.botId === selectedBot.id);
 
-  // Toggle Engine Power
-  const toggleEnginePower = () => {
-    if (isEngineRunning) {
-      setIsEngineRunning(false);
-      toast.info("Auto-trader mis en pause — Sécurité active.");
+  // Live Calculations
+  const calculatedRiskUsd = useMemo(() => {
+    if (sizingMode === "fixed_lot") {
+      const pipValue = lotSize * 10;
+      return Number((stopLossPips * pipValue).toFixed(2));
+    } else if (sizingMode === "risk_percent") {
+      return Number((24860.42 * (riskPercentPerTrade / 100)).toFixed(2));
     } else {
-      setIsEngineRunning(true);
-      playOpenSound();
-      toast.success("Auto-trader démarré avec succès sur flux NY4 !");
+      return fixedUsdPerTrade;
     }
+  }, [sizingMode, lotSize, stopLossPips, riskPercentPerTrade, fixedUsdPerTrade]);
+
+  const calculatedRewardUsd = useMemo(() => {
+    return Number((calculatedRiskUsd * takeProfitRatio).toFixed(2));
+  }, [calculatedRiskUsd, takeProfitRatio]);
+
+  const calculatedEffectiveLot = useMemo(() => {
+    if (sizingMode === "fixed_lot") return lotSize;
+    const pipValuePerLot = 10;
+    const eff = calculatedRiskUsd / (stopLossPips * pipValuePerLot);
+    return Math.max(0.01, Number(eff.toFixed(2)));
+  }, [sizingMode, lotSize, calculatedRiskUsd, stopLossPips]);
+
+  const requiredMargin = useMemo(() => {
+    const levNum = parseInt(leverage.replace("1:", "")) || 100;
+    return Number(((calculatedEffectiveLot * 100000) / levNum).toFixed(2));
+  }, [calculatedEffectiveLot, leverage]);
+
+  // Quick Preset Application Logic
+  const applyPresetProfile = (type: "conservative" | "balanced" | "aggressive") => {
+    if (type === "conservative") {
+      setSizingMode("fixed_lot");
+      setLotSize(0.10);
+      setStopLossPips(15);
+      setTakeProfitRatio(2.0);
+      setTrailingStopEnabled(true);
+      setTrailingStopDistance(10);
+      setBreakEvenEnabled(true);
+      setPartialCloseEnabled(true);
+      setMaxSlippagePips(0.5);
+      setMaxAllowedSpread(0.8);
+      toast.success("Profil 'Scalping Conservateur' appliqué (0.10 lot · SL 15 pips · R:R 1:2.0).");
+    } else if (type === "balanced") {
+      setSizingMode("fixed_lot");
+      setLotSize(0.25);
+      setStopLossPips(25);
+      setTakeProfitRatio(2.5);
+      setTrailingStopEnabled(true);
+      setTrailingStopDistance(15);
+      setBreakEvenEnabled(true);
+      setPartialCloseEnabled(true);
+      setMaxSlippagePips(0.8);
+      setMaxAllowedSpread(1.2);
+      toast.success("Profil 'Day Trading Équilibré' appliqué (0.25 lot · SL 25 pips · R:R 1:2.5).");
+    } else {
+      setSizingMode("fixed_lot");
+      setLotSize(0.50);
+      setStopLossPips(35);
+      setTakeProfitRatio(3.0);
+      setTrailingStopEnabled(true);
+      setTrailingStopDistance(20);
+      setBreakEvenEnabled(true);
+      setPartialCloseEnabled(false);
+      setMaxSlippagePips(1.2);
+      setMaxAllowedSpread(1.8);
+      toast.success("Profil 'Breakout Dynamique' appliqué (0.50 lot · SL 35 pips · R:R 1:3.0).");
+    }
+  };
+
+  // Request Profile Preset Application with Confirmation
+  const requestApplyPresetProfile = (type: "conservative" | "balanced" | "aggressive") => {
+    const label =
+      type === "conservative"
+        ? "0.10 lot · SL 15p · R:R 1:2.0"
+        : type === "balanced"
+        ? "0.25 lot · SL 25p · R:R 1:2.5"
+        : "0.50 lot · SL 35p · R:R 1:3.0";
+
+    const name = type === "conservative" ? "Conservateur" : type === "balanced" ? "Équilibré" : "Dynamique";
+
+    setConfirmModal({
+      isOpen: true,
+      type: "profile_preset",
+      presetType: type,
+      title: `Profil ${name} ?`,
+      description: `Ajuster ${selectedBot.name} : ${label}`,
+      actionButtonLabel: `Appliquer`,
+      isDangerous: false,
+    });
+  };
+
+  const handleSaveExecutionSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    playWinSound();
+    toast.success(
+      `Paramètres MT5 enregistrés pour ${selectedBot.name} : ${calculatedEffectiveLot} lot(s) · SL ${stopLossPips} pips · TP (1:${takeProfitRatio.toFixed(1)}R).`
+    );
+  };
+
+  // Security Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: "master_engine" | "bot_toggle" | "profile_preset";
+    targetBot?: EngineBot;
+    targetState?: "ACTIF" | "EN PAUSE";
+    presetType?: "conservative" | "balanced" | "aggressive";
+    title: string;
+    description: string;
+    actionButtonLabel: string;
+    isDangerous?: boolean;
+  } | null>(null);
+
+  // Request Master Engine Power Toggle (With Security Confirmation)
+  const requestToggleEnginePower = () => {
+    const nextActive = !isEngineRunning;
+    setConfirmModal({
+      isOpen: true,
+      type: "master_engine",
+      targetState: nextActive ? "ACTIF" : "EN PAUSE",
+      title: nextActive ? "Activer le Trading Auto ?" : "Mettre en Pause le Trading ?",
+      description: nextActive
+        ? "Le moteur reconnectera les flux FIX et reprendra la prise d'ordres."
+        : "Tous les ordres automatiques seront suspendus. Vos positions ouvertes restent actives.",
+      actionButtonLabel: nextActive ? "Activer" : "Mettre en Pause",
+      isDangerous: !nextActive,
+    });
+  };
+
+  // Request Individual Bot Pause / Activate (With Security Confirmation)
+  const requestToggleBotPause = (bot: EngineBot) => {
+    const nextState = bot.statusBadge === "ACTIF" ? "EN PAUSE" : "ACTIF";
+    setConfirmModal({
+      isOpen: true,
+      type: "bot_toggle",
+      targetBot: bot,
+      targetState: nextState,
+      title: nextState === "ACTIF" ? `Activer ${bot.primarySymbol} ?` : `Mettre en pause ${bot.primarySymbol} ?`,
+      description: nextState === "ACTIF"
+        ? `Réactiver le scan et l'exécution sur ${bot.name}.`
+        : `Stopper la prise de nouveaux ordres sur ${bot.name}.`,
+      actionButtonLabel: nextState === "ACTIF" ? "Activer" : "Mettre en Pause",
+      isDangerous: nextState === "EN PAUSE",
+    });
+  };
+
+  // Confirm Action Execution
+  const handleConfirmAction = () => {
+    if (!confirmModal) return;
+    if (confirmModal.type === "master_engine") {
+      const next = !isEngineRunning;
+      setIsEngineRunning(next);
+      if (next) {
+        playOpenSound();
+        toast.success("Trading Automatique global activé avec succès sur flux FIX NY4 !");
+      } else {
+        toast.warning("Trading Automatique global suspendu de sécurité.");
+      }
+    } else if (confirmModal.type === "bot_toggle" && confirmModal.targetBot) {
+      onToggleBotPause(confirmModal.targetBot.id);
+    } else if (confirmModal.type === "profile_preset" && confirmModal.presetType) {
+      applyPresetProfile(confirmModal.presetType);
+    }
+    setConfirmModal(null);
   };
 
   // Test trade simulateur
@@ -1327,155 +1616,131 @@ function EngineTab({
   });
 
   return (
-    <div className="space-y-5">
-      {/* ── 1. BARRE DE COMMANDE PRINCIPALE (MODERNE, ÉPURÉE, ULTRA-FLUIDE) ── */}
-      <section className="rounded-2xl border border-white/[0.08] bg-[#10141b]/95 p-4 sm:p-5 shadow-xl backdrop-blur-md">
+    <div className="space-y-6">
+      {/* ── 1. BARRE DE COMMANDE PRINCIPALE (CHARTE PROFIL USER HARMONISÉE) ── */}
+      <section className="admin-card p-5 sm:p-6 shadow-xl space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Titre & Statut */}
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-xl border border-[#00D084]/40 bg-[#00D084]/15 text-[#00D084] shadow-[0_0_15px_rgba(0,208,132,0.2)]">
+          <div className="flex items-center gap-3.5">
+            <div className="grid size-11 place-items-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
               <Cpu className="size-5.5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                   Centre de Contrôle Moteurs IA
                 </h2>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 text-[10px] font-mono font-bold text-[#00D084]">
-                  <span className="size-1.5 rounded-full bg-[#00D084] animate-ping" />
-                  NY4 · 11ms
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-400">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  Flux FIX NY4 · 11ms
                 </span>
               </div>
-              <p className="text-xs text-gray-400">
-                Supervision algorithmique · MT5 FIX · {activeBots.length} Moteurs actifs
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Exécution algorithmique MT5 · Compte ECN Direct #802194
               </p>
             </div>
           </div>
 
-          {/* Mode Selector & Power & Actions */}
+          {/* Master Power & Test Signal */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* Mode Switcher Segmented */}
-            <div className="flex items-center rounded-xl border border-white/[0.08] bg-[#080b0f] p-1 text-xs">
-              {(["simulation", "demo", "live"] as const).map((m) => {
-                const isSelected = tradingMode === m;
-                return (
-                  <button
-                    key={m}
-                    onClick={() => {
-                      if (m === "live" && !confirm("Activer le mode LIVE avec capital réel ?")) return;
-                      setTradingMode(m);
-                      toast.info(`Mode : ${m.toUpperCase()}`);
-                    }}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold uppercase transition cursor-pointer ${
-                      isSelected
-                        ? m === "live"
-                          ? "bg-rose-500/25 text-rose-300 border border-rose-500/40 shadow-sm"
-                          : "bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/40 shadow-sm"
-                        : "text-gray-400 hover:text-white"
-                    }`}
-                  >
-                    <span>{m === "simulation" ? "🧪" : m === "demo" ? "🎮" : "⚡"}</span>
-                    <span>{m}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Master Power Toggle Button */}
+            {/* Master Engine Power Toggle Button */}
             <button
-              onClick={toggleEnginePower}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-md ${
+              onClick={requestToggleEnginePower}
+              className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-md ${
                 isEngineRunning
-                  ? "border border-[#00D084]/60 bg-[#00D084]/20 text-[#00D084] hover:bg-[#00D084]/30 shadow-[0_0_20px_rgba(0,208,132,0.25)]"
-                  : "border border-white/[0.1] bg-[#141a23] text-gray-400 hover:text-white"
+                  ? "border border-emerald-500/60 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.25)]"
+                  : "border border-rose-500/60 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 shadow-[0_0_20px_rgba(244,63,94,0.25)]"
               }`}
+              title="Interrupteur général : active ou suspend instantanément l'envoi d'ordres automatiques"
             >
               <Power className="size-4" />
-              <span>{isEngineRunning ? "Moteur Actif" : "En Pause"}</span>
+              <span>Trading Auto : {isEngineRunning ? "ACTIF" : "EN PAUSE"}</span>
             </button>
 
             {/* Quick Test Trade Button */}
             <button
               onClick={handleTestTrade}
-              disabled={forcingTrade}
-              className="flex items-center gap-1.5 rounded-xl border border-white/[0.1] bg-[#141a23] hover:bg-[#1a2330] px-3.5 py-2 text-xs font-bold text-white transition cursor-pointer shadow-sm"
+              disabled={forcingTrade || !isEngineRunning}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 disabled:opacity-50 px-3.5 py-2.5 text-xs font-bold text-white transition cursor-pointer shadow-sm"
+              title="Simule la détection d'un setup L2 et valide le flux FIX"
             >
-              <Activity className="size-3.5 text-sky-400" />
-              <span>{forcingTrade ? "Exécution..." : "Trade Test"}</span>
+              <Activity className="size-3.5 text-indigo-400" />
+              <span>{forcingTrade ? "Exécution..." : "Signal Test L2"}</span>
             </button>
           </div>
         </div>
       </section>
 
-      {/* ── 2. CARTES BOTS ACTIFS + INTERRUPTEURS ON/OFF ── */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_260px]">
-        {/* 2.1 CARTE BOT 1 (GOLD) */}
+      {/* ── 2. CARTES BOTS ACTIFS (COULEURS HARMONISÉES USER PROFILE) ── */}
+      {/* ── 2. CARTES BOTS ACTIFS (3 MOTEURS IA + ALLOCATION PAR MARCHÉ) ── */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 2.1 CARTE BOT 1 (GOLD - AMBER / GOLD) */}
         {activeBots[0] && (() => {
           const bot = activeBots[0];
           const isSelected = bot.id === selectedBotId;
           return (
             <article
               onClick={() => setSelectedBotId(bot.id)}
-              className={`group relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-all duration-300 flex flex-col justify-between bg-[#0b0e14] bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(245,158,11,0.15),rgba(11,14,20,0.98))] ${
+              className={`admin-card-amber p-4 sm:p-5 flex flex-col justify-between transition-all duration-300 cursor-pointer relative overflow-hidden ${
                 isSelected
-                  ? "border-amber-400/80 shadow-[0_0_20px_rgba(245,158,11,0.18)] ring-1 ring-amber-400/60"
-                  : "border-amber-500/25 hover:border-amber-500/40"
+                  ? "border-amber-400/90 shadow-[0_0_25px_rgba(245,158,11,0.22)] ring-1 ring-amber-400/80"
+                  : "hover:border-amber-500/50"
               }`}
             >
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="inline-flex items-center rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-amber-300">
+                    <span className="inline-flex items-center rounded border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase text-amber-300">
                       {bot.primarySymbol}
                     </span>
-                    <h3 className="text-base font-black text-white mt-1">{bot.name}</h3>
+                    <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 tracking-tight">{bot.name}</h3>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-[#00D084]">
-                    <span className="size-1.5 rounded-full bg-[#00D084] animate-ping" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
                     ACTIF
                   </span>
                 </div>
 
-                <div className="mt-3 flex items-end justify-between border-y border-white/[0.06] py-2 font-mono">
+                <div className="mt-3.5 flex items-end justify-between border-y border-amber-500/20 py-2.5 font-mono">
                   <div>
-                    <span className="text-[10px] text-gray-400 font-sans uppercase font-bold">P&amp;L JOUR</span>
-                    <p className={`text-lg font-black mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
+                    <span className="text-[10px] text-slate-300 font-sans uppercase font-bold">P&amp;L JOUR</span>
+                    <p className={`text-lg sm:text-xl font-bold mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                       {bot.pnlToday}
                     </p>
                   </div>
                   <div className="text-right">
                     <div className="text-xs">
-                      <span className="text-gray-400 text-[10px] uppercase font-sans mr-1">Score</span>
-                      <strong className="text-white">{bot.lastScore}</strong>
+                      <span className="text-slate-300 text-[10px] uppercase font-sans mr-1">Score</span>
+                      <strong className="text-amber-300">{bot.lastScore}</strong>
                     </div>
-                    <div className="mt-1 h-1 w-16 rounded-full bg-white/[0.08] overflow-hidden ml-auto">
+                    <div className="mt-1.5 h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden ml-auto">
                       <div className="h-full rounded-full bg-amber-400" style={{ width: `${bot.lastScoreNum}%` }} />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="mt-4 flex items-center justify-between gap-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedBotId(bot.id);
                   }}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
                     isSelected
-                      ? "neon-btn text-black shadow-[0_0_12px_rgba(0,208,132,0.25)]"
-                      : "border border-white/[0.1] bg-[#141a23] hover:bg-[#1a2330] text-gray-200"
+                      ? "admin-btn-primary shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+                      : "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
                   }`}
                 >
-                  {isSelected ? "● Affiché sur le graphique" : "Sélectionner →"}
+                  {isSelected ? "● Actif" : "Choisir"}
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpenBotDetail(bot);
                   }}
-                  className="rounded-lg border border-white/[0.08] bg-black/40 hover:bg-black/60 px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition cursor-pointer"
+                  className="rounded-xl border border-slate-700/60 bg-[#0b1220] hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
                 >
                   Détails
                 </button>
@@ -1484,73 +1749,73 @@ function EngineTab({
           );
         })()}
 
-        {/* 2.2 CARTE BOT 2 (FOREX) */}
+        {/* 2.2 CARTE BOT 2 (FOREX - CYAN) */}
         {activeBots[1] && (() => {
           const bot = activeBots[1];
           const isSelected = bot.id === selectedBotId;
           return (
             <article
               onClick={() => setSelectedBotId(bot.id)}
-              className={`group relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-all duration-300 flex flex-col justify-between bg-[#0b0e14] bg-[radial-gradient(ellipse_120%_80%_at_0%_0%,rgba(56,189,248,0.15),rgba(11,14,20,0.98))] ${
+              className={`admin-card-cyan p-4 sm:p-5 flex flex-col justify-between transition-all duration-300 cursor-pointer relative overflow-hidden ${
                 isSelected
-                  ? "border-sky-400/80 shadow-[0_0_20px_rgba(56,189,248,0.18)] ring-1 ring-sky-400/60"
-                  : "border-sky-500/25 hover:border-sky-500/40"
+                  ? "border-cyan-400/90 shadow-[0_0_25px_rgba(6,182,212,0.22)] ring-1 ring-cyan-400/80"
+                  : "hover:border-cyan-500/50"
               }`}
             >
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="inline-flex items-center rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase text-sky-300">
+                    <span className="inline-flex items-center rounded border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase text-cyan-300">
                       {bot.primarySymbol}
                     </span>
-                    <h3 className="text-base font-black text-white mt-1">{bot.name}</h3>
+                    <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 tracking-tight">{bot.name}</h3>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 font-mono text-[10px] font-bold text-[#00D084]">
-                    <span className="size-1.5 rounded-full bg-[#00D084] animate-ping" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
                     ACTIF
                   </span>
                 </div>
 
-                <div className="mt-3 flex items-end justify-between border-y border-white/[0.06] py-2 font-mono">
+                <div className="mt-3.5 flex items-end justify-between border-y border-cyan-500/20 py-2.5 font-mono">
                   <div>
-                    <span className="text-[10px] text-gray-400 font-sans uppercase font-bold">P&amp;L JOUR</span>
-                    <p className={`text-lg font-black mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
+                    <span className="text-[10px] text-slate-300 font-sans uppercase font-bold">P&amp;L JOUR</span>
+                    <p className={`text-lg sm:text-xl font-bold mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                       {bot.pnlToday}
                     </p>
                   </div>
                   <div className="text-right">
                     <div className="text-xs">
-                      <span className="text-gray-400 text-[10px] uppercase font-sans mr-1">Score</span>
-                      <strong className="text-white">{bot.lastScore}</strong>
+                      <span className="text-slate-300 text-[10px] uppercase font-sans mr-1">Score</span>
+                      <strong className="text-cyan-300">{bot.lastScore}</strong>
                     </div>
-                    <div className="mt-1 h-1 w-16 rounded-full bg-white/[0.08] overflow-hidden ml-auto">
-                      <div className="h-full rounded-full bg-sky-400" style={{ width: `${bot.lastScoreNum}%` }} />
+                    <div className="mt-1.5 h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden ml-auto">
+                      <div className="h-full rounded-full bg-cyan-400" style={{ width: `${bot.lastScoreNum}%` }} />
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2">
+              <div className="mt-4 flex items-center justify-between gap-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedBotId(bot.id);
                   }}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
                     isSelected
-                      ? "neon-btn text-black shadow-[0_0_12px_rgba(0,208,132,0.25)]"
-                      : "border border-white/[0.1] bg-[#141a23] hover:bg-[#1a2330] text-gray-200"
+                      ? "admin-btn-primary shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+                      : "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
                   }`}
                 >
-                  {isSelected ? "● Affiché sur le graphique" : "Sélectionner →"}
+                  {isSelected ? "● Actif" : "Choisir"}
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpenBotDetail(bot);
                   }}
-                  className="rounded-lg border border-white/[0.08] bg-black/40 hover:bg-black/60 px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition cursor-pointer"
+                  className="rounded-xl border border-slate-700/60 bg-[#0b1220] hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
                 >
                   Détails
                 </button>
@@ -1559,15 +1824,94 @@ function EngineTab({
           );
         })()}
 
-        {/* 2.3 CARTE INTERRUPTEURS ON/OFF */}
-        <article className="rounded-2xl border border-[#00D084]/25 bg-[#0c0f15] p-4 shadow-md flex flex-col justify-between sm:col-span-2 lg:col-span-1">
+        {/* 2.3 CARTE BOT 3 (INDICES - PURPLE / INDIGO) */}
+        {activeBots[2] && (() => {
+          const bot = activeBots[2];
+          const isSelected = bot.id === selectedBotId;
+          return (
+            <article
+              onClick={() => setSelectedBotId(bot.id)}
+              className={`admin-card-purple p-4 sm:p-5 flex flex-col justify-between transition-all duration-300 cursor-pointer relative overflow-hidden ${
+                isSelected
+                  ? "border-purple-400/90 shadow-[0_0_25px_rgba(168,85,247,0.22)] ring-1 ring-purple-400/80"
+                  : "hover:border-purple-500/50"
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="inline-flex items-center rounded border border-purple-500/40 bg-purple-500/15 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase text-purple-300">
+                      {bot.primarySymbol}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 tracking-tight">{bot.name}</h3>
+                  </div>
+
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    ACTIF
+                  </span>
+                </div>
+
+                <div className="mt-3.5 flex items-end justify-between border-y border-purple-500/20 py-2.5 font-mono">
+                  <div>
+                    <span className="text-[10px] text-slate-300 font-sans uppercase font-bold">P&amp;L JOUR</span>
+                    <p className={`text-lg sm:text-xl font-bold mt-0.5 ${bot.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {bot.pnlToday}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs">
+                      <span className="text-slate-300 text-[10px] uppercase font-sans mr-1">Score</span>
+                      <strong className="text-purple-300">{bot.lastScore}</strong>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-16 rounded-full bg-slate-800 overflow-hidden ml-auto">
+                      <div className="h-full rounded-full bg-purple-400" style={{ width: `${bot.lastScoreNum}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBotId(bot.id);
+                  }}
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                    isSelected
+                      ? "admin-btn-primary shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+                      : "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
+                  }`}
+                >
+                  {isSelected ? "● Actif" : "Choisir"}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenBotDetail(bot);
+                  }}
+                  className="rounded-xl border border-slate-700/60 bg-[#0b1220] hover:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  Détails
+                </button>
+              </div>
+            </article>
+          );
+        })()}
+
+        {/* 2.4 CARTE INTERRUPTEURS ON/OFF (EMERALD PALETTE) */}
+        <article className="admin-card-emerald p-4 sm:p-5 flex flex-col justify-between shadow-md">
           <div>
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-300">
-                INTERRUPTEURS ALGOS
+            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-300 font-mono">
+                ALLOCATION PAR ACTIF
               </span>
-              <span className="size-2 rounded-full bg-[#00D084] animate-pulse" />
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
             </div>
+
+            <p className="mt-1 text-[10px] text-slate-400">
+              Activez ou suspendez les signaux MT5 par marché :
+            </p>
 
             <div className="mt-2.5 space-y-2">
               {bots.map((b) => {
@@ -1575,22 +1919,23 @@ function EngineTab({
                 return (
                   <div
                     key={b.id}
-                    className="flex items-center justify-between rounded-xl border border-white/[0.04] bg-[#121620]/80 px-2.5 py-1.5"
+                    className="flex items-center justify-between admin-subcard px-2.5 py-1.5"
                   >
-                    <div className="truncate max-w-[120px]">
+                    <div className="truncate max-w-[100px]">
                       <p className="font-bold text-xs text-white truncate">{b.name}</p>
-                      <p className="text-[10px] text-gray-400 font-mono">{b.primarySymbol}</p>
+                      <p className="text-[9px] text-slate-400 font-mono">{b.primarySymbol}</p>
                     </div>
 
                     <button
-                      onClick={() => onToggleBotPause(b.id)}
-                      className={`relative inline-flex h-4.5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
-                        isBotActive ? "bg-[#00D084]" : "bg-gray-700"
+                      onClick={() => requestToggleBotPause(b)}
+                      className={`relative inline-flex h-4.5 w-8.5 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                        isBotActive ? "bg-emerald-500" : "bg-slate-700"
                       }`}
+                      title={isBotActive ? `Désactiver ${b.name}` : `Activer ${b.name}`}
                     >
                       <span
-                        className={`pointer-events-none inline-block size-3.5 transform rounded-full bg-black shadow ring-0 transition duration-200 ${
-                          isBotActive ? "translate-x-4.5" : "translate-x-0"
+                        className={`pointer-events-none inline-block size-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                          isBotActive ? "translate-x-4" : "translate-x-0"
                         }`}
                       />
                     </button>
@@ -1600,14 +1945,469 @@ function EngineTab({
             </div>
           </div>
 
-          <div className="mt-2 pt-2 border-t border-white/[0.04] flex items-center justify-between text-[10px] font-mono text-gray-400">
-            <span>État</span>
-            <span className="text-[#00D084] font-bold">2/3 Actifs</span>
+          <div className="mt-2.5 pt-2 border-t border-emerald-500/20 flex items-center justify-between text-[10px] font-mono text-slate-300">
+            <span>Algos actifs</span>
+            <span className="text-emerald-400 font-bold">3/3 Connectés</span>
           </div>
         </article>
       </section>
 
-      {/* ── 3. WORKSPACE TRADINGVIEW EN DIRECT (PIXEL PAR PIXEL) ── */}
+      {/* ── 3. PANNEAU DE CONFIGURATION DES MISES, STOP LOSS & EXÉCUTION MT5 ── */}
+      <section className="admin-card p-5 sm:p-7 shadow-xl space-y-6">
+        {/* Header with Title & Quick Presets */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-700/50 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+              <SlidersHorizontal className="size-5.5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                  Ajustement des Mises, Stop Loss &amp; Paramètres MT5
+                </h3>
+                <span className="rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-0.5 text-xs font-mono font-bold text-indigo-300">
+                  {selectedBot.name}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Dimensionnez vos positions, vos niveaux de Stop Loss / Take Profit et sécurisez votre capital en temps réel.
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Presets & Collapse Toggle */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-400 mr-1 hidden sm:inline">Profils :</span>
+            <button
+              type="button"
+              onClick={() => requestApplyPresetProfile("conservative")}
+              className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 text-xs font-bold text-emerald-300 transition cursor-pointer flex items-center gap-1.5"
+              title="0.10 lot · SL 15 pips · R:R 1:2.0"
+            >
+              <span>🛡️</span>
+              <span>Conservateur</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => requestApplyPresetProfile("balanced")}
+              className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1.5 text-xs font-bold text-cyan-300 transition cursor-pointer flex items-center gap-1.5"
+              title="0.25 lot · SL 25 pips · R:R 1:2.5"
+            >
+              <span>⚡</span>
+              <span>Équilibré</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => requestApplyPresetProfile("aggressive")}
+              className="rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 text-xs font-bold text-amber-300 transition cursor-pointer flex items-center gap-1.5"
+              title="0.50 lot · SL 35 pips · R:R 1:3.0"
+            >
+              <span>🚀</span>
+              <span>Dynamique</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen((prev) => !prev)}
+              className="p-1.5 rounded-lg border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-300 transition cursor-pointer ml-1"
+              title={isSettingsOpen ? "Réduire" : "Développer"}
+            >
+              <ChevronDown className={`size-4 transition-transform duration-200 ${isSettingsOpen ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+        </div>
+
+        {isSettingsOpen && (
+          <form onSubmit={handleSaveExecutionSettings} className="space-y-6 animate-in fade-in duration-200">
+            {/* 3 Config Cards Grid */}
+            <div className="grid gap-5 md:grid-cols-3">
+              {/* 1. SIZING & LOTS (EMERALD THEME) */}
+              <article className="admin-card-emerald p-5 space-y-4 shadow-lg flex flex-col justify-between">
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2.5">
+                    <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Calculator className="size-3.5 text-emerald-400" />
+                      1. Dimensionnement de la Mise
+                    </span>
+                    <span className="text-[11px] font-mono text-slate-400">Capital: $24 860</span>
+                  </div>
+
+                  {/* Sizing Mode Tabs */}
+                  <div className="grid grid-cols-3 gap-1 rounded-xl bg-[#0b1220] p-1 border border-emerald-500/20 text-xs">
+                    {[
+                      { id: "fixed_lot" as const, label: "Lot Fixe" },
+                      { id: "risk_percent" as const, label: "% Capital" },
+                      { id: "fixed_usd" as const, label: "$ Fixe" },
+                    ].map((mode) => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setSizingMode(mode.id)}
+                        className={`py-1 rounded-lg font-bold transition text-center text-xs ${
+                          sizingMode === mode.id
+                            ? "bg-emerald-500 text-black shadow-sm font-bold"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Mode Specific Inputs */}
+                  {sizingMode === "fixed_lot" && (
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-300 font-medium flex justify-between">
+                        <span>Volume par Ordre (Lots MT5)</span>
+                        <span className="font-mono text-emerald-400 font-bold">{lotSize.toFixed(2)} lot(s)</span>
+                      </label>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setLotSize((v) => Math.max(0.01, Number((v - 0.05).toFixed(2))))}
+                          className="size-9 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-white font-bold text-base grid place-items-center transition cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          max="10.00"
+                          value={lotSize}
+                          onChange={(e) => setLotSize(Math.max(0.01, parseFloat(e.target.value) || 0.01))}
+                          className="flex-1 rounded-xl border border-emerald-500/30 bg-[#0b1220] px-3 py-2 text-center text-base font-mono font-bold text-white outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setLotSize((v) => Number((v + 0.05).toFixed(2)))}
+                          className="size-9 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-white font-bold text-base grid place-items-center transition cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Quick lot preset buttons */}
+                      <div className="flex items-center gap-1.5 pt-1">
+                        {[0.05, 0.10, 0.20, 0.50, 1.00].map((quickLot) => (
+                          <button
+                            key={quickLot}
+                            type="button"
+                            onClick={() => setLotSize(quickLot)}
+                            className={`flex-1 rounded-lg py-1 text-[11px] font-mono font-bold transition border ${
+                              lotSize === quickLot
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                                : "bg-[#121a2d] text-slate-400 hover:text-white border-slate-700/50"
+                            }`}
+                          >
+                            {quickLot.toFixed(2)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {sizingMode === "risk_percent" && (
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-300 font-medium flex justify-between">
+                        <span>% du Solde Engagé</span>
+                        <span className="font-mono text-emerald-400 font-bold">{riskPercentPerTrade.toFixed(2)} %</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="3.0"
+                        step="0.05"
+                        value={riskPercentPerTrade}
+                        onChange={(e) => setRiskPercentPerTrade(parseFloat(e.target.value))}
+                        className="w-full accent-emerald-500 cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[11px] font-mono text-slate-400">
+                        <span>0.10% (Ultra sûr)</span>
+                        <span>1.00% (Standard)</span>
+                        <span>3.00% (Max)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {sizingMode === "fixed_usd" && (
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-300 font-medium flex justify-between">
+                        <span>Montant Fixe Risqué ($ USD)</span>
+                        <span className="font-mono text-emerald-400 font-bold">${fixedUsdPerTrade} USD</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="10"
+                          min="10"
+                          max="2000"
+                          value={fixedUsdPerTrade}
+                          onChange={(e) => setFixedUsdPerTrade(Math.max(10, parseInt(e.target.value) || 10))}
+                          className="w-full rounded-xl border border-emerald-500/30 bg-[#0b1220] px-3 py-2 text-center text-base font-mono font-bold text-white outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Levier */}
+                  <div className="pt-2 border-t border-emerald-500/20 flex items-center justify-between text-xs">
+                    <span className="text-slate-400">Levier ECN :</span>
+                    <select
+                      value={leverage}
+                      onChange={(e) => setLeverage(e.target.value)}
+                      className="rounded-lg border border-slate-700/60 bg-[#0b1220] px-2.5 py-1 text-xs font-mono font-bold text-white outline-none focus:border-emerald-500 cursor-pointer"
+                    >
+                      <option value="1:30">1:30 (Régulé)</option>
+                      <option value="1:100">1:100 (Standard Pro)</option>
+                      <option value="1:200">1:200 (Institutionnel)</option>
+                      <option value="1:500">1:500 (Flux Élevé)</option>
+                    </select>
+                  </div>
+                </div>
+              </article>
+
+              {/* 2. STOP LOSS & TRAILING (AMBER THEME) */}
+              <article className="admin-card-amber p-5 space-y-4 shadow-lg flex flex-col justify-between">
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-amber-500/20 pb-2.5">
+                    <span className="text-xs font-bold text-amber-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Shield className="size-3.5 text-amber-400" />
+                      2. Protection &amp; Stop Loss
+                    </span>
+                    <span className="text-[11px] font-mono text-amber-400 font-bold">Coupe-Circuit Actif</span>
+                  </div>
+
+                  {/* Stop Loss Slider & Pip Input */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-slate-300 font-medium">
+                      <span>Stop Loss Strict</span>
+                      <span className="font-mono text-amber-300 font-bold">{stopLossPips} pips ({stopLossPips * 10} pts)</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="100"
+                      step="1"
+                      value={stopLossPips}
+                      onChange={(e) => setStopLossPips(parseInt(e.target.value) || 5)}
+                      className="w-full accent-amber-500 cursor-pointer"
+                    />
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                      <span>Scalp (5-15p)</span>
+                      <span>Intraday (25-40p)</span>
+                      <span>Swing (60p+)</span>
+                    </div>
+                  </div>
+
+                  {/* Trailing Stop Loss Switch */}
+                  <div className="admin-subcard p-3 space-y-2 border-amber-500/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-white">Trailing Stop Dynamique</p>
+                        <p className="text-[10px] text-slate-400">Verrouille les gains au fil du cours</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTrailingStopEnabled((prev) => !prev)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                          trailingStopEnabled ? "bg-amber-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block size-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                            trailingStopEnabled ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {trailingStopEnabled && (
+                      <div className="pt-2 border-t border-slate-700/50 flex items-center justify-between text-xs animate-in fade-in">
+                        <span className="text-slate-300">Distance Trailing :</span>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min="5"
+                            max="50"
+                            value={trailingStopDistance}
+                            onChange={(e) => setTrailingStopDistance(parseInt(e.target.value) || 5)}
+                            className="w-14 rounded-lg border border-amber-500/30 bg-[#0b1220] px-2 py-0.5 text-center font-mono font-bold text-amber-300 text-xs outline-none"
+                          />
+                          <span className="font-mono text-slate-400">pips</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Auto Break-Even */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <p className="text-xs font-bold text-slate-200">Break-Even Automatique</p>
+                      <p className="text-[10px] text-slate-400">SL ramené à l'entrée à +1.5R</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBreakEvenEnabled((prev) => !prev)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                        breakEvenEnabled ? "bg-amber-500" : "bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block size-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                          breakEvenEnabled ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </article>
+
+              {/* 3. TAKE PROFIT & EXECUTION (CYAN THEME) */}
+              <article className="admin-card-cyan p-5 space-y-4 shadow-lg flex flex-col justify-between">
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-cyan-500/20 pb-2.5">
+                    <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <TrendingUp className="size-3.5 text-cyan-400" />
+                      3. Prise de Profit &amp; FIX
+                    </span>
+                    <span className="text-[11px] font-mono text-cyan-400 font-bold">1:{takeProfitRatio.toFixed(1)} R:R</span>
+                  </div>
+
+                  {/* Take Profit Ratio R:R Slider */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-slate-300 font-medium">
+                      <span>Objectif Take Profit (R:R)</span>
+                      <span className="font-mono text-cyan-300 font-bold">
+                        1 : {takeProfitRatio.toFixed(1)} ({(stopLossPips * takeProfitRatio).toFixed(0)} pips)
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="5.0"
+                      step="0.1"
+                      value={takeProfitRatio}
+                      onChange={(e) => setTakeProfitRatio(parseFloat(e.target.value) || 1.0)}
+                      className="w-full accent-cyan-500 cursor-pointer"
+                    />
+                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                      <span>1:1.5 (Scalp)</span>
+                      <span>1:2.5 (Optimal)</span>
+                      <span>1:4.0+ (Trend)</span>
+                    </div>
+                  </div>
+
+                  {/* Partial Close 50% */}
+                  <div className="admin-subcard p-3 space-y-1.5 border-cyan-500/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-white">Prise Partielle TP1 (50%)</p>
+                        <p className="text-[10px] text-slate-400">Sécurise la moitié du trade à 1:1R</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPartialCloseEnabled((prev) => !prev)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                          partialCloseEnabled ? "bg-cyan-500" : "bg-slate-700"
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block size-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                            partialCloseEnabled ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Execution Mode & Slippage */}
+                  <div className="space-y-2 pt-1 border-t border-cyan-500/20">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300">Type d'Ordre :</span>
+                      <select
+                        value={executionType}
+                        onChange={(e) => setExecutionType(e.target.value as any)}
+                        className="rounded-lg border border-slate-700/60 bg-[#0b1220] px-2 py-0.5 text-xs font-mono font-bold text-white outline-none focus:border-cyan-500 cursor-pointer"
+                      >
+                        <option value="MARKET_FIX">Marché FIX ECN Direct</option>
+                        <option value="LIMIT_PULLBACK">Limite (Pullback L2)</option>
+                        <option value="STOP_BREAKOUT">Stop (Breakout M1)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Slippage max toléré :</span>
+                      <span className="font-mono text-cyan-300 font-bold">{maxSlippagePips} pips (FIX Equinix)</span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            {/* ── 4. SIMULATEUR TÉLÉMÉTRIQUE & IMPACT DU PROCHAIN ORDRE ── */}
+            <div className="admin-subcard p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono shadow-inner">
+              <div className="space-y-1">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider font-sans font-bold">
+                  Volume Effectif
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-white">
+                  {calculatedEffectiveLot.toFixed(2)} <span className="text-xs text-slate-400 font-normal">lot(s)</span>
+                </p>
+                <p className="text-[10px] text-slate-400 font-sans">Valeur pip: ${(calculatedEffectiveLot * 10).toFixed(2)}/p</p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] sm:text-xs text-rose-400 uppercase tracking-wider font-sans font-bold">
+                  Perte Max au Stop Loss
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-rose-400">
+                  -${calculatedRiskUsd.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-rose-300/80 font-sans">
+                  -{((calculatedRiskUsd / 24860.42) * 100).toFixed(2)}% du solde
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] sm:text-xs text-emerald-400 uppercase tracking-wider font-sans font-bold">
+                  Gain Prévu au Take Profit
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-emerald-400">
+                  +${calculatedRewardUsd.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-emerald-300/80 font-sans">
+                  +{((calculatedRewardUsd / 24860.42) * 100).toFixed(2)}% du solde
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[10px] sm:text-xs text-indigo-300 uppercase tracking-wider font-sans font-bold">
+                  Marge Requise (Levier {leverage})
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-indigo-300">
+                  ${requiredMargin.toFixed(2)}
+                </p>
+                <p className="text-[10px] text-slate-400 font-sans">Niveau marge &gt; 1200%</p>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <button
+                type="submit"
+                className="admin-btn-primary w-full py-4 text-xs sm:text-sm font-bold uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.005]"
+              >
+                <CheckCircle2 className="size-4.5" />
+                <span>Enregistrer &amp; Appliquer les Paramètres au Moteur {selectedBot.name}</span>
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+
+      {/* ── 4. WORKSPACE TRADINGVIEW EN DIRECT (PIXEL PAR PIXEL) ── */}
       <section className="space-y-2">
         <TradingViewEngineChart
           bot={selectedBot}
@@ -1616,11 +2416,11 @@ function EngineTab({
         />
       </section>
 
-      {/* ── 4. COCKPIT D'INTELLIGENCE INFÉRIEUR À ONGLETS (FLUIDE & SANS ENCOMBREMENT) ── */}
-      <section className="rounded-2xl border border-white/[0.08] bg-[#10141b] shadow-xl overflow-hidden">
+      {/* ── 4. COCKPIT D'INTELLIGENCE INFÉRIEUR À ONGLETS (HARMONISÉ) ── */}
+      <section className="admin-card overflow-hidden shadow-xl">
         {/* Navigation par Onglets */}
-        <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#0c1017] px-4 py-2">
-          <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center justify-between border-b border-slate-700/50 bg-[#0f172a]/95 px-4 py-2.5">
+          <div className="flex items-center gap-1.5 text-xs">
             {[
               { id: "decision" as const, label: "🧠 Analyse & Décision IA" },
               { id: "metrics" as const, label: "📊 Métriques & Équité" },
@@ -1631,8 +2431,8 @@ function EngineTab({
                 onClick={() => setActiveBottomTab(tab.id)}
                 className={`rounded-lg px-3.5 py-1.5 font-bold transition-all cursor-pointer ${
                   activeBottomTab === tab.id
-                    ? "bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/30 shadow-sm"
-                    : "text-gray-400 hover:text-white hover:bg-white/[0.03]"
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 shadow-sm"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800/50"
                 }`}
               >
                 {tab.label}
@@ -1640,13 +2440,13 @@ function EngineTab({
             ))}
           </div>
 
-          <span className="text-xs font-mono text-gray-400 hidden sm:inline">
+          <span className="text-xs font-mono text-slate-400 hidden sm:inline">
             Moteur : <strong className="text-white">{selectedBot.name}</strong>
           </span>
         </div>
 
         {/* CONTENU ONGLETS */}
-        <div className="p-4 sm:p-5">
+        <div className="p-5 sm:p-6">
           {/* TAB 1: ANALYSE & DÉCISION */}
           {activeBottomTab === "decision" && (
             <div className="space-y-4 animate-in fade-in duration-200">
@@ -1659,15 +2459,15 @@ function EngineTab({
                       key={idx}
                       className={`rounded-xl border p-3 flex flex-col justify-between gap-2 shadow-sm ${
                         p.ok
-                          ? "bg-[#00D084]/10 border-[#00D084]/30 text-[#00D084]"
-                          : "bg-white/[0.02] border-white/[0.06] text-gray-500 opacity-60"
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                          : "admin-subcard text-slate-500 opacity-60"
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-90">{p.label}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">{p.label}</span>
                         <Icon className="size-4" />
                       </div>
-                      <div className="text-xs font-black truncate font-mono">{p.status}</div>
+                      <div className="text-xs font-bold truncate font-mono">{p.status}</div>
                     </div>
                   );
                 })}
@@ -1675,22 +2475,22 @@ function EngineTab({
 
               {/* Dual Cards: Technique & Décision */}
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-4 space-y-3">
-                  <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                <div className="admin-card-amber p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
                     <span className="text-xs font-bold text-white">Sentiment &amp; Régime</span>
                     <span className="text-xs font-mono text-amber-300">{selectedBot.primarySymbol}</span>
                   </div>
                   <SentimentFearGreedBar trend="BULLISH" score={selectedBot.lastScoreNum} />
                 </div>
 
-                <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-4 flex items-center gap-4">
+                <div className="admin-card-emerald p-4 flex items-center gap-4">
                   <ConfidenceCircularGauge value={selectedBot.lastScoreNum} />
-                  <div className="flex-1 space-y-1.5 text-xs text-gray-300">
+                  <div className="flex-1 space-y-1.5 text-xs text-slate-300">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-white">Action : {selectedBot.lastDecision.action}</span>
-                      <span className="font-mono text-[#00D084] font-bold">Score {selectedBot.lastScore}</span>
+                      <span className="font-mono text-emerald-400 font-bold">Score {selectedBot.lastScore}</span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-gray-400">
+                    <p className="text-[11px] leading-relaxed text-slate-400">
                       {selectedBot.lastDecision.reason || "Signal validé par le multi-timeframe scanner et confirmation du carnet L2."}
                     </p>
                   </div>
@@ -1703,30 +2503,30 @@ function EngineTab({
           {activeBottomTab === "metrics" && (
             <div className="grid gap-4 lg:grid-cols-3 animate-in fade-in duration-200">
               {/* Sparkline Direct */}
-              <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-4 space-y-2">
+              <div className="admin-card-indigo p-4 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-gray-300">Prix Direct {selectedBot.primarySymbol}</span>
-                  <span className="font-mono font-black text-white">{selectedBot.id === "nexium-ai-gold" ? "2,388.90" : "1.08584"}</span>
+                  <span className="font-bold text-slate-300">Prix Direct {selectedBot.primarySymbol}</span>
+                  <span className="font-mono font-bold text-white">{selectedBot.id === "nexium-ai-gold" ? "2,388.90" : "1.08584"}</span>
                 </div>
                 <SparklinePrice price={2388} />
-                <span className="text-[10px] text-[#00D084] font-mono font-bold block text-right">+0.48% Momentum</span>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold block text-right">+0.48% Momentum</span>
               </div>
 
               {/* Courbe d'Équité */}
-              <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-4 space-y-2">
+              <div className="admin-card-emerald p-4 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-gray-300">Courbe d'Équité Session</span>
-                  <span className="font-mono font-black text-[#00D084]">+384.50 $</span>
+                  <span className="font-bold text-slate-300">Courbe d'Équité Session</span>
+                  <span className="font-mono font-bold text-emerald-400">+384.50 $</span>
                 </div>
                 <EquityCurveMini />
-                <span className="text-[10px] text-sky-400 font-mono font-bold block text-right">+3.8% Profit</span>
+                <span className="text-[10px] text-cyan-300 font-mono font-bold block text-right">+3.8% Profit</span>
               </div>
 
               {/* Compte à Rebours & Win Rate */}
-              <div className="rounded-xl border border-white/[0.06] bg-[#0c1017] p-4 flex flex-col justify-between">
-                <div className="flex items-center justify-between text-xs border-b border-white/[0.06] pb-2">
-                  <span className="font-bold text-gray-300">Prochain Tick M1</span>
-                  <span className="font-mono text-[#00D084] font-bold">Win Rate 70%</span>
+              <div className="admin-card-cyan p-4 flex flex-col justify-between">
+                <div className="flex items-center justify-between text-xs border-b border-cyan-500/20 pb-2">
+                  <span className="font-bold text-slate-300">Prochain Tick M1</span>
+                  <span className="font-mono text-cyan-300 font-bold">Win Rate 70%</span>
                 </div>
                 <CountdownTimerGauge isRunning={isEngineRunning} />
               </div>
@@ -1739,14 +2539,14 @@ function EngineTab({
               {/* Logs filtrables */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Journal d'Arbitrage</span>
-                  <div className="flex items-center rounded-lg border border-white/[0.06] bg-[#080b0f] p-0.5 text-[10px]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Journal d'Arbitrage</span>
+                  <div className="flex items-center rounded-lg border border-slate-700/60 bg-[#0b1220] p-0.5 text-[10px]">
                     {(["all", "won", "lost", "open"] as const).map((f) => (
                       <button
                         key={f}
                         onClick={() => setLogFilter(f)}
                         className={`rounded px-2 py-0.5 font-bold uppercase transition cursor-pointer ${
-                          logFilter === f ? "bg-[#00D084] text-black" : "text-gray-400 hover:text-white"
+                          logFilter === f ? "bg-emerald-500 text-black font-bold" : "text-slate-400 hover:text-white"
                         }`}
                       >
                         {f}
@@ -1757,20 +2557,20 @@ function EngineTab({
 
                 <div className="space-y-2 max-h-[190px] overflow-y-auto pr-1 text-xs font-mono">
                   {filteredLogs.map((l, i) => (
-                    <div key={i} className="flex items-start gap-2 rounded-lg border border-white/[0.04] bg-[#0c1017] p-2">
-                      <span className="text-[10px] text-gray-500 shrink-0">{l.time}</span>
+                    <div key={i} className="flex items-start gap-2 admin-subcard p-2">
+                      <span className="text-[10px] text-slate-400 shrink-0">{l.time}</span>
                       <span
-                        className={`rounded px-1 py-0.2 text-[9px] font-black uppercase shrink-0 ${
+                        className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase shrink-0 ${
                           l.level === "WON" || l.level === "SUCCESS"
-                            ? "bg-[#00D084]/20 text-[#00D084]"
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                             : l.level === "LOST"
-                            ? "bg-rose-500/20 text-rose-300"
-                            : "bg-sky-500/20 text-sky-300"
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                            : "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
                         }`}
                       >
                         {l.level}
                       </span>
-                      <span className="text-gray-300 leading-snug flex-1 truncate">{l.msg}</span>
+                      <span className="text-slate-300 leading-snug flex-1 truncate">{l.msg}</span>
                     </div>
                   ))}
                 </div>
@@ -1778,21 +2578,21 @@ function EngineTab({
 
               {/* Calendrier Économique */}
               <div className="space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Calendrier Économique HFT</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Calendrier Économique HFT</span>
                 <div className="space-y-2">
                   {[
                     { time: "14:30", title: "NFP - Non-Farm Payrolls", curr: "USD", impact: "high" },
                     { time: "16:00", title: "FOMC Rate Decision", curr: "USD", impact: "high" },
                     { time: "Demain 09:00", title: "ECB Press Conference", curr: "EUR", impact: "medium" },
                   ].map((ev, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0c1017] p-2.5 text-xs">
+                    <div key={i} className="flex items-center justify-between admin-subcard p-2.5 text-xs">
                       <div className="flex items-center gap-2.5">
-                        <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 font-mono">
+                        <span className="rounded bg-amber-400/20 border border-amber-400/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 font-mono">
                           {ev.time}
                         </span>
-                        <span className="font-bold text-white truncate">{ev.title}</span>
+                        <span className="font-semibold text-white truncate">{ev.title}</span>
                       </div>
-                      <span className="font-mono text-[10px] text-gray-400 font-bold">{ev.curr}</span>
+                      <span className="font-mono text-[10px] text-slate-400 font-bold">{ev.curr}</span>
                     </div>
                   ))}
                 </div>
@@ -1801,6 +2601,68 @@ function EngineTab({
           )}
         </div>
       </section>
+
+      {/* ── 5. MODALE DE CONFIRMATION DE SÉCURITÉ (SIMPLIFIÉE) ── */}
+      {confirmModal && confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className={`w-full max-w-sm admin-card p-5 sm:p-6 shadow-2xl space-y-4 border ${
+            confirmModal.isDangerous ? "border-rose-500/40" : "border-emerald-500/40"
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`grid size-9 place-items-center rounded-xl border font-mono ${
+                  confirmModal.isDangerous
+                    ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                    : "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                }`}>
+                  {confirmModal.isDangerous ? <AlertTriangle className="size-4.5" /> : <ShieldCheck className="size-4.5" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base text-white leading-tight">
+                    {confirmModal.title}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {confirmModal.targetBot ? `${confirmModal.targetBot.name} · ${confirmModal.targetBot.primarySymbol}` : "Trading FIX NY4"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              {confirmModal.description}
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="flex-1 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-2.5 text-xs font-bold text-slate-300 transition cursor-pointer"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmAction}
+                className={`flex-1 rounded-xl py-2.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
+                  confirmModal.isDangerous
+                    ? "bg-rose-600 hover:bg-rose-700 text-white"
+                    : "admin-btn-primary"
+                }`}
+              >
+                {confirmModal.actionButtonLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1900,30 +2762,30 @@ function OverviewTab({
 
   return (
     <div className="space-y-8">
-      {/* Hero Welcome */}
-      <section className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
-        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-[#00D084]/10 blur-3xl" />
+      {/* Hero Welcome (Harmonisé avec le Profil Client) */}
+      <section className="admin-card-emerald p-6 sm:p-8 relative overflow-hidden space-y-6 shadow-xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-emerald-500/10 blur-3xl" />
 
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black tracking-wider text-[#00D084] uppercase">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-emerald-400 uppercase font-mono">
               <Zap className="size-4" />
               TABLEAU DE BORD EXÉCUTIF MT5
             </div>
-            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-              Bonjour, <span className="text-[#00D084]">Ludovic</span>
+            <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
+              Bonjour, <span className="text-emerald-400">Ludovic</span>
             </h2>
-            <p className="max-w-xl text-sm sm:text-base text-gray-300 font-medium leading-relaxed">
-              Vos 3 moteurs institutionnels (AI Gold, FX Trend, Index Reversion) sont synchronisés avec le serveur <strong className="text-white">Equinix NY4</strong>.
+            <p className="max-w-xl text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
+              Vos 3 moteurs institutionnels (AI Gold, FX Trend, Index Reversion) sont synchronisés avec le serveur <strong className="text-white font-mono">Equinix NY4</strong>.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3.5">
             <button
               onClick={onToggleRunning}
-              className={`inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg ${
+              className={`inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer shadow-lg ${
                 running
-                  ? "neon-btn text-black shadow-[0_0_20px_rgba(0,208,132,0.3)] hover:scale-[1.02]"
+                  ? "admin-btn-primary shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02]"
                   : "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
               }`}
             >
@@ -1933,32 +2795,32 @@ function OverviewTab({
 
             <button
               onClick={onOpenDeposit}
-              className="inline-flex items-center gap-2.5 rounded-2xl border border-white/[0.12] bg-[#141a23] hover:bg-[#1a2330] px-5 py-3.5 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer"
+              className="inline-flex items-center gap-2.5 rounded-2xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-5 py-3.5 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm"
             >
-              <Plus className="size-4 text-[#00D084]" />
+              <Plus className="size-4 text-emerald-400" />
               DÉPÔT RAPIDE
             </button>
           </div>
         </div>
 
         {/* Live Market Tickers Ribbon */}
-        <div className="mt-8 border-t border-white/[0.06] pt-5">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400 mb-3">
-            <Activity className="size-3.5 text-[#00D084]" /> COTATIONS DIRECTES · SPREAD FIX ULTRA-FAIBLE
+        <div className="border-t border-emerald-500/20 pt-5">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 font-mono">
+            <Activity className="size-3.5 text-emerald-400" /> COTATIONS DIRECTES · SPREAD FIX ULTRA-FAIBLE
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
             {marketTickers.map((tick) => (
               <div
                 key={tick.pair}
-                className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#0c1017] px-4 py-3 transition-colors hover:border-[#00D084]/40"
+                className="admin-subcard px-4 py-3 flex items-center justify-between transition-colors hover:border-emerald-500/40"
               >
                 <div>
-                  <span className="font-mono text-xs text-gray-400 font-bold">{tick.pair}</span>
-                  <p className="font-mono text-sm sm:text-base font-black text-white">{tick.price}</p>
+                  <span className="font-mono text-xs text-slate-400 font-bold">{tick.pair}</span>
+                  <p className="font-mono text-sm sm:text-base font-bold text-white mt-0.5">{tick.price}</p>
                 </div>
                 <span
-                  className={`text-xs font-mono font-black ${
-                    tick.up ? "text-[#00D084]" : "text-rose-400"
+                  className={`text-xs font-mono font-bold ${
+                    tick.up ? "text-emerald-400" : "text-rose-400"
                   }`}
                 >
                   {tick.change}
@@ -1969,82 +2831,90 @@ function OverviewTab({
         </div>
       </section>
 
-      {/* KPI Cards */}
-      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-2xl sm:rounded-3xl border border-[#00D084]/30 bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-[#00D084]/50">
+      {/* KPI Cards (Harmonisées avec les Cartes Analytiques de Gains et Pertes du Profil) */}
+      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 font-mono">
+        <article className="admin-card-emerald p-5 sm:p-6 space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">VALEUR DU COMPTE (EQUITY)</span>
-            <Wallet className="size-4 sm:size-5 text-[#00D084]" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">VALEUR DU COMPTE (EQUITY)</span>
+            <div className="grid size-9 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <Wallet className="size-4.5" />
+            </div>
           </div>
-          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-400">
             ${(balance + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
-            <span className="text-gray-400">Solde cash</span>
-            <span className="font-mono font-bold text-gray-200">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-emerald-500/20 font-sans">
+            <span className="text-slate-400">Solde cash</span>
+            <span className="font-mono font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
           </div>
         </article>
 
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-white/[0.15]">
+        <article className={`p-5 sm:p-6 space-y-2.5 ${totalOpenPnl >= 0 ? "admin-card-indigo" : "admin-card border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98"}`}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">P&amp;L LATENT (EN COURS)</span>
-            <TrendingUp className="size-4 sm:size-5 text-[#00D084]" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">P&amp;L LATENT (EN COURS)</span>
+            <div className={`grid size-9 place-items-center rounded-xl ${totalOpenPnl >= 0 ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>
+              <TrendingUp className="size-4.5" />
+            </div>
           </div>
           <p
-            className={`mt-3 font-mono text-2xl sm:text-3xl font-black ${
-              totalOpenPnl >= 0 ? "text-[#00D084]" : "text-rose-400"
+            className={`mt-2 text-2xl sm:text-3xl font-bold ${
+              totalOpenPnl >= 0 ? "text-emerald-400" : "text-rose-400"
             }`}
           >
             {totalOpenPnl >= 0 ? `+$${totalOpenPnl.toFixed(2)}` : `-$${Math.abs(totalOpenPnl).toFixed(2)}`}
           </p>
-          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
-            <span className="text-gray-400">Positions actives</span>
-            <span className="font-mono font-bold text-[#00D084]">{positions.length} en direct</span>
+          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-700/50 font-sans">
+            <span className="text-slate-400">Positions actives</span>
+            <span className="font-mono font-bold text-emerald-400">{positions.length} en direct</span>
           </div>
         </article>
 
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-white/[0.15]">
+        <article className="admin-card-cyan p-5 sm:p-6 space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">AUTO-TRADERS EN LIGNE</span>
-            <Bot className="size-4 sm:size-5 text-sky-400" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">AUTO-TRADERS EN LIGNE</span>
+            <div className="grid size-9 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+              <Bot className="size-4.5" />
+            </div>
           </div>
-          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-sky-400">3 / 3</p>
-          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
-            <span className="text-gray-400">Equinix NY4</span>
-            <span className="font-mono font-bold text-[#00D084]">100% Opérationnel</span>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-cyan-300">3 / 3</p>
+          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-cyan-500/20 font-sans">
+            <span className="text-slate-400">Equinix NY4</span>
+            <span className="font-mono font-bold text-emerald-400">100% Opérationnel</span>
           </div>
         </article>
 
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md transition-all hover:border-white/[0.15]">
+        <article className="admin-card-amber p-5 sm:p-6 space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">RISQUE &amp; DRAWDOWN</span>
-            <ShieldCheck className="size-4 sm:size-5 text-[#00D084]" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">RISQUE &amp; DRAWDOWN</span>
+            <div className="grid size-9 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <ShieldCheck className="size-4.5" />
+            </div>
           </div>
-          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">0.34%</p>
-          <div className="mt-2.5 flex items-center justify-between text-xs sm:text-sm">
-            <span className="text-gray-400">Limite max autorisée</span>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-amber-300">0.34%</p>
+          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-amber-500/20 font-sans">
+            <span className="text-slate-400">Limite max autorisée</span>
             <span className="font-mono font-bold text-amber-400">2.00% / jour</span>
           </div>
         </article>
       </section>
 
-      {/* Interactive Equity Curve & Quick Bot Summary */}
+      {/* Interactive Equity Curve & Quick Bot Summary (Harmonisé) */}
       <section className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]">
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-md">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.06] pb-4">
+        <article className="admin-card-indigo p-6 sm:p-8 space-y-5 shadow-xl">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-indigo-500/20 pb-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-wider text-gray-400">ÉVOLUTION DE L'EQUITY</p>
-              <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Performance Cumulée des Auto-Traders</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-300 font-mono">ÉVOLUTION DE L'EQUITY</p>
+              <h3 className="mt-1 text-lg sm:text-xl font-bold text-white tracking-tight">Performance Cumulée des Auto-Traders</h3>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#0c1017] p-1">
+            <div className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-[#0b1220] p-1">
               {(["24H", "7J", "30J", "1A"] as const).map((tf) => (
                 <button
                   key={tf}
                   onClick={() => setChartTimeframe(tf)}
                   className={`rounded-lg px-3.5 py-1.5 text-xs sm:text-sm font-mono font-bold transition-all cursor-pointer ${
                     chartTimeframe === tf
-                      ? "bg-[#00D084] text-black font-black"
-                      : "text-gray-400 hover:text-white"
+                      ? "bg-emerald-500 text-black font-bold shadow"
+                      : "text-slate-400 hover:text-white"
                   }`}
                 >
                   {tf}
@@ -2058,15 +2928,15 @@ function OverviewTab({
               <svg viewBox="0 0 500 150" className="h-full w-full overflow-visible" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#00D084" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#00D084" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
                 <path d={`${svgPath} L 500,150 L 0,150 Z`} fill="url(#chartGrad)" />
-                <path d={svgPath} fill="none" stroke="#00D084" strokeWidth="3.5" strokeLinecap="round" className="drop-shadow-[0_0_10px_rgba(0,208,132,0.6)]" />
+                <path d={svgPath} fill="none" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" className="drop-shadow-[0_0_10px_rgba(16,185,129,0.6)]" />
               </svg>
             </div>
-            <div className="mt-5 flex justify-between border-t border-white/[0.06] pt-3 text-xs sm:text-sm font-mono text-gray-300">
+            <div className="mt-5 flex justify-between border-t border-indigo-500/20 pt-3 text-xs sm:text-sm font-mono text-slate-300">
               {chartPoints.map((pt) => (
                 <span key={pt.label}>
                   {pt.label} : <strong className="text-white">${pt.val.toLocaleString()}</strong>
@@ -2077,43 +2947,43 @@ function OverviewTab({
         </article>
 
         {/* 3 Bots Quick Snapshot */}
-        <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-md flex flex-col justify-between">
+        <article className="admin-card p-6 sm:p-8 shadow-xl flex flex-col justify-between space-y-5">
           <div>
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
+            <div className="flex items-center justify-between border-b border-slate-700/50 pb-4">
               <div>
-                <p className="text-xs font-black uppercase tracking-wider text-gray-400">AUTO-TRADERS OPÉRATIONNELS</p>
-                <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Supervision Rapide</h3>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">AUTO-TRADERS OPÉRATIONNELS</p>
+                <h3 className="mt-1 text-lg sm:text-xl font-bold text-white tracking-tight">Supervision Rapide</h3>
               </div>
               <button
                 onClick={onOpenEngine}
-                className="text-xs sm:text-sm font-bold text-[#00D084] hover:underline cursor-pointer flex items-center gap-1"
+                className="text-xs sm:text-sm font-bold text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
               >
                 Page Auto-Trader <ChevronRight className="size-4" />
               </button>
             </div>
 
-            <div className="mt-5 space-y-3.5">
+            <div className="mt-5 space-y-3">
               {bots.map((b) => (
                 <div
                   key={b.id}
-                  className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#0c1017] p-4 transition-colors hover:border-white/[0.12]"
+                  className="admin-subcard p-4 flex items-center justify-between transition-colors hover:border-slate-500/40"
                 >
                   <div className="flex items-center gap-3">
                     <span
                       className={`size-2.5 rounded-full ${
-                        b.statusBadge === "ACTIF" ? "bg-[#00D084] animate-pulse" : "bg-rose-500"
+                        b.statusBadge === "ACTIF" ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
                       }`}
                     />
                     <div>
                       <span className="font-bold text-sm sm:text-base text-white">{b.name}</span>
-                      <p className="text-xs text-gray-400 font-mono mt-0.5">{b.markets}</p>
+                      <p className="text-xs text-slate-400 font-mono mt-0.5">{b.markets}</p>
                     </div>
                   </div>
                   <div className="text-right font-mono">
-                    <span className={`text-sm sm:text-base font-black ${b.pnlTodayNum >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
+                    <span className={`text-sm sm:text-base font-bold ${b.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                       {b.pnlToday}
                     </span>
-                    <p className="text-xs text-gray-400">{b.openPositions} pos.</p>
+                    <p className="text-xs text-slate-400">{b.openPositions} pos.</p>
                   </div>
                 </div>
               ))}
@@ -2122,9 +2992,9 @@ function OverviewTab({
 
           <button
             onClick={onOpenEngine}
-            className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-white/[0.1] bg-[#141a23] py-3.5 text-xs sm:text-sm font-bold text-white hover:bg-[#1a2330] transition cursor-pointer"
+            className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-slate-700/60 bg-[#121a2d] py-3.5 text-xs sm:text-sm font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-sm"
           >
-            <Zap className="size-4 text-[#00D084]" />
+            <Zap className="size-4 text-emerald-400" />
             OUVRIR L'AUTO-TRADER &amp; LE SUPERCHART
           </button>
         </article>
@@ -2145,60 +3015,82 @@ function StrategiesTab({
 }) {
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <section className="admin-card-indigo p-6 sm:p-8 relative overflow-hidden space-y-4 shadow-xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-indigo-300 uppercase mb-2 font-mono">
               BIBLIOTHÈQUE STRATÉGIQUE MT5
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Auto-Traders &amp; Algorithmes Certifiés</h2>
-            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Auto-Traders &amp; Algorithmes Certifiés</h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
               Chaque algorithme Auto-Trader est optimisé pour une classe d'actifs dédiée et opère selon un cahier des charges quantitatif institutionnel.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-3">
-        {bots.map((b) => (
-          <article
-            key={b.id}
-            className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md flex flex-col justify-between transition-all hover:border-[#00D084]/40"
-          >
-            <div>
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg sm:text-xl font-black text-white">{b.name}</h3>
-                <StatusPill variant={b.statusBadge === "ACTIF" ? "emerald" : "rose"}>
-                  {b.statusBadge}
-                </StatusPill>
-              </div>
-              <p className="mt-1 font-mono text-xs sm:text-sm text-[#00D084] font-bold">{b.specialty}</p>
-              <p className="mt-3 text-xs sm:text-sm text-gray-300 leading-relaxed font-medium">{b.subtitle}</p>
+      <section className="grid gap-6 md:grid-cols-3">
+        {bots.map((b) => {
+          const cardVariant =
+            b.id === "nexium-ai-gold"
+              ? "admin-card-amber"
+              : b.id === "nexium-fx-trend"
+              ? "admin-card-cyan"
+              : "admin-card-purple";
+          const accentColor =
+            b.id === "nexium-ai-gold"
+              ? "text-amber-300"
+              : b.id === "nexium-fx-trend"
+              ? "text-cyan-300"
+              : "text-purple-300";
 
-              <div className="mt-5 space-y-2 text-xs sm:text-sm border-t border-white/[0.06] pt-3.5">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Marchés :</span>
-                  <span className="font-mono font-bold text-white">{b.markets}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Stratégie :</span>
-                  <span className="font-bold text-gray-200">{b.strategy}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Régime :</span>
-                  <span className="font-mono text-[#00D084] font-bold">{b.marketRegime}</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => onOpenBotDetail(b)}
-              className="mt-5 w-full rounded-xl sm:rounded-2xl border border-[#00D084]/40 bg-[#00D084]/10 py-3 text-xs sm:text-sm font-bold text-[#00D084] hover:bg-[#00D084]/20 transition cursor-pointer"
+          return (
+            <article
+              key={b.id}
+              className={`${cardVariant} p-6 shadow-xl flex flex-col justify-between transition-all hover:scale-[1.01]`}
             >
-              VOIR FICHE DÉTAILLÉE
-            </button>
-          </article>
-        ))}
+              <div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">{b.name}</h3>
+                  <StatusPill variant={b.statusBadge === "ACTIF" ? "emerald" : "rose"}>
+                    {b.statusBadge}
+                  </StatusPill>
+                </div>
+                <p className={`mt-1 font-mono text-xs sm:text-sm ${accentColor} font-bold`}>{b.specialty}</p>
+                <p className="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">{b.subtitle}</p>
+
+                <div className="mt-5 space-y-2 text-xs sm:text-sm admin-subcard p-3.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Marchés :</span>
+                    <span className="font-mono font-bold text-white">{b.markets}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Stratégie :</span>
+                    <span className="font-bold text-slate-200">{b.strategy}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Régime :</span>
+                    <span className={`font-mono ${accentColor} font-bold`}>{b.marketRegime}</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => onOpenBotDetail(b)}
+                className={`mt-5 w-full rounded-xl py-3 text-xs sm:text-sm font-bold transition cursor-pointer border ${
+                  b.id === "nexium-ai-gold"
+                    ? "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+                    : b.id === "nexium-fx-trend"
+                    ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25"
+                    : "border-purple-500/40 bg-purple-500/15 text-purple-300 hover:bg-purple-500/25"
+                }`}
+              >
+                VOIR FICHE DÉTAILLÉE
+              </button>
+            </article>
+          );
+        })}
       </section>
     </div>
   );
@@ -2234,14 +3126,15 @@ function RiskTab({
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-rose-500/30 bg-[#140c10] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <section className="admin-card p-6 sm:p-8 border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98 relative overflow-hidden space-y-4 shadow-xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-rose-500/10 blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-rose-400 uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-rose-400 uppercase mb-2 font-mono">
               RISK GOVERNOR &amp; SÉCURITÉ DU CAPITAL
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Protection Active du Capital</h2>
-            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Protection Active du Capital</h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
               Le moteur applique un coupe-circuit strict dès que les tolérances de drawdown ou d'exposition sont atteintes.
             </p>
           </div>
@@ -2250,84 +3143,86 @@ function RiskTab({
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-md space-y-5">
-          <div className="border-b border-white/[0.06] pb-3.5">
-            <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">RÉGLAGES EN DIRECT</p>
-            <h3 className="mt-1 text-base sm:text-lg lg:text-xl font-black text-white">Seuils de Tolérance Algorithmique</h3>
+        <article className="admin-card-emerald p-6 sm:p-8 shadow-xl space-y-6">
+          <div className="border-b border-emerald-500/20 pb-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-300 font-mono">RÉGLAGES EN DIRECT</p>
+            <h3 className="mt-1 text-lg sm:text-xl font-bold text-white tracking-tight">Seuils de Tolérance Algorithmique</h3>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs sm:text-sm font-bold text-gray-300">
-              <span>DRAWDOWN JOURNALIER MAXIMUM</span>
-              <span className="font-mono text-[#00D084] text-base">{maxDrawdownPercent.toFixed(1)}%</span>
+          <div className="space-y-4">
+            <div className="admin-subcard p-4 space-y-2">
+              <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-200">
+                <span>DRAWDOWN JOURNALIER MAXIMUM</span>
+                <span className="font-mono text-emerald-400 text-base">{maxDrawdownPercent.toFixed(1)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="5.0"
+                step="0.1"
+                value={maxDrawdownPercent}
+                onChange={(e) => setMaxDrawdownPercent(parseFloat(e.target.value))}
+                className="w-full accent-emerald-500 cursor-pointer"
+              />
             </div>
-            <input
-              type="range"
-              min="0.5"
-              max="5.0"
-              step="0.1"
-              value={maxDrawdownPercent}
-              onChange={(e) => setMaxDrawdownPercent(parseFloat(e.target.value))}
-              className="w-full accent-[#00D084] cursor-pointer"
-            />
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs sm:text-sm font-bold text-gray-300">
-              <span>EXPOSITION TOTALE MAXIMALE</span>
-              <span className="font-mono text-sky-400 text-base">{maxExposureLots.toFixed(1)} lots</span>
+            <div className="admin-subcard p-4 space-y-2">
+              <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-200">
+                <span>EXPOSITION TOTALE MAXIMALE</span>
+                <span className="font-mono text-cyan-300 text-base">{maxExposureLots.toFixed(1)} lots</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="10.0"
+                step="0.5"
+                value={maxExposureLots}
+                onChange={(e) => setMaxExposureLots(parseFloat(e.target.value))}
+                className="w-full accent-cyan-400 cursor-pointer"
+              />
             </div>
-            <input
-              type="range"
-              min="0.5"
-              max="10.0"
-              step="0.5"
-              value={maxExposureLots}
-              onChange={(e) => setMaxExposureLots(parseFloat(e.target.value))}
-              className="w-full accent-sky-400 cursor-pointer"
-            />
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs sm:text-sm font-bold text-gray-300">
-              <span>RISQUE ENGAGÉ PAR ORDRE</span>
-              <span className="font-mono text-purple-400 text-base">{riskPerTrade.toFixed(2)}%</span>
+            <div className="admin-subcard p-4 space-y-2">
+              <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-200">
+                <span>RISQUE ENGAGÉ PAR ORDRE</span>
+                <span className="font-mono text-purple-300 text-base">{riskPerTrade.toFixed(2)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="2.0"
+                step="0.05"
+                value={riskPerTrade}
+                onChange={(e) => setRiskPerTrade(parseFloat(e.target.value))}
+                className="w-full accent-purple-400 cursor-pointer"
+              />
             </div>
-            <input
-              type="range"
-              min="0.1"
-              max="2.0"
-              step="0.05"
-              value={riskPerTrade}
-              onChange={(e) => setRiskPerTrade(parseFloat(e.target.value))}
-              className="w-full accent-purple-400 cursor-pointer"
-            />
           </div>
 
           <button
             onClick={handleSaveRisk}
-            className="neon-btn w-full rounded-xl sm:rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer transition-all hover:scale-[1.01]"
+            className="admin-btn-primary w-full py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer transition-all shadow-lg"
           >
             ENREGISTRER LES LIMITES DE RISQUE
           </button>
         </article>
 
         {/* Emergency Kill Switch */}
-        <article className="rounded-2xl sm:rounded-3xl border border-rose-500/40 bg-rose-500/10 p-5 sm:p-7 shadow-md flex flex-col justify-between">
+        <article className="admin-card p-6 sm:p-8 border-rose-500/40 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98 shadow-xl flex flex-col justify-between space-y-6">
           <div>
             <div className="flex items-center gap-2 text-rose-400">
-              <ShieldAlert className="size-4 sm:size-5" />
-              <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider">INTERRUPTEUR D'URGENCE (KILL SWITCH)</p>
+              <ShieldAlert className="size-5" />
+              <p className="text-xs font-bold uppercase tracking-wider font-mono">INTERRUPTEUR D'URGENCE (KILL SWITCH)</p>
             </div>
-            <h3 className="mt-2 text-lg sm:text-xl font-black text-white">Arrêt d'Urgence Immédiat</h3>
-            <p className="mt-2.5 text-xs sm:text-sm leading-relaxed text-gray-300 font-medium">
+            <h3 className="mt-2.5 text-xl font-bold text-white tracking-tight">Arrêt d'Urgence Immédiat</h3>
+            <p className="mt-3 text-xs sm:text-sm leading-relaxed text-slate-300 font-medium">
               Coupe instantanément tous les signaux actifs, ferme l'intégralité des positions ouvertes sur MT5 et passe l'ensemble des Auto-Traders en mode sécurisé.
             </p>
           </div>
 
           <button
             onClick={onEmergencyHalt}
-            className="mt-6 w-full rounded-xl sm:rounded-2xl bg-rose-600 hover:bg-rose-700 py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-white shadow-lg transition-all cursor-pointer"
+            className="w-full rounded-2xl bg-rose-600 hover:bg-rose-700 py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all cursor-pointer"
           >
             🚨 DÉCLENCHER LE COUPE-CIRCUIT IMMÉDIAT
           </button>
@@ -2370,14 +3265,15 @@ function PortfolioTab({
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <section className="admin-card-emerald p-6 sm:p-8 relative overflow-hidden space-y-4 shadow-xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-emerald-400 uppercase mb-2 font-mono">
               GESTION FINANCIÈRE &amp; TRÉSORERIE
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Portefeuille &amp; Dépôts</h2>
-            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Portefeuille &amp; Dépôts</h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
               Consultez vos soldes en temps réel, créditez votre compte ou effectuez des retraits sécurisés.
             </p>
           </div>
@@ -2385,14 +3281,14 @@ function PortfolioTab({
           <div className="flex flex-wrap gap-3">
             <button
               onClick={onOpenDeposit}
-              className="neon-btn inline-flex items-center gap-2 rounded-xl sm:rounded-2xl px-5 py-3 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
+              className="admin-btn-primary inline-flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
             >
               <Plus className="size-4" />
               DÉPOSER DES FONDS
             </button>
             <button
               onClick={onOpenWithdraw}
-              className="inline-flex items-center gap-2 rounded-xl sm:rounded-2xl border border-white/[0.12] bg-[#141a23] hover:bg-[#1a2330] px-5 py-3 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-5 py-3 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm"
             >
               RETIRER DES FONDS
             </button>
@@ -2401,31 +3297,31 @@ function PortfolioTab({
       </section>
 
       {/* Balances */}
-      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-2xl sm:rounded-3xl border border-[#00D084]/30 bg-[#10141b] p-5 sm:p-6">
-          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-[#00D084]">SOLDE CASH DISPONIBLE</p>
-          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">
+      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 font-mono">
+        <article className="admin-card-emerald p-5 sm:p-6 space-y-2.5">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-300">SOLDE CASH DISPONIBLE</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-400">
             ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <p className="mt-2 text-xs sm:text-sm text-gray-400">Compte ECN Principal · USD</p>
+          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-emerald-500/20">Compte ECN Principal · USD</p>
         </article>
 
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6">
-          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">TOTAL GAINS GÉNERÉS</p>
-          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-[#00D084]">+$3 480.20</p>
-          <p className="mt-2 text-xs sm:text-sm text-gray-400">Gains algorithmiques nets</p>
+        <article className="admin-card-cyan p-5 sm:p-6 space-y-2.5">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-cyan-300">TOTAL GAINS GÉNERÉS</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-cyan-300">+$3 480.20</p>
+          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-cyan-500/20">Gains algorithmiques nets</p>
         </article>
 
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6">
-          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">RETRAITS EFFECTUÉS</p>
-          <p className="mt-3 font-mono text-2xl sm:text-3xl font-black text-white">$1 200.00</p>
-          <p className="mt-2 text-xs sm:text-sm text-gray-400">Virés sans frais</p>
+        <article className="admin-card-amber p-5 sm:p-6 space-y-2.5">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300">RETRAITS EFFECTUÉS</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-white">$1 200.00</p>
+          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-amber-500/20">Virés sans frais</p>
         </article>
 
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6">
-          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">STATUT CONFORMITÉ</p>
-          <p className="mt-3 font-mono text-xl sm:text-2xl font-black text-[#00D084]">KYC VALIDÉ</p>
-          <p className="mt-2 text-xs sm:text-sm text-gray-400">Niveau institutionnel illimité</p>
+        <article className="admin-card-indigo p-5 sm:p-6 space-y-2.5">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-300">STATUT CONFORMITÉ</p>
+          <p className="mt-2 text-xl sm:text-2xl font-bold text-emerald-400">KYC VALIDÉ</p>
+          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-indigo-500/20">Niveau institutionnel illimité</p>
         </article>
       </section>
 
@@ -3103,7 +3999,7 @@ function MessagingTab({
   // ---------------- EMAIL STATE ----------------
   const [emails, setEmails] = useState<EmailItem[]>(INITIAL_EMAILS);
   const [emailFolder, setEmailFolder] = useState<"inbox" | "sent" | "compose">("inbox");
-  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(INITIAL_EMAILS[0]);
+  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(INITIAL_EMAILS[0] ?? null);
   const [composeTo, setComposeTo] = useState("desk-quant@nexiummarkets.com");
   const [composeSubject, setComposeSubject] = useState("");
   const [composePriority, setComposePriority] = useState<"NORMAL" | "URGENT" | "CRITIQUE">("NORMAL");
@@ -3169,30 +4065,30 @@ function MessagingTab({
   return (
     <div className="space-y-3.5">
       {/* ── 1. EN-TÊTE ULTRA-MODERNE & SÉLECTEUR DE CANAUX ── */}
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-3">
+      <section className="admin-card p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shadow-xl">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Centre de Messagerie &amp; Support
             </h2>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 text-xs font-mono font-bold text-[#00D084]">
-              <span className="size-2 rounded-full bg-[#00D084] animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-xs font-mono font-bold text-emerald-400">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
               DESK LIVE 24/7
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5 font-mono">
             Messenger instantané, captures d'écran, notes vocales, boîte e-mail sécurisée et ligne chiffrée MT5.
           </p>
         </div>
 
         {/* Sélecteur de canal 3-en-1 avec badge non lu */}
-        <div className="flex items-center rounded-2xl border border-white/[0.08] bg-[#0c1017] p-1 shadow-lg shrink-0">
+        <div className="flex items-center rounded-2xl border border-slate-700/60 bg-[#0b1220] p-1 shadow-lg shrink-0">
           <button
             onClick={() => setActiveChannel("chat")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeChannel === "chat"
-                ? "bg-[#00D084] text-black font-black shadow-[0_0_15px_rgba(0,208,132,0.35)]"
-                : "text-gray-400 hover:text-white"
+                ? "bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             <MessageSquare className="size-4" />
@@ -3204,14 +4100,14 @@ function MessagingTab({
             onClick={() => setActiveChannel("email")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeChannel === "email"
-                ? "bg-[#00D084] text-black font-black shadow-[0_0_15px_rgba(0,208,132,0.35)]"
-                : "text-gray-400 hover:text-white"
+                ? "bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             <Mail className="size-4" />
             <span>E-mail</span>
             {emails.filter((e) => e.unread).length > 0 && (
-              <span className="rounded-full bg-amber-400 px-1.5 py-0.2 font-mono text-[10px] font-black text-black">
+              <span className="rounded-full bg-amber-400 px-1.5 py-0.2 font-mono text-[10px] font-bold text-black">
                 {emails.filter((e) => e.unread).length}
               </span>
             )}
@@ -3221,8 +4117,8 @@ function MessagingTab({
             onClick={() => setActiveChannel("call")}
             className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeChannel === "call"
-                ? "bg-[#00D084] text-black font-black shadow-[0_0_15px_rgba(0,208,132,0.35)]"
-                : "text-gray-400 hover:text-white"
+                ? "bg-emerald-500 text-black font-bold shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             <PhoneCall className="size-4" />
@@ -3240,17 +4136,17 @@ function MessagingTab({
       {activeChannel === "chat" && (
         <section className="grid gap-4 lg:grid-cols-[300px_1fr] h-[calc(100vh-235px)] min-h-[480px] max-h-[calc(100vh-235px)]">
           {/* 1.1 SIDEBAR DES CONTACTS ET CANAUX */}
-          <aside className="flex flex-col justify-between h-full rounded-3xl border border-white/[0.08] bg-[#10141b] p-3.5 shadow-xl space-y-3">
+          <aside className="flex flex-col justify-between h-full admin-card p-3.5 shadow-xl space-y-3">
             <div className="space-y-2.5 flex-1 flex flex-col min-h-0">
               {/* Search contacts */}
               <div className="relative shrink-0">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Rechercher..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
-                  className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] pl-9.5 pr-3 py-2.5 text-xs sm:text-sm text-white placeholder:text-gray-500 outline-none focus:border-[#00D084] transition"
+                  className="w-full rounded-xl border border-slate-700/60 bg-[#0b1220] pl-9.5 pr-3 py-2 text-xs sm:text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 transition"
                 />
               </div>
 
@@ -3265,10 +4161,10 @@ function MessagingTab({
                   <button
                     key={tab.id}
                     onClick={() => setFilterCategory(tab.id as any)}
-                    className={`py-1.5 rounded-lg transition cursor-pointer text-center truncate text-xs ${
+                    className={`py-1.5 rounded-lg transition cursor-pointer text-center truncate text-xs font-semibold ${
                       filterCategory === tab.id
-                        ? "bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/40 font-bold"
-                        : "bg-[#141a23] text-gray-400 hover:text-white border border-white/[0.04]"
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                        : "bg-[#121a2d] text-slate-400 hover:text-white border border-slate-700/50"
                     }`}
                   >
                     {tab.label}
@@ -3289,17 +4185,17 @@ function MessagingTab({
                         setSelectedContactId(contact.id);
                         setReplyingTo(null);
                       }}
-                      className={`cursor-pointer rounded-2xl border p-3 transition-all duration-200 ${
+                      className={`cursor-pointer rounded-2xl p-3 transition-all duration-200 border ${
                         isSelected
-                          ? "border-[#00D084] bg-[#00D084]/15 shadow-md ring-1 ring-[#00D084]/40"
-                          : "border-white/[0.06] bg-[#0c1017] hover:border-white/[0.15] hover:bg-[#141a23]/60"
+                          ? "admin-card-emerald border-emerald-400 text-white shadow-md ring-1 ring-emerald-400/60"
+                          : "admin-subcard hover:border-slate-500/50"
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`relative grid size-10 place-items-center rounded-xl border font-mono text-sm font-black shrink-0 ${contact.avatarBg}`}>
                           {contact.avatar}
                           {contact.isOnline && (
-                            <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-[#00D084] border-2 border-[#0c1017]" />
+                            <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 border-2 border-[#0c121e]" />
                           )}
                         </div>
 
@@ -3308,16 +4204,16 @@ function MessagingTab({
                             <h4 className="font-bold text-sm text-white truncate">
                               {contact.name}
                             </h4>
-                            <span className="text-xs font-mono text-gray-400">
+                            <span className="text-xs font-mono text-slate-400">
                               {lastMsg ? lastMsg.time : "Live"}
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between mt-0.5">
-                            <p className="text-xs text-gray-300 truncate max-w-[130px]">
+                            <p className="text-xs text-slate-300 truncate max-w-[130px]">
                               {contact.role}
                             </p>
-                            <span className="text-xs text-[#00D084] font-semibold font-mono">
+                            <span className="text-xs text-emerald-400 font-semibold font-mono">
                               {contact.sla}
                             </span>
                           </div>
@@ -3330,34 +4226,34 @@ function MessagingTab({
             </div>
 
             {/* Discreet Security Footer */}
-            <div className="shrink-0 flex items-center justify-between text-xs font-mono text-gray-400 px-1 pt-2 border-t border-white/[0.06]">
+            <div className="shrink-0 flex items-center justify-between text-xs font-mono text-slate-400 px-1 pt-2 border-t border-slate-700/50">
               <span>MT5 #802194</span>
-              <span className="text-[#00D084] font-medium flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-[#00D084] animate-pulse" />
+              <span className="text-emerald-400 font-medium flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
                 Chiffré AES-256
               </span>
             </div>
           </aside>
 
           {/* 1.2 MAIN CHAT CONVERSATION AREA */}
-          <main className="flex flex-col justify-between h-full rounded-3xl border border-white/[0.08] bg-[#10141b] shadow-2xl overflow-hidden">
+          <main className="flex flex-col justify-between h-full admin-card shadow-2xl overflow-hidden">
             {/* ── CHAT HEADER ── */}
-            <div className="shrink-0 flex items-center justify-between border-b border-white/[0.08] bg-[#0c1017] px-5 py-3.5">
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-700/50 bg-[#0f172a]/95 px-5 py-3.5">
               <div className="flex items-center gap-3">
                 <div className={`grid size-10 place-items-center rounded-xl border font-mono text-sm font-black ${activeContact.avatarBg}`}>
                   {activeContact.avatar}
                 </div>
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <h3 className="font-black text-white text-base sm:text-lg leading-tight">
+                    <h3 className="font-bold text-white text-base sm:text-lg leading-tight">
                       {activeContact.name}
                     </h3>
-                    <span className="rounded-full bg-[#00D084]/15 border border-[#00D084]/30 px-2.5 py-0.5 text-xs font-mono font-bold text-[#00D084]">
+                    <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-mono font-bold text-emerald-400">
                       {activeContact.sla}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-gray-300 mt-0.5 flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
+                  <p className="text-xs sm:text-sm text-slate-300 mt-0.5 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     {activeContact.role}
                   </p>
                 </div>
@@ -3370,7 +4266,7 @@ function MessagingTab({
                     setActiveChannel("call");
                     startAudioCall(callSelectedAgent);
                   }}
-                  className="flex items-center gap-2 rounded-xl border border-[#00D084]/30 bg-[#00D084]/10 hover:bg-[#00D084]/20 px-3.5 py-2 text-xs sm:text-sm font-bold text-[#00D084] transition cursor-pointer"
+                  className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-3.5 py-2 text-xs sm:text-sm font-bold text-emerald-400 transition cursor-pointer"
                   title="Appel chiffré"
                 >
                   <Phone className="size-4" />
@@ -3383,7 +4279,7 @@ function MessagingTab({
                     setComposeTo(activeContact.id === "expert-quant" ? "desk-quant@nexiummarkets.com" : "support-vip@nexiummarkets.com");
                     setEmailFolder("compose");
                   }}
-                  className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] hover:bg-[#1e2634] px-3.5 py-2 text-xs sm:text-sm font-bold text-gray-200 hover:text-white transition cursor-pointer"
+                  className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-200 hover:text-white transition cursor-pointer"
                   title="E-mail officiel"
                 >
                   <Mail className="size-4" />
@@ -4326,8 +5222,10 @@ function MessagingTab({
 // MAIN DASHBOARD COMPONENT
 // ----------------------------------------------------
 function NexiumDashboard() {
+  const navigate = useNavigate();
   const [running, setRunning] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("Auto-Trader");
   const [balance, setBalance] = useState(24860.42);
 
@@ -4387,6 +5285,12 @@ function NexiumDashboard() {
   ];
 
   // Actions
+  const handleLogout = () => {
+    setUserMenuOpen(false);
+    toast.info("Déconnexion réussie. À bientôt !");
+    navigate({ to: "/login" });
+  };
+
   const handleToggleEngine = () => {
     setRunning((prev) => {
       const next = !prev;
@@ -4635,6 +5539,13 @@ function NexiumDashboard() {
             <ExternalLink className="size-4 text-[#00D084]" />
             Retour au Site Public
           </Link>
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-rose-400 hover:bg-rose-500/15 hover:text-rose-300 transition cursor-pointer border border-rose-500/20 bg-rose-500/5"
+          >
+            <LogOut className="size-4 text-rose-400" />
+            Déconnexion
+          </button>
         </div>
       </aside>
 
@@ -4691,9 +5602,69 @@ function NexiumDashboard() {
             >
               ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD
             </button>
-            <div className="grid size-10 place-items-center rounded-xl border border-white/[0.1] bg-[#141a23] text-sm font-black text-white">
-              LM
+
+            {/* Profile Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen((prev) => !prev)}
+                className="flex items-center gap-2.5 rounded-xl border border-white/[0.1] bg-[#141a23] px-2.5 py-1.5 hover:border-white/20 transition cursor-pointer"
+                title="Menu profil"
+              >
+                <div className="grid size-7 sm:size-8 place-items-center rounded-lg bg-[#00D084]/15 border border-[#00D084]/30 text-xs sm:text-sm font-black text-[#00D084]">
+                  LM
+                </div>
+                <div className="hidden md:flex flex-col text-left leading-none">
+                  <span className="text-xs font-black text-white">Ludovic M.</span>
+                  <span className="text-[10px] font-mono text-gray-400">#802194</span>
+                </div>
+                <ChevronDown className="size-3 text-gray-400" />
+              </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-white/[0.1] bg-[#10141b] p-2 shadow-2xl z-50 backdrop-blur-xl">
+                  <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
+                    <p className="text-xs font-bold text-white">Ludovic M.</p>
+                    <p className="text-[10px] font-mono text-[#00D084]">Compte MT5 #802194</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      setSettingsOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white transition cursor-pointer"
+                  >
+                    <Settings className="size-3.5" />
+                    Paramètres
+                  </button>
+                  <Link
+                    to="/"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white transition cursor-pointer"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Site public
+                  </Link>
+                  <div className="my-1 border-t border-white/[0.06]" />
+                  <button
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/15 transition cursor-pointer"
+                  >
+                    <LogOut className="size-3.5 text-rose-400" />
+                    Déconnexion
+                  </button>
+                </div>
+              )}
             </div>
+
+            {/* Direct Logout Button */}
+            <button
+              onClick={handleLogout}
+              title="Se déconnecter"
+              className="flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/50 transition cursor-pointer"
+            >
+              <LogOut className="size-4" />
+              <span className="hidden sm:inline">Déconnexion</span>
+            </button>
           </div>
         </header>
 
@@ -5108,6 +6079,19 @@ function NexiumDashboard() {
               >
                 ENREGISTRER
               </button>
+
+              <div className="border-t border-white/[0.06] pt-3">
+                <button
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    handleLogout();
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 py-3 text-xs sm:text-sm font-bold text-rose-400 hover:bg-rose-500/20 transition cursor-pointer"
+                >
+                  <LogOut className="size-4" />
+                  Se Déconnecter de la Session
+                </button>
+              </div>
             </div>
           </div>
         </div>

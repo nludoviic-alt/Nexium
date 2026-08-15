@@ -78,7 +78,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
             </Link>
           </div>
 
-          <div className="hidden items-center gap-4 text-xs font-medium md:flex">
+          <div className="hidden items-center gap-4 text-xs font-medium lg:flex">
             <Link to="/how-it-works" className="cursor-pointer transition-colors hover:text-white">
               {t.nav.automation}
             </Link>
