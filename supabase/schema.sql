@@ -51,6 +51,28 @@ UPDATE public.profiles SET balance = 0 WHERE balance IS NULL;
 ALTER TABLE public.profiles ALTER COLUMN balance SET NOT NULL;
 ALTER TABLE public.profiles ALTER COLUMN balance SET DEFAULT 0.00;
 
+-- Colonnes pour la gestion totale et réelle du profil client depuis /composition
+-- (auparavant simulées en local uniquement : rien ne survivait au rechargement).
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS country TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS mt5_server TEXT DEFAULT 'Nexium-NY4-Equinix';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS mt5_investor_pass TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS max_daily_loss_percent NUMERIC(5, 2) DEFAULT 3.0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS max_simultaneous_trades INTEGER DEFAULT 3;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS risk_guard_auto_stop BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS engines_config JSONB;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS license_key TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS license_expires DATE;
+
+-- Notes confidentielles du staff sur un client (CRM) — policy RLS définie
+-- plus bas, section 11, une fois get_my_role() disponible.
+CREATE TABLE IF NOT EXISTS public.crm_notes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    author_name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 3. TABLE : MT5_ACCOUNTS & STRATÉGIES IA
 CREATE TABLE IF NOT EXISTS public.mt5_accounts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -182,6 +204,16 @@ AS $$
   SELECT role FROM public.profiles WHERE id = auth.uid();
 $$;
 
+CREATE OR REPLACE FUNCTION public.am_i_primary_owner()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT COALESCE((SELECT is_primary_owner FROM public.profiles WHERE id = auth.uid()), FALSE);
+$$;
+
 -- 10. PROTECTION DES COLONNES SENSIBLES DE PROFILES ET DU SUPER OWNER
 CREATE OR REPLACE FUNCTION public.protect_privileged_profile_fields()
 RETURNS TRIGGER
@@ -227,9 +259,17 @@ BEGIN
     NEW.gross_loss_total := OLD.gross_loss_total;
     NEW.mt5_login := OLD.mt5_login;
     NEW.mt5_broker := OLD.mt5_broker;
+    NEW.mt5_server := OLD.mt5_server;
+    NEW.mt5_investor_pass := OLD.mt5_investor_pass;
     NEW.assigned_advisor := OLD.assigned_advisor;
     NEW.license_status := OLD.license_status;
     NEW.active_preset := OLD.active_preset;
+    NEW.max_daily_loss_percent := OLD.max_daily_loss_percent;
+    NEW.max_simultaneous_trades := OLD.max_simultaneous_trades;
+    NEW.risk_guard_auto_stop := OLD.risk_guard_auto_stop;
+    NEW.engines_config := OLD.engines_config;
+    NEW.license_key := OLD.license_key;
+    NEW.license_expires := OLD.license_expires;
     RETURN NEW;
   END IF;
 
@@ -242,9 +282,17 @@ BEGIN
     NEW.gross_loss_total := OLD.gross_loss_total;
     NEW.mt5_login := OLD.mt5_login;
     NEW.mt5_broker := OLD.mt5_broker;
+    NEW.mt5_server := OLD.mt5_server;
+    NEW.mt5_investor_pass := OLD.mt5_investor_pass;
     NEW.assigned_advisor := OLD.assigned_advisor;
     NEW.license_status := OLD.license_status;
     NEW.active_preset := OLD.active_preset;
+    NEW.max_daily_loss_percent := OLD.max_daily_loss_percent;
+    NEW.max_simultaneous_trades := OLD.max_simultaneous_trades;
+    NEW.risk_guard_auto_stop := OLD.risk_guard_auto_stop;
+    NEW.engines_config := OLD.engines_config;
+    NEW.license_key := OLD.license_key;
+    NEW.license_expires := OLD.license_expires;
   END IF;
 
   RETURN NEW;
@@ -268,6 +316,7 @@ ALTER TABLE public.email_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.crm_notes ENABLE ROW LEVEL SECURITY;
 
 -- Politiques PROFILES
 DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
@@ -294,8 +343,17 @@ CREATE POLICY "profiles_update" ON public.profiles
     FOR UPDATE USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'))
     WITH CHECK (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
 
+-- Suppression : jamais le Super Owner. Un OWNER/SUPER_ADMIN peut supprimer
+-- n'importe quel profil SAUF un autre OWNER — seul le Super Owner peut
+-- supprimer un compte OWNER (protection de souveraineté).
 CREATE POLICY "profiles_delete" ON public.profiles
-    FOR DELETE USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN') AND NOT is_primary_owner);
+    FOR DELETE USING (
+        NOT is_primary_owner
+        AND (
+            (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN') AND role <> 'OWNER')
+            OR public.am_i_primary_owner()
+        )
+    );
 
 -- Politiques TRANSACTIONS
 DROP POLICY IF EXISTS "transactions_select" ON public.transactions;
@@ -359,6 +417,12 @@ CREATE POLICY "audit_logs_insert" ON public.audit_logs
         public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT')
         OR (action = 'CLIENT_REGISTERED' AND admin_id = auth.uid()::text AND target_user_id = auth.uid()::text)
     );
+
+-- Politiques CRM_NOTES
+DROP POLICY IF EXISTS "crm_notes_staff_all" ON public.crm_notes;
+CREATE POLICY "crm_notes_staff_all" ON public.crm_notes
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
 
 -- 12. ACTIVATION SUPABASE REALTIME
 -- Publication pour streaming WebSockets instantané des messages et des fils

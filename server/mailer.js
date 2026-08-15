@@ -45,7 +45,7 @@ async function authenticateAdminCaller(authHeader) {
   const callerUser = await userRes.json();
 
   const profileRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${callerUser.id}&select=role,status,is_primary_owner`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${callerUser.id}&select=id,role,status,is_primary_owner`,
     {
       headers: {
         apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -61,6 +61,31 @@ async function authenticateAdminCaller(authHeader) {
   }
 
   return { callerProfile };
+}
+
+async function getProfileById(id) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}&select=id,role,is_primary_owner,email`, {
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+// Un OWNER classique ne peut pas toucher un autre OWNER ni le Super Owner —
+// seul le Super Owner peut agir sur un compte OWNER (hors lui-même).
+function isTargetProtectedFromCaller(callerProfile, targetProfile) {
+  if (!targetProfile) return "Compte cible introuvable.";
+  const actingOnSelf = callerProfile.id === targetProfile.id;
+  if (targetProfile.is_primary_owner && !actingOnSelf) {
+    return "Compte Super Owner protégé.";
+  }
+  if (targetProfile.role === "OWNER" && !actingOnSelf && !callerProfile.is_primary_owner) {
+    return "Seul le Super Owner peut agir sur un compte OWNER.";
+  }
+  return null;
 }
 
 async function handleInviteUser(req, res) {
@@ -148,6 +173,196 @@ async function handleInviteUser(req, res) {
   }
 }
 
+// Changement d'e-mail de connexion d'un client/staff par un admin. Le nouvel
+// e-mail est confirmé directement (email_confirm: true) — pas de double
+// confirmation, l'admin a déjà vérifié l'identité de la personne.
+async function handleUpdateUserEmail(req, res) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Service non configuré côté serveur." }));
+    return;
+  }
+  try {
+    const auth = await authenticateAdminCaller(req.headers.authorization);
+    if (auth.error) {
+      res.writeHead(auth.status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: auth.error }));
+      return;
+    }
+
+    const { userId, newEmail } = await readJsonBody(req);
+    if (!userId || !newEmail) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "userId et newEmail sont requis." }));
+      return;
+    }
+
+    const target = await getProfileById(userId);
+    const blocked = isTargetProtectedFromCaller(auth.callerProfile, target);
+    if (blocked) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: blocked }));
+      return;
+    }
+
+    const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ email: newEmail, email_confirm: true }),
+    });
+    const authData = await authRes.json();
+    if (!authRes.ok) {
+      res.writeHead(authRes.status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: authData?.msg || "Échec du changement d'e-mail." }));
+      return;
+    }
+
+    const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ email: newEmail }),
+    });
+    if (!profileRes.ok) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "E-mail changé côté connexion mais échec de la synchronisation du profil." }));
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+  } catch (err) {
+    console.error("Update email error:", err);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: err.message }));
+  }
+}
+
+// Définit un nouveau mot de passe pour un compte, choisi par l'admin (ex:
+// dépannage d'un client bloqué). Invalide au passage ses sessions actives
+// (comportement standard de GoTrue lors d'un changement de mot de passe).
+async function handleSetUserPassword(req, res) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Service non configuré côté serveur." }));
+    return;
+  }
+  try {
+    const auth = await authenticateAdminCaller(req.headers.authorization);
+    if (auth.error) {
+      res.writeHead(auth.status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: auth.error }));
+      return;
+    }
+
+    const { userId, newPassword } = await readJsonBody(req);
+    if (!userId || !newPassword || newPassword.length < 8) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "userId et un mot de passe d'au moins 8 caractères sont requis." }));
+      return;
+    }
+
+    const target = await getProfileById(userId);
+    const blocked = isTargetProtectedFromCaller(auth.callerProfile, target);
+    if (blocked) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: blocked }));
+      return;
+    }
+
+    const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ password: newPassword }),
+    });
+    const authData = await authRes.json();
+    if (!authRes.ok) {
+      res.writeHead(authRes.status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: authData?.msg || "Échec de la mise à jour du mot de passe." }));
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+  } catch (err) {
+    console.error("Set password error:", err);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: err.message }));
+  }
+}
+
+// Déconnecte de force toutes les sessions actives d'un utilisateur. GoTrue
+// n'expose pas de route dédiée "kill sessions" — on obtient le même effet en
+// lui attribuant un nouveau mot de passe aléatoire côté serveur (invalide
+// tous ses jetons existants), sans jamais faire transiter ce mot de passe
+// ailleurs qu'ici : la personne devra utiliser "Mot de passe oublié" pour
+// revenir dans son compte.
+async function handleKillSessions(req, res) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Service non configuré côté serveur." }));
+    return;
+  }
+  try {
+    const auth = await authenticateAdminCaller(req.headers.authorization);
+    if (auth.error) {
+      res.writeHead(auth.status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: auth.error }));
+      return;
+    }
+
+    const { userId } = await readJsonBody(req);
+    if (!userId) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "userId requis." }));
+      return;
+    }
+
+    const target = await getProfileById(userId);
+    const blocked = isTargetProtectedFromCaller(auth.callerProfile, target);
+    if (blocked) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: blocked }));
+      return;
+    }
+
+    const randomPassword = Array.from({ length: 24 }, () => Math.random().toString(36)[2] || "x").join("");
+    const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({ password: randomPassword }),
+    });
+    if (!authRes.ok) {
+      const authData = await authRes.json();
+      res.writeHead(authRes.status, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: authData?.msg || "Échec de la déconnexion forcée." }));
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+  } catch (err) {
+    console.error("Kill sessions error:", err);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: err.message }));
+  }
+}
+
 async function handleSendEmail(req, res) {
   let body = "";
   req.on("data", (chunk) => (body += chunk));
@@ -205,6 +420,21 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "POST" && req.url === "/api/admin/invite-user") {
     await handleInviteUser(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/admin/update-user-email") {
+    await handleUpdateUserEmail(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/admin/set-user-password") {
+    await handleSetUserPassword(req, res);
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/admin/kill-sessions") {
+    await handleKillSessions(req, res);
     return;
   }
 

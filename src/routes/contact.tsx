@@ -192,13 +192,13 @@ function ContactPage() {
         }
       }
 
-      // B. Notification immédiate dans le routeur Desk / Messagerie en direct
+      // B. Notification immédiate dans le routeur Desk / Chat
       createLiveChatThread({
         visitorName: formData.fullName.trim(),
         contact: formData.email.trim(),
         initialQuery: `[Formulaire Contact] Sujet: ${formData.subject} | MT5: ${formData.mt5Account || "Non spécifié"} | ${formData.message.trim()}`,
         language: language as "fr" | "en",
-      });
+      }).catch((err) => console.warn("Notice création fil chat:", err));
 
       // C. Envoi e-mail d'alerte Desk via Resend
       sendContactNotificationEmail({

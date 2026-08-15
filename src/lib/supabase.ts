@@ -56,10 +56,19 @@ export interface SupabaseUserProfile {
   active_preset?: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION" | string;
   mt5_login?: string;
   mt5_broker?: string;
+  mt5_server?: string;
+  mt5_investor_pass?: string;
   balance?: number;
   gross_profit_total?: number;
   gross_loss_total?: number;
   assigned_advisor?: string;
+  country?: string;
+  max_daily_loss_percent?: number;
+  max_simultaneous_trades?: number;
+  risk_guard_auto_stop?: boolean;
+  engines_config?: Record<string, unknown>;
+  license_key?: string;
+  license_expires?: string;
   created_at?: string;
 }
 
@@ -358,17 +367,11 @@ export async function updateClientBalance(userId: string, newBalance: number) {
    ========================================================================== */
 
 /**
- * Invite une nouvelle personne (client ou staff) : crée son compte de connexion
- * Supabase Auth + son profil, et lui envoie un e-mail avec un lien pour choisir
- * son propre mot de passe. Passe par le petit service backend du VPS (seul
- * endroit autorisé à détenir la clé service_role) — jamais exécuté côté client.
+ * Appelle une route /api/admin/* du service backend dédié (seul endroit
+ * autorisé à détenir la clé service_role) en portant le JWT de l'admin
+ * connecté — jamais exécuté côté client sans passer par ce relais.
  */
-export async function inviteUser(params: {
-  name: string;
-  email: string;
-  phone?: string;
-  role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
-}): Promise<{ success: boolean; error?: string }> {
+async function callAdminApi(path: string, body: unknown): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured) {
     return { success: false, error: "Supabase n'est pas configuré." };
   }
@@ -381,22 +384,98 @@ export async function inviteUser(params: {
   }
 
   try {
-    const res = await fetch("/api/admin/invite-user", {
+    const res = await fetch(path, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) {
-      return { success: false, error: data?.error || "Échec de l'invitation." };
+      return { success: false, error: data?.error || "Échec de l'opération." };
     }
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || "Service d'invitation injoignable." };
+    return { success: false, error: err.message || "Service d'administration injoignable." };
   }
+}
+
+/**
+ * Invite une nouvelle personne (client ou staff) : crée son compte de connexion
+ * Supabase Auth + son profil, et lui envoie un e-mail avec un lien pour choisir
+ * son propre mot de passe.
+ */
+export async function inviteUser(params: {
+  name: string;
+  email: string;
+  phone?: string;
+  role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
+}): Promise<{ success: boolean; error?: string }> {
+  return callAdminApi("/api/admin/invite-user", params);
+}
+
+/**
+ * Change l'e-mail de connexion d'un compte (client ou staff), confirmé
+ * immédiatement — action réservée aux admins.
+ */
+export async function updateUserEmail(userId: string, newEmail: string): Promise<{ success: boolean; error?: string }> {
+  return callAdminApi("/api/admin/update-user-email", { userId, newEmail });
+}
+
+/**
+ * Définit un nouveau mot de passe pour un compte (dépannage client bloqué).
+ */
+export async function setUserPassword(userId: string, newPassword: string): Promise<{ success: boolean; error?: string }> {
+  return callAdminApi("/api/admin/set-user-password", { userId, newPassword });
+}
+
+/**
+ * Déconnecte de force toutes les sessions actives d'un compte.
+ */
+export async function killUserSessions(userId: string): Promise<{ success: boolean; error?: string }> {
+  return callAdminApi("/api/admin/kill-sessions", { userId });
+}
+
+/* ==========================================================================
+   NOTES CRM (STAFF → CLIENT)
+   ========================================================================== */
+
+export interface SupabaseCrmNote {
+  id?: string;
+  user_id: string;
+  author_name: string;
+  text: string;
+  created_at?: string;
+}
+
+export async function getCrmNotes(userId: string): Promise<SupabaseCrmNote[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("crm_notes")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("Erreur chargement notes CRM:", error);
+    return [];
+  }
+  return data as SupabaseCrmNote[];
+}
+
+export async function addCrmNote(userId: string, authorName: string, text: string) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const { data, error } = await supabase
+    .from("crm_notes")
+    .insert([{ user_id: userId, author_name: authorName, text }])
+    .select()
+    .single();
+  if (error) {
+    console.error("Erreur ajout note CRM:", error);
+    return { success: false, error };
+  }
+  return { success: true, data: data as SupabaseCrmNote };
 }
 
 /* ==========================================================================

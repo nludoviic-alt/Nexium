@@ -149,6 +149,11 @@ import {
   updateTransactionStatus,
   updateClientBalance,
   inviteUser,
+  updateUserEmail,
+  setUserPassword,
+  killUserSessions,
+  getCrmNotes,
+  addCrmNote,
 } from "@/lib/supabase";
 
 export const Route = createFileRoute("/composition")({
@@ -846,7 +851,7 @@ function NexiumAdminDashboard({
 
   // Synchronisation temps réel avec le Routeur Chatbot Web
   useEffect(() => {
-    setWebThreads(getLiveChatThreads());
+    getLiveChatThreads().then(setWebThreads);
     const unsub = subscribeToLiveChatUpdates((threads) => {
       setWebThreads(threads);
     });
@@ -998,27 +1003,73 @@ function NexiumAdminDashboard({
     setMt5InvestorPass(client.mt5.investorPass || "");
 
     setActiveSection("user-detail");
+
+    if (isSupabaseConfigured) {
+      getCrmNotes(client.id).then((notes) => {
+        if (notes.length === 0) return;
+        setClients((prev) =>
+          prev.map((c) =>
+            c.id === client.id
+              ? {
+                  ...c,
+                  crmNotes: notes.map((n): CrmNote => ({
+                    id: n.id || `note-${n.created_at}`,
+                    author: n.author_name,
+                    date: (n.created_at ? n.created_at.split("T")[0] : "") ?? "",
+                    text: n.text,
+                  })),
+                }
+              : c
+          )
+        );
+      });
+    }
   };
 
   const handleSaveClientProfile = async () => {
     if (!activeClient) return;
 
-    // Seuls les champs avec une colonne réelle dans `profiles` sont persistés
-    // (nom, téléphone, statut, KYC, login/broker MT5). Les presets moteurs,
-    // le risk management et le mot de passe MT5 n'ont pas encore de table
-    // dédiée côté base — ils restent gérés localement pour l'instant.
+    const engines_config = {
+      aiGold: { active: goldActive, preset: goldPreset, maxLot: goldMaxLot },
+      fxTrend: { active: fxActive, preset: fxPreset, maxLot: fxMaxLot },
+      indexReversion: { active: indexActive, preset: indexPreset, maxLot: indexMaxLot },
+    };
+
     if (isSupabaseConfigured) {
       const result = await updateUserProfile(activeClient.id, {
         name: editName,
         phone: editPhone,
         status: editStatus,
         kyc_status: editKycStatus === "PENDING_REVIEW" ? "PENDING" : editKycStatus,
+        country: editCountry,
         mt5_login: mt5Login,
         mt5_broker: mt5Broker,
+        mt5_server: mt5Server,
+        ...(mt5InvestorPass ? { mt5_investor_pass: mt5InvestorPass } : {}),
+        max_daily_loss_percent: editMaxDailyLoss,
+        max_simultaneous_trades: editMaxPositions,
+        risk_guard_auto_stop: editRiskGuardAuto,
+        engines_config,
       });
       if (!result.success) {
         toast.error("Échec de l'enregistrement du profil côté base de données.");
         return;
+      }
+
+      if (editEmail && editEmail !== activeClient.email) {
+        const emailResult = await updateUserEmail(activeClient.id, editEmail);
+        if (!emailResult.success) {
+          toast.error(emailResult.error || "Échec du changement d'e-mail.");
+          return;
+        }
+      }
+
+      if (newPasswordInput) {
+        const passResult = await setUserPassword(activeClient.id, newPasswordInput);
+        if (!passResult.success) {
+          toast.error(passResult.error || "Échec de la définition du mot de passe.");
+          return;
+        }
       }
     }
 
@@ -1036,7 +1087,6 @@ function NexiumAdminDashboard({
             maxDailyLossPercent: editMaxDailyLoss,
             maxSimultaneousTrades: editMaxPositions,
             riskGuardAutoStop: editRiskGuardAuto,
-            tempPassword: newPasswordInput ? newPasswordInput : c.tempPassword,
             engines: {
               aiGold: { ...c.engines.aiGold, active: goldActive, preset: goldPreset, maxLot: goldMaxLot },
               fxTrend: { ...c.engines.fxTrend, active: fxActive, preset: fxPreset, maxLot: fxMaxLot },
@@ -1055,6 +1105,7 @@ function NexiumAdminDashboard({
       })
     );
 
+    setNewPasswordInput("");
     addAuditLog("CLIENT_PROFILE_UPDATED", `Profil et paramètres enregistrés pour ${editName}.`, activeClient.email);
     toast.success(`Profil, presets et règles enregistrés pour ${editName}.`);
   };
@@ -1072,8 +1123,8 @@ function NexiumAdminDashboard({
             id: p.id,
             name: p.name,
             email: p.email,
-            phone: p.phone || "+33 6 00 00 00 00",
-            country: "France 🇫🇷",
+            phone: p.phone || "",
+            country: p.country || "",
             status: p.status as AccountStatus,
             createdAt: p.created_at ? p.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
             lastActive: "Nouveau compte",
@@ -1092,9 +1143,9 @@ function NexiumAdminDashboard({
               proofOfAddressName: "En cours d'examen",
               submittedDate: "Aujourd'hui",
             },
-            maxDailyLossPercent: 3.5,
-            maxSimultaneousTrades: 3,
-            riskGuardAutoStop: true,
+            maxDailyLossPercent: p.max_daily_loss_percent ?? 3.0,
+            maxSimultaneousTrades: p.max_simultaneous_trades ?? 3,
+            riskGuardAutoStop: p.risk_guard_auto_stop ?? true,
             assignedAdvisor: p.assigned_advisor || "Dr. Antoine R.",
             sessions: [],
             crmNotes: [],
@@ -1116,7 +1167,9 @@ function NexiumAdminDashboard({
             losingTradesCount: 0,
             highWaterMark: p.balance || 0,
             lastFundingDate: "Nouveau compte",
-            engines: {
+            performanceFeeRate: 20,
+            pendingPerfFee: 0,
+            engines: (p.engines_config as any) || {
               aiGold: { active: true, preset: "EQUINIX_NY4_DIRECT", maxLot: 1.0, minScore: 82, riskCapPercent: 2.0 },
               fxTrend: { active: true, preset: "INSTITUTIONAL_ALPHA", maxLot: 1.0, minScore: 78, riskCapPercent: 2.0 },
               indexReversion: { active: false, preset: "CONSERVATIVE_CORE", maxLot: 0.5, minScore: 85, riskCapPercent: 1.5 },
@@ -1124,8 +1177,13 @@ function NexiumAdminDashboard({
             mt5: {
               login: p.mt5_login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`,
               broker: p.mt5_broker || "Nexium Prime ECN",
-              server: "Nexium-NY4-Equinix",
+              server: p.mt5_server || "Nexium-NY4-Equinix",
+              investorPass: p.mt5_investor_pass || "",
+              pingMs: 16,
+              status: "ONLINE" as const,
             },
+            licenseKey: p.license_key || "",
+            licenseExpires: p.license_expires || "",
             tradingHistory: [],
             livePositions: [],
           }));
@@ -1380,8 +1438,8 @@ function NexiumAdminDashboard({
   };
 
   // Handlers pour la file d'attente Web (Live Chat Router)
-  const handleClaimWebThread = (threadId: string) => {
-    const updated = claimLiveChatThread(threadId, `Conseiller Desk (${currentSessionRole})`, currentSessionRole);
+  const handleClaimWebThread = async (threadId: string) => {
+    const updated = await claimLiveChatThread(threadId, `Conseiller Desk (${currentSessionRole})`, currentSessionRole);
     if (updated) {
       addAuditLog("LIVE_CHAT_CLAIMED", `Fil prospect #${threadId} pris en charge par ${currentSessionRole}.`);
       toast.success(`Vous avez pris en charge le fil #${threadId} !`);
@@ -1389,11 +1447,11 @@ function NexiumAdminDashboard({
     }
   };
 
-  const handleSendWebThreadMessage = (e: React.FormEvent) => {
+  const handleSendWebThreadMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!webThreadReplyInput.trim() || !activeWebThread) return;
 
-    sendLiveChatMessage({
+    await sendLiveChatMessage({
       threadId: activeWebThread.id,
       sender: "ADVISOR",
       authorName: `Conseiller Desk (${currentSessionRole})`,
@@ -1404,8 +1462,8 @@ function NexiumAdminDashboard({
     setWebThreadReplyInput("");
   };
 
-  const handleResolveWebThread = (threadId: string) => {
-    resolveLiveChatThread(threadId);
+  const handleResolveWebThread = async (threadId: string) => {
+    await resolveLiveChatThread(threadId);
     addAuditLog("LIVE_CHAT_RESOLVED", `Fil prospect #${threadId} clôturé.`);
     toast.success("Session de chat clôturée avec succès.");
   };
@@ -1617,8 +1675,11 @@ function NexiumAdminDashboard({
       toast.error("Compte Super Owner protégé : suppression impossible, y compris pour vous-même.");
       return;
     }
-    if (st.role === "OWNER") {
-      toast.error("Action impossible : Le compte Propriétaire (OWNER) ne peut être supprimé.");
+    // Seul le Super Owner peut supprimer un compte OWNER — un OWNER ne peut
+    // pas en supprimer un autre (protection de souveraineté, appliquée aussi
+    // côté base via la policy profiles_delete).
+    if (st.role === "OWNER" && !isPrimaryOwner) {
+      toast.error("Action impossible : seul le Super Owner peut supprimer un compte Propriétaire (OWNER).");
       return;
     }
     openConfirmModal(
@@ -2048,17 +2109,37 @@ function NexiumAdminDashboard({
     toast.success(`Supervision Live activée pour le compte de ${client.name}.`);
   };
 
-  const handleExtendLicense = (months: number) => {
+  const handleExtendLicense = async (months: number) => {
     const newYear = 2026 + (months >= 12 ? 1 : 0);
     const newMonth = months === 1 ? "11" : months === 6 ? "04" : "10";
     const newExp = `${newYear}-${newMonth}-15`;
+
+    if (isSupabaseConfigured) {
+      const result = await updateUserProfile(activeClient.id, { license_expires: newExp });
+      if (!result.success) {
+        toast.error("Échec de l'enregistrement côté base de données.");
+        return;
+      }
+    }
+
     setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, licenseExpires: newExp } : c)));
+    addAuditLog("LICENSE_EXTENDED", `Licence prolongée jusqu'au ${newExp} pour ${activeClient.name}.`, activeClient.email);
     toast.success(`Licence prolongée jusqu'au ${newExp}.`);
   };
 
-  const handleGenerateNewLicenseKey = () => {
+  const handleGenerateNewLicenseKey = async () => {
     const newKey = `NX-PRO-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-DUAL`;
+
+    if (isSupabaseConfigured) {
+      const result = await updateUserProfile(activeClient.id, { license_key: newKey });
+      if (!result.success) {
+        toast.error("Échec de l'enregistrement côté base de données.");
+        return;
+      }
+    }
+
     setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, licenseKey: newKey } : c)));
+    addAuditLog("LICENSE_KEY_GENERATED", `Nouvelle clé de licence générée pour ${activeClient.name}.`, activeClient.email);
     toast.success(`Nouvelle clé de licence générée : ${newKey}`);
   };
 
@@ -2068,20 +2149,39 @@ function NexiumAdminDashboard({
       `Cette action va invalider tous les jetons d'accès du client.`,
       "Forcer la Déconnexion",
       "WARNING",
-      () => {
+      async () => {
+        if (isSupabaseConfigured) {
+          const result = await killUserSessions(activeClient.id);
+          if (!result.success) {
+            toast.error(result.error || "Échec de la déconnexion forcée.");
+            return;
+          }
+        }
         setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, sessions: [] } : c)));
+        addAuditLog("SESSIONS_KILLED", `Toutes les sessions déconnectées pour ${activeClient.name}.`, activeClient.email);
         toast.error(`Toutes les sessions de ${activeClient.name} ont été fermées.`);
       }
     );
   };
 
-  const handleAddCrmNote = () => {
-    if (!newCrmNoteText.trim()) return;
+  const handleAddCrmNote = async () => {
+    if (!newCrmNoteText.trim() || !activeClient) return;
+    const authorName = `${sessionUser.name} (${currentSessionRole})`;
+    const text = newCrmNoteText.trim();
+
+    if (isSupabaseConfigured) {
+      const result = await addCrmNote(activeClient.id, authorName, text);
+      if (!result.success) {
+        toast.error("Échec de l'enregistrement de la note côté base de données.");
+        return;
+      }
+    }
+
     const newNote: CrmNote = {
       id: `note-${Date.now()}`,
-      author: `Conseiller (${currentSessionRole})`,
+      author: authorName,
       date: new Date().toISOString().split("T")[0],
-      text: newCrmNoteText.trim(),
+      text,
     };
     setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, crmNotes: [newNote, ...c.crmNotes] } : c)));
     toast.success("Note confidentielle enregistrée.");
@@ -2522,7 +2622,7 @@ function NexiumAdminDashboard({
             </div>
             <div className="text-left hidden sm:block">
               <div className="flex items-center gap-1.5 leading-tight">
-                <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">{sessionUser.name}</span>
+                <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">{sessionUser.name.split(" ")[0]}</span>
                 <span className="size-1.5 rounded-full bg-emerald-400"></span>
               </div>
               <span className="text-[10px] font-mono text-slate-400 block">
@@ -2581,10 +2681,8 @@ function NexiumAdminDashboard({
               },
               {
                 key: "messaging",
-                label: "Messagerie",
+                label: "Chat",
                 icon: MessageSquare,
-                badge: "EN DIRECT",
-                badgeTone: "brand",
                 isActive: activeSection === "messaging",
               },
               {
@@ -4689,10 +4787,10 @@ function NexiumAdminDashboard({
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
                     <MessageCircle className="size-6 text-emerald-400" />
-                    <span>Messagerie &amp; Desk Opérateur</span>
+                    <span>Chat &amp; Desk Opérateur</span>
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                    Routeur de chat en direct, file d&apos;attente des prospects du site et assistance clients MT5.
+                    Routeur de chat, file d&apos;attente des prospects du site et assistance clients MT5.
                   </p>
                 </div>
 

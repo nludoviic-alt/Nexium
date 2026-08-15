@@ -232,7 +232,7 @@ export function ChatWidget() {
         sender: "VISITOR",
         authorName: liveThread.visitorName || "Visiteur",
         text,
-      });
+      }).catch((err) => console.warn("Notice envoi message chat:", err));
       setDraft("");
       return;
     }
@@ -273,11 +273,20 @@ export function ChatWidget() {
 
     try {
       // 1. Create a live thread in the central Router (Claim Queue)
-      const thread = createLiveChatThread({
+      const thread = await createLiveChatThread({
         contact: operatorContact,
         initialQuery: userQuery || "Demande d'opérateur en direct",
         language,
       });
+      if (!thread) {
+        toast.error(
+          language === "fr"
+            ? "Impossible de contacter le desk pour le moment. Réessayez dans un instant."
+            : "Unable to reach the desk right now. Please try again shortly."
+        );
+        setIsSendingToOperator(false);
+        return;
+      }
       setActiveThreadId(thread.id);
       setLiveThread(thread);
 
