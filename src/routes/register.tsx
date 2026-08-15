@@ -146,7 +146,7 @@ function RegisterPage() {
       // 4. Double flux d'envoi d'e-mails transactionnels via Resend (Sans aucune limite restrictive)
       try {
         // A. E-mail de confirmation au client
-        await sendRegistrationPendingEmail(email, fullName, country);
+        await sendRegistrationPendingEmail(email, fullName, country, language as "fr" | "en");
         // B. E-mail d'alerte instantanée au Desk d'Administration
         await sendAdminNewClientAlertEmail({
           name: fullName,

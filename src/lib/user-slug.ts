@@ -4,7 +4,7 @@
  * et de Desk d'administration (ex: /desk/ludovic ou /admin/ludovic).
  */
 
-export function slugify(text: string): string {
+export function slugify(text?: string | null): string {
   if (!text) return "trader";
   return text
     .toString()
@@ -23,7 +23,7 @@ export function slugify(text: string): string {
  * - "Ludovic Martin" -> "ludovic-martin"
  * - "investisseur@nexium.io" -> "investisseur"
  */
-export function getUserSlug(user?: { name?: string | null; email?: string | null; id?: string | null }): string {
+export function getUserSlug(user?: { name?: string | null | undefined; email?: string | null | undefined; id?: string | null | undefined }): string {
   if (!user) return "trader";
 
   if (user.name && user.name.trim().length > 1) {
@@ -51,7 +51,7 @@ export function getUserSlug(user?: { name?: string | null; email?: string | null
  * - "Antoine R." -> "antoine"
  * - "admin@nexiummarkets.com" -> "admin"
  */
-export function getAdminSlug(user?: { name?: string | null; email?: string | null; id?: string | null }): string {
+export function getAdminSlug(user?: { name?: string | null | undefined; email?: string | null | undefined; id?: string | null | undefined }): string {
   if (!user) return "admin";
 
   if (user.name && user.name.trim().length > 1) {

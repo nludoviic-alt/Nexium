@@ -6,15 +6,19 @@ import {
   Mail,
   MessageSquare,
   Phone,
+  PhoneCall,
   Send,
   ShieldCheck,
   User,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader, PageShell, Section } from "@/components/site/PageShell";
 import { useLanguage } from "@/context/LanguageContext";
+import { createLiveChatThread } from "@/lib/chat-router";
+import { sendContactNotificationEmail } from "@/lib/resend";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({

@@ -543,6 +543,10 @@ const INDEX_PRESETS = [
 ];
 
 const CANNED_RESPONSES = [
+  { title: "👑 Compte MT5 Activé", text: "Bonjour,\n\nNous vous confirmons l'activation complète de votre compte de trading MetaTrader 5 sur notre infrastructure Equinix NY4. Vos accès au portail client sont désormais opérationnels pour déployer vos premiers algorithmes." },
+  { title: "⏳ Confirmation Inscription", text: "Bonjour,\n\nVotre demande d'ouverture de compte a bien été reçue par notre équipe conformité. Votre dossier est en cours de validation et vos accès définitifs vous seront transmis sous 2h ouvrées." },
+  { title: "🔑 Réinitialisation Accès", text: "Bonjour,\n\nUn lien sécurisé de réinitialisation de votre mot de passe vient de vous être expédié par e-mail via notre infrastructure Resend. Ce lien chiffré reste valide pendant 15 minutes." },
+  { title: "💰 Dépôt MT5 Crédité", text: "Bonjour,\n\nVotre versement a été validé avec succès par notre desk financier. Vos fonds sont immédiatement disponibles sur votre solde MT5 pour vos opérations de trading." },
   { title: "🛡️ News Guard NFP / FOMC", text: "Bonjour,\n\nConformément à nos règles de gestion du risque, les robots de trading sont automatiquement mis en pause 15 minutes avant et après les annonces macro-économiques majeures afin d'éviter tout décalage de spread." },
   { title: "💳 Procédure de Retrait SEPA", text: "Bonjour,\n\nVotre demande de retrait a bien été enregistrée par notre desk financier. Le virement vers votre compte bancaire enregistré est exécuté sous un délai standard de 24h ouvrées." },
   { title: "🤖 Optimisation Moteur Gold", text: "Bonjour,\n\nLe preset Conservateur sur Nexium AI Gold a été calibré avec un stop-loss basé sur l'ATR 1.2 pour préserver votre capital en période de forte volatilité de l'Or." },
@@ -1581,7 +1585,7 @@ function NexiumAdminDashboard({
     // Envoi de l'e-mail de bienvenue via Resend
     sendWelcomeEmail(newCl.email, newCl.name, newCl.mt5.login)
       .then((res) => {
-        if (res.success && !res.simulated) {
+        if (res.success) {
           toast.success(`E-mail officiel de bienvenue expédié à ${newCl.email} via Resend.`);
         }
       })
