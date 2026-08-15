@@ -237,9 +237,9 @@ export async function sendRegistrationPendingEmail(
 export async function sendAdminNewClientAlertEmail(clientData: {
   name: string;
   email: string;
-  country?: string;
-  phone?: string;
-  ibCode?: string;
+  country?: string | undefined;
+  phone?: string | undefined;
+  ibCode?: string | undefined;
 }): Promise<SendEmailResult> {
   const subject = `🚨 [NOUVEAU CLIENT] Inscription en attente d'approbation — ${clientData.name}`;
   const preheader = `Un nouvel investisseur vient de créer son compte : ${clientData.name} (${clientData.email}).`;
