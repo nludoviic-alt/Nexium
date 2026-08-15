@@ -5245,29 +5245,49 @@ function NexiumDashboard() {
   const [selectedPresetModal, setSelectedPresetModal] = useState<any | null>(null);
   const [submittingPreset, setSubmittingPreset] = useState(false);
 
-  // Chargement dynamique du profil client connecté depuis Supabase
+  // Chargement dynamique & Protection stricte de l'espace client
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) {
-        setCurrentUserId(user.id);
-        setClientEmail(user.email || "investisseur@nexiummarkets.com");
-        const profile = await getUserProfile(user.id);
-        if (profile) {
-          if (profile.name) setClientName(profile.name);
-          if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
-          if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
-          if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
-          if (profile.license_status) {
-            setLicenseStatus(profile.license_status as any);
-          } else if (profile.status === "ACTIVE" && profile.active_preset) {
-            setLicenseStatus("ACTIVE");
-          } else {
-            setLicenseStatus("NOT_REQUESTED");
-          }
-          if (profile.requested_preset) setRequestedPreset(profile.requested_preset);
-          if (profile.active_preset) setActivePreset(profile.active_preset);
+    supabase.auth.getUser().then(async ({ data: { user }, error }) => {
+      if (error || !user) {
+        toast.info("Veuillez vous connecter pour accéder à votre espace institutionnel.");
+        navigate({ to: "/login" });
+        return;
+      }
+
+      setCurrentUserId(user.id);
+      setClientEmail(user.email || "investisseur@nexiummarkets.com");
+      const profile = await getUserProfile(user.id);
+
+      if (profile) {
+        // Si le profil est en attente d'approbation globale, bloquer et renvoyer sur login
+        if (profile.status === "PENDING_APPROVAL") {
+          toast.warning("Votre compte est en cours d'approbation par la Direction.");
+          await supabase.auth.signOut();
+          navigate({ to: "/login" });
+          return;
         }
+
+        if (profile.status === "REVOKED" || profile.status === "BANNED") {
+          toast.error("Accès restreint. Contactez support@nexiummarkets.com");
+          await supabase.auth.signOut();
+          navigate({ to: "/login" });
+          return;
+        }
+
+        if (profile.name) setClientName(profile.name);
+        if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
+        if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
+        if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
+        if (profile.license_status) {
+          setLicenseStatus(profile.license_status as any);
+        } else if (profile.status === "ACTIVE" && profile.active_preset) {
+          setLicenseStatus("ACTIVE");
+        } else {
+          setLicenseStatus("NOT_REQUESTED");
+        }
+        if (profile.requested_preset) setRequestedPreset(profile.requested_preset);
+        if (profile.active_preset) setActivePreset(profile.active_preset);
       }
     });
   }, []);

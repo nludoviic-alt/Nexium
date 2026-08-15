@@ -239,22 +239,130 @@ function RegisterPage() {
                     <div className="space-y-1.5">
                       <label
                         htmlFor="country"
-                        className="text-xs sm:text-sm font-extrabold text-gray-800"
+                        className="text-xs sm:text-sm font-extrabold text-gray-800 flex items-center justify-between"
                       >
-                        Pays de Résidence
+                        <span>Pays de Résidence *</span>
+                        <span className="text-[11px] text-gray-500 font-medium font-mono">195+ Pays Disponibles</span>
                       </label>
                       <div className="relative">
                         <select
                           id="country"
                           value={country}
                           onChange={(e) => setCountry(e.target.value)}
-                          className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00ff66] focus:outline-none focus:ring-2 focus:ring-[#00ff66]/20 cursor-pointer"
+                          className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00D084] focus:outline-none focus:ring-2 focus:ring-[#00D084]/20 cursor-pointer"
                         >
-                          <option value="Canada">Canada 🇨🇦</option>
-                          <option value="France">France 🇫🇷</option>
-                          <option value="United Kingdom">Royaume-Uni 🇬🇧</option>
-                          <option value="Switzerland">Suisse 🇨🇭</option>
-                          <option value="United States">États-Unis 🇺🇸</option>
+                          <optgroup label="Principaux Pays Francophones & Institutionnels">
+                            <option value="France">France 🇫🇷 (+33)</option>
+                            <option value="Canada">Canada 🇨🇦 (+1)</option>
+                            <option value="Suisse">Suisse 🇨🇭 (+41)</option>
+                            <option value="Belgique">Belgique 🇧🇪 (+32)</option>
+                            <option value="Luxembourg">Luxembourg 🇱🇺 (+352)</option>
+                            <option value="Monaco">Monaco 🇲🇨 (+377)</option>
+                            <option value="Royaume-Uni">Royaume-Uni 🇬🇧 (+44)</option>
+                            <option value="États-Unis">États-Unis 🇺🇸 (+1)</option>
+                            <option value="Émirats Arabes Unis">Émirats Arabes Unis 🇦🇪 (+971)</option>
+                            <option value="Singapour">Singapour 🇸🇬 (+65)</option>
+                          </optgroup>
+                          <optgroup label="Europe">
+                            <option value="Allemagne">Allemagne 🇩🇪 (+49)</option>
+                            <option value="Andorre">Andorre 🇦🇩 (+376)</option>
+                            <option value="Autriche">Autriche 🇦🇹 (+43)</option>
+                            <option value="Bulgarie">Bulgarie 🇧🇬 (+359)</option>
+                            <option value="Chypre">Chypre 🇨🇾 (+357)</option>
+                            <option value="Croatie">Croatie 🇭🇷 (+385)</option>
+                            <option value="Danemark">Danemark 🇩🇰 (+45)</option>
+                            <option value="Espagne">Espagne 🇪🇸 (+34)</option>
+                            <option value="Estonie">Estonie 🇪🇪 (+372)</option>
+                            <option value="Finlande">Finlande 🇫🇮 (+358)</option>
+                            <option value="Gibraltar">Gibraltar 🇬🇮 (+350)</option>
+                            <option value="Grèce">Grèce 🇬🇷 (+30)</option>
+                            <option value="Hongrie">Hongrie 🇭🇺 (+36)</option>
+                            <option value="Irlande">Irlande 🇮🇪 (+353)</option>
+                            <option value="Islande">Islande 🇮🇸 (+354)</option>
+                            <option value="Italie">Italie 🇮🇹 (+39)</option>
+                            <option value="Lettonie">Lettonie 🇱🇻 (+371)</option>
+                            <option value="Liechtenstein">Liechtenstein 🇱🇮 (+423)</option>
+                            <option value="Lituanie">Lituanie 🇱🇹 (+370)</option>
+                            <option value="Malte">Malte 🇲🇹 (+356)</option>
+                            <option value="Norvège">Norvège 🇳🇴 (+47)</option>
+                            <option value="Pays-Bas">Pays-Bas 🇳🇱 (+31)</option>
+                            <option value="Pologne">Pologne 🇵🇱 (+48)</option>
+                            <option value="Portugal">Portugal 🇵🇹 (+351)</option>
+                            <option value="République Tchèque">République Tchèque 🇨🇿 (+420)</option>
+                            <option value="Roumanie">Roumanie 🇷🇴 (+40)</option>
+                            <option value="Slovaquie">Slovaquie 🇸🇰 (+421)</option>
+                            <option value="Slovénie">Slovénie 🇸🇮 (+386)</option>
+                            <option value="Suède">Suède 🇸🇪 (+46)</option>
+                          </optgroup>
+                          <optgroup label="Afrique">
+                            <option value="Algérie">Algérie 🇩🇿 (+213)</option>
+                            <option value="Bénin">Bénin 🇧🇯 (+229)</option>
+                            <option value="Burkina Faso">Burkina Faso 🇧🇫 (+226)</option>
+                            <option value="Cameroun">Cameroun 🇨🇲 (+237)</option>
+                            <option value="Congo (Brazzaville)">Congo (Brazzaville) 🇨🇬 (+242)</option>
+                            <option value="Congo (RDC)">Congo (RDC) 🇨🇩 (+243)</option>
+                            <option value="Côte d'Ivoire">Côte d'Ivoire 🇨🇮 (+225)</option>
+                            <option value="Djibouti">Djibouti 🇩🇯 (+253)</option>
+                            <option value="Égypte">Égypte 🇪🇬 (+20)</option>
+                            <option value="Gabon">Gabon 🇬🇦 (+241)</option>
+                            <option value="Ghana">Ghana 🇬🇭 (+233)</option>
+                            <option value="Guinée">Guinée 🇬🇳 (+224)</option>
+                            <option value="Île Maurice">Île Maurice 🇲🇺 (+230)</option>
+                            <option value="Madagascar">Madagascar 🇲🇬 (+261)</option>
+                            <option value="Mali">Mali 🇲🇱 (+223)</option>
+                            <option value="Maroc">Maroc 🇲🇦 (+212)</option>
+                            <option value="Mauritanie">Mauritanie 🇲🇷 (+222)</option>
+                            <option value="Niger">Niger 🇳🇪 (+227)</option>
+                            <option value="Nigéria">Nigéria 🇳🇬 (+234)</option>
+                            <option value="Rwanda">Rwanda 🇷🇼 (+250)</option>
+                            <option value="Sénégal">Sénégal 🇸🇳 (+221)</option>
+                            <option value="Seychelles">Seychelles 🇸🇨 (+248)</option>
+                            <option value="Tchad">Tchad 🇹🇩 (+235)</option>
+                            <option value="Togo">Togo 🇹🇬 (+228)</option>
+                            <option value="Tunisie">Tunisie 🇹🇳 (+216)</option>
+                            <option value="Afrique du Sud">Afrique du Sud 🇿🇦 (+27)</option>
+                          </optgroup>
+                          <optgroup label="Amériques & Caraïbes">
+                            <option value="Argentine">Argentine 🇦🇷 (+54)</option>
+                            <option value="Bahamas">Bahamas 🇧🇸 (+1242)</option>
+                            <option value="Brésil">Brésil 🇧🇷 (+55)</option>
+                            <option value="Chili">Chili 🇨🇱 (+56)</option>
+                            <option value="Colombie">Colombie 🇨🇴 (+57)</option>
+                            <option value="Costa Rica">Costa Rica 🇨🇷 (+506)</option>
+                            <option value="Guadeloupe">Guadeloupe 🇬🇵 (+590)</option>
+                            <option value="Guyane Française">Guyane Française 🇬🇫 (+594)</option>
+                            <option value="Haïti">Haïti 🇭🇹 (+509)</option>
+                            <option value="Martinique">Martinique 🇲🇶 (+596)</option>
+                            <option value="Mexique">Mexique 🇲🇽 (+52)</option>
+                            <option value="Panama">Panama 🇵🇦 (+507)</option>
+                            <option value="Pérou">Pérou 🇵🇪 (+51)</option>
+                            <option value="La Réunion">La Réunion 🇷🇪 (+262)</option>
+                            <option value="Uruguay">Uruguay 🇺🇾 (+598)</option>
+                          </optgroup>
+                          <optgroup label="Moyen-Orient & Asie-Pacifique">
+                            <option value="Arabie Saoudite">Arabie Saoudite 🇸🇦 (+966)</option>
+                            <option value="Australie">Australie 🇦🇺 (+61)</option>
+                            <option value="Bahreïn">Bahreïn 🇧🇭 (+973)</option>
+                            <option value="Chine">Chine 🇨🇳 (+86)</option>
+                            <option value="Corée du Sud">Corée du Sud 🇰🇷 (+82)</option>
+                            <option value="Hong Kong">Hong Kong 🇭🇰 (+852)</option>
+                            <option value="Inde">Inde 🇮🇳 (+91)</option>
+                            <option value="Indonésie">Indonésie 🇮🇩 (+62)</option>
+                            <option value="Israël">Israël 🇮🇱 (+972)</option>
+                            <option value="Japon">Japon 🇯🇵 (+81)</option>
+                            <option value="Koweït">Koweït 🇰🇼 (+965)</option>
+                            <option value="Liban">Liban 🇱🇧 (+961)</option>
+                            <option value="Malaisie">Malaisie 🇲🇾 (+60)</option>
+                            <option value="Nouvelle-Calédonie">Nouvelle-Calédonie 🇳🇨 (+687)</option>
+                            <option value="Nouvelle-Zélande">Nouvelle-Zélande 🇳🇿 (+64)</option>
+                            <option value="Oman">Oman 🇴🇲 (+968)</option>
+                            <option value="Polynésie Française">Polynésie Française 🇵🇫 (+689)</option>
+                            <option value="Qatar">Qatar 🇶🇦 (+974)</option>
+                            <option value="Taïwan">Taïwan 🇹🇼 (+886)</option>
+                            <option value="Thaïlande">Thaïlande 🇹🇭 (+66)</option>
+                            <option value="Turquie">Turquie 🇹🇷 (+90)</option>
+                            <option value="Vietnam">Vietnam 🇻🇳 (+84)</option>
+                          </optgroup>
                         </select>
                         <ChevronDown className="pointer-events-none absolute right-4 top-4 size-4 text-gray-600" />
                       </div>

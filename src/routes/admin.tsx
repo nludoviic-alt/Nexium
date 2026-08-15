@@ -801,10 +801,10 @@ const INITIAL_STAFF: StaffAdministrator[] = [
 ];
 
 const INITIAL_GATEWAYS: BrokerGateway[] = [
-  { id: "gw-1", broker: "Pepperstone ECN", server: "Pepperstone-Edge02", ip: "194.67.12.8", latencyMs: 14, status: "OPTIMAL", connectedAccounts: 420, ticksPerSec: 184 },
-  { id: "gw-2", broker: "IC Markets SC", server: "ICMarketsSC-Live04", ip: "185.142.18.2", latencyMs: 18, status: "OPTIMAL", connectedAccounts: 560, ticksPerSec: 210 },
-  { id: "gw-3", broker: "Vantage Raw ECN", server: "VantageFX-Live-01", ip: "104.22.45.19", latencyMs: 22, status: "OPTIMAL", connectedAccounts: 180, ticksPerSec: 145 },
-  { id: "gw-4", broker: "FTMO Server Pro", server: "FTMO-Live-US", ip: "172.67.182.90", latencyMs: 38, status: "DEGRADED", connectedAccounts: 90, ticksPerSec: 92 },
+  { id: "gw-1", broker: "Nexium Prime ECN (NY4)", server: "Nexium-NY4-Equinix", ip: "198.51.100.24", latencyMs: 1.8, status: "OPTIMAL", connectedAccounts: 1420, ticksPerSec: 340 },
+  { id: "gw-2", broker: "Nexium London LD4 Bridge", server: "Nexium-LD4-Interbank", ip: "195.66.224.12", latencyMs: 2.4, status: "OPTIMAL", connectedAccounts: 980, ticksPerSec: 290 },
+  { id: "gw-3", broker: "Nexium Chicago CME Feed", server: "Nexium-CME-Direct", ip: "199.168.1.18", latencyMs: 3.1, status: "OPTIMAL", connectedAccounts: 760, ticksPerSec: 310 },
+  { id: "gw-4", broker: "Nexium Tokyo TY3 Asian", server: "Nexium-TY3-Tokyo", ip: "203.0.113.88", latencyMs: 4.2, status: "OPTIMAL", connectedAccounts: 540, ticksPerSec: 220 },
 ];
 
 const INITIAL_VPN_ACCOUNTS: VpnAccount[] = [

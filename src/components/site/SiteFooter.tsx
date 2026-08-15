@@ -71,7 +71,7 @@ export function SiteFooter() {
               {language === "fr" ? "Tarifs & Licences" : "Pricing & Licenses"}
             </Link>
             <Link
-              to="/login"
+              to="/NEXIUM"
               className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
             >
               {t.nav.clientArea}
