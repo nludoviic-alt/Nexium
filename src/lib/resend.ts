@@ -1,6 +1,9 @@
-import { Resend } from "resend";
+/**
+ * Service d'envoi d'e-mails transactionnels Nexium Markets via Resend.
+ * Compatible 100% navigateur et serveur.
+ */
 
-const resendApiKey = import.meta.env.VITE_RESEND_API_KEY || import.meta.env.RESEND_API_KEY || "";
+const resendApiKey = import.meta.env.VITE_RESEND_API_KEY || "";
 const defaultFromEmail = import.meta.env.VITE_RESEND_FROM_EMAIL || "Nexium Markets <onboarding@resend.dev>";
 
 /**
@@ -11,19 +14,6 @@ export const isResendConfigured = Boolean(
   resendApiKey.startsWith("re_") &&
   !resendApiKey.includes("your-api-key")
 );
-
-if (!isResendConfigured && typeof window !== "undefined") {
-  console.info(
-    "ℹ️ [Nexium Markets] Resend n'est pas encore connecté à une clé API réelle (re_...). " +
-    "L'application utilise le mode simulation pour l'envoi d'e-mails. " +
-    "Pour activer les envois réels, renseignez VITE_RESEND_API_KEY dans votre fichier .env.local."
-  );
-}
-
-/**
- * Instance Resend.
- */
-export const resend = new Resend(resendApiKey || "re_dummy_key_for_initialization");
 
 /* ==========================================================================
    TEMPLATES HTML OFFICIELS AUX COULEURS DE NEXIUM (OBSIDIENNE & ÉMERAUDE)
@@ -38,7 +28,7 @@ function getEmailWrapper(title: string, contentHtml: string): string {
   <title>${title}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0d10; color: #f8fafc; margin: 0; padding: 40px 20px; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #12161c; border-radius: 16px; border: 1px solid rgba(0, 208, 132, 0.2); overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+    .container { max-width: 600px; margin: 0 auto; background-color: #12161c; border-radius: 16px; border: 1px solid rgba(0, 208, 132, 0.25); overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
     .header { padding: 32px 32px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: linear-gradient(180deg, #161c24 0%, #12161c 100%); }
     .logo { font-size: 24px; font-weight: 900; letter-spacing: 4px; color: #ffffff; text-transform: uppercase; margin: 0; font-family: monospace; }
     .logo-accent { color: #00D084; }
@@ -68,10 +58,6 @@ function getEmailWrapper(title: string, contentHtml: string): string {
   `.trim();
 }
 
-/* ==========================================================================
-   MÉTHODES D'ENVOI TRANSACTIONNELLES TYPESAFE
-   ========================================================================== */
-
 export interface SendEmailResult {
   success: boolean;
   messageId?: string;
@@ -80,14 +66,56 @@ export interface SendEmailResult {
 }
 
 /**
- * Envoie un e-mail de bienvenue à l'investisseur avec confirmation de son compte.
+ * Envoie un email via l'API HTTP officielle de Resend.
+ */
+async function sendViaResendHttp(to: string, subject: string, html: string): Promise<SendEmailResult> {
+  if (!isResendConfigured) {
+    console.info(`[Resend Simulé] E-mail pour ${to} : ${subject}`);
+    return { success: true, simulated: true, messageId: `sim_${Date.now()}` };
+  }
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${resendApiKey}`,
+      },
+      body: JSON.stringify({
+        from: defaultFromEmail,
+        to: [to],
+        subject,
+        html,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.warn("Resend API response:", data);
+      return { success: false, error: data?.message || "Erreur lors de l'envoi Resend" };
+    }
+
+    return { success: true, messageId: data.id };
+  } catch (err: any) {
+    console.error("Erreur réseau Resend:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+/* ==========================================================================
+   MÉTHODES TYPESAFE PUBLIQUES
+   ========================================================================== */
+
+/**
+ * Envoie un e-mail de bienvenue à l'investisseur avec ses accès.
  */
 export async function sendWelcomeEmail(to: string, clientName: string, mt5Login?: string): Promise<SendEmailResult> {
   const html = getEmailWrapper(
     "Bienvenue chez Nexium Markets",
     `
       <h2 style="color: #ffffff; margin-top: 0;">Bienvenue, ${clientName}</h2>
-      <p>Votre compte d'accès institutionnel Nexium Markets a été créé avec succès.</p>
+      <p>Votre compte d'accès institutionnel Nexium Markets a été configuré avec succès.</p>
       
       <div class="highlight-card">
         <strong style="color: #00D084; font-size: 13px; text-transform: uppercase; font-family: monospace;">Identifiants MT5 ECN Direct</strong>
@@ -98,28 +126,12 @@ export async function sendWelcomeEmail(to: string, clientName: string, mt5Login?
         </p>
       </div>
 
-      <p>Vous pouvez dès à présent configurer vos stratégies de trading algorithmique et effectuer votre dépôt d'activation.</p>
-      <a href="https://nexiummarkets.com/login" class="btn">Accéder à votre Espace Investisseur</a>
+      <p>Vous pouvez dès à présent allouer vos capitaux aux 3 stratégies de trading algorithmique.</p>
+      <a href="https://nexiummarkets.com/NEXIUM" class="btn">Accéder à votre Espace Investisseur</a>
     `
   );
 
-  if (!isResendConfigured) {
-    console.info(`[Resend Simulé] E-mail de bienvenue pour ${to} (${clientName})`);
-    return { success: true, simulated: true, messageId: `sim_${Date.now()}` };
-  }
-
-  try {
-    const res = await resend.emails.send({
-      from: defaultFromEmail,
-      to,
-      subject: "Bienvenue sur votre compte institutionnel Nexium Markets",
-      html,
-    });
-    return { success: true, messageId: res.data?.id };
-  } catch (err: any) {
-    console.error("Erreur envoi Resend:", err);
-    return { success: false, error: err.message };
-  }
+  return sendViaResendHttp(to, "Bienvenue sur votre compte institutionnel Nexium Markets", html);
 }
 
 /**
@@ -142,28 +154,12 @@ export async function sendDepositConfirmedEmail(to: string, clientName: string, 
         </p>
       </div>
 
-      <p>Les algorithmes alloués à votre portefeuille sont prêts à exécuter les signaux sur les sessions de marché actives.</p>
+      <p>Les algorithmes alloués à votre portefeuille sont actifs sur les sessions de marché en cours.</p>
       <a href="https://nexiummarkets.com/NEXIUM" class="btn">Consulter votre Solde en Direct</a>
     `
   );
 
-  if (!isResendConfigured) {
-    console.info(`[Resend Simulé] E-mail de confirmation de dépôt pour ${to}: ${amountFormatted}`);
-    return { success: true, simulated: true, messageId: `sim_${Date.now()}` };
-  }
-
-  try {
-    const res = await resend.emails.send({
-      from: defaultFromEmail,
-      to,
-      subject: `Dépôt confirmé : +${amountFormatted} crédités sur votre compte MT5 #${mt5Login}`,
-      html,
-    });
-    return { success: true, messageId: res.data?.id };
-  } catch (err: any) {
-    console.error("Erreur envoi Resend:", err);
-    return { success: false, error: err.message };
-  }
+  return sendViaResendHttp(to, `Dépôt confirmé : +${amountFormatted} crédités sur votre compte MT5 #${mt5Login}`, html);
 }
 
 /**
@@ -177,21 +173,5 @@ export async function sendCustomDeskEmail(to: string, subject: string, bodyText:
     `
   );
 
-  if (!isResendConfigured) {
-    console.info(`[Resend Simulé] E-mail officiel envoyé à ${to} avec le sujet "${subject}"`);
-    return { success: true, simulated: true, messageId: `sim_${Date.now()}` };
-  }
-
-  try {
-    const res = await resend.emails.send({
-      from: defaultFromEmail,
-      to,
-      subject,
-      html,
-    });
-    return { success: true, messageId: res.data?.id };
-  } catch (err: any) {
-    console.error("Erreur envoi Resend:", err);
-    return { success: false, error: err.message };
-  }
+  return sendViaResendHttp(to, subject, html);
 }
