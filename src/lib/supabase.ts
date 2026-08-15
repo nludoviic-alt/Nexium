@@ -49,6 +49,9 @@ export interface SupabaseUserProfile {
   role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
   status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "BANNED" | "REVOKED";
   kyc_status: "VERIFIED" | "PENDING" | "REJECTED" | "NOT_SUBMITTED";
+  license_status?: "NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE" | "EXPIRED";
+  requested_preset?: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION" | string;
+  active_preset?: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION" | string;
   mt5_login?: string;
   mt5_broker?: string;
   balance?: number;
@@ -145,6 +148,28 @@ export async function rejectClientAccount(userId: string) {
   return updateUserProfile(userId, {
     status: "REVOKED",
     kyc_status: "REJECTED",
+  });
+}
+
+/**
+ * Demande d'activation d'un preset par le client.
+ */
+export async function requestPresetActivation(userId: string, presetKey: string) {
+  return updateUserProfile(userId, {
+    license_status: "PENDING_PRESET_APPROVAL",
+    requested_preset: presetKey,
+  });
+}
+
+/**
+ * Validation et activation d'un preset par l'administrateur.
+ */
+export async function approvePresetActivation(userId: string, presetKey?: string) {
+  const profile = await getUserProfile(userId);
+  const finalPreset = presetKey || profile?.requested_preset || "AI_GOLD";
+  return updateUserProfile(userId, {
+    license_status: "ACTIVE",
+    active_preset: finalPreset,
   });
 }
 

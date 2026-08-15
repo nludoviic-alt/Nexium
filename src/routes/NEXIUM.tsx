@@ -98,7 +98,12 @@ import {
 import { useEffect, useId, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { TradingViewSuperchart } from "@/components/site/TradingViewSuperchart";
-import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
+import {
+  supabase,
+  isSupabaseConfigured,
+  getUserProfile,
+  requestPresetActivation,
+} from "@/lib/supabase";
 
 export const Route = createFileRoute("/NEXIUM")({
   head: () => ({
@@ -5229,16 +5234,23 @@ function NexiumDashboard() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("Auto-Trader");
   const [balance, setBalance] = useState(24860.42);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("Ludovic M.");
   const [clientEmail, setClientEmail] = useState("ludovic@nexium.io");
   const [mt5AccountNumber, setMt5AccountNumber] = useState("802194");
   const [assignedAdvisor, setAssignedAdvisor] = useState("Dr. Antoine R. (Quant Desk)");
+  const [licenseStatus, setLicenseStatus] = useState<"NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE">("ACTIVE");
+  const [requestedPreset, setRequestedPreset] = useState<string | null>(null);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [selectedPresetModal, setSelectedPresetModal] = useState<any | null>(null);
+  const [submittingPreset, setSubmittingPreset] = useState(false);
 
   // Chargement dynamique du profil client connecté depuis Supabase
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
+        setCurrentUserId(user.id);
         setClientEmail(user.email || "investisseur@nexiummarkets.com");
         const profile = await getUserProfile(user.id);
         if (profile) {
@@ -5246,10 +5258,36 @@ function NexiumDashboard() {
           if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
           if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
           if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
+          if (profile.license_status) {
+            setLicenseStatus(profile.license_status as any);
+          } else if (profile.status === "ACTIVE" && profile.active_preset) {
+            setLicenseStatus("ACTIVE");
+          } else {
+            setLicenseStatus("NOT_REQUESTED");
+          }
+          if (profile.requested_preset) setRequestedPreset(profile.requested_preset);
+          if (profile.active_preset) setActivePreset(profile.active_preset);
         }
       }
     });
   }, []);
+
+  const handleConfirmPresetRequest = async (presetId: string) => {
+    setSubmittingPreset(true);
+    try {
+      if (isSupabaseConfigured && currentUserId) {
+        await requestPresetActivation(currentUserId, presetId);
+      }
+      setLicenseStatus("PENDING_PRESET_APPROVAL");
+      setRequestedPreset(presetId);
+      setSelectedPresetModal(null);
+      toast.success("Demande d'attribution de Preset transmise au Desk d'Administration !");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la transmission de la demande.");
+    } finally {
+      setSubmittingPreset(false);
+    }
+  };
 
   // States
   const [bots, setBots] = useState<EngineBot[]>(INITIAL_BOTS);
@@ -5479,6 +5517,323 @@ function NexiumDashboard() {
     }, 1000);
   };
 
+  // ----------------------------------------------------
+  // CATALOGUE DES 3 PRESETS ALGORITHMIQUES
+  // ----------------------------------------------------
+  const OFFICIAL_PRESETS = [
+    {
+      id: "AI_GOLD",
+      name: "Preset 1 : Nexium AI Gold",
+      subtitle: "XAUUSD Institutional Breakout",
+      badge: "Moteur Primaire Or",
+      market: "XAUUSD (Or Spot)",
+      timeframe: "M15 / H1",
+      targetReturn: "+14.8% à +24.2% / mois",
+      maxDrawdown: "< 4.2%",
+      winRate: "73.8%",
+      gateway: "Equinix NY4 Cross-Connect FIX 4.4",
+      description:
+        "Algorithme propriétaire exploitant les micro-ruptures de volatilité et le carnet d'ordres L2 sur le cours de l'Or Spot avec prise de profit dynamique.",
+      borderClass: "border-amber-500/40 hover:border-amber-400 shadow-amber-500/10",
+      accentBg: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+      btnClass: "bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20",
+    },
+    {
+      id: "FX_TREND",
+      name: "Preset 2 : Nexium FX Trend",
+      subtitle: "Forex Majors Macro Momentum",
+      badge: "Multi-Paires Alpha",
+      market: "EURUSD · GBPUSD · USDJPY",
+      timeframe: "H1 / H4",
+      targetReturn: "+11.5% à +18.5% / mois",
+      maxDrawdown: "< 3.5%",
+      winRate: "70.2%",
+      gateway: "LD4 London Equinix Bridge",
+      description:
+        "Moteur de suivi de tendance macroéconomique synchronisé avec les écarts de taux interbancaires et les flux institutionnels de devises majeures.",
+      borderClass: "border-cyan-500/40 hover:border-cyan-400 shadow-cyan-500/10",
+      accentBg: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
+      btnClass: "bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/20",
+    },
+    {
+      id: "INDEX_REVERSION",
+      name: "Preset 3 : Nexium Index Reversion",
+      subtitle: "US Indices Mean Reversion Stat-Arb",
+      badge: "Haute Fréquence Indices",
+      market: "NAS100 · US30 · US500",
+      timeframe: "M5 / M15",
+      targetReturn: "+13.2% à +21.0% / mois",
+      maxDrawdown: "< 4.8%",
+      winRate: "76.4%",
+      gateway: "Chicago CME Direct Feed",
+      description:
+        "Stratégie de retour à la moyenne statistique sur les indices américains lors des ouvertures de session de Wall Street et des flux institutionnels.",
+      borderClass: "border-purple-500/40 hover:border-purple-400 shadow-purple-500/10",
+      accentBg: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+      btnClass: "bg-purple-500 hover:bg-purple-400 text-white shadow-purple-500/20",
+    },
+  ];
+
+  // ----------------------------------------------------
+  // ÉCRAN 1 : VUE CLIENT AVANT ACTIVATION DE LA LICENCE
+  // (Le client ne voit que ses infos et les 3 presets)
+  // ----------------------------------------------------
+  if (licenseStatus !== "ACTIVE") {
+    return (
+      <div className="min-h-screen bg-[#080a0e] text-white flex flex-col font-sans selection:bg-[#00D084]/30">
+        {/* Header Institutionnel Haut de Page */}
+        <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#0c1017]/90 backdrop-blur-xl px-4 sm:px-8 py-4">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <Link to="/" className="flex items-center gap-3">
+              <span className="font-mono text-2xl font-black tracking-[0.25em] text-white">NEXIUM</span>
+              <span className="h-4 w-px bg-[#00D084]" />
+              <span className="text-xs font-black tracking-[0.3em] text-[#00D084]">MARKETS</span>
+            </Link>
+
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div className="px-3 py-1.5 rounded-xl border border-white/[0.08] bg-[#141a23] flex items-center gap-2">
+                <span className="text-slate-400">Client :</span>
+                <strong className="text-white font-semibold">{clientName}</strong>
+              </div>
+
+              <div className="px-3 py-1.5 rounded-xl border border-[#00D084]/30 bg-[#00D084]/10 text-[#00D084] font-mono font-bold flex items-center gap-2">
+                <span>MT5 : #{mt5AccountNumber}</span>
+              </div>
+
+              <button
+                onClick={async () => {
+                  if (isSupabaseConfigured) await supabase.auth.signOut();
+                  toast.info("Déconnexion réussie.");
+                  navigate({ to: "/login" });
+                }}
+                className="px-3 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <LogOut className="size-3.5" />
+                <span>Déconnexion</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Corps Central */}
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-8 py-10 w-full space-y-8">
+          {/* Bannière de Statut si Demande en Cours */}
+          {licenseStatus === "PENDING_PRESET_APPROVAL" ? (
+            <div className="p-6 rounded-3xl bg-amber-500/10 border border-amber-500/30 backdrop-blur-xl shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in fade-in">
+              <div className="flex items-start gap-4">
+                <div className="size-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 grid place-items-center shrink-0">
+                  <Clock className="size-6 animate-spin" style={{ animationDuration: "8s" }} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      En cours de validation Desk
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">Protocole FIX 4.4</span>
+                  </div>
+                  <h2 className="text-lg font-bold text-white mt-1">
+                    Demande de Preset transmise à l'Administration
+                  </h2>
+                  <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                    Votre demande pour le <strong>{OFFICIAL_PRESETS.find(p => p.id === requestedPreset)?.name || requestedPreset}</strong> est
+                    actuellement examinée par votre gestionnaire <strong>{assignedAdvisor}</strong>. Dès que l'administrateur confirme votre
+                    abonnement, l'intégralité de votre Dashboard de trading sera instantanément déverrouillée.
+                  </p>
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                <div className="px-4 py-2 rounded-xl bg-black/40 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-amber-400 animate-ping" />
+                  <span>En attente validation Admin</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                <ShieldCheck className="size-3.5" />
+                <span>Compte Titulaire Vérifié</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                Activez votre Abonnement Algorithmique
+              </h1>
+              <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+                Votre compte de trading MT5 <strong>#{mt5AccountNumber}</strong> est opérationnel. Veuillez sélectionner ci-dessous le
+                Preset initial à déployer. Votre choix sera validé par l'Administration pour déverrouiller votre Dashboard de trading en direct.
+              </p>
+            </div>
+          )}
+
+          {/* Grille des 3 Presets */}
+          <div className="grid md:grid-cols-3 gap-6 pt-2">
+            {OFFICIAL_PRESETS.map((preset) => {
+              const isSelected = requestedPreset === preset.id;
+              const isPending = licenseStatus === "PENDING_PRESET_APPROVAL" && isSelected;
+
+              return (
+                <div
+                  key={preset.id}
+                  className={`rounded-3xl border bg-[#0d121a]/90 backdrop-blur-xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 shadow-xl ${preset.borderClass} ${
+                    isSelected ? "ring-2 ring-emerald-400/50" : ""
+                  }`}
+                >
+                  <div className="space-y-5">
+                    {/* Header Carte */}
+                    <div className="flex items-center justify-between">
+                      <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${preset.accentBg}`}>
+                        {preset.badge}
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-400">{preset.timeframe}</span>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xl font-black text-white tracking-tight">{preset.name}</h3>
+                      <p className="text-xs text-slate-400 font-mono mt-0.5">{preset.subtitle}</p>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed min-h-[48px]">
+                      {preset.description}
+                    </p>
+
+                    {/* Métriques Clés */}
+                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.08] font-mono">
+                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
+                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Marché Clé</span>
+                        <strong className="text-xs text-white">{preset.market}</strong>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
+                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Objectif Mensuel</span>
+                        <strong className="text-xs text-emerald-400">{preset.targetReturn}</strong>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
+                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Drawdown Max</span>
+                        <strong className="text-xs text-amber-300">{preset.maxDrawdown}</strong>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
+                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Win Rate Testé</span>
+                        <strong className="text-xs text-cyan-300">{preset.winRate}</strong>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                      <Wifi className="size-3.5 text-emerald-400 shrink-0" />
+                      <span className="truncate">{preset.gateway}</span>
+                    </div>
+                  </div>
+
+                  {/* Bouton d'Action */}
+                  <div className="pt-6">
+                    {isPending ? (
+                      <div className="w-full py-3.5 px-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold text-center flex items-center justify-center gap-2">
+                        <Clock className="size-4 animate-spin" />
+                        <span>Demande en cours d'approbation</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setSelectedPresetModal(preset)}
+                        className={`w-full py-3.5 px-4 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg ${preset.btnClass}`}
+                      >
+                        <span>Demander l'Activation de ce Preset</span>
+                        <ChevronRight className="size-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Section d'Information Conseiller */}
+          <div className="p-6 rounded-3xl border border-white/[0.08] bg-[#0c1017] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-2xl bg-white/[0.06] grid place-items-center text-white">
+                <ShieldCheck className="size-5" />
+              </div>
+              <div>
+                <strong className="text-white block font-semibold">Conseiller Référent Dédié</strong>
+                <span>{assignedAdvisor} · Supervision des risques et allocations 24/7</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-400">Support Technique : </span>
+              <strong className="text-emerald-400 font-mono">support@nexiummarkets.com</strong>
+            </div>
+          </div>
+        </main>
+
+        {/* Modale de Confirmation de Demande de Preset */}
+        {selectedPresetModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md grid place-items-center p-4 animate-in fade-in">
+            <div className="w-full max-w-lg rounded-3xl border border-white/[0.12] bg-[#0f141d] p-6 sm:p-8 shadow-2xl space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center">
+                    <CheckCircle2 className="size-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Validation du Preset</h3>
+                    <p className="text-xs text-slate-400 font-mono">{selectedPresetModal.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedPresetModal(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06]"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-300 leading-relaxed bg-black/40 p-4 rounded-2xl border border-white/[0.06]">
+                <p>
+                  Vous êtes sur le point de soumettre la demande d'activation pour le{" "}
+                  <strong className="text-white">{selectedPresetModal.name}</strong> sur votre compte MT5{" "}
+                  <strong className="text-emerald-400">#{mt5AccountNumber}</strong>.
+                </p>
+                <ul className="space-y-1.5 text-slate-400 pt-2 border-t border-white/[0.06]">
+                  <li>• Stratégie : <strong className="text-white">{selectedPresetModal.subtitle}</strong></li>
+                  <li>• Marché Ciblé : <strong className="text-white">{selectedPresetModal.market}</strong></li>
+                  <li>• Passerelle d'exécution : <strong className="text-white">{selectedPresetModal.gateway}</strong></li>
+                  <li>• Régulation : <strong className="text-emerald-400">Validation obligatoire par l'Administrateur</strong></li>
+                </ul>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setSelectedPresetModal(null)}
+                  className="px-4 py-2.5 rounded-xl border border-white/[0.1] text-xs font-bold text-slate-300 hover:bg-white/[0.06] transition"
+                >
+                  Annuler
+                </button>
+                <button
+                  disabled={submittingPreset}
+                  onClick={() => handleConfirmPresetRequest(selectedPresetModal.id)}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                >
+                  {submittingPreset ? (
+                    <>
+                      <Clock className="size-4 animate-spin" />
+                      <span>Transmission...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="size-4" />
+                      <span>Confirmer &amp; Transmettre à l'Admin</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // ÉCRAN 2 : DASHBOARD COMPLET DÉVERROUILLÉ
+  // (Affiché UNIQUEMENT lorsque l'Admin a validé le Preset)
+  // ----------------------------------------------------
   return (
     <div className="min-h-screen bg-[#0b0d10] text-gray-100 font-sans selection:bg-[#00D084]/30">
       {/* Sidebar */}

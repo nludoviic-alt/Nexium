@@ -126,6 +126,7 @@ import {
   isSupabaseConfigured,
   approveClientAccount,
   rejectClientAccount,
+  approvePresetActivation,
   getAllClientProfiles,
 } from "@/lib/supabase";
 
@@ -227,9 +228,10 @@ interface UserProfile {
   forcePasswordReset: boolean;
   balance: number;
   bonusCredit: number;
-  equity: number;
-  
   kycStatus: KycStatus;
+  licenseStatus?: "NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE" | "EXPIRED";
+  requestedPreset?: string;
+  activePreset?: string;
   kycDocuments: {
     idCardName: string;
     proofOfAddressName: string;
@@ -1582,6 +1584,9 @@ function NexiumAdminDashboard() {
             bonusCredit: 0,
             equity: p.balance || 0,
             kycStatus: p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW",
+            licenseStatus: (p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED"),
+            requestedPreset: p.requested_preset,
+            activePreset: p.active_preset,
             kycDocuments: {
               idCardName: "En cours d'examen",
               proofOfAddressName: "En cours d'examen",
@@ -1679,6 +1684,43 @@ function NexiumAdminDashboard() {
 
     addAuditLog("CLIENT_REJECTED", `Demande de compte de ${client.name} (${client.email}) refusée.`, client.name);
     toast.error(`La demande de compte de ${client.name} a été refusée.`);
+  };
+
+  // Validation & Activation d'un Preset de Trading par l'Administrateur
+  const handleApproveClientPreset = async (client: UserProfile, presetKey?: string) => {
+    const finalPreset = presetKey || client.requestedPreset || "AI_GOLD";
+
+    if (isSupabaseConfigured) {
+      await approvePresetActivation(client.id, finalPreset);
+    }
+
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id === client.id) {
+          return {
+            ...c,
+            licenseStatus: "ACTIVE",
+            activePreset: finalPreset,
+            status: "ACTIVE",
+          };
+        }
+        return c;
+      })
+    );
+
+    // Envoi de l'e-mail officiel d'activation de la licence via Resend
+    sendCustomDeskEmail(
+      client.email,
+      `Activation de votre Stratégie Algorithmique (${finalPreset})`,
+      `Bonjour ${client.name},\n\nVotre demande d'activation pour le Preset Algorithmique [${finalPreset}] a été validée par la Direction des Opérations.\n\nVotre Dashboard de Trading en direct (flux Equinix NY4 FIX 4.4) est désormais déverrouillé et opérationnel sur votre compte MT5 #${client.mt5.login}.\n\nConnectez-vous dès maintenant pour suivre vos exécutions et vos performances en temps réel : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+    ).catch((err) => console.warn("Resend email error:", err));
+
+    addAuditLog(
+      "PRESET_APPROVED",
+      `Preset [${finalPreset}] validé et activé pour ${client.name} (${client.email}). Dashboard déverrouillé.`,
+      client.name
+    );
+    toast.success(`Preset [${finalPreset}] activé ! Le Dashboard de ${client.name} est maintenant totalement accessible.`);
   };
 
   // Envoi d'un message dans le chat desk
@@ -3114,6 +3156,25 @@ function NexiumAdminDashboard() {
                 </div>
               )}
 
+              {/* ── BANNIÈRE DEMANDES DE PRESET EN ATTENTE ── */}
+              {clients.some((c) => c.licenseStatus === "PENDING_PRESET_APPROVAL") && (
+                <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in">
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-xl bg-cyan-500/20 text-cyan-400 grid place-items-center shrink-0">
+                      <Zap className="size-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-cyan-300">
+                        {clients.filter((c) => c.licenseStatus === "PENDING_PRESET_APPROVAL").length} Demande(s) d'Activation de Preset Algorithmique
+                      </h3>
+                      <p className="text-xs text-slate-300">
+                        Des clients ont validé leur sélection de stratégie (Preset 1, 2 ou 3). Validez leur abonnement pour déverrouiller leur Dashboard complet.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Tableau Clients */}
               <AdminDataTable
                 columns={[
@@ -3130,24 +3191,32 @@ function NexiumAdminDashboard() {
                   },
                   {
                     key: "status",
-                    header: "STATUT",
+                    header: "STATUT & LICENCE",
                     render: (c: UserProfile) => (
                       <div className="space-y-1">
                         <AdminBadge
                           variant={
-                            c.status === "ACTIVE"
-                              ? "emerald"
-                              : c.status === "PENDING_APPROVAL"
+                            c.status === "PENDING_APPROVAL"
                               ? "amber"
+                              : c.licenseStatus === "PENDING_PRESET_APPROVAL"
+                              ? "cyan"
+                              : c.status === "ACTIVE"
+                              ? "emerald"
                               : c.status === "SUSPENDED"
                               ? "amber"
                               : "rose"
                           }
                           dot={false}
                         >
-                          {c.status === "PENDING_APPROVAL" ? "⏳ EN ATTENTE" : c.status}
+                          {c.status === "PENDING_APPROVAL"
+                            ? "⏳ COMPTE EN ATTENTE"
+                            : c.licenseStatus === "PENDING_PRESET_APPROVAL"
+                            ? `🎯 PRESET : ${c.requestedPreset || "AI_GOLD"}`
+                            : c.status}
                         </AdminBadge>
-                        <span className="text-[11px] text-indigo-300 font-mono block">KYC : {c.kycStatus}</span>
+                        <span className="text-[11px] text-indigo-300 font-mono block">
+                          KYC : {c.kycStatus} {c.activePreset ? `· ${c.activePreset}` : ""}
+                        </span>
                       </div>
                     ),
                   },
@@ -3186,13 +3255,29 @@ function NexiumAdminDashboard() {
                               className="rounded-xl border border-emerald-500 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black py-1.5 px-3 transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
                             >
                               <CheckCircle2 className="size-3.5" />
-                              <span>Valider &amp; Activer</span>
+                              <span>Valider Compte</span>
                             </button>
                             <button
                               onClick={() => handleRejectPendingClient(c)}
                               className="rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold py-1.5 px-2.5 transition cursor-pointer"
                             >
                               Refuser
+                            </button>
+                          </>
+                        ) : c.licenseStatus === "PENDING_PRESET_APPROVAL" ? (
+                          <>
+                            <button
+                              onClick={() => handleApproveClientPreset(c, c.requestedPreset)}
+                              className="rounded-xl border border-cyan-400 bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black py-1.5 px-3 transition cursor-pointer inline-flex items-center gap-1 shadow-md shadow-cyan-500/20"
+                            >
+                              <Zap className="size-3.5" />
+                              <span>Valider Preset &amp; Déverrouiller</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenClientProfile(c)}
+                              className="rounded-xl border border-white/[0.1] bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 text-xs font-bold py-1.5 px-2.5 transition cursor-pointer"
+                            >
+                              Fiche
                             </button>
                           </>
                         ) : (
