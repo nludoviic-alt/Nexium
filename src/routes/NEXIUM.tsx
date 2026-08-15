@@ -229,15 +229,15 @@ export interface ChatMessage {
   senderName: string;
   text: string;
   time: string;
-  avatar?: string;
-  image?: string;
-  imageCaption?: string;
-  isVoice?: boolean;
-  voiceDuration?: string;
-  reactions?: { emoji: string; count: number; byMe?: boolean }[];
-  status?: "sent" | "delivered" | "read";
-  replyTo?: { senderName: string; text: string };
-  contactId?: string;
+  avatar?: string | undefined;
+  image?: string | undefined;
+  imageCaption?: string | undefined;
+  isVoice?: boolean | undefined;
+  voiceDuration?: string | undefined;
+  reactions?: { emoji: string; count: number; byMe?: boolean }[] | undefined;
+  status?: "sent" | "delivered" | "read" | undefined;
+  replyTo?: { senderName: string; text: string } | undefined;
+  contactId?: string | undefined;
 }
 
 export interface PriceAlert {
@@ -2823,7 +2823,7 @@ function MessagingTab({
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [attachedImageCaption, setAttachedImageCaption] = useState<string>("");
   const [showScreenshotMenu, setShowScreenshotMenu] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<{ url: string; caption?: string } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; caption?: string | undefined } | null>(null);
 
   // Voice recording state
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -2859,8 +2859,8 @@ function MessagingTab({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatThreads, isTyping]);
 
-  const activeContact = useMemo(() => {
-    return MESSENGER_CONTACTS.find((c) => c.id === selectedContactId) ?? MESSENGER_CONTACTS[0];
+  const activeContact: MessengerContact = useMemo(() => {
+    return MESSENGER_CONTACTS.find((c) => c.id === selectedContactId) ?? (MESSENGER_CONTACTS[0] as MessengerContact);
   }, [selectedContactId]);
 
   const activeMessages = useMemo(() => {
