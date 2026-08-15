@@ -127,6 +127,7 @@ import {
   approveClientAccount,
   rejectClientAccount,
   approvePresetActivation,
+  assignAdvisorToClient,
   getAllClientProfiles,
 } from "@/lib/supabase";
 
@@ -1367,8 +1368,26 @@ function NexiumAdminDashboard() {
     { id: "a-2", timestamp: "14:50:12", admin: "Elena Rostova", action: "MESSAGE_SENT", targetUser: "Alexandre Dupuis", details: "Réponse sur support direct News Guard." },
   ]);
 
+  // Détection des privilèges Super Admin et Conseiller
+  const isSuperAdmin = currentSessionRole === "SUPER_ADMIN" || currentSessionRole === "OWNER";
+  const currentStaffMember = useMemo(() => staffList.find((s) => s.role === currentSessionRole), [staffList, currentSessionRole]);
+  const [advisorFilter, setAdvisorFilter] = useState<string>("ALL");
+
+  // Filtrage des clients : les conseillers ne voient que leur portefeuille assigné
+  const visibleClients = useMemo(() => {
+    if (!isSuperAdmin && currentStaffMember) {
+      return clients.filter((c) =>
+        c.assignedAdvisor?.toLowerCase().includes(currentStaffMember.name.toLowerCase())
+      );
+    }
+    if (advisorFilter !== "ALL") {
+      return clients.filter((c) => c.assignedAdvisor === advisorFilter);
+    }
+    return clients;
+  }, [clients, isSuperAdmin, currentStaffMember, advisorFilter]);
+
   // Tableaux : recherche & pagination
-  const clientsTable = useTableQuery(clients, matchesClient);
+  const clientsTable = useTableQuery(visibleClients, matchesClient);
   const staffTable = useTableQuery(staffList, matchesStaff);
   const auditLogsTable = useTableQuery(auditLogs, matchesAuditEntry);
   const feesTable = useTableQuery(clients, matchesClient);
@@ -1686,8 +1705,13 @@ function NexiumAdminDashboard() {
     toast.error(`La demande de compte de ${client.name} a été refusée.`);
   };
 
-  // Validation & Activation d'un Preset de Trading par l'Administrateur
+  // Validation & Activation d'un Preset de Trading (SOUVERAINETÉ EXCLUSIVE DU SUPER ADMIN)
   const handleApproveClientPreset = async (client: UserProfile, presetKey?: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Privilège insuffisant : Seul le Super Administrateur / Direction peut valider et activer les Presets.");
+      return;
+    }
+
     const finalPreset = presetKey || client.requestedPreset || "AI_GOLD";
 
     if (isSupabaseConfigured) {
@@ -1717,10 +1741,33 @@ function NexiumAdminDashboard() {
 
     addAuditLog(
       "PRESET_APPROVED",
-      `Preset [${finalPreset}] validé et activé pour ${client.name} (${client.email}). Dashboard déverrouillé.`,
+      `Preset [${finalPreset}] validé et activé pour ${client.name} (${client.email}) par le Super Admin. Dashboard déverrouillé.`,
       client.name
     );
-    toast.success(`Preset [${finalPreset}] activé ! Le Dashboard de ${client.name} est maintenant totalement accessible.`);
+    toast.success(`Preset [${finalPreset}] validé ! Le Dashboard de ${client.name} est maintenant totalement accessible.`);
+  };
+
+  // Attribution d'un client à un Administrateur / Conseiller Dédié
+  const handleAssignAdvisor = async (client: UserProfile, newAdvisor: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Seul le Super Administrateur peut réassigner les portefeuilles clients.");
+      return;
+    }
+
+    if (isSupabaseConfigured) {
+      await assignAdvisorToClient(client.id, newAdvisor);
+    }
+
+    setClients((prev) =>
+      prev.map((c) => (c.id === client.id ? { ...c, assignedAdvisor: newAdvisor } : c))
+    );
+
+    addAuditLog(
+      "ADVISOR_ASSIGNED",
+      `Client ${client.name} (${client.email}) assigné au Conseiller ${newAdvisor}.`,
+      client.name
+    );
+    toast.success(`Le client ${client.name} est désormais assigné à ${newAdvisor}.`);
   };
 
   // Envoi d'un message dans le chat desk
@@ -3057,9 +3104,33 @@ function NexiumAdminDashboard() {
                     <Users className="size-7 text-emerald-400" />
                     <span>Comptes Clients</span>
                   </h1>
+                  {!isSuperAdmin && currentStaffMember && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Vue restreinte : Portefeuille dédié de <strong className="text-emerald-400">{currentStaffMember.name}</strong> ({visibleClients.length} clients)
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Sélecteur de Portefeuille Conseiller pour le Super Admin */}
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400 font-medium">Portefeuille :</span>
+                      <select
+                        value={advisorFilter}
+                        onChange={(e) => setAdvisorFilter(e.target.value)}
+                        className="rounded-xl border border-white/[0.12] bg-[#141a23] text-xs font-bold text-emerald-400 px-3 py-2 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                      >
+                        <option value="ALL">Tous les Conseillers ({clients.length} Clients)</option>
+                        {staffList.map((s) => (
+                          <option key={s.id} value={s.name}>
+                            {s.name} ({clients.filter((c) => c.assignedAdvisor?.includes(s.name)).length})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => setActiveSection("create-user")}
                     className="admin-btn-primary"
@@ -3122,9 +3193,9 @@ function NexiumAdminDashboard() {
 
                 <div className="admin-card-purple p-5 space-y-2">
                   <div className="flex justify-between items-start">
-                    <span className="text-xs text-slate-300 uppercase font-semibold font-sans">Algorithmes en Direct</span>
-                    <div className="grid size-8 place-items-center rounded-lg bg-purple-500/15 text-purple-300">
-                      <Cpu className="size-4" />
+                    <span className="text-xs text-slate-300 uppercase font-semibold font-sans">Moteurs Algorithmiques</span>
+                    <div className="grid size-8 place-items-center rounded-lg bg-purple-500/15 text-purple-400">
+                      <Bot className="size-4" />
                     </div>
                   </div>
                   <p className="text-2xl font-bold text-purple-300">
@@ -3168,7 +3239,9 @@ function NexiumAdminDashboard() {
                         {clients.filter((c) => c.licenseStatus === "PENDING_PRESET_APPROVAL").length} Demande(s) d'Activation de Preset Algorithmique
                       </h3>
                       <p className="text-xs text-slate-300">
-                        Des clients ont validé leur sélection de stratégie (Preset 1, 2 ou 3). Validez leur abonnement pour déverrouiller leur Dashboard complet.
+                        {isSuperAdmin
+                          ? "Des clients ont validé leur sélection de stratégie. Validez leur abonnement ci-dessous pour déverrouiller leur Dashboard."
+                          : "Des clients ont validé leur sélection de stratégie. Validation réservée au Super Administrateur."}
                       </p>
                     </div>
                   </div>
@@ -3221,6 +3294,31 @@ function NexiumAdminDashboard() {
                     ),
                   },
                   {
+                    key: "advisor",
+                    header: "CONSEILLER DÉDIÉ",
+                    render: (c: UserProfile) => (
+                      <div>
+                        {isSuperAdmin ? (
+                          <select
+                            value={c.assignedAdvisor || "Dr. Antoine R."}
+                            onChange={(e) => handleAssignAdvisor(c, e.target.value)}
+                            className="text-xs font-semibold rounded-lg bg-black/40 border border-slate-700 text-slate-200 px-2 py-1 focus:border-emerald-500 focus:outline-none cursor-pointer"
+                          >
+                            {staffList.map((s) => (
+                              <option key={s.id} value={s.name}>
+                                {s.name} ({s.role})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-300 bg-white/[0.06] px-2.5 py-1 rounded-lg border border-white/[0.08]">
+                            {c.assignedAdvisor || "Non assigné"}
+                          </span>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
                     key: "balance",
                     header: "SOLDE & P&L JOUR",
                     render: (c: UserProfile) => (
@@ -3266,13 +3364,19 @@ function NexiumAdminDashboard() {
                           </>
                         ) : c.licenseStatus === "PENDING_PRESET_APPROVAL" ? (
                           <>
-                            <button
-                              onClick={() => handleApproveClientPreset(c, c.requestedPreset)}
-                              className="rounded-xl border border-cyan-400 bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black py-1.5 px-3 transition cursor-pointer inline-flex items-center gap-1 shadow-md shadow-cyan-500/20"
-                            >
-                              <Zap className="size-3.5" />
-                              <span>Valider Preset &amp; Déverrouiller</span>
-                            </button>
+                            {isSuperAdmin ? (
+                              <button
+                                onClick={() => handleApproveClientPreset(c, c.requestedPreset)}
+                                className="rounded-xl border border-cyan-400 bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black py-1.5 px-3 transition cursor-pointer inline-flex items-center gap-1 shadow-md shadow-cyan-500/20"
+                              >
+                                <Zap className="size-3.5" />
+                                <span>Valider Preset &amp; Déverrouiller</span>
+                              </button>
+                            ) : (
+                              <span className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-[11px] font-bold py-1.5 px-2.5 inline-flex items-center gap-1">
+                                🔒 Attente Super Admin
+                              </span>
+                            )}
                             <button
                               onClick={() => handleOpenClientProfile(c)}
                               className="rounded-xl border border-white/[0.1] bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 text-xs font-bold py-1.5 px-2.5 transition cursor-pointer"

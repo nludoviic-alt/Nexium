@@ -162,7 +162,7 @@ export async function requestPresetActivation(userId: string, presetKey: string)
 }
 
 /**
- * Validation et activation d'un preset par l'administrateur.
+ * Validation et activation d'un preset par le Super Administrateur.
  */
 export async function approvePresetActivation(userId: string, presetKey?: string) {
   const profile = await getUserProfile(userId);
@@ -170,6 +170,15 @@ export async function approvePresetActivation(userId: string, presetKey?: string
   return updateUserProfile(userId, {
     license_status: "ACTIVE",
     active_preset: finalPreset,
+  });
+}
+
+/**
+ * Attribution d'un client à un Administrateur / Conseiller par le Super Admin.
+ */
+export async function assignAdvisorToClient(userId: string, advisorName: string) {
+  return updateUserProfile(userId, {
+    assigned_advisor: advisorName,
   });
 }
 
