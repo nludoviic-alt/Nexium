@@ -22,21 +22,83 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
-import { Check, ChevronDown, Eye, EyeOff, Globe } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, Globe, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { sendWelcomeEmail } from "@/lib/resend";
 
 function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [country, setCountry] = useState("Canada");
   const [hasIb, setHasIb] = useState(true);
   const [ibCode, setIbCode] = useState("90462");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Compte créé avec succès ! Bienvenue sur Nexium Markets.");
-    navigate({ to: "/NEXIUM" });
+    if (!email || !password || !firstName) {
+      toast.error("Veuillez remplir tous les champs obligatoires.");
+      return;
+    }
+
+    setLoading(true);
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
+    try {
+      if (isSupabaseConfigured) {
+        // 1. Création compte utilisateur Supabase Auth
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name: fullName,
+              country,
+              ib_code: hasIb ? ibCode : null,
+            },
+          },
+        });
+
+        if (error) {
+          toast.error(`Erreur d'inscription : ${error.message}`);
+          setLoading(false);
+          return;
+        }
+
+        // 2. Création de la fiche profil dans la table `profiles`
+        if (data.user) {
+          await supabase.from("profiles").upsert({
+            id: data.user.id,
+            email,
+            name: fullName,
+            role: "TRADER",
+            status: "ACTIVE",
+            kyc_status: "NOT_SUBMITTED",
+            balance: 10000.0, // Solde de démonstration institutionnel
+            assigned_advisor: "Dr. Antoine R.",
+          });
+
+          // 3. Envoi e-mail officiel de bienvenue via Resend
+          sendWelcomeEmail(email, fullName, "Nexium-Live-NY4").catch((err) =>
+            console.warn("Resend email error:", err)
+          );
+        }
+      }
+
+      toast.success("Compte créé avec succès ! Bienvenue sur Nexium Markets.");
+      navigate({ to: "/NEXIUM" });
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la création du compte.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -137,13 +199,15 @@ function RegisterPage() {
                   <div className="relative">
                     <select
                       id="country"
-                      className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00ff66] focus:outline-none focus:ring-2 focus:ring-[#00ff66]/20"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00ff66] focus:outline-none focus:ring-2 focus:ring-[#00ff66]/20 cursor-pointer"
                     >
-                      <option value="Canada">Canada</option>
-                      <option value="France">France</option>
-                      <option value="United Kingdom">Royaume-Uni</option>
-                      <option value="Switzerland">Suisse</option>
-                      <option value="United States">États-Unis</option>
+                      <option value="Canada">Canada 🇨🇦</option>
+                      <option value="France">France 🇫🇷</option>
+                      <option value="United Kingdom">Royaume-Uni 🇬🇧</option>
+                      <option value="Switzerland">Suisse 🇨🇭</option>
+                      <option value="United States">États-Unis 🇺🇸</option>
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-4 top-4 size-4 text-gray-600" />
                   </div>
@@ -156,10 +220,13 @@ function RegisterPage() {
                       htmlFor="firstName"
                       className="text-xs sm:text-sm font-extrabold text-gray-800"
                     >
-                      Prénom
+                      Prénom *
                     </label>
                     <Input
                       id="firstName"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
                       placeholder="Prénom"
                       className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                     />
@@ -173,6 +240,8 @@ function RegisterPage() {
                     </label>
                     <Input
                       id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
                       placeholder="Nom"
                       className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                     />
@@ -185,11 +254,14 @@ function RegisterPage() {
                     htmlFor="email"
                     className="text-xs sm:text-sm font-extrabold text-gray-800"
                   >
-                    Adresse E-mail
+                    Adresse E-mail *
                   </label>
                   <Input
                     id="email"
                     type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="Adresse e-mail"
                     className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                   />
@@ -201,19 +273,22 @@ function RegisterPage() {
                     htmlFor="password"
                     className="text-xs sm:text-sm font-extrabold text-gray-800"
                   >
-                    Mot de Passe
+                    Mot de Passe *
                   </label>
                   <div className="relative">
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Mot de passe du portail"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Mot de passe sécurisé (min. 6 caractères)"
                       className="rounded-xl border-gray-300 bg-white px-4 py-3.5 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800"
+                      className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800 cursor-pointer"
                     >
                       {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                     </button>
@@ -260,9 +335,11 @@ function RegisterPage() {
                 {/* Create Account Black Pill Button */}
                 <Button
                   type="submit"
-                  className="w-full bg-black text-white hover:bg-gray-800 rounded-xl py-4 text-sm font-black uppercase tracking-wider transition-all shadow-lg mt-3 hover:scale-[1.01]"
+                  disabled={loading}
+                  className="w-full mt-3 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Créer Mon Compte
+                  {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
+                  <span>{loading ? "Création en cours..." : "Créer Mon Compte"}</span>
                 </Button>
               </form>
             </div>

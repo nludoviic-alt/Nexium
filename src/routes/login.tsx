@@ -21,21 +21,67 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-import { Eye, EyeOff, Globe } from "lucide-react";
+import { Eye, EyeOff, Globe, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
 
 function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("ludovic@nexium.io");
   const [password, setPassword] = useState("••••••••••••");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Connexion réussie. Bienvenue sur votre Dashboard Nexium.");
-    navigate({ to: "/NEXIUM" });
+    if (!email || !password) {
+      toast.error("Veuillez saisir votre e-mail et mot de passe.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // 1. Authentification Supabase si configuré
+      if (isSupabaseConfigured && password !== "••••••••••••") {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          toast.error(`Erreur de connexion : ${error.message}`);
+          setLoading(false);
+          return;
+        }
+
+        if (data.user) {
+          const profile = await getUserProfile(data.user.id);
+          toast.success(`Bienvenue, ${profile?.name || data.user.email} !`);
+
+          if (profile?.role && ["OWNER", "SUPER_ADMIN", "ADMIN"].includes(profile.role)) {
+            navigate({ to: "/admin" });
+          } else {
+            navigate({ to: "/NEXIUM" });
+          }
+          return;
+        }
+      }
+
+      // 2. Mode Démo / Accès direct
+      toast.success("Connexion réussie. Bienvenue sur votre Dashboard Nexium.");
+      if (email.toLowerCase().includes("admin") || email.toLowerCase().includes("owner")) {
+        navigate({ to: "/admin" });
+      } else {
+        navigate({ to: "/NEXIUM" });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Impossible de se connecter.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -133,6 +179,9 @@ function LoginPage() {
                   <Input
                     id="email"
                     type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="Adresse e-mail"
                     className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                   />
@@ -158,13 +207,16 @@ function LoginPage() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       placeholder="Mot de passe du portail"
                       className="rounded-xl border-gray-300 bg-white px-4 py-3.5 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800"
+                      className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800 cursor-pointer"
                     >
                       {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
                     </button>
@@ -174,9 +226,11 @@ function LoginPage() {
                 {/* Submit Black Pill Button */}
                 <Button
                   type="submit"
-                  className="w-full bg-black text-white hover:bg-gray-800 rounded-xl py-4 text-sm font-black uppercase tracking-wider transition-all shadow-lg mt-3 hover:scale-[1.01]"
+                  disabled={loading}
+                  className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Se Connecter au Portail
+                  {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
+                  <span>{loading ? "Connexion en cours..." : "Se Connecter"}</span>
                 </Button>
               </form>
             </div>
