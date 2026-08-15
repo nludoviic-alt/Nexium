@@ -1,49 +1,23 @@
-name: Auto Deploy Nexium Markets CI/CD
+name: Auto Deploy Nexium Markets to OVH VPS
 
 on:
   push:
     branches:
       - main
-      - master
 
 jobs:
-  build-and-deploy:
+  deploy:
+    name: Deploy to OVH Production VPS
     runs-on: ubuntu-latest
-    name: Build and Deploy Platform
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-
-      - name: Install Dependencies
-        run: npm ci || npm install
-
-      - name: Verify TypeScript & Build Bundle
-        run: |
-          npx tsc --noEmit
-          npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY }}
-
-      - name: Deploy to VPS (SSH) - Optional
-        if: env.VPS_HOST != ''
+      - name: Trigger Remote VPS Deployment
         uses: appleboy/ssh-action@master
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME || 'root' }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          host: 149.56.97.158
+          username: ubuntu
+          password: ${{ secrets.VPS_PASSWORD || 'Nexium2026!Markets#Pro' }}
+          port: 22
           script: |
-            cd /var/www/nexium || cd ~/nexium
-            git pull origin main
-            npm install
-            npm run build
-            pm2 restart all || true
+            echo "🚀 Lancement du déploiement automatique sur le VPS OVH..."
+            /home/ubuntu/deploy.sh
+            echo "✅ Déploiement terminé avec succès sur https://nexiummarkets.com !"
