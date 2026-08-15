@@ -4,97 +4,95 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 
 import { DemoBadge, PageHeader, PageShell, Section } from "@/components/site/PageShell";
 import { RISK_DISCLAIMER, robots } from "@/data/robots";
+import { useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/performance")({
   head: () => ({
     meta: [
-      { title: "Performance et méthodologie — Nexium-markets" },
+      { title: "Performance et méthodologie — Nexium Markets" },
       {
         name: "description",
         content:
-          "Comment Nexium-markets mesure et affiche les statistiques de trading : données issues du terminal MT5, jamais de chiffres inventés.",
-      },
-      { property: "og:title", content: "Performance et méthodologie — Nexium-markets" },
-      {
-        property: "og:description",
-        content: "Métriques, méthodologie et avertissement sur les risques.",
+          "Comment Nexium Markets mesure et affiche les statistiques de trading : données réelles issues des serveurs MT5.",
       },
     ],
   }),
   component: PerformancePage,
 });
 
-const metrics = [
-  "Balance et equity",
-  "P&L net",
-  "Drawdown maximum",
-  "Nombre de trades",
-  "Win rate",
-  "Profit factor",
-  "Gain moyen et perte moyenne",
-  "Recovery factor",
-  "Expectancy",
-];
-
-const performanceKPIs = [
-  {
-    label: "Vitesse d'Exécution Moyen",
-    value: "< 38 ms",
-    sub: "Connexion directe FIX API 4.4",
-    icon: Zap,
-    color: "text-emerald-600 bg-emerald-50 border-emerald-100",
-  },
-  {
-    label: "Win Rate Benchmark",
-    value: "78.4%",
-    sub: "Moyenne certifiée sur 10,000+ trades",
-    icon: TrendingUp,
-    color: "text-[#00c853] bg-[#00c853]/10 border-[#00c853]/20",
-  },
-  {
-    label: "Contrôle du Drawdown Max",
-    value: "11.8%",
-    sub: "Algorithme Stop-Loss & Equity Guard",
-    icon: ShieldCheck,
-    color: "text-blue-600 bg-blue-50 border-blue-100",
-  },
-  {
-    label: "Disponibilité Serveur VPS",
-    value: "99.99%",
-    sub: "Hébergement Equinix LD4 / NY4",
-    icon: Server,
-    color: "text-purple-600 bg-purple-50 border-purple-100",
-  },
-];
-
-const executionBenchmark = [
-  {
-    feature: "Technologie de Routing",
-    retail: "Bridge Standard Retail (ECN)",
-    pro: "FIX API 4.4 Ultra-Direct",
-    badge: "Nexium Core",
-  },
-  {
-    feature: "Vitesse d'Exécution",
-    retail: "150ms - 350ms",
-    pro: "< 38ms (Equinix NY4)",
-    badge: "Institutionnel",
-  },
-  {
-    feature: "Slippage Moyen",
-    retail: "+0.8 à +2.4 pips",
-    pro: "0.0 pip (Zero Fill-Delay)",
-    badge: "Optimisé",
-  },
-  {
-    feature: "Vérification des Licences",
-    retail: "Manuelle / Mensuelle",
-    pro: "Heartbeat continu (60s)",
-    badge: "Sécurisé",
-  },
-];
-
 function PerformancePage() {
+  const { language, t } = useLanguage();
+
+  const metrics = [
+    language === "fr" ? "Balance et équité" : "Balance & Equity",
+    language === "fr" ? "P&L net réalisé" : "Net Realized P&L",
+    language === "fr" ? "Drawdown maximum" : "Maximum Drawdown",
+    language === "fr" ? "Nombre total de trades" : "Total Trade Count",
+    language === "fr" ? "Taux de réussite (Win rate)" : "Win Rate %",
+    language === "fr" ? "Profit factor" : "Profit Factor",
+    language === "fr" ? "Gain moyen et perte moyenne" : "Average Gain & Average Loss",
+    language === "fr" ? "Recovery factor" : "Recovery Factor",
+    language === "fr" ? "Espérance mathématique" : "Mathematical Expectancy",
+  ];
+
+  const performanceKPIs = [
+    {
+      label: t.performance.kpi1Title,
+      value: "< 38 ms",
+      sub: t.performance.kpi1Sub,
+      icon: Zap,
+      color: "text-emerald-600 bg-emerald-50 border-emerald-100",
+    },
+    {
+      label: t.performance.kpi2Title,
+      value: "78.4%",
+      sub: t.performance.kpi2Sub,
+      icon: TrendingUp,
+      color: "text-[#00c853] bg-[#00c853]/10 border-[#00c853]/20",
+    },
+    {
+      label: t.performance.kpi3Title,
+      value: "11.8%",
+      sub: t.performance.kpi3Sub,
+      icon: ShieldCheck,
+      color: "text-blue-600 bg-blue-50 border-blue-100",
+    },
+    {
+      label: language === "fr" ? "Disponibilité Serveur VPS" : "VPS Server Uptime",
+      value: "99.99%",
+      sub: language === "fr" ? "Hébergement Equinix LD4 / NY4" : "Equinix LD4 / NY4 Co-location",
+      icon: Server,
+      color: "text-purple-600 bg-purple-50 border-purple-100",
+    },
+  ];
+
+  const executionBenchmark = [
+    {
+      feature: language === "fr" ? "Technologie de Routage" : "Routing Technology",
+      retail: language === "fr" ? "Bridge Standard Retail (ECN)" : "Standard Retail Bridge",
+      pro: "FIX API 4.4 Ultra-Direct",
+      badge: "Nexium Core",
+    },
+    {
+      feature: language === "fr" ? "Vitesse d'Exécution" : "Execution Speed",
+      retail: "150ms - 350ms",
+      pro: "< 38ms (Equinix NY4)",
+      badge: language === "fr" ? "Institutionnel" : "Institutional",
+    },
+    {
+      feature: language === "fr" ? "Slippage Moyen" : "Average Slippage",
+      retail: "+0.8 à +2.4 pips",
+      pro: "0.0 pip (Zero Fill-Delay)",
+      badge: language === "fr" ? "Optimisé" : "Optimized",
+    },
+    {
+      feature: language === "fr" ? "Vérification des Licences" : "Licensing Verification",
+      retail: language === "fr" ? "Manuelle / Mensuelle" : "Manual / Monthly",
+      pro: language === "fr" ? "Heartbeat continu (60s)" : "Continuous Heartbeat (60s)",
+      badge: language === "fr" ? "Sécurisé" : "Secured",
+    },
+  ];
+
   const chartData = robots.map((r) => ({
     name: r.name.replace("Nexium ", ""),
     winRate: r.demoStats.winRate,
@@ -104,16 +102,16 @@ function PerformancePage() {
   return (
     <PageShell>
       <PageHeader
-        eyebrow="MOTEUR D'ANALYTICS"
-        title="Des Statistiques Transparentes, Jamais Inventées"
-        description="Chaque statistique affichée dans votre dashboard provient directement de la télémétrie FIX API colocalisée. Aucun chiffre n'est jamais interpolé ou simulé."
+        eyebrow={t.performance.badge}
+        title={t.performance.title}
+        description={t.performance.subtitle}
       />
 
       <Section>
         <div className="grid gap-8 lg:grid-cols-[1fr_1.2fr]">
           <div className="glass-card-dark rounded-3xl p-8 border border-gray-800 shadow-xl">
             <h2 className="text-2xl font-black text-white">
-              Métriques Calculées dans le Dashboard
+              {t.performance.tableTitle}
             </h2>
             <ul className="mt-6 grid gap-3 sm:grid-cols-2">
               {metrics.map((m) => (
@@ -127,12 +125,15 @@ function PerformancePage() {
 
           <div className="glass-card-dark rounded-3xl p-8 border border-gray-800 shadow-xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-black text-white">Télémétrie en Direct</h2>
+              <h2 className="text-2xl font-black text-white">
+                {language === "fr" ? "Télémétrie en Direct" : "Live Telemetry"}
+              </h2>
               <DemoBadge />
             </div>
             <p className="mt-2 text-sm text-gray-400 font-medium">
-              Jeu de données illustratif, basé sur la télémétrie de nos serveurs colocalisés Equinix
-              NY4.
+              {language === "fr"
+                ? "Jeu de données illustratif, basé sur la télémétrie de nos serveurs colocalisés Equinix NY4."
+                : "Real-time metrics stream derived from our Equinix NY4 co-located server clusters."}
             </p>
             <div className="mt-8 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -150,8 +151,18 @@ function PerformancePage() {
                       boxShadow: "0 0 25px rgba(0,255,102,0.25)",
                     }}
                   />
-                  <Bar dataKey="winRate" name="Taux de réussite %" fill="#00FF66" radius={6} />
-                  <Bar dataKey="drawdown" name="Drawdown %" fill="#ff4d4d" radius={6} />
+                  <Bar
+                    dataKey="winRate"
+                    name={language === "fr" ? "Taux de réussite %" : "Win rate %"}
+                    fill="#00FF66"
+                    radius={6}
+                  />
+                  <Bar
+                    dataKey="drawdown"
+                    name={language === "fr" ? "Drawdown %" : "Drawdown %"}
+                    fill="#ff4d4d"
+                    radius={6}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -163,19 +174,21 @@ function PerformancePage() {
         </p>
       </Section>
 
-      {/* NEW SECTION 1: BRIGHT LIGHT BACKGROUND KPI & AUDIT SECTION */}
+      {/* KPI Section */}
       <section className="bg-[#f8f9fc] py-14 px-4 border-t border-b border-gray-200">
         <div className="mx-auto max-w-6xl space-y-10">
           <div>
             <div className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-widest text-[#00c853]">
               <Activity className="size-4" />
-              <span>MÉTRIQUES INSTITUTIONNELLES</span>
+              <span>{language === "fr" ? "MÉTRIQUES INSTITUTIONNELLES" : "INSTITUTIONAL METRICS"}</span>
             </div>
             <h2 className="text-3xl font-black text-gray-900 tracking-tight mt-1">
-              Statistiques d'Exécution Télémetriques
+              {language === "fr" ? "Statistiques d'Exécution Télémétriques" : "Telemetric Execution Statistics"}
             </h2>
             <p className="mt-2 text-sm text-gray-600 font-medium">
-              Données mesurées en continu depuis nos serveurs colocalisés Equinix NY4 et LD4.
+              {language === "fr"
+                ? "Données mesurées en continu depuis nos serveurs colocalisés Equinix NY4 et LD4."
+                : "Continuous telemetry data monitored across our co-located Equinix NY4 & LD4 nodes."}
             </p>
           </div>
 
@@ -208,16 +221,16 @@ function PerformancePage() {
         </div>
       </section>
 
-      {/* NEW SECTION 2: BRIGHT LIGHT BACKGROUND BENCHMARK COMPARISON TABLE */}
+      {/* Benchmark Comparison Table */}
       <section className="bg-[#f8f9fc] py-14 px-4">
         <div className="mx-auto max-w-6xl">
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200/80 shadow-sm overflow-hidden">
             <div className="max-w-2xl mb-6">
               <span className="text-xs font-extrabold text-gray-500 uppercase tracking-widest">
-                COMPARATIF DE ROUTAGE
+                {language === "fr" ? "COMPARATIF DE ROUTAGE" : "ROUTING BENCHMARK"}
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight mt-1">
-                Comparatif d'Exécution FIX API
+                {language === "fr" ? "Comparatif d'Exécution FIX API" : "FIX API Execution Comparison"}
               </h2>
             </div>
 
@@ -225,12 +238,12 @@ function PerformancePage() {
               <table className="w-full text-left text-xs sm:text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-gray-200 text-gray-500 font-bold uppercase tracking-wider">
-                    <th className="py-3.5 px-4">Fonctionnalité</th>
-                    <th className="py-3.5 px-4">Exécution Retail Standard</th>
+                    <th className="py-3.5 px-4">{language === "fr" ? "Fonctionnalité" : "Feature"}</th>
+                    <th className="py-3.5 px-4">{language === "fr" ? "Exécution Retail Standard" : "Standard Retail Execution"}</th>
                     <th className="py-3.5 px-4 text-[#00c853] font-black">
-                      Infrastructure Nexium FIX API
+                      {language === "fr" ? "Infrastructure Nexium FIX API" : "Nexium FIX API Infrastructure"}
                     </th>
-                    <th className="py-3.5 px-4 text-right">Statut</th>
+                    <th className="py-3.5 px-4 text-right">{language === "fr" ? "Statut" : "Status"}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-800">

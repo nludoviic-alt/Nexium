@@ -1,18 +1,18 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Globe, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useLanguage } from "@/context/LanguageContext";
 
 export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [isTopBarHidden, setIsTopBarHidden] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const lastScrollY = useRef(0);
-  const { language, setLanguage, t } = useLanguage();
+  const { t } = useLanguage();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,10 +38,10 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
   }, []);
 
   useEffect(() => {
-    if (open || langDropdownOpen) {
+    if (open) {
       setIsTopBarHidden(false);
     }
-  }, [langDropdownOpen, open]);
+  }, [open]);
 
   const mainNav = [
     { to: "/how-it-works", label: t.nav.howItWorks },
@@ -56,14 +56,16 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
       } ${transparent && !isScrolled ? "bg-[#0b0d10]/45" : "bg-[#0b0d10]/95"}`}
     >
       <div
-        className={`overflow-hidden border-[#00D084]/15 bg-[#070b12]/95 text-xs text-gray-300 transition-[max-height,opacity,border-width] duration-300 ease-out ${
-          isTopBarHidden ? "max-h-0 border-b-0 opacity-0" : "max-h-14 border-b opacity-100"
+        className={`relative z-50 border-[#00D084]/15 bg-[#070b12]/95 text-xs text-gray-300 transition-[max-height,opacity,border-width] duration-300 ease-out ${
+          isTopBarHidden
+            ? "max-h-0 overflow-hidden border-b-0 opacity-0 pointer-events-none"
+            : "max-h-14 overflow-visible border-b opacity-100"
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
           <div className="flex items-center gap-4 font-semibold tracking-wide">
             <Link
-              to="/NEXIUM"
+              to="/portal"
               className="cursor-pointer text-xs font-extrabold tracking-wider text-[#00D084] uppercase hover:underline"
             >
               {t.nav.clientArea}
@@ -96,53 +98,8 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
             </Link>
             <span className="text-gray-700">|</span>
 
-            {/* Language Switcher Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex items-center gap-1.5 font-bold uppercase transition-colors hover:text-[#00D084] cursor-pointer bg-slate-800/60 px-2.5 py-1 rounded-full border border-slate-700/60"
-              >
-                <Globe className="size-3.5 text-[#00D084]" />
-                <span>{language === "fr" ? "FR 🇫🇷" : "EN 🇬🇧"}</span>
-                <ChevronDown className="size-3 text-slate-400" />
-              </button>
-
-              {langDropdownOpen && (
-                <div
-                  onMouseLeave={() => setLangDropdownOpen(false)}
-                  className="absolute right-0 top-full mt-1.5 w-32 rounded-xl border border-slate-700 bg-[#080d18] p-1.5 shadow-2xl z-50 animate-in fade-in"
-                >
-                  <button
-                    onClick={() => {
-                      setLanguage("fr");
-                      setLangDropdownOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
-                      language === "fr"
-                        ? "bg-[#00D084]/15 text-[#00D084]"
-                        : "text-slate-300 hover:bg-white/5"
-                    }`}
-                  >
-                    <span>Français</span>
-                    <span>🇫🇷</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setLanguage("en");
-                      setLangDropdownOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
-                      language === "en"
-                        ? "bg-[#00D084]/15 text-[#00D084]"
-                        : "text-slate-300 hover:bg-white/5"
-                    }`}
-                  >
-                    <span>English</span>
-                    <span>🇬🇧</span>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Premium Language Dropdown */}
+            <LanguageSelector variant="dropdown" />
           </div>
         </div>
       </div>
@@ -179,7 +136,14 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-4 lg:flex">
+        <div className="hidden items-center gap-3 lg:flex">
+          {/* Quick switcher in sticky bar when scrolled */}
+          {isTopBarHidden && (
+            <div className="mr-1 animate-in fade-in zoom-in-95 duration-200">
+              <LanguageSelector variant="compact" />
+            </div>
+          )}
+
           <Button
             asChild
             className="neon-btn rounded-full px-7 py-2.5 text-xs font-extrabold tracking-wider uppercase"
@@ -195,81 +159,65 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
           </Button>
         </div>
 
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild className="lg:hidden">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Open menu"
-              className="size-10 border-gray-600 bg-transparent text-white hover:border-[#00D084]"
+        <div className="flex items-center gap-2 lg:hidden">
+          {/* Mobile direct quick switcher */}
+          <LanguageSelector variant="compact" showIcon={false} className="bg-slate-900/90 border-slate-800 text-[11px] px-2.5 py-1" />
+
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Open menu"
+                className="size-10 border-gray-600 bg-transparent text-white hover:border-[#00D084]"
+              >
+                <Menu className="size-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="w-80 border-l border-[#00D084]/20 bg-[#070b12] text-white"
             >
-              <Menu className="size-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent
-            side="right"
-            className="w-80 border-l border-[#00D084]/20 bg-[#070b12] text-white"
-          >
-            <div className="mt-8 flex flex-col gap-4">
-              {/* Mobile Language Switcher */}
-              <div className="flex items-center justify-between bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 mb-2">
-                <span className="text-xs font-bold text-slate-400">{t.nav.langSwitch}</span>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => setLanguage("fr")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
-                      language === "fr"
-                        ? "bg-[#00D084] text-black font-black"
-                        : "bg-slate-800 text-slate-300"
-                    }`}
+              <div className="mt-8 flex flex-col gap-4">
+                {/* Mobile Language Switcher Card */}
+                <div className="flex items-center justify-between bg-slate-900/90 p-3 rounded-2xl border border-slate-800/80 mb-2 shadow-lg">
+                  <span className="text-xs font-bold text-slate-300">{t.nav.langSwitch}</span>
+                  <LanguageSelector variant="segmented" />
+                </div>
+
+                {mainNav.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setOpen(false)}
+                    className="rounded-lg px-4 py-3 text-lg font-semibold text-gray-100 hover:bg-[#00D084]/10 hover:text-[#00D084]"
                   >
-                    FR 🇫🇷
-                  </button>
-                  <button
-                    onClick={() => setLanguage("en")}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
-                      language === "en"
-                        ? "bg-[#00D084] text-black font-black"
-                        : "bg-slate-800 text-slate-300"
-                    }`}
+                    {item.label}
+                  </Link>
+                ))}
+                <div className="mt-6 flex flex-col gap-3">
+                  <Button
+                    asChild
+                    className="neon-btn rounded-full py-3 text-xs font-extrabold uppercase"
                   >
-                    EN 🇬🇧
-                  </button>
+                    <Link to="/register" onClick={() => setOpen(false)}>
+                      {t.nav.openAccount}
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="rounded-full border-gray-500 bg-transparent py-3 text-xs font-extrabold text-white"
+                  >
+                    <Link to="/login" onClick={() => setOpen(false)}>
+                      {t.nav.login}
+                    </Link>
+                  </Button>
                 </div>
               </div>
-
-              {mainNav.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg px-4 py-3 text-lg font-semibold text-gray-100 hover:bg-[#00D084]/10 hover:text-[#00D084]"
-                >
-                  {item.label}
-                </Link>
-              ))}
-              <div className="mt-6 flex flex-col gap-3">
-                <Button
-                  asChild
-                  className="neon-btn rounded-full py-3 text-xs font-extrabold uppercase"
-                >
-                  <Link to="/register" onClick={() => setOpen(false)}>
-                    {t.nav.openAccount}
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="rounded-full border-gray-500 bg-transparent py-3 text-xs font-extrabold text-white"
-                >
-                  <Link to="/login" onClick={() => setOpen(false)}>
-                    {t.nav.login}
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   );

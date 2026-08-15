@@ -14,6 +14,7 @@ import {
 import { DemoBadge, PageShell, Section } from "@/components/site/PageShell";
 import { Button } from "@/components/ui/button";
 import { RISK_DISCLAIMER, getRobot } from "@/data/robots";
+import { useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/robots/$slug")({
   loader: ({ params }) => {
@@ -46,18 +47,25 @@ export const Route = createFileRoute("/robots/$slug")({
 });
 
 function RobotNotFound() {
+  const { language } = useLanguage();
   return (
     <PageShell>
       <Section className="text-center py-24">
-        <h1 className="text-3xl font-black text-white">Robot introuvable</h1>
+        <h1 className="text-3xl font-black text-white">
+          {language === "fr" ? "Robot introuvable" : "Robot Not Found"}
+        </h1>
         <p className="mt-3 text-gray-400 font-medium">
-          Ce robot n'existe pas ou n'est plus disponible au catalogue.
+          {language === "fr"
+            ? "Ce robot n'existe pas ou n'est plus disponible au catalogue."
+            : "This Expert Advisor does not exist or has been archived from the catalog."}
         </p>
         <Button
           asChild
           className="mt-6 bg-[#00ff66] text-black hover:bg-[#00e65c] rounded-2xl px-8 py-3 font-black"
         >
-          <Link to="/robots">Retour au Catalogue Robots</Link>
+          <Link to="/robots">
+            {language === "fr" ? "Retour au Catalogue Robots" : "Back to Robots Catalog"}
+          </Link>
         </Button>
       </Section>
     </PageShell>
@@ -65,21 +73,22 @@ function RobotNotFound() {
 }
 
 function RobotDetail() {
+  const { language } = useLanguage();
   const { robot } = Route.useLoaderData();
   const s = robot.demoStats;
 
   const stats = [
-    { label: "Trades Totaux", value: s.trades.toString() },
-    { label: "Taux de Réussite %", value: `${s.winRate.toFixed(1)}%` },
-    { label: "Facteur de Profit", value: s.profitFactor.toFixed(2) },
-    { label: "Drawdown Maximum", value: `${s.maxDrawdown.toFixed(1)}%` },
-    { label: "Gain Moyen", value: `$${s.avgWin.toFixed(2)}` },
-    { label: "Perte Moyenne", value: `$${s.avgLoss.toFixed(2)}` },
+    { label: language === "fr" ? "Trades Totaux" : "Total Trades", value: s.trades.toString() },
+    { label: language === "fr" ? "Taux de Réussite %" : "Win Rate %", value: `${s.winRate.toFixed(1)}%` },
+    { label: language === "fr" ? "Facteur de Profit" : "Profit Factor", value: s.profitFactor.toFixed(2) },
+    { label: language === "fr" ? "Drawdown Maximum" : "Max Drawdown", value: `${s.maxDrawdown.toFixed(1)}%` },
+    { label: language === "fr" ? "Gain Moyen" : "Average Win", value: `$${s.avgWin.toFixed(2)}` },
+    { label: language === "fr" ? "Perte Moyenne" : "Average Loss", value: `$${s.avgLoss.toFixed(2)}` },
   ];
 
   return (
     <PageShell>
-      {/* Dark Hero Section for Robot Detail */}
+      {/* Dark Hero Section */}
       <section className="relative w-full bg-gradient-to-b from-[#020d05] via-[#04190c] to-[#020d05] py-16 sm:py-20 border-b border-[#00ff66]/20 text-white overflow-hidden">
         <div className="absolute top-0 right-0 size-96 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[#00ff66]/15 via-transparent to-transparent pointer-events-none" />
 
@@ -112,7 +121,7 @@ function RobotDetail() {
               className="bg-[#00ff66] text-black hover:bg-[#00e65c] rounded-2xl px-9 py-4 text-sm font-black uppercase tracking-wider shadow-[0_0_25px_rgba(0,255,102,0.4)] hover:scale-105"
             >
               <Link to="/register">
-                <span>Déployer la Licence EA</span>
+                <span>{language === "fr" ? "Déployer la Licence EA" : "Deploy EA License"}</span>
                 <ArrowRight className="size-4 ml-2" />
               </Link>
             </Button>
@@ -122,20 +131,28 @@ function RobotDetail() {
               variant="outline"
               className="rounded-2xl border-white/15 bg-white/5 px-8 py-4 text-sm font-black text-white hover:bg-white/10"
             >
-              <a href="#features">Spécifications Techniques</a>
+              <a href="#features">
+                {language === "fr" ? "Spécifications Techniques" : "Technical Specs"}
+              </a>
             </Button>
           </div>
 
           {/* Quick Metrics Bar */}
           <dl className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: "Tarif Mensuel", value: `$${robot.priceMonthly} / mois` },
-              { label: "Plateforme", value: robot.platform },
               {
-                label: "Statut Déploiement",
-                value: robot.status === "BETA" ? "Build Bêta" : "Release Certifiée",
+                label: language === "fr" ? "Tarif Mensuel" : "Monthly Price",
+                value: `$${robot.priceMonthly} ${language === "fr" ? "/ mois" : "/ mo"}`,
               },
-              { label: "Version Actuelle", value: `v${robot.version}` },
+              { label: language === "fr" ? "Plateforme" : "Platform", value: robot.platform },
+              {
+                label: language === "fr" ? "Statut Déploiement" : "Release Status",
+                value:
+                  robot.status === "BETA"
+                    ? language === "fr" ? "Build Bêta" : "Beta Build"
+                    : language === "fr" ? "Release Certifiée" : "Certified Release",
+              },
+              { label: language === "fr" ? "Version Actuelle" : "Current Version", value: `v${robot.version}` },
             ].map((k) => (
               <div
                 key={k.label}
@@ -151,7 +168,7 @@ function RobotDetail() {
         </div>
       </section>
 
-      {/* Main Bright Canvas */}
+      {/* Main Content */}
       <section className="bg-[#f8f9fc] py-16 px-4 border-t border-b border-gray-200">
         <div className="mx-auto max-w-6xl space-y-12">
           <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
@@ -161,10 +178,10 @@ function RobotDetail() {
               <div className="bg-white rounded-[32px] p-8 sm:p-10 border border-gray-200/90 shadow-sm space-y-4">
                 <span className="text-xs font-extrabold text-[#00c853] uppercase tracking-widest flex items-center gap-2">
                   <Zap className="size-4" />
-                  <span>APERÇU ALGORITHMIQUE</span>
+                  <span>{language === "fr" ? "APERÇU ALGORITHMIQUE" : "ALGORITHMIC OVERVIEW"}</span>
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                  Description & Architecture
+                  {language === "fr" ? "Description & Architecture" : "Architecture & Description"}
                 </h2>
                 <p className="text-sm sm:text-base leading-relaxed text-gray-600 font-medium">
                   {robot.longDescription}
@@ -177,7 +194,7 @@ function RobotDetail() {
                 className="bg-white rounded-[32px] p-8 sm:p-10 border border-gray-200/90 shadow-sm space-y-6"
               >
                 <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                  Fonctionnalités Algorithmiques
+                  {language === "fr" ? "Fonctionnalités Algorithmiques" : "Algorithmic Capabilities"}
                 </h2>
                 <ul className="space-y-4">
                   {robot.features.map((f) => (
@@ -197,7 +214,7 @@ function RobotDetail() {
               {/* Requirements */}
               <div className="bg-white rounded-[32px] p-8 sm:p-10 border border-gray-200/90 shadow-sm space-y-6">
                 <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                  Prérequis et Configuration Recommandée
+                  {language === "fr" ? "Prérequis et Configuration Recommandée" : "System & Account Requirements"}
                 </h2>
                 <ul className="space-y-4">
                   {robot.requirements.map((r) => (
@@ -217,7 +234,7 @@ function RobotDetail() {
               {/* Changelog */}
               <div className="bg-white rounded-[32px] p-8 sm:p-10 border border-gray-200/90 shadow-sm space-y-6">
                 <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                  Historique des Versions (Changelog)
+                  {language === "fr" ? "Historique des Versions (Changelog)" : "Release History (Changelog)"}
                 </h2>
                 <div className="space-y-4">
                   {robot.changelog.map((c) => (
@@ -245,11 +262,15 @@ function RobotDetail() {
               {/* Telemetry Glass Box */}
               <div className="bg-[#05170b]/95 rounded-[32px] p-8 border border-[#00ff66]/25 shadow-2xl space-y-6 text-white">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-black text-white">Télémesure Live</h3>
+                  <h3 className="text-xl font-black text-white">
+                    {language === "fr" ? "Télémesure Live" : "Live Telemetry"}
+                  </h3>
                   <DemoBadge />
                 </div>
                 <p className="text-xs text-gray-300 font-medium">
-                  Rapport de performance mesuré sur le serveur NY4.
+                  {language === "fr"
+                    ? "Rapport de performance mesuré sur le serveur NY4."
+                    : "Audited performance telemetry measured on Equinix NY4 cluster."}
                 </p>
 
                 <dl className="grid grid-cols-2 gap-4 border-t border-b border-white/10 py-6">
@@ -267,22 +288,24 @@ function RobotDetail() {
 
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
                   <CheckCircle2 className="size-4 text-[#00ff66]" />
-                  <span>Synchronisation 60s active</span>
+                  <span>{language === "fr" ? "Synchronisation 60s active" : "60s telemetry heartbeat active"}</span>
                 </div>
               </div>
 
               {/* Technical Specifications */}
               <div className="bg-white rounded-[32px] p-8 border border-gray-200/90 shadow-sm space-y-6">
-                <h3 className="text-xl font-black text-gray-900">Spécifications Techniques</h3>
+                <h3 className="text-xl font-black text-gray-900">
+                  {language === "fr" ? "Spécifications Techniques" : "Technical Specifications"}
+                </h3>
                 <dl className="space-y-4 text-xs sm:text-sm">
                   {[
-                    { label: "Actifs Cibles", value: robot.assets.join(", ") },
+                    { label: language === "fr" ? "Actifs Cibles" : "Target Assets", value: robot.assets.join(", ") },
                     { label: "Timeframes", value: robot.timeframes.join(", ") },
-                    { label: "Stratégie", value: robot.strategy },
-                    { label: "Profil de Risque", value: robot.riskLevel },
+                    { label: language === "fr" ? "Stratégie" : "Strategy", value: robot.strategy },
+                    { label: language === "fr" ? "Profil de Risque" : "Risk Profile", value: robot.riskLevel },
                     {
-                      label: "Période d'Essai",
-                      value: robot.trialDays ? `${robot.trialDays} Jours` : "N/A",
+                      label: language === "fr" ? "Période d'Essai" : "Trial Period",
+                      value: robot.trialDays ? `${robot.trialDays} ${language === "fr" ? "Jours" : "Days"}` : "N/A",
                     },
                   ].map((k) => (
                     <div
@@ -300,7 +323,7 @@ function RobotDetail() {
                   disabled
                 >
                   <Download className="size-4 mr-2 text-gray-400" />
-                  Téléchargement Réservé aux Membres
+                  {language === "fr" ? "Téléchargement Réservé aux Membres" : "Download Reserved for Members"}
                 </Button>
               </div>
             </aside>

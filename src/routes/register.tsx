@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sendRegistrationPendingEmail, sendAdminNewClientAlertEmail } from "@/lib/resend";
 import { passwordIssue } from "@/lib/password";
+import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
 
 function RegisterPage() {
@@ -187,13 +188,7 @@ function RegisterPage() {
         </Link>
 
         {/* Language Switcher */}
-        <button
-          onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
-          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-200/80 hover:bg-gray-300 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-        >
-          <Globe className="size-3.5 text-emerald-600" />
-          <span>{language === "fr" ? "FR 🇫🇷" : "EN 🇬🇧"}</span>
-        </button>
+        <LanguageSelector variant="segmented" />
       </header>
 
       {/* Main Form Center Content */}
@@ -207,20 +202,40 @@ function RegisterPage() {
 
             <div className="relative z-10">
               <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight text-white">
-                Automatisez
-                <br />
-                Votre
-                <br />
-                Trading
+                {language === "fr" ? (
+                  <>
+                    Automatisez
+                    <br />
+                    Votre
+                    <br />
+                    Trading
+                  </>
+                ) : (
+                  <>
+                    Automate
+                    <br />
+                    Your
+                    <br />
+                    Trading
+                  </>
+                )}
               </h2>
 
-              <ul className="mt-8 space-y-4 text-sm sm:text-base font-semibold">
-                {[
-                  "Robots MT5 certifiés",
-                  "Dashboard de pilotage centralisé",
-                  "Licence Hardware-Bound sécurisée",
-                  "Support technique 24/7",
-                ].map((item) => (
+              <ul className="mt-6 space-y-3.5 text-sm sm:text-base font-semibold">
+                {(language === "fr"
+                  ? [
+                      "Robots MT5 certifiés",
+                      "Dashboard de pilotage",
+                      "Licence sécurisée",
+                      "Support 24/7",
+                    ]
+                  : [
+                      "Certified MT5 bots",
+                      "Centralized dashboard",
+                      "Hardware-bound license",
+                      "24/7 Support",
+                    ]
+                ).map((item) => (
                   <li key={item} className="flex items-center gap-3">
                     <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#00ff66] text-black font-black text-xs shadow-[0_0_12px_rgba(0,255,102,0.6)]">
                       ✓
@@ -232,19 +247,19 @@ function RegisterPage() {
             </div>
 
             {/* Bottom Candlesticks Graphic Mockup */}
-            <div className="relative z-10 mt-10 pt-5 border-t border-[#00ff66]/20">
-              <div className="flex items-end gap-2.5 h-24 w-full justify-around opacity-90">
-                <div className="w-4 bg-[#00ff66] rounded-sm h-14 relative shadow-[0_0_12px_rgba(0,255,102,0.5)]">
-                  <div className="absolute -top-3 left-1.5 w-0.5 h-20 bg-[#00ff66]" />
+            <div className="relative z-10 mt-8 pt-4 border-t border-[#00ff66]/20">
+              <div className="flex items-end gap-2.5 h-20 w-full justify-around opacity-90">
+                <div className="w-4 bg-[#00ff66] rounded-sm h-12 relative shadow-[0_0_12px_rgba(0,255,102,0.5)]">
+                  <div className="absolute -top-3 left-1.5 w-0.5 h-16 bg-[#00ff66]" />
                 </div>
-                <div className="w-5 bg-[#00ff66] rounded-sm h-20 relative shadow-[0_0_18px_rgba(0,255,102,0.6)]">
-                  <div className="absolute -top-2 left-2 w-0.5 h-24 bg-[#00ff66]" />
+                <div className="w-5 bg-[#00ff66] rounded-sm h-16 relative shadow-[0_0_18px_rgba(0,255,102,0.6)]">
+                  <div className="absolute -top-2 left-2 w-0.5 h-20 bg-[#00ff66]" />
                 </div>
-                <div className="w-4 bg-emerald-400 rounded-sm h-10 relative">
-                  <div className="absolute -top-2 left-1.5 w-0.5 h-14 bg-emerald-400" />
+                <div className="w-4 bg-emerald-400 rounded-sm h-8 relative">
+                  <div className="absolute -top-2 left-1.5 w-0.5 h-12 bg-emerald-400" />
                 </div>
-                <div className="w-6 bg-[#00ff66] rounded-sm h-22 relative shadow-[0_0_22px_rgba(0,255,102,0.7)]">
-                  <div className="absolute -top-3 left-2.5 w-0.5 h-26 bg-[#00ff66]" />
+                <div className="w-6 bg-[#00ff66] rounded-sm h-18 relative shadow-[0_0_22px_rgba(0,255,102,0.7)]">
+                  <div className="absolute -top-3 left-2.5 w-0.5 h-22 bg-[#00ff66]" />
                 </div>
               </div>
             </div>

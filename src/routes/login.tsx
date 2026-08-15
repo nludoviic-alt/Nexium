@@ -26,6 +26,8 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
+import { getUserSlug, getAdminSlug } from "@/lib/user-slug";
+import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
 
 function LoginPage() {
@@ -64,8 +66,9 @@ function LoginPage() {
 
           // Vérification du rôle Administrateur
           if (profile?.role && ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role)) {
+            const adminSlug = getAdminSlug({ name: profile.name, email: data.user.email, id: data.user.id });
             toast.success(`Connexion Desk confirmée. Bienvenue, ${profile.name || data.user.email} !`);
-            navigate({ to: "/composition" });
+            navigate({ to: "/desk/$slug", params: { slug: adminSlug } });
             return;
           }
 
@@ -86,8 +89,9 @@ function LoginPage() {
             return;
           }
 
+          const userSlug = getUserSlug({ name: profile?.name, email: data.user.email, id: data.user.id });
           toast.success(`Connexion réussie. Bienvenue, ${profile?.name || data.user.email} !`);
-          navigate({ to: "/NEXIUM" });
+          navigate({ to: "/portal/$slug", params: { slug: userSlug } });
           return;
         }
       }
@@ -120,13 +124,7 @@ function LoginPage() {
         </Link>
 
         {/* Interactive Language Switcher */}
-        <button
-          onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
-          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-200/80 hover:bg-gray-300 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-        >
-          <Globe className="size-3.5 text-emerald-600" />
-          <span>{language === "fr" ? "FR 🇫🇷" : "EN 🇬🇧"}</span>
-        </button>
+        <LanguageSelector variant="segmented" />
       </header>
 
       {/* Main Form Center Content */}
@@ -140,20 +138,36 @@ function LoginPage() {
 
             <div className="relative z-10">
               <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight text-white">
-                Connexion
-                <br />
-                Espace
-                <br />
-                Client
+                {language === "fr" ? (
+                  <>
+                    Espace
+                    <br />
+                    Client
+                  </>
+                ) : (
+                  <>
+                    Client
+                    <br />
+                    Portal
+                  </>
+                )}
               </h2>
 
-              <ul className="mt-8 space-y-4 text-sm sm:text-base font-semibold">
-                {[
-                  "Télémesure P&L en Temps Réel",
-                  "Gestion des Licences Hardware",
-                  "Routage de Compte FIX API 4.4",
-                  "Support Institutionnel Dédié",
-                ].map((item) => (
+              <ul className="mt-6 space-y-3.5 text-sm sm:text-base font-semibold">
+                {(language === "fr"
+                  ? [
+                      "P&L en temps réel",
+                      "Gestion des licences",
+                      "Routage FIX API 4.4",
+                      "Support 24/7",
+                    ]
+                  : [
+                      "Real-time P&L",
+                      "License management",
+                      "FIX API 4.4 routing",
+                      "24/7 Support",
+                    ]
+                ).map((item) => (
                   <li key={item} className="flex items-center gap-3">
                     <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#00ff66] text-black font-black text-xs shadow-[0_0_12px_rgba(0,255,102,0.6)]">
                       ✓
@@ -165,16 +179,16 @@ function LoginPage() {
             </div>
 
             {/* Bottom Candlesticks Graphic Mockup */}
-            <div className="relative z-10 mt-10 pt-5 border-t border-[#00ff66]/20">
-              <div className="flex items-end gap-2.5 h-24 w-full justify-around opacity-90">
-                <div className="w-4 bg-[#00ff66] rounded-sm h-14 relative shadow-[0_0_12px_rgba(0,255,102,0.5)]">
-                  <div className="absolute -top-3 left-1.5 w-0.5 h-20 bg-[#00ff66]" />
+            <div className="relative z-10 mt-8 pt-4 border-t border-[#00ff66]/20">
+              <div className="flex items-end gap-2.5 h-20 w-full justify-around opacity-90">
+                <div className="w-4 bg-[#00ff66] rounded-sm h-12 relative shadow-[0_0_12px_rgba(0,255,102,0.5)]">
+                  <div className="absolute -top-3 left-1.5 w-0.5 h-16 bg-[#00ff66]" />
                 </div>
-                <div className="w-5 bg-[#00ff66] rounded-sm h-20 relative shadow-[0_0_22px_rgba(0,255,102,0.7)]">
-                  <div className="absolute -top-2.5 left-2 w-0.5 h-24 bg-[#00ff66]" />
+                <div className="w-5 bg-[#00ff66] rounded-sm h-16 relative shadow-[0_0_22px_rgba(0,255,102,0.7)]">
+                  <div className="absolute -top-2.5 left-2 w-0.5 h-20 bg-[#00ff66]" />
                 </div>
-                <div className="w-4 bg-emerald-400 rounded-sm h-10 relative">
-                  <div className="absolute -top-2 left-1.5 w-0.5 h-14 bg-emerald-400" />
+                <div className="w-4 bg-emerald-400 rounded-sm h-8 relative">
+                  <div className="absolute -top-2 left-1.5 w-0.5 h-12 bg-emerald-400" />
                 </div>
               </div>
             </div>
@@ -184,11 +198,11 @@ function LoginPage() {
           <div className="lg:col-span-7 bg-white p-8 lg:p-10 text-gray-900 flex flex-col justify-between">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                Connectez-vous à Votre Compte
+                {language === "fr" ? "Connexion" : "Login"}
               </h1>
 
               <form
-                className="mt-6 space-y-4 sm:space-y-5"
+                className="mt-6 space-y-4"
                 onSubmit={handleLogin}
               >
                 {/* Email Address */}
@@ -197,7 +211,7 @@ function LoginPage() {
                     htmlFor="email"
                     className="text-xs sm:text-sm font-extrabold text-gray-800"
                   >
-                    Adresse E-mail
+                    {language === "fr" ? "E-mail" : "Email"}
                   </label>
                   <Input
                     id="email"
@@ -205,8 +219,8 @@ function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Adresse e-mail"
-                    className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                    placeholder="nom@exemple.com"
+                    className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                   />
                 </div>
 
@@ -217,13 +231,13 @@ function LoginPage() {
                       htmlFor="password"
                       className="text-xs sm:text-sm font-extrabold text-gray-800"
                     >
-                      Mot de Passe
+                      {language === "fr" ? "Mot de passe" : "Password"}
                     </label>
                     <Link
                       to="/forgot-password"
                       className="text-xs sm:text-sm font-bold text-gray-600 hover:text-gray-900 underline"
                     >
-                      Mot de passe oublié ?
+                      {language === "fr" ? "Mot de passe oublié ?" : "Forgot password?"}
                     </Link>
                   </div>
                   <div className="relative">
@@ -233,15 +247,15 @@ function LoginPage() {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Mot de passe du portail"
-                      className="rounded-xl border-gray-300 bg-white px-4 py-3.5 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                      placeholder="••••••••"
+                      className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800 cursor-pointer"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
                   </div>
                 </div>
@@ -250,19 +264,29 @@ function LoginPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                 >
                   {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
-                  <span>{loading ? "Connexion en cours..." : "Se Connecter"}</span>
+                  <span>
+                    {loading
+                      ? language === "fr"
+                        ? "Connexion en cours..."
+                        : "Signing in..."
+                      : language === "fr"
+                      ? "Se connecter"
+                      : "Sign in"}
+                  </span>
                 </Button>
               </form>
             </div>
 
             {/* Bottom Switch Link */}
-            <div className="mt-8 pt-4 text-center text-xs sm:text-sm font-semibold text-gray-600 border-t border-gray-100">
-              Vous n'avez pas encore de compte ?{" "}
-              <Link to="/register" className="font-extrabold text-gray-900 underline">
-                Créer un compte
+            <div className="mt-8 pt-4 text-center text-xs sm:text-sm font-semibold text-gray-600 border-t border-gray-100 flex justify-between items-center">
+              <Link to="/register" className="font-extrabold text-gray-900 underline hover:text-[#00c853]">
+                {language === "fr" ? "Créer un compte" : "Create account"}
+              </Link>
+              <Link to="/" className="text-gray-500 hover:text-gray-900">
+                {language === "fr" ? "← Retour à l'accueil" : "← Back to Home"}
               </Link>
             </div>
           </div>

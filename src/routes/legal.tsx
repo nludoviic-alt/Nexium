@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Building2, Globe, Mail, MapPin, Scale, Server, ShieldCheck } from "lucide-react";
 
 import { PageHeader, PageShell, Section } from "@/components/site/PageShell";
+import { useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/legal")({
   head: () => ({
@@ -12,61 +13,67 @@ export const Route = createFileRoute("/legal")({
         content:
           "Mentions légales, informations sur l'éditeur, hébergeur des serveurs Equinix NY4 et propriété intellectuelle de Nexium Markets.",
       },
-      { property: "og:title", content: "Mentions Légales — Nexium Markets" },
-      { property: "og:description", content: "Informations légales et éditeur." },
     ],
   }),
   component: LegalPage,
 });
 
-const legalBlocks = [
-  {
-    icon: Building2,
-    title: "1. Éditeur de la Plateforme",
-    items: [
-      { label: "Dénomination sociale", value: "Nexium Markets Technologies Ltd." },
-      { label: "Forme juridique", value: "Société à Responsabilité Limitée Technologique" },
-      { label: "Numéro d'immatriculation", value: "NX-89210-449" },
-      { label: "Email de contact", value: "legal@nexium-markets.com" },
-      { label: "Directeur de la publication", value: "Département Juridique & Conformité" },
-    ],
-  },
-  {
-    icon: Server,
-    title: "2. Hébergement & Infrastructure Réseau",
-    items: [
-      { label: "Centre de données", value: "Equinix NY4 Financial IBX (Secaucus, NJ, USA)" },
-      { label: "Hébergeur Cloud & SaaS", value: "Infrastructure Haute Disponibilité Cloudflare Inc. & AWS ECN" },
-      { label: "Chiffrement réseau", value: "Protocole TLS 1.3 / SSL 256-bit avec flux FIX API sécurisé" },
-    ],
-  },
-  {
-    icon: Scale,
-    title: "3. Activité & Cadre Réglementaire",
-    content:
-      "Nexium Markets est un éditeur de logiciels spécialisé dans l'automatisation du trading et les Expert Advisors pour MetaTrader 5. Nexium Markets n'agit pas en tant que courtier (broker), prestataire de services d'investissement (PSI) ou conseiller financier. La plateforme ne reçoit ni ne gère directement les fonds des utilisateurs.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "4. Propriété Intellectuelle & Marques",
-    content:
-      "L'ensemble des algorithmes, codes sources MQL5, interfaces graphiques, logos, marques et documentations présents sur ce site sont la propriété exclusive de Nexium Markets Technologies Ltd. Toute reproduction, décompilation ou ingénierie inverse sans accord écrit préalable est strictement interdite.",
-  },
-  {
-    icon: Globe,
-    title: "5. Juridiction & Droit Applicable",
-    content:
-      "Les présentes mentions légales et l'utilisation de la plateforme sont régies par le droit international des services logiciels numériques. En cas de litige, une solution amiable sera recherchée avant toute action judiciaire devant les tribunaux compétents.",
-  },
-];
-
 function LegalPage() {
+  const { language, t } = useLanguage();
+
+  const legalBlocks = [
+    {
+      icon: Building2,
+      title: language === "fr" ? "1. Éditeur de la Plateforme" : "1. Platform Publisher",
+      items: [
+        { label: language === "fr" ? "Dénomination sociale" : "Corporate Name", value: "Nexium Markets Technologies Ltd." },
+        { label: language === "fr" ? "Forme juridique" : "Legal Structure", value: language === "fr" ? "Société de Technologies Logicielles" : "Software Technology Corporation" },
+        { label: language === "fr" ? "Numéro d'immatriculation" : "Registration Number", value: "NX-89210-449" },
+        { label: language === "fr" ? "Email légal" : "Legal Email", value: "legal@nexiummarkets.com" },
+        { label: language === "fr" ? "Directeur de la publication" : "Publishing Officer", value: language === "fr" ? "Département Juridique & Conformité" : "Legal & Compliance Directorate" },
+      ],
+    },
+    {
+      icon: Server,
+      title: language === "fr" ? "2. Hébergement & Infrastructure Réseau" : "2. Network Hosting & Infrastructure",
+      items: [
+        { label: language === "fr" ? "Centre de données" : "Primary Datacenter", value: "Equinix NY4 Financial IBX (Secaucus, NJ, USA)" },
+        { label: language === "fr" ? "Hébergeur Cloud & SaaS" : "Cloud & SaaS Backbone", value: "Cloudflare Inc. & AWS High-Availability ECN" },
+        { label: language === "fr" ? "Chiffrement réseau" : "Network Encryption", value: "TLS 1.3 / SSL 256-bit with authenticated FIX API" },
+      ],
+    },
+    {
+      icon: Scale,
+      title: language === "fr" ? "3. Activité & Cadre Réglementaire" : "3. Activity & Regulatory Scope",
+      content:
+        language === "fr"
+          ? "Nexium Markets est un éditeur de logiciels spécialisé dans l'automatisation du trading et les Expert Advisors pour MetaTrader 5. Nexium Markets n'agit pas en tant que courtier (broker), prestataire de services d'investissement (PSI) ou conseiller financier. La plateforme ne reçoit ni ne gère directement les fonds des utilisateurs."
+          : "Nexium Markets is a specialized software technology provider developing automated tools and Expert Advisors for MetaTrader 5. Nexium Markets does not act as a broker, custodian, or investment advisor. The platform never holds customer funds.",
+    },
+    {
+      icon: ShieldCheck,
+      title: language === "fr" ? "4. Propriété Intellectuelle & Marques" : "4. Intellectual Property & Trademarks",
+      content:
+        language === "fr"
+          ? "L'ensemble des algorithmes, codes sources MQL5, interfaces graphiques, logos, marques et documentations présents sur ce site sont la propriété exclusive de Nexium Markets Technologies Ltd. Toute reproduction, décompilation ou ingénierie inverse sans accord écrit préalable est strictement interdite."
+          : "All algorithmic models, MQL5 source code, visual interfaces, logos, and documentation on this platform are the exclusive intellectual property of Nexium Markets Technologies Ltd. Unauthorized reverse-engineering or reproduction is strictly prohibited.",
+    },
+    {
+      icon: Globe,
+      title: language === "fr" ? "5. Juridiction & Droit Applicable" : "5. Jurisdiction & Applicable Law",
+      content:
+        language === "fr"
+          ? "Les présentes mentions légales et l'utilisation de la plateforme sont régies par le droit international des services logiciels numériques. En cas de litige, une solution amiable sera recherchée avant toute action judiciaire devant les tribunaux compétents."
+          : "These legal terms and platform access are governed by international digital software regulations. In the event of disputes, amicable resolution will precede any competent jurisdiction proceedings.",
+    },
+  ];
+
   return (
     <PageShell>
       <PageHeader
-        eyebrow="INFORMATIONS RÉGLEMENTAIRES"
-        title="Mentions Légales & Éditeur"
-        description="Informations légales relatives à la société éditrice, à l'hébergement de l'infrastructure Equinix NY4 et aux droits de propriété intellectuelle."
+        eyebrow={language === "fr" ? "INFORMATIONS RÉGLEMENTAIRES" : "REGULATORY DISCLOSURES"}
+        title={t.legalPages.legalNoticeTitle}
+        description={t.legalPages.legalNoticeSubtitle}
       />
 
       <Section>
@@ -99,12 +106,16 @@ function LegalPage() {
               )}
 
               {block.content && (
-                <p className="mt-5 text-sm leading-relaxed text-gray-300 font-medium">
-                  {block.content}
-                </p>
+                <p className="mt-6 text-sm leading-relaxed text-gray-300 font-medium">{block.content}</p>
               )}
             </div>
           ))}
+
+          <div className="mt-8 rounded-2xl border border-white/10 bg-black/40 p-6 text-center text-xs text-gray-400">
+            {language === "fr"
+              ? "Informations légales officielles · Version v2.4 · Dernière mise à jour : 15 août 2026."
+              : "Official corporate disclosures · Version v2.4 · Last updated: August 15, 2026."}
+          </div>
         </div>
       </Section>
     </PageShell>

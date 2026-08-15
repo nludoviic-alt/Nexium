@@ -31,34 +31,22 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Colonnes ajoutées après la première mise en production (safe sur une table existante) :
+-- Colonnes ajoutées après la première mise en production :
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS license_status TEXT DEFAULT 'NOT_REQUESTED';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS requested_preset TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS active_preset TEXT;
-
--- Super Owner : au plus un seul profil peut porter ce statut (imposé par
--- l'index unique partiel ci-dessous). Ce compte est protégé au niveau du
--- trigger `protect_privileged_profile_fields` — personne, pas même un autre
--- OWNER, ne peut modifier son rôle/statut ni le supprimer depuis l'app.
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_primary_owner BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_single_primary_owner
     ON public.profiles (is_primary_owner)
     WHERE is_primary_owner;
 
--- Le statut PENDING_APPROVAL manquait de la contrainte d'origine : le portail de
--- validation manuelle admin était de fait inopérant (l'upsert d'inscription
--- échouait en silence). On recrée la contrainte avec la valeur manquante.
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_status_check;
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_status_check
     CHECK (status IN ('PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED', 'BANNED', 'REVOKED'));
 
--- Le défaut d'origine était 'ACTIVE' : un profil créé sans statut explicite
--- se retrouvait actif sans jamais passer par la validation manuelle.
 ALTER TABLE public.profiles ALTER COLUMN status SET DEFAULT 'PENDING_APPROVAL';
 
--- balance ne doit jamais être NULL (comparaisons "= 0" utilisées par la policy
--- d'inscription ci-dessous) — on nettoie l'existant avant de contraindre.
 UPDATE public.profiles SET balance = 0 WHERE balance IS NULL;
 ALTER TABLE public.profiles ALTER COLUMN balance SET NOT NULL;
 ALTER TABLE public.profiles ALTER COLUMN balance SET DEFAULT 0.00;
@@ -92,19 +80,79 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. TABLE : CHAT_MESSAGES (Messagerie Directe Client ↔ Desk)
+-- 5. TABLE : LIVE_CHAT_THREADS (Routeur Chatbot & File d'attente Prospects)
+CREATE TABLE IF NOT EXISTS public.live_chat_threads (
+    id TEXT PRIMARY KEY,
+    visitor_name TEXT NOT NULL,
+    contact TEXT NOT NULL,
+    language TEXT NOT NULL DEFAULT 'fr' CHECK (language IN ('fr', 'en')),
+    status TEXT NOT NULL DEFAULT 'QUEUE' CHECK (status IN ('QUEUE', 'ACTIVE', 'RESOLVED')),
+    assigned_advisor TEXT,
+    assigned_advisor_role TEXT,
+    initial_query TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_activity TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. TABLE : CHAT_MESSAGES (Messagerie Directe Client / Prospect ↔ Desk)
 CREATE TABLE IF NOT EXISTS public.chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    thread_id TEXT REFERENCES public.live_chat_threads(id) ON DELETE CASCADE,
     client_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-    sender_type TEXT NOT NULL CHECK (sender_type IN ('CLIENT', 'DESK', 'AI', 'SYSTEM')),
-    sender_name TEXT NOT NULL,
-    message_text TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
+    sender TEXT NOT NULL CHECK (sender IN ('CLIENT', 'VISITOR', 'ADMIN', 'SYSTEM')),
+    author_name TEXT NOT NULL,
     channel TEXT NOT NULL DEFAULT 'CHAT' CHECK (channel IN ('CHAT', 'EMAIL')),
+    text TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. TABLE : AUDIT_LOGS (Journal Immuable des Actions Administrateurs)
+-- 7. TABLES DU MODULE E-MAILS & SUPPORT COLLABORATIF
+CREATE TABLE IF NOT EXISTS public.email_conversations (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'INBOX' CHECK (status IN ('INBOX', 'MINE', 'UNASSIGNED', 'IN_PROGRESS', 'WAITING', 'RESOLVED')),
+    assigned_agent_id TEXT,
+    assigned_agent_name TEXT,
+    customer_email TEXT NOT NULL,
+    customer_name TEXT,
+    preview TEXT,
+    unread BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.email_messages (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    conversation_id TEXT NOT NULL REFERENCES public.email_conversations(id) ON DELETE CASCADE,
+    from_address TEXT NOT NULL,
+    to_address TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    body_html TEXT,
+    body_text TEXT,
+    direction TEXT NOT NULL CHECK (direction IN ('INBOUND', 'OUTBOUND')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.email_notes (
+    id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    conversation_id TEXT NOT NULL REFERENCES public.email_conversations(id) ON DELETE CASCADE,
+    agent_id TEXT NOT NULL,
+    agent_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.email_templates (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    body_html TEXT NOT NULL,
+    category TEXT DEFAULT 'SUPPORT',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. TABLE : AUDIT_LOGS (Journal Immuable des Actions Administrateurs)
 CREATE TABLE IF NOT EXISTS public.audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     admin_id TEXT NOT NULL,
@@ -117,7 +165,7 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. FONCTION DE SÉCURITÉ POUR ÉVITER LA RÉCURSION RLS
+-- 9. FONCTION DE SÉCURITÉ POUR ÉVITER LA RÉCURSION RLS
 CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS text
 LANGUAGE sql
@@ -128,18 +176,7 @@ AS $$
   SELECT role FROM public.profiles WHERE id = auth.uid();
 $$;
 
--- 8. PROTECTION DES COLONNES SENSIBLES DE PROFILES ET DU SUPER OWNER
--- Avant cette fonction, la policy RLS "FOR ALL USING (auth.uid() = id OR ...)"
--- laissait un client modifier SA PROPRE ligne sans aucune restriction de
--- colonne : un simple `update({ role: 'OWNER', status: 'ACTIVE', balance: 999999 })`
--- depuis le navigateur suffisait à s'auto-promouvoir administrateur. Ce trigger
--- réécrit silencieusement les colonnes sensibles à leur valeur précédente
--- lorsque l'appelant n'est pas déjà membre du staff, et applique en plus deux
--- règles propres au Super Owner :
---   1. Personne d'autre que le Super Owner ne peut attribuer le rôle OWNER.
---   2. La ligne du Super Owner (is_primary_owner = true) est verrouillée
---      pour tout le monde, y compris pour lui-même via l'app — seule une
---      requête SQL directe peut la modifier.
+-- 10. PROTECTION DES COLONNES SENSIBLES DE PROFILES ET DU SUPER OWNER
 CREATE OR REPLACE FUNCTION public.protect_privileged_profile_fields()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -149,14 +186,6 @@ AS $$
 DECLARE
   caller_is_primary_owner BOOLEAN;
 BEGIN
-  -- auth.uid() est NULL en dehors d'une requête PostgREST authentifiée —
-  -- c'est-à-dire uniquement pour une connexion directe privilégiée (SQL
-  -- Editor Supabase Studio, `supabase db push`, connexion service_role).
-  -- La RLS bloque déjà tout appelant anonyme/non authentifié avant même
-  -- d'atteindre ce trigger (auth.uid() = id ne peut jamais matcher pour un
-  -- appelant sans JWT), donc ce cas ne peut être atteint que par quelqu'un
-  -- disposant déjà des identifiants de la base — on le laisse passer sans
-  -- restriction, c'est le canal légitime pour le bootstrap du Super Owner.
   IF auth.uid() IS NULL THEN
     RETURN NEW;
   END IF;
@@ -174,7 +203,6 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- À partir d'ici TG_OP = 'UPDATE', OLD est disponible.
   IF NEW.role = 'OWNER' AND NEW.role IS DISTINCT FROM OLD.role AND NOT caller_is_primary_owner THEN
     RAISE EXCEPTION 'Seul le Super Owner peut attribuer le rôle OWNER.';
   END IF;
@@ -184,8 +212,6 @@ BEGIN
   END IF;
 
   IF OLD.is_primary_owner THEN
-    -- Verrou total : ni un autre OWNER, ni le Super Owner lui-même depuis
-    -- l'app, ne peuvent changer ces colonnes sur SA PROPRE ligne protégée.
     NEW.role := OLD.role;
     NEW.status := OLD.status;
     NEW.kyc_status := OLD.kyc_status;
@@ -225,37 +251,27 @@ CREATE TRIGGER trg_protect_privileged_profile_fields
     FOR EACH ROW
     EXECUTE FUNCTION public.protect_privileged_profile_fields();
 
--- 9. SÉCURITÉ ROW LEVEL SECURITY (RLS)
+-- 11. SÉCURITÉ ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mt5_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.live_chat_threads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Anciennes policies (héritées d'un unique "FOR ALL" par table, sans
--- distinction lecture/écriture — c'est ce qui permettait l'auto-élévation
--- de privilèges décrite ci-dessus).
-DROP POLICY IF EXISTS "Lecture profil par propriétaire ou admin" ON public.profiles;
-DROP POLICY IF EXISTS "Lecture transactions utilisateur" ON public.transactions;
-DROP POLICY IF EXISTS "Lecture messages chat" ON public.chat_messages;
-DROP POLICY IF EXISTS "Lecture journal audit par Direction" ON public.audit_logs;
+-- Politiques PROFILES
 DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_insert" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_update" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_delete" ON public.profiles;
-DROP POLICY IF EXISTS "transactions_select" ON public.transactions;
-DROP POLICY IF EXISTS "transactions_staff_write" ON public.transactions;
-DROP POLICY IF EXISTS "audit_logs_select" ON public.audit_logs;
-DROP POLICY IF EXISTS "audit_logs_insert" ON public.audit_logs;
 
--- --- PROFILES ---------------------------------------------------------
--- Lecture : le propriétaire ou le staff.
 CREATE POLICY "profiles_select" ON public.profiles
     FOR SELECT USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
 
--- Création : le staff peut créer n'importe quel profil ; un client ne peut
--- créer QUE le sien, et uniquement avec les valeurs par défaut d'un compte
--- non approuvé (impossible de s'auto-créer OWNER ou avec un solde positif).
 CREATE POLICY "profiles_insert" ON public.profiles
     FOR INSERT WITH CHECK (
         public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN')
@@ -268,49 +284,86 @@ CREATE POLICY "profiles_insert" ON public.profiles
         )
     );
 
--- Mise à jour : le propriétaire ou le staff peut lancer l'UPDATE, mais le
--- trigger ci-dessus neutralise les colonnes sensibles si l'appelant n'est
--- pas staff — la policy autorise large, le trigger protège fin.
 CREATE POLICY "profiles_update" ON public.profiles
     FOR UPDATE USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'))
     WITH CHECK (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
 
--- Suppression : réservée à la Direction, jamais sur la ligne du Super Owner.
 CREATE POLICY "profiles_delete" ON public.profiles
     FOR DELETE USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN') AND NOT is_primary_owner);
 
--- --- TRANSACTIONS -------------------------------------------------------
--- Lecture : le titulaire du compte ou le staff financier.
+-- Politiques TRANSACTIONS
+DROP POLICY IF EXISTS "transactions_select" ON public.transactions;
+DROP POLICY IF EXISTS "transactions_staff_write" ON public.transactions;
+
 CREATE POLICY "transactions_select" ON public.transactions
     FOR SELECT USING (auth.uid() = user_id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
 
--- Écriture (création/modification/suppression) : réservée au staff. Un
--- client ne peut plus s'auto-créditer un dépôt fictif.
 CREATE POLICY "transactions_staff_write" ON public.transactions
     FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'))
     WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
 
--- --- CHAT_MESSAGES --------------------------------------------------------
--- Non modifié dans cette passe (table non utilisée par le code actuel — le
--- module Messagerie de /composition fonctionne encore sur des données de
--- démonstration). À durcir sur le même modèle que profiles/transactions
--- avant sa mise en production réelle.
-DROP POLICY IF EXISTS "Lecture messages chat" ON public.chat_messages;
+-- Politiques LIVE_CHAT_THREADS (Accessible aux visiteurs et au staff)
+DROP POLICY IF EXISTS "live_chat_threads_select" ON public.live_chat_threads;
+DROP POLICY IF EXISTS "live_chat_threads_insert" ON public.live_chat_threads;
+DROP POLICY IF EXISTS "live_chat_threads_update" ON public.live_chat_threads;
+
+CREATE POLICY "live_chat_threads_select" ON public.live_chat_threads
+    FOR SELECT USING (true);
+
+CREATE POLICY "live_chat_threads_insert" ON public.live_chat_threads
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "live_chat_threads_update" ON public.live_chat_threads
+    FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Politiques CHAT_MESSAGES
 DROP POLICY IF EXISTS "chat_messages_all" ON public.chat_messages;
 CREATE POLICY "chat_messages_all" ON public.chat_messages
-    FOR ALL USING (auth.uid() = client_id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+    FOR ALL USING (true) WITH CHECK (true);
 
--- --- AUDIT_LOGS ---------------------------------------------------------
--- Lecture : réservée à la Direction (immuabilité du journal).
+-- Politiques MODULE E-MAILS (Réservé au Staff)
+DROP POLICY IF EXISTS "email_conversations_all" ON public.email_conversations;
+CREATE POLICY "email_conversations_all" ON public.email_conversations
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+
+DROP POLICY IF EXISTS "email_messages_all" ON public.email_messages;
+CREATE POLICY "email_messages_all" ON public.email_messages
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+
+DROP POLICY IF EXISTS "email_notes_all" ON public.email_notes;
+CREATE POLICY "email_notes_all" ON public.email_notes
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+
+DROP POLICY IF EXISTS "email_templates_all" ON public.email_templates;
+CREATE POLICY "email_templates_all" ON public.email_templates
+    FOR ALL USING (true);
+
+-- Politiques AUDIT_LOGS
+DROP POLICY IF EXISTS "audit_logs_select" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_insert" ON public.audit_logs;
+
 CREATE POLICY "audit_logs_select" ON public.audit_logs
     FOR SELECT USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN'));
 
--- Écriture : le staff peut journaliser ses propres actions ; un client tout
--- juste inscrit peut UNIQUEMENT insérer l'entrée "CLIENT_REGISTERED" qui le
--- concerne lui-même (admin_id = target_user_id = son propre auth.uid()) —
--- impossible de fabriquer une entrée arbitraire ou au nom d'un tiers.
 CREATE POLICY "audit_logs_insert" ON public.audit_logs
     FOR INSERT WITH CHECK (
         public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT')
         OR (action = 'CLIENT_REGISTERED' AND admin_id = auth.uid()::text AND target_user_id = auth.uid()::text)
     );
+
+-- 12. ACTIVATION SUPABASE REALTIME
+-- Publication pour streaming WebSockets instantané des messages et des fils
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    CREATE PUBLICATION supabase_realtime;
+  END IF;
+END $$;
+
+ALTER PUBLICATION supabase_realtime ADD TABLE public.live_chat_threads;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.email_conversations;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.email_messages;

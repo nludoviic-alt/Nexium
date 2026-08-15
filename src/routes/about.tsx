@@ -3,6 +3,7 @@ import { ShieldCheck, Cpu, Activity, Server, Zap, ArrowRight } from "lucide-reac
 
 import { PageHeader, PageShell, Section } from "@/components/site/PageShell";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -13,63 +14,59 @@ export const Route = createFileRoute("/about")({
         content:
           "Nexium Markets développe une infrastructure de gestion pour robots de trading MetaTrader 5 : licences, monitoring et analytics.",
       },
-      { property: "og:title", content: "À propos de Nexium Markets" },
-      {
-        property: "og:description",
-        content: "Notre mission : rendre le trading automatisé mesurable et contrôlable.",
-      },
     ],
   }),
   component: AboutPage,
 });
 
-const values = [
-  {
-    title: "Transparence des données",
-    text: "Aucune statistique inventée. Chaque chiffre affiché provient de la base de données ou du terminal MetaTrader.",
-    icon: Activity,
-    color: "text-[#00c853] bg-emerald-50 border-emerald-100",
-  },
-  {
-    title: "Contrôle du risque",
-    text: "Les outils de limitation d'exposition et de suivi de drawdown sont au centre du produit.",
-    icon: ShieldCheck,
-    color: "text-blue-600 bg-blue-50 border-blue-100",
-  },
-  {
-    title: "Sécurité par défaut",
-    text: "Licences signées, sessions révocables, journalisation des actions sensibles.",
-    icon: Cpu,
-    color: "text-purple-600 bg-purple-50 border-purple-100",
-  },
-];
-
-const pillars = [
-  {
-    num: "01",
-    title: "Pont Réseau Co-localisé",
-    desc: "Connexion directe par fibre avec les serveurs Equinix NY4 réduisant le slippage et assurant une exécution sous 38ms.",
-  },
-  {
-    num: "02",
-    title: "Chiffrement Cryptographique",
-    desc: "Chaque licence est liée au hash matériel unique de votre VPS sans jamais manipuler votre mot de passe principal MT5.",
-  },
-  {
-    num: "03",
-    title: "Monitoring Télémetrique 24/7",
-    desc: "Supervision constante des signaux de présence (Heartbeat) et journalisation de chaque transaction exécutée.",
-  },
-];
-
 function AboutPage() {
+  const { language, t } = useLanguage();
+
+  const values = [
+    {
+      title: t.about.val1Title,
+      text: t.about.val1Desc,
+      icon: Activity,
+      color: "text-[#00c853] bg-emerald-50 border-emerald-100",
+    },
+    {
+      title: t.about.val2Title,
+      text: t.about.val2Desc,
+      icon: ShieldCheck,
+      color: "text-blue-600 bg-blue-50 border-blue-100",
+    },
+    {
+      title: t.about.val3Title,
+      text: t.about.val3Desc,
+      icon: Cpu,
+      color: "text-purple-600 bg-purple-50 border-purple-100",
+    },
+  ];
+
+  const pillars = [
+    {
+      num: t.about.pillar1Num,
+      title: t.about.pillar1Title,
+      desc: t.about.pillar1Desc,
+    },
+    {
+      num: t.about.pillar2Num,
+      title: t.about.pillar2Title,
+      desc: t.about.pillar2Desc,
+    },
+    {
+      num: t.about.pillar3Num,
+      title: t.about.pillar3Title,
+      desc: t.about.pillar3Desc,
+    },
+  ];
+
   return (
     <PageShell>
-      {/* Original Hero Component */}
       <PageHeader
-        eyebrow="À PROPOS DE NEXIUM MARKETS"
-        title="Une Infrastructure Institutionnelle pour le Trading Algorithmique"
-        description="Nexium Markets conçoit une infrastructure à très faible latence, un routage FIX API 4.4 et une supervision complète du cycle de vie de vos Expert Advisors MetaTrader 5."
+        eyebrow={t.about.badge}
+        title={t.about.title}
+        description={t.about.subtitle}
       />
 
       {/* Top Section - Glowing Dark Cards for Core Values */}
@@ -97,7 +94,7 @@ function AboutPage() {
                 </div>
 
                 <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between text-xs font-mono text-gray-400">
-                  <span>GARANTIE NEXIUM</span>
+                  <span>{language === "fr" ? "GARANTIE NEXIUM" : "NEXIUM STANDARD"}</span>
                   <span className="size-2 rounded-full bg-[#00ff66] shadow-[0_0_8px_#00ff66]" />
                 </div>
               </div>
@@ -114,10 +111,10 @@ function AboutPage() {
             <div className="max-w-2xl mb-10">
               <span className="text-xs font-extrabold text-[#00c853] uppercase tracking-widest flex items-center gap-2">
                 <Server className="size-4" />
-                <span>PILIERS DE L'INFRASTRUCTURE</span>
+                <span>{language === "fr" ? "PILIERS DE L'INFRASTRUCTURE" : "INFRASTRUCTURE PILLARS"}</span>
               </span>
               <h2 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight mt-1">
-                Les 3 Piliers de Notre Technologie
+                {language === "fr" ? "Les 3 Piliers de Notre Technologie" : "The 3 Pillars of our Technology"}
               </h2>
             </div>
 
@@ -140,7 +137,7 @@ function AboutPage() {
                   </div>
 
                   <div className="mt-8 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-gray-400">
-                    <span>TECHNOLOGIE ACCÉLÉRÉE</span>
+                    <span>{language === "fr" ? "ACCÉLÉRATION NY4" : "NY4 ACCELERATED"}</span>
                     <Zap className="size-4 text-[#00c853]" />
                   </div>
                 </div>
@@ -153,13 +150,15 @@ function AboutPage() {
             <div className="relative z-10 space-y-3 text-center lg:text-left max-w-2xl">
               <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#00ff66]">
                 <ShieldCheck className="size-4.5" />
-                <span>EXPÉRIENCE INSTITUTIONNELLE</span>
+                <span>{language === "fr" ? "EXPÉRIENCE INSTITUTIONNELLE" : "INSTITUTIONAL GRADE"}</span>
               </div>
               <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Prêt à numériser votre trading ?
+                {language === "fr" ? "Prêt à automatiser votre trading ?" : "Ready to automate your trading?"}
               </h3>
               <p className="text-xs sm:text-sm text-gray-300 font-medium leading-relaxed">
-                Consultez notre catalogue de robots certifiés ou découvrez nos offres d'abonnement.
+                {language === "fr"
+                  ? "Consultez notre catalogue de robots certifiés ou découvrez nos offres d'abonnement."
+                  : "Explore our certified MT5 Expert Advisors or choose your subscription plan."}
               </p>
             </div>
 
@@ -168,7 +167,7 @@ function AboutPage() {
               className="relative z-10 bg-[#00ff66] text-black hover:bg-[#00e65c] rounded-2xl px-8 py-4 text-sm font-black uppercase tracking-wider transition-all duration-300 shadow-[0_0_25px_rgba(0,255,102,0.45)] hover:scale-105 shrink-0"
             >
               <Link to="/robots" className="flex items-center gap-2">
-                <span>Explorer les Robots</span>
+                <span>{language === "fr" ? "Explorer les Robots" : "Explore Robots"}</span>
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

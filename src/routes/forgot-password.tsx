@@ -25,6 +25,7 @@ import { Globe, Loader2, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
 
 function ForgotPasswordPage() {
@@ -92,13 +93,7 @@ function ForgotPasswordPage() {
         </Link>
 
         {/* Interactive Language Switcher */}
-        <button
-          onClick={() => setLanguage(language === "fr" ? "en" : "fr")}
-          className="flex items-center gap-1.5 text-xs font-bold text-gray-700 hover:text-black bg-gray-200/80 hover:bg-gray-300 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-        >
-          <Globe className="size-3.5 text-emerald-600" />
-          <span>{language === "fr" ? "FR 🇫🇷" : "EN 🇬🇧"}</span>
-        </button>
+        <LanguageSelector variant="segmented" />
       </header>
 
       {/* Main Form Center Content */}
@@ -112,20 +107,36 @@ function ForgotPasswordPage() {
 
             <div className="relative z-10">
               <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight text-white">
-                Portail de
-                <br />
-                Récupération
-                <br />
-                du Compte
+                {language === "fr" ? (
+                  <>
+                    Récupération
+                    <br />
+                    du Compte
+                  </>
+                ) : (
+                  <>
+                    Account
+                    <br />
+                    Recovery
+                  </>
+                )}
               </h2>
 
-              <ul className="mt-8 space-y-4 text-sm sm:text-base font-semibold">
-                {[
-                  "Lien de Réinitialisation Chiffré",
-                  "Protection des Licences Hardware",
-                  "Envoi Instantané par E-mail",
-                  "Support Sécurité 24/7",
-                ].map((item) => (
+              <ul className="mt-6 space-y-3.5 text-sm sm:text-base font-semibold">
+                {(language === "fr"
+                  ? [
+                      "Lien sécurisé chiffré",
+                      "Envoi instantané",
+                      "Protection des licences",
+                      "Support 24/7",
+                    ]
+                  : [
+                      "Encrypted secure link",
+                      "Instant email delivery",
+                      "License protection",
+                      "24/7 Support",
+                    ]
+                ).map((item) => (
                   <li key={item} className="flex items-center gap-3">
                     <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#00ff66] text-black font-black text-xs shadow-[0_0_12px_rgba(0,255,102,0.6)]">
                       ✓
@@ -137,13 +148,13 @@ function ForgotPasswordPage() {
             </div>
 
             {/* Bottom Candlesticks Graphic Mockup */}
-            <div className="relative z-10 mt-10 pt-5 border-t border-[#00ff66]/20">
-              <div className="flex items-end gap-2.5 h-24 w-full justify-around opacity-90">
-                <div className="w-4 bg-[#00ff66] rounded-sm h-14 relative shadow-[0_0_12px_rgba(0,255,102,0.5)]">
-                  <div className="absolute -top-3 left-1.5 w-0.5 h-20 bg-[#00ff66]" />
+            <div className="relative z-10 mt-8 pt-4 border-t border-[#00ff66]/20">
+              <div className="flex items-end gap-2.5 h-20 w-full justify-around opacity-90">
+                <div className="w-4 bg-[#00ff66] rounded-sm h-12 relative shadow-[0_0_12px_rgba(0,255,102,0.5)]">
+                  <div className="absolute -top-3 left-1.5 w-0.5 h-16 bg-[#00ff66]" />
                 </div>
-                <div className="w-5 bg-[#00ff66] rounded-sm h-20 relative shadow-[0_0_18px_rgba(0,255,102,0.6)]">
-                  <div className="absolute -top-2 left-2 w-0.5 h-24 bg-[#00ff66]" />
+                <div className="w-5 bg-[#00ff66] rounded-sm h-16 relative shadow-[0_0_18px_rgba(0,255,102,0.6)]">
+                  <div className="absolute -top-2 left-2 w-0.5 h-20 bg-[#00ff66]" />
                 </div>
               </div>
             </div>
@@ -153,28 +164,42 @@ function ForgotPasswordPage() {
           <div className="lg:col-span-7 bg-white p-8 lg:p-10 text-gray-900 flex flex-col justify-between">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                Réinitialiser le Mot de Passe
+                {language === "fr" ? "Mot de passe oublié" : "Forgot Password"}
               </h1>
-              <p className="mt-2 text-xs sm:text-sm text-gray-500 font-medium">
-                Saisissez votre adresse e-mail pour recevoir les instructions de réinitialisation.
+              <p className="mt-1.5 text-xs sm:text-sm text-gray-500 font-medium">
+                {language === "fr"
+                  ? "Entrez votre e-mail pour recevoir le lien de réinitialisation."
+                  : "Enter your email to receive the reset link."}
               </p>
 
               {submitted ? (
-                <div className="mt-8 p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="size-6 text-emerald-600 shrink-0" />
-                    <h3 className="font-extrabold text-base">E-mail de Récupération Envoyé !</h3>
+                <div className="mt-6 p-5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-emerald-950 space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
+                    <h3 className="font-extrabold text-sm sm:text-base">
+                      {language === "fr" ? "E-mail envoyé !" : "Email sent!"}
+                    </h3>
                   </div>
-                  <p className="text-xs sm:text-sm text-emerald-800 leading-relaxed font-medium">
-                    Un e-mail officiel contenant votre lien sécurisé de réinitialisation vient d'être expédié à <strong>{email}</strong>.
+                  <p className="text-xs sm:text-sm text-emerald-900 font-medium leading-normal">
+                    {language === "fr" ? (
+                      <>
+                        Lien expédié à <strong>{email}</strong>.
+                      </>
+                    ) : (
+                      <>
+                        Reset link sent to <strong>{email}</strong>.
+                      </>
+                    )}
                   </p>
-                  <p className="text-xs text-emerald-700">
-                    Vérifiez votre boîte de réception (et vos spams si nécessaire). Le lien expirera dans 15 minutes.
+                  <p className="text-[11px] sm:text-xs text-emerald-700">
+                    {language === "fr"
+                      ? "Vérifiez vos spams si besoin. Valable 15 min."
+                      : "Check spam if needed. Valid for 15 min."}
                   </p>
                 </div>
               ) : (
                 <form
-                  className="mt-6 space-y-4 sm:space-y-5"
+                  className="mt-6 space-y-4"
                   onSubmit={handleResetPassword}
                 >
                   {/* Email Address */}
@@ -183,7 +208,7 @@ function ForgotPasswordPage() {
                       htmlFor="email"
                       className="text-xs sm:text-sm font-extrabold text-gray-800"
                     >
-                      Adresse E-mail
+                      {language === "fr" ? "E-mail" : "Email"}
                     </label>
                     <Input
                       id="email"
@@ -191,8 +216,8 @@ function ForgotPasswordPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Adresse e-mail de votre compte"
-                      className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                      placeholder="nom@exemple.com"
+                      className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                     />
                   </div>
 
@@ -200,10 +225,18 @@ function ForgotPasswordPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full mt-3 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
                     {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
-                    <span>{loading ? "Envoi en cours..." : "Envoyer le Lien de Récupération"}</span>
+                    <span>
+                      {loading
+                        ? language === "fr"
+                          ? "Envoi en cours..."
+                          : "Sending..."
+                        : language === "fr"
+                        ? "Envoyer le lien"
+                        : "Send reset link"}
+                    </span>
                   </Button>
                 </form>
               )}
@@ -211,11 +244,11 @@ function ForgotPasswordPage() {
 
             {/* Bottom Switch Link */}
             <div className="mt-8 pt-4 text-center text-xs sm:text-sm font-semibold text-gray-600 border-t border-gray-100 flex justify-between items-center">
-              <Link to="/login" className="font-extrabold text-gray-900 underline">
-                ← Retour à la Connexion
+              <Link to="/login" className="font-extrabold text-gray-900 underline hover:text-[#00c853]">
+                {language === "fr" ? "← Connexion" : "← Login"}
               </Link>
-              <Link to="/register" className="font-extrabold text-gray-900 underline">
-                Créer un compte
+              <Link to="/register" className="font-extrabold text-gray-900 underline hover:text-[#00c853]">
+                {language === "fr" ? "Créer un compte" : "Create account"}
               </Link>
             </div>
           </div>

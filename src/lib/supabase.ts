@@ -232,6 +232,36 @@ export interface SupabaseChatMessage {
   created_at?: string;
 }
 
+export interface SupabaseLiveChatThread {
+  id: string;
+  visitor_name: string;
+  contact: string;
+  language: "fr" | "en";
+  status: "QUEUE" | "ACTIVE" | "RESOLVED";
+  assigned_advisor?: string | null;
+  assigned_advisor_role?: string | null;
+  initial_query: string;
+  created_at?: string;
+  last_activity?: string;
+}
+
+/**
+ * Récupère tous les fils du routeur de chat depuis Supabase.
+ */
+export async function getSupabaseLiveChatThreads(): Promise<SupabaseLiveChatThread[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("live_chat_threads")
+    .select("*")
+    .order("last_activity", { ascending: false });
+
+  if (error) {
+    console.warn("Notice chargement live_chat_threads Supabase:", error);
+    return [];
+  }
+  return data as SupabaseLiveChatThread[];
+}
+
 /**
  * Récupère les messages d'un fil de discussion client.
  */
@@ -267,3 +297,4 @@ export async function sendChatMessage(msg: Omit<SupabaseChatMessage, "id" | "cre
   }
   return { success: true, data };
 }
+

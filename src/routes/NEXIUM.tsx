@@ -5227,7 +5227,9 @@ function MessagingTab({
 // ----------------------------------------------------
 // MAIN DASHBOARD COMPONENT
 // ----------------------------------------------------
-function NexiumDashboard() {
+import { getUserSlug } from "@/lib/user-slug";
+
+export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const navigate = useNavigate();
   const [running, setRunning] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -5288,9 +5290,18 @@ function NexiumDashboard() {
         }
         if (profile.requested_preset) setRequestedPreset(profile.requested_preset);
         if (profile.active_preset) setActivePreset(profile.active_preset);
+
+        // Vérification du slug personnalisé dans l'URL
+        const ownSlug = getUserSlug({ name: profile.name, email: user.email, id: user.id });
+        const isAdmin = profile.role && ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
+
+        // Si l'utilisateur est sur /NEXIUM sans slug, rediriger vers son URL personnalisée
+        if (!customSlug && !isAdmin) {
+          navigate({ to: "/portal/$slug", params: { slug: ownSlug } });
+        }
       }
     });
-  }, []);
+  }, [customSlug]);
 
   const handleConfirmPresetRequest = async (presetId: string) => {
     setSubmittingPreset(true);
@@ -6027,6 +6038,22 @@ function NexiumDashboard() {
                   <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
                     <p className="text-xs font-bold text-white">{clientName}</p>
                     <p className="text-[10px] font-mono text-[#00D084]">Compte MT5 #{mt5AccountNumber}</p>
+                    <div className="mt-1.5 flex items-center justify-between rounded-lg bg-black/40 px-2 py-1 border border-white/5">
+                      <span className="text-[9px] font-mono text-gray-400 truncate max-w-[140px]">
+                        /portal/{customSlug || getUserSlug({ name: clientName, email: clientEmail, id: currentUserId })}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const slug = customSlug || getUserSlug({ name: clientName, email: clientEmail, id: currentUserId });
+                          navigator.clipboard.writeText(`https://nexiummarkets.com/portal/${slug}`);
+                          toast.success("Lien de votre portail copié !");
+                        }}
+                        className="text-[9px] font-bold text-[#00D084] hover:underline cursor-pointer ml-1"
+                        title="Copier mon URL personnalisée"
+                      >
+                        Copier
+                      </button>
+                    </div>
                   </div>
                   <button
                     onClick={() => {

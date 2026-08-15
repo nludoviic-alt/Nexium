@@ -11,6 +11,14 @@ import {
   type EmailAgentSummary,
 } from "@/lib/emailApi";
 import {
+  getLiveChatThreads,
+  claimLiveChatThread,
+  sendLiveChatMessage,
+  resolveLiveChatThread,
+  subscribeToLiveChatUpdates,
+  type LiveChatThread,
+} from "@/lib/chat-router";
+import {
   Activity,
   AlertOctagon,
   AlertTriangle,
@@ -139,13 +147,13 @@ export const Route = createFileRoute("/composition")({
 const ADMIN_CONSOLE_ROLES: ReadonlyArray<string> = ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
 
 /**
- * Garde d'accès de /composition. Le build étant statique (pas de serveur pour
- * vérifier la session par requête), c'est le meilleur contrôle possible :
- * rien du contenu du dashboard n'est rendu tant que la session + le rôle
- * n'ont pas été vérifiés auprès de Supabase, et tout échec redirige vers
- * /login au lieu de laisser passer par défaut.
+import { getAdminSlug } from "@/lib/user-slug";
+
+/**
+ * Garde d'accès de /composition / /desk/$slug. Le build étant statique,
+ * la vérification de session + rôle s'exécute côté client auprès de Supabase.
  */
-function CompositionAccessGate() {
+export function CompositionAccessGate({ customAdminSlug }: { customAdminSlug?: string } = {}) {
   const navigate = useNavigate();
   const [state, setState] = useState<"checking" | "authorized" | "denied">("checking");
   const [sessionRole, setSessionRole] = useState<AdminSystemRole | null>(null);
@@ -182,13 +190,19 @@ function CompositionAccessGate() {
       setIsPrimaryOwner(Boolean(profile.is_primary_owner));
       setSessionUser({ name: profile.name || userData.user.email || "Administrateur", email: profile.email });
       setState("authorized");
+
+      // Si l'administrateur arrive sur /composition générique, le rediriger vers son URL avec son prénom
+      const adminSlug = getAdminSlug({ name: profile.name, email: userData.user.email, id: userData.user.id });
+      if (!customAdminSlug) {
+        navigate({ to: "/desk/$slug", params: { slug: adminSlug } });
+      }
     }
 
     verify();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [customAdminSlug]);
 
   useEffect(() => {
     if (state === "denied") {
@@ -655,6 +669,10 @@ function NexiumAdminDashboard({
   const [newsGuardActive, setNewsGuardActive] = useState<boolean>(true);
 
   // Messagerie State (chat uniquement — les e-mails vivent dans le module "E-mails")
+  const [messagingTab, setMessagingTab] = useState<"WEB_QUEUE" | "CLIENTS">("WEB_QUEUE");
+  const [webThreads, setWebThreads] = useState<LiveChatThread[]>([]);
+  const [selectedWebThreadId, setSelectedWebThreadId] = useState<string | null>(null);
+  const [webThreadReplyInput, setWebThreadReplyInput] = useState("");
   const [channelFilter, setChannelFilter] = useState<"ALL" | "CHAT" | "EMAIL">("ALL");
   const [messagesList, setMessagesList] = useState<ChatMessage[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
@@ -810,6 +828,24 @@ function NexiumAdminDashboard({
       return matchSearch;
     });
   }, [clients, searchContactQuery]);
+
+  // Synchronisation temps réel avec le Routeur Chatbot Web
+  useEffect(() => {
+    setWebThreads(getLiveChatThreads());
+    const unsub = subscribeToLiveChatUpdates((threads) => {
+      setWebThreads(threads);
+    });
+    return unsub;
+  }, []);
+
+  const activeWebThread = useMemo(() => {
+    if (!selectedWebThreadId) return webThreads[0] || null;
+    return webThreads.find((t) => t.id === selectedWebThreadId) || webThreads[0] || null;
+  }, [webThreads, selectedWebThreadId]);
+
+  const queueCount = useMemo(() => {
+    return webThreads.filter((t) => t.status === "QUEUE").length;
+  }, [webThreads]);
 
   // États d'édition Client
   const [editName, setEditName] = useState(activeClient?.name || "");
@@ -1175,6 +1211,37 @@ function NexiumAdminDashboard({
     addAuditLog("DESK_MESSAGE_SENT", `Message transmis à ${activeClient.name}.`, activeClient.name);
     toast.success(`Message transmis à ${activeClient.name}.`);
     setChatReplyInput("");
+  };
+
+  // Handlers pour la file d'attente Web (Live Chat Router)
+  const handleClaimWebThread = (threadId: string) => {
+    const updated = claimLiveChatThread(threadId, `Conseiller Desk (${currentSessionRole})`, currentSessionRole);
+    if (updated) {
+      addAuditLog("LIVE_CHAT_CLAIMED", `Fil prospect #${threadId} pris en charge par ${currentSessionRole}.`);
+      toast.success(`Vous avez pris en charge le fil #${threadId} !`);
+      setSelectedWebThreadId(threadId);
+    }
+  };
+
+  const handleSendWebThreadMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!webThreadReplyInput.trim() || !activeWebThread) return;
+
+    sendLiveChatMessage({
+      threadId: activeWebThread.id,
+      sender: "ADVISOR",
+      authorName: `Conseiller Desk (${currentSessionRole})`,
+      text: webThreadReplyInput.trim(),
+    });
+
+    addAuditLog("LIVE_CHAT_REPLY", `Réponse envoyée au prospect ${activeWebThread.visitorName} (#${activeWebThread.id}).`);
+    setWebThreadReplyInput("");
+  };
+
+  const handleResolveWebThread = (threadId: string) => {
+    resolveLiveChatThread(threadId);
+    addAuditLog("LIVE_CHAT_RESOLVED", `Fil prospect #${threadId} clôturé.`);
+    toast.success("Session de chat clôturée avec succès.");
   };
 
   // Insertion d'une réponse rapide prédéfinie
@@ -2113,18 +2180,27 @@ function NexiumAdminDashboard({
     if (!selectedEmailConversationId || !emailReplyText.trim()) return;
     setEmailSending(true);
     try {
-      if (!emailConfigured) {
-        toast.error("Service e-mail non configuré.");
-        return;
+      if (emailConfigured) {
+        await emailApi.reply(
+          currentEmailAgentId,
+          selectedEmailConversationId,
+          emailReplyText.trim(),
+          emailPendingAttachments.map((a) => a.id)
+        );
+      } else {
+        // Mode direct via Resend & Supabase
+        const targetEmail = emailConversationDetail?.conversation.customerEmail || "client@nexiummarkets.com";
+        const subject = `Re: ${emailConversationDetail?.conversation.subject || "Votre demande Nexium Markets"}`;
+        await sendCustomDeskEmail(
+          targetEmail,
+          subject,
+          emailReplyText.trim(),
+          `Conseiller Desk (${currentSessionRole})`
+        );
       }
 
-      await emailApi.reply(
-        currentEmailAgentId,
-        selectedEmailConversationId,
-        emailReplyText.trim(),
-        emailPendingAttachments.map((a) => a.id)
-      );
-      toast.success("E-mail envoyé.");
+      addAuditLog("EMAIL_REPLY_SENT", `Réponse e-mail envoyée pour le dossier #${selectedEmailConversationId}.`);
+      toast.success("E-mail envoyé avec succès au destinataire !");
       setEmailReplyText("");
       setEmailPendingAttachments([]);
       refreshEmailDetail(selectedEmailConversationId);
@@ -2329,7 +2405,7 @@ function NexiumAdminDashboard({
 
           {/* Lien direct vers le portail client */}
           <Link
-            to="/NEXIUM"
+            to="/portal"
             className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-300 hover:text-white transition cursor-pointer shadow-sm"
             title="Accéder à l'interface de trading vue par les clients"
           >
@@ -4629,192 +4705,450 @@ function NexiumAdminDashboard({
 
               {/* ── HEADER ── */}
               <div className="border-b border-slate-700/50 pb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
-                  <MessageCircle className="size-6 text-emerald-400" />
-                  <span>Messagerie</span>
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-400">
-                  Chat direct avec les clients. Pour la boîte e-mail partagée, voir <strong className="text-slate-300">E-mails</strong> dans le menu.
-                </p>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-2.5">
+                    <MessageCircle className="size-6 text-emerald-400" />
+                    <span>Messagerie &amp; Desk Opérateur</span>
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                    Routeur de chat en direct, file d&apos;attente des prospects du site et assistance clients MT5.
+                  </p>
+                </div>
+
+                {/* Sub-tab switcher */}
+                <div className="flex items-center gap-1.5 bg-[#090d16] p-1.5 rounded-2xl border border-slate-800 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMessagingTab("WEB_QUEUE")}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      messagingTab === "WEB_QUEUE"
+                        ? "bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <Flame className="size-3.5" />
+                    <span>File d&apos;attente Web</span>
+                    {queueCount > 0 && (
+                      <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+                        messagingTab === "WEB_QUEUE" ? "bg-black text-emerald-400" : "bg-amber-500 text-black animate-pulse"
+                      }`}>
+                        {queueCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMessagingTab("CLIENTS")}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      messagingTab === "CLIENTS"
+                        ? "bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <User className="size-3.5" />
+                    <span>Traders MT5 ({clients.length})</span>
+                  </button>
+                </div>
               </div>
 
-              {/* ── CORPS PRINCIPAL : liste contacts + panneau conversation ── */}
-              <div className="grid gap-5 lg:grid-cols-12" style={{ height: "calc(100vh - 240px)", minHeight: "600px" }}>
+              {/* ── CORPS PRINCIPAL : Selon l'onglet actif ── */}
+              {messagingTab === "WEB_QUEUE" ? (
+                /* ================= FILE D'ATTENTE PROSPECTS DU SITE ================= */
+                <div className="grid gap-5 lg:grid-cols-12" style={{ height: "calc(100vh - 240px)", minHeight: "600px" }}>
+                  {/* Colonne gauche : Liste des fils du routeur */}
+                  <div className="lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                    <div className="p-3.5 border-b border-slate-700/40 bg-[#0f1626]/80 flex items-center justify-between text-xs font-mono shrink-0">
+                      <span className="text-slate-400 font-bold uppercase">Fils Entrants Chatbot</span>
+                      <span className="text-emerald-400 font-bold">{webThreads.length} Total</span>
+                    </div>
 
-                {/* ── COLONNE GAUCHE : Contacts ── */}
-                <div className="lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                    <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">
+                      {webThreads.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-sm">
+                          Aucun prospect en attente actuellement.
+                        </div>
+                      ) : (
+                        webThreads.map((th) => {
+                          const isSelected = activeWebThread?.id === th.id;
+                          const isQueue = th.status === "QUEUE";
+                          const isActive = th.status === "ACTIVE";
+                          const lastMsg = th.messages[th.messages.length - 1];
 
-                  {/* Recherche */}
-                  <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 shrink-0">
-                    <div className="relative">
-                      <Search className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <input
-                        type="text"
-                        placeholder="Rechercher un trader…"
-                        aria-label="Rechercher un contact"
-                        value={searchContactQuery}
-                        onChange={(e) => setSearchContactQuery(e.target.value)}
-                        className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 transition"
-                      />
+                          return (
+                            <button
+                              key={th.id}
+                              onClick={() => setSelectedWebThreadId(th.id)}
+                              className={`w-full text-left p-4 transition flex items-start gap-3.5 cursor-pointer ${
+                                isSelected
+                                  ? "bg-emerald-600/12 border-l-[3px] border-l-emerald-500"
+                                  : "hover:bg-slate-800/40 border-l-[3px] border-l-transparent"
+                              }`}
+                            >
+                              <div className="relative shrink-0">
+                                <div className={`size-11 rounded-xl grid place-items-center font-bold text-base ${
+                                  isQueue
+                                    ? "bg-amber-500/20 border border-amber-500/40 text-amber-300 animate-pulse"
+                                    : isActive
+                                    ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-300"
+                                    : "bg-slate-700/60 border border-slate-600/50 text-slate-400"
+                                }`}>
+                                  {th.visitorName.charAt(0)}
+                                </div>
+                                <span className={`size-2.5 rounded-full ring-2 ring-[#0f1626] absolute -bottom-0.5 -right-0.5 ${
+                                  isQueue ? "bg-amber-400 animate-ping" : isActive ? "bg-emerald-400" : "bg-slate-500"
+                                }`} />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start mb-1">
+                                  <strong className={`text-sm font-bold truncate ${isSelected ? "text-white" : "text-slate-100"}`}>
+                                    {th.visitorName}
+                                  </strong>
+                                  <span className="text-[10px] text-slate-500 font-mono">
+                                    {lastMsg?.timestamp || "—"}
+                                  </span>
+                                </div>
+
+                                <p className="text-xs text-slate-400 truncate mb-2">
+                                  {lastMsg ? lastMsg.text : th.initialQuery}
+                                </p>
+
+                                <div className="flex items-center gap-2">
+                                  {isQueue && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                                      ⏳ EN FILE D&apos;ATTENTE
+                                    </span>
+                                  )}
+                                  {isActive && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      🟢 Pris par {th.assignedAdvisor}
+                                    </span>
+                                  )}
+                                  {th.status === "RESOLVED" && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                                      ✓ Résolu
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] uppercase font-mono text-slate-500 ml-auto">
+                                    {th.language}
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
 
-                  {/* Liste */}
-                  <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">
-                    {filteredContacts.length === 0 ? (
-                      <div className="p-8 text-center text-slate-500 text-sm">Aucun contact trouvé.</div>
-                    ) : (
-                      filteredContacts.map((c) => {
-                        const lastMsg = messagesList.filter((m) => m.clientId === c.id && m.channel === "CHAT").slice(-1)[0];
-                        const isSelected = c.id === activeClient?.id;
-                        const unread = messagesList.filter((m) => m.clientId === c.id && !m.isRead).length;
-
-                        return (
-                          <button
-                            key={c.id}
-                            onClick={() => setSelectedUserId(c.id)}
-                            className={`w-full text-left p-4 transition flex items-start gap-3.5 cursor-pointer ${
-                              isSelected
-                                ? "bg-emerald-600/12 border-l-[3px] border-l-emerald-500"
-                                : "hover:bg-slate-800/40 border-l-[3px] border-l-transparent"
-                            }`}
-                          >
-                            {/* Avatar */}
-                            <div className="relative shrink-0">
-                              <div className={`size-11 rounded-xl grid place-items-center font-bold text-base ${
-                                isSelected
-                                  ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-200"
-                                  : "bg-slate-700/60 border border-slate-600/50 text-slate-300"
-                              }`}>
-                                {c.name.charAt(0)}
-                              </div>
-                              <span className="size-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0f1626] absolute -bottom-0.5 -right-0.5" />
+                  {/* Colonne droite : Chat en direct avec le prospect */}
+                  <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                    {activeWebThread ? (
+                      <>
+                        {/* En-tête fil web */}
+                        <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 flex flex-wrap justify-between items-center gap-3 shrink-0">
+                          <div className="flex items-center gap-3.5">
+                            <div className="size-11 rounded-xl bg-emerald-600/20 border border-emerald-500/30 grid place-items-center font-bold text-emerald-300 text-base shrink-0">
+                              {activeWebThread.visitorName.charAt(0)}
                             </div>
+                            <div>
+                              <div className="flex items-center gap-2.5 mb-0.5">
+                                <h3 className="text-base font-bold text-white">{activeWebThread.visitorName}</h3>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  activeWebThread.status === "QUEUE"
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                    : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25"
+                                }`}>
+                                  {activeWebThread.status === "QUEUE" ? "⏳ EN ATTENTE DE CONSEILLER" : "● SESSION EN DIRECT"}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-400 font-mono">
+                                Contact : <strong className="text-slate-200">{activeWebThread.contact}</strong> · Langue : {activeWebThread.language.toUpperCase()}
+                              </p>
+                            </div>
+                          </div>
 
-                            {/* Infos */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex justify-between items-start mb-1">
-                                <strong className={`text-sm font-bold truncate ${isSelected ? "text-white" : "text-slate-100"}`}>{c.name}</strong>
-                                <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                                  {unread > 0 && (
-                                    <span className="size-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold grid place-items-center">{unread}</span>
-                                  )}
-                                  <span className="text-xs text-slate-500 font-mono">{lastMsg?.timestamp ?? "—"}</span>
+                          <div className="flex items-center gap-2">
+                            {activeWebThread.status === "QUEUE" ? (
+                              <button
+                                onClick={() => handleClaimWebThread(activeWebThread.id)}
+                                className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.3)] transition cursor-pointer"
+                              >
+                                <UserCheck className="size-4" />
+                                <span>Prendre en charge ce prospect ➔</span>
+                              </button>
+                            ) : (
+                              activeWebThread.status === "ACTIVE" && (
+                                <button
+                                  onClick={() => handleResolveWebThread(activeWebThread.id)}
+                                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs px-3.5 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
+                                >
+                                  Clôturer la session
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Fil de discussion */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                          {activeWebThread.messages.map((m) => {
+                            if (m.sender === "SYSTEM") {
+                              return (
+                                <div key={m.id} className="text-center my-2">
+                                  <span className="inline-block bg-slate-800/90 text-slate-400 text-xs font-mono px-3.5 py-1 rounded-full border border-slate-700">
+                                    {m.text} · {m.timestamp}
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            const isAdvisor = m.sender === "ADVISOR";
+                            return (
+                              <div key={m.id} className={`flex ${isAdvisor ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[75%] rounded-2xl px-4 py-3 space-y-1.5 ${
+                                  isAdvisor
+                                    ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-50 rounded-tr-none"
+                                    : "bg-[#0c121e] text-slate-200 border border-slate-700/50 rounded-tl-none"
+                                }`}>
+                                  <div className={`flex justify-between gap-4 text-xs font-mono ${isAdvisor ? "opacity-70" : "text-slate-500"}`}>
+                                    <span>{m.authorName}</span>
+                                    <span>{m.timestamp}</span>
+                                  </div>
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.text}</p>
                                 </div>
                               </div>
-                              <p className="text-xs text-slate-400 truncate mb-1.5">
-                                {lastMsg ? (lastMsg.subject ?? lastMsg.text) : "Aucun message récent."}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs font-mono">
-                                <span className="text-emerald-400 font-semibold">MT5 #{c.mt5.login}</span>
-                                <span className="text-slate-600">·</span>
-                                <span className="text-slate-400">${c.balance.toLocaleString("fr-FR")}</span>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })
+                            );
+                          })}
+                        </div>
+
+                        {/* Modèles de réponse */}
+                        <div className="px-4 py-2.5 border-t border-slate-800/60 bg-[#0c121e]/60 flex items-center gap-2 overflow-x-auto shrink-0">
+                          <span className="text-xs font-semibold text-slate-500 uppercase font-mono shrink-0">Modèles :</span>
+                          {CANNED_RESPONSES.map((cr, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setWebThreadReplyInput(cr.text)}
+                              className="rounded-lg border border-slate-700/50 bg-[#131c30] hover:bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:text-white shrink-0 cursor-pointer transition"
+                            >
+                              {cr.title}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Zone de saisie */}
+                        <form onSubmit={handleSendWebThreadMessage} className="p-4 border-t border-slate-700/40 bg-[#0f1626]/80 space-y-3 shrink-0">
+                          <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
+                            <span>Canal : <strong className="text-emerald-400">Routeur Chatbot Public</strong></span>
+                            <span>Signé par : {currentSessionRole}</span>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="text"
+                              placeholder={
+                                activeWebThread.status === "QUEUE"
+                                  ? "Prenez d'abord en charge ce fil pour répondre..."
+                                  : "Écrire une réponse au visiteur du site..."
+                              }
+                              aria-label="Zone de saisie du message"
+                              disabled={activeWebThread.status === "QUEUE"}
+                              value={webThreadReplyInput}
+                              onChange={(e) => setWebThreadReplyInput(e.target.value)}
+                              className="flex-1 rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 disabled:opacity-50 transition"
+                            />
+                            <button
+                              type="submit"
+                              disabled={activeWebThread.status === "QUEUE" || !webThreadReplyInput.trim()}
+                              className="admin-btn-primary py-3 px-5 text-sm font-bold shrink-0 flex items-center gap-2 disabled:opacity-40"
+                            >
+                              <Send className="size-4" />
+                              <span>Envoyer au Visiteur</span>
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center p-8 text-slate-500 text-center">
+                        <MessageCircle className="size-12 mb-3 text-slate-700" />
+                        <p className="text-base font-bold text-slate-400">Sélectionnez un fil de la file d&apos;attente</p>
+                        <p className="text-xs text-slate-600 mt-1">Les prospects écrivant sur le site apparaîtront ici en temps réel.</p>
+                      </div>
                     )}
                   </div>
                 </div>
-
-                {/* ── COLONNE DROITE : Conversation ── */}
-                <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
-
-                  {/* En-tête contact */}
-                  <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-3.5">
-                      <div className="size-11 rounded-xl bg-emerald-600/20 border border-emerald-500/30 grid place-items-center font-bold text-emerald-300 text-base shrink-0">
-                        {activeClient?.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2.5 mb-0.5">
-                          <h3 className="text-base font-bold text-white">{activeClient?.name}</h3>
-                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
-                            ● EN DIRECT
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 font-mono">{activeClient?.email} · {activeClient?.phone}</p>
+              ) : (
+                /* ================= CONTACTS TRADERS MT5 ================= */
+                <div className="grid gap-5 lg:grid-cols-12" style={{ height: "calc(100vh - 240px)", minHeight: "600px" }}>
+                  {/* ── COLONNE GAUCHE : Contacts ── */}
+                  <div className="lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                    <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 shrink-0">
+                      <div className="relative">
+                        <Search className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Rechercher un trader…"
+                          aria-label="Rechercher un contact"
+                          value={searchContactQuery}
+                          onChange={(e) => setSearchContactQuery(e.target.value)}
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 transition"
+                        />
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => toast.info(`Appel en cours vers ${activeClient?.phone}…`)}
-                        className="size-9 rounded-xl border border-slate-700/60 bg-[#0c121e] hover:bg-slate-800 text-slate-300 hover:text-emerald-300 grid place-items-center cursor-pointer transition"
-                        title="Appeler"
-                      >
-                        <PhoneCall className="size-4" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenClientProfile(activeClient)}
-                        className="size-9 rounded-xl border border-slate-700/60 bg-[#0c121e] hover:bg-slate-800 text-slate-300 hover:text-white grid place-items-center cursor-pointer transition"
-                        title="Voir fiche client"
-                      >
-                        <User className="size-4" />
-                      </button>
-                    </div>
-                  </div>
+                    <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">
+                      {filteredContacts.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-sm">Aucun contact trouvé.</div>
+                      ) : (
+                        filteredContacts.map((c) => {
+                          const lastMsg = messagesList.filter((m) => m.clientId === c.id && m.channel === "CHAT").slice(-1)[0];
+                          const isSelected = c.id === activeClient?.id;
+                          const unread = messagesList.filter((m) => m.clientId === c.id && !m.isRead).length;
 
-                  {/* Fil de messages */}
-                  <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                    {activeClientMessages.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
-                        <MessageCircle className="size-10 text-slate-700" />
-                        <p className="text-sm font-medium">Commencez la conversation avec {activeClient?.name}</p>
-                      </div>
-                    ) : (
-                      activeClientMessages.map((msg) => {
-                        const isAdmin = msg.sender === "ADMIN";
-                        return (
-                          <div key={msg.id} className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[75%] rounded-2xl px-4 py-3 space-y-1.5 ${
-                              isAdmin
-                                ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-50 rounded-tr-none"
-                                : "bg-[#0c121e] text-slate-200 border border-slate-700/50 rounded-tl-none"
-                            }`}>
-                              <div className={`flex justify-between gap-4 text-xs font-mono ${isAdmin ? "opacity-70" : "text-slate-500"}`}>
-                                <span>{msg.authorName}</span><span>{msg.timestamp}</span>
+                          return (
+                            <button
+                              key={c.id}
+                              onClick={() => setSelectedUserId(c.id)}
+                              className={`w-full text-left p-4 transition flex items-start gap-3.5 cursor-pointer ${
+                                isSelected
+                                  ? "bg-emerald-600/12 border-l-[3px] border-l-emerald-500"
+                                  : "hover:bg-slate-800/40 border-l-[3px] border-l-transparent"
+                              }`}
+                            >
+                              <div className="relative shrink-0">
+                                <div className={`size-11 rounded-xl grid place-items-center font-bold text-base ${
+                                  isSelected
+                                    ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-200"
+                                    : "bg-slate-700/60 border border-slate-600/50 text-slate-300"
+                                }`}>
+                                  {c.name.charAt(0)}
+                                </div>
+                                <span className="size-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0f1626] absolute -bottom-0.5 -right-0.5" />
                               </div>
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                            </div>
-                          </div>
-                        );
-                      }))}
-                    </div>
 
-                  <div className="px-4 py-2.5 border-t border-slate-800/60 bg-[#0c121e]/60 flex items-center gap-2 overflow-x-auto shrink-0">
-                    <span className="text-xs font-semibold text-slate-500 uppercase font-mono shrink-0">Modeles :</span>
-                    {CANNED_RESPONSES.map((cr, idx) => (
-                      <button key={idx} onClick={() => handleInsertCannedResponse(cr)}
-                        className="rounded-lg border border-slate-700/50 bg-[#131c30] hover:bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:text-white shrink-0 cursor-pointer transition">
-                        {cr.title}
-                      </button>
-                    ))}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex justify-between items-start mb-1">
+                                  <strong className={`text-sm font-bold truncate ${isSelected ? "text-white" : "text-slate-100"}`}>{c.name}</strong>
+                                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                    {unread > 0 && (
+                                      <span className="size-5 rounded-full bg-emerald-500 text-white text-[10px] font-bold grid place-items-center">{unread}</span>
+                                    )}
+                                    <span className="text-xs text-slate-500 font-mono">{lastMsg?.timestamp ?? "—"}</span>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-slate-400 truncate mb-1.5">
+                                  {lastMsg ? (lastMsg.subject ?? lastMsg.text) : "Aucun message récent."}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs font-mono">
+                                  <span className="text-emerald-400 font-semibold">MT5 #{c.mt5.login}</span>
+                                  <span className="text-slate-600">·</span>
+                                  <span className="text-slate-400">${c.balance.toLocaleString("fr-FR")}</span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
 
-                  <form onSubmit={handleSendDeskMessage} className="p-4 border-t border-slate-700/40 bg-[#0f1626]/80 space-y-3 shrink-0">
-                    <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
-                      <span>Canal : <strong className="text-slate-300">Live Chat</strong></span>
-                      <span>Signe par : {currentSessionRole}</span>
+                  {/* ── COLONNE DROITE : Conversation Trader ── */}
+                  <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                    <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-3.5">
+                        <div className="size-11 rounded-xl bg-emerald-600/20 border border-emerald-500/30 grid place-items-center font-bold text-emerald-300 text-base shrink-0">
+                          {activeClient?.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2.5 mb-0.5">
+                            <h3 className="text-base font-bold text-white">{activeClient?.name}</h3>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                              ● EN DIRECT
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 font-mono">{activeClient?.email} · {activeClient?.phone}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toast.info(`Appel en cours vers ${activeClient?.phone}…`)}
+                          className="size-9 rounded-xl border border-slate-700/60 bg-[#0c121e] hover:bg-slate-800 text-slate-300 hover:text-emerald-300 grid place-items-center cursor-pointer transition"
+                          title="Appeler"
+                        >
+                          <PhoneCall className="size-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenClientProfile(activeClient)}
+                          className="size-9 rounded-xl border border-slate-700/60 bg-[#0c121e] hover:bg-slate-800 text-slate-300 hover:text-white grid place-items-center cursor-pointer transition"
+                          title="Voir fiche client"
+                        >
+                          <User className="size-4" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <input type="text"
-                        placeholder="Envoyer un message..."
-                        aria-label="Zone de saisie du message"
-                        value={chatReplyInput}
-                        onChange={(e) => setChatReplyInput(e.target.value)}
-                        className="flex-1 rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 transition"
-                      />
-                      <button type="submit" className="admin-btn-primary py-3 px-5 text-sm font-bold shrink-0 flex items-center gap-2">
-                        <Send className="size-4" />
-                        <span>Envoyer</span>
-                      </button>
+                    <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                      {activeClientMessages.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+                          <MessageCircle className="size-10 text-slate-700" />
+                          <p className="text-sm font-medium">Commencez la conversation avec {activeClient?.name}</p>
+                        </div>
+                      ) : (
+                        activeClientMessages.map((msg) => {
+                          const isAdmin = msg.sender === "ADMIN";
+                          return (
+                            <div key={msg.id} className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-[75%] rounded-2xl px-4 py-3 space-y-1.5 ${
+                                isAdmin
+                                  ? "bg-emerald-500/20 border border-emerald-500/40 text-emerald-50 rounded-tr-none"
+                                  : "bg-[#0c121e] text-slate-200 border border-slate-700/50 rounded-tl-none"
+                              }`}>
+                                <div className={`flex justify-between gap-4 text-xs font-mono ${isAdmin ? "opacity-70" : "text-slate-500"}`}>
+                                  <span>{msg.authorName}</span><span>{msg.timestamp}</span>
+                                </div>
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
-                  </form>
+
+                    <div className="px-4 py-2.5 border-t border-slate-800/60 bg-[#0c121e]/60 flex items-center gap-2 overflow-x-auto shrink-0">
+                      <span className="text-xs font-semibold text-slate-500 uppercase font-mono shrink-0">Modèles :</span>
+                      {CANNED_RESPONSES.map((cr, idx) => (
+                        <button key={idx} onClick={() => handleInsertCannedResponse(cr)}
+                          className="rounded-lg border border-slate-700/50 bg-[#131c30] hover:bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:text-white shrink-0 cursor-pointer transition">
+                          {cr.title}
+                        </button>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleSendDeskMessage} className="p-4 border-t border-slate-700/40 bg-[#0f1626]/80 space-y-3 shrink-0">
+                      <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
+                        <span>Canal : <strong className="text-slate-300">Live Chat MT5</strong></span>
+                        <span>Signé par : {currentSessionRole}</span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <input type="text"
+                          placeholder="Envoyer un message..."
+                          aria-label="Zone de saisie du message"
+                          value={chatReplyInput}
+                          onChange={(e) => setChatReplyInput(e.target.value)}
+                          className="flex-1 rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 transition"
+                        />
+                        <button type="submit" className="admin-btn-primary py-3 px-5 text-sm font-bold shrink-0 flex items-center gap-2">
+                          <Send className="size-4" />
+                          <span>Envoyer</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 

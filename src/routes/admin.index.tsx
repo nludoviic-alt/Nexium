@@ -1,8 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getCurrentSession, getUserProfile, isSupabaseConfigured } from "@/lib/supabase";
-import { getUserSlug } from "@/lib/user-slug";
+import { getAdminSlug } from "@/lib/user-slug";
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute("/admin/")({
   beforeLoad: async () => {
     if (!isSupabaseConfigured) {
       throw redirect({ to: "/login" });
@@ -14,11 +14,11 @@ export const Route = createFileRoute("/dashboard")({
     }
 
     const profile = await getUserProfile(session.user.id);
-    const userSlug = getUserSlug({ name: profile?.name, email: session.user.email, id: session.user.id });
+    const adminSlug = getAdminSlug({ name: profile?.name, email: session.user.email, id: session.user.id });
 
     throw redirect({
-      to: "/portal/$slug",
-      params: { slug: userSlug },
+      to: "/admin/$slug",
+      params: { slug: adminSlug },
     });
   },
 });

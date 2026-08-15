@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getCurrentSession, getUserProfile, isSupabaseConfigured } from "@/lib/supabase";
 import { getUserSlug } from "@/lib/user-slug";
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute("/portal/")({
   beforeLoad: async () => {
     if (!isSupabaseConfigured) {
       throw redirect({ to: "/login" });

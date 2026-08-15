@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
+import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
 
 export function SiteFooter() {
@@ -71,7 +72,7 @@ export function SiteFooter() {
               {language === "fr" ? "Tarifs & Licences" : "Pricing & Licenses"}
             </Link>
             <Link
-              to="/NEXIUM"
+              to="/portal"
               className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
             >
               {t.nav.clientArea}
@@ -202,9 +203,12 @@ export function SiteFooter() {
             </Link>
           </div>
 
-          <p className="text-xs text-gray-400 font-bold">
-            © {new Date().getFullYear()} Nexium Markets. {t.footer.rights}
-          </p>
+          <div className="flex items-center gap-4">
+            <LanguageSelector variant="footer" />
+            <p className="text-xs text-gray-400 font-bold">
+              © {new Date().getFullYear()} Nexium Markets. {t.footer.rights}
+            </p>
+          </div>
         </div>
       </div>
     </footer>

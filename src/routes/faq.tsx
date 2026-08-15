@@ -13,15 +13,7 @@ import {
 import { PageHeader, PageShell } from "@/components/site/PageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { faqs } from "@/data/faq";
-
-const faqCategories = [
-  { id: "all", label: "Toutes les questions", icon: HelpCircle },
-  { id: "licensing", label: "Licences & MT5", icon: Cpu },
-  { id: "security", label: "Sécurité & Broker", icon: ShieldCheck },
-  { id: "vps", label: "VPS & Latence", icon: Cpu },
-  { id: "billing", label: "Abonnements", icon: CreditCard },
-] as const;
+import { useLanguage } from "@/lib/i18n";
 
 export const Route = createFileRoute("/faq")({
   head: () => ({
@@ -32,40 +24,96 @@ export const Route = createFileRoute("/faq")({
         content:
           "Toutes les réponses sur les licences robots MetaTrader 5, la sécurité des comptes, le VPS et l'infrastructure d'exécution.",
       },
-      { property: "og:title", content: "FAQ — Nexium Markets" },
-      {
-        property: "og:description",
-        content: "Licences, connexion MetaTrader 5, sécurité et abonnements.",
-      },
-    ],
-    scripts: [
-      {
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "FAQPage",
-          mainEntity: faqs.map((f) => ({
-            "@type": "Question",
-            name: f.q,
-            acceptedAnswer: { "@type": "Answer", text: f.a },
-          })),
-        }),
-      },
     ],
   }),
   component: FaqPage,
 });
 
 function FaqPage() {
+  const { language, t } = useLanguage();
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [openItems, setOpenItems] = useState<Record<number, boolean>>({ 1: true });
+
+  const faqCategories = [
+    { id: "all", label: t.faq.catAll, icon: HelpCircle },
+    { id: "licensing", label: t.faq.catLicensing, icon: Cpu },
+    { id: "security", label: t.faq.catSecurity, icon: ShieldCheck },
+    { id: "vps", label: t.faq.catVps, icon: Cpu },
+    { id: "billing", label: t.faq.catBilling, icon: CreditCard },
+  ] as const;
+
+  const faqsList = [
+    {
+      id: 1,
+      category: "security",
+      q: language === "fr" ? "Ai-je besoin de fournir le mot de passe de mon compte MetaTrader ?" : "Do I need to share my main MetaTrader trading password?",
+      a: language === "fr"
+        ? "Absolument pas. Seuls le nom du broker, le serveur MT5, le numéro de compte et le nom du titulaire sont enregistrés. Le mot de passe principal du terminal n'est jamais demandé ni stocké sur nos serveurs."
+        : "Never. Only your broker name, server designation, and account number are verified. Your master terminal password is never requested, transmitted, or stored.",
+      tag: language === "fr" ? "Sécurité" : "Security",
+    },
+    {
+      id: 2,
+      category: "licensing",
+      q: language === "fr" ? "Comment fonctionne la licence d'un robot EA ?" : "How does the Expert Advisor license work?",
+      a: language === "fr"
+        ? "Chaque licence génère une clé de chiffrement unique liée à vos comptes MetaTrader 5 autorisés. Lors de l'initialisation dans MT5, le robot valide sa signature numérique en temps réel auprès de notre serveur de vérification."
+        : "Each license generates a cryptographically signed key tied to your authorized MetaTrader 5 account ID. The EA verifies this signature in real time against our authorization servers upon initialization.",
+      tag: language === "fr" ? "Licence" : "Licensing",
+    },
+    {
+      id: 3,
+      category: "licensing",
+      q: language === "fr" ? "Comment savoir si mon robot fonctionne réellement en direct ?" : "How do I know if my robot is running live in real time?",
+      a: language === "fr"
+        ? "Le robot transmet un signal de présence (heartbeat telemetry) toutes les 60 secondes. Votre dashboard distingue la licence active de l'exécution réelle et affiche l'horodatage exact de la dernière communication."
+        : "The robot transmits a telemetry heartbeat every 60 seconds. Your dashboard displays active connection status, latency, and the exact timestamp of the last heartbeat.",
+      tag: language === "fr" ? "Monitoring" : "Monitoring",
+    },
+    {
+      id: 4,
+      category: "security",
+      q: language === "fr" ? "Les performances affichées sont-elles garanties ?" : "Are historical performance returns guaranteed?",
+      a: language === "fr"
+        ? "Non. Le trading sur devises, indices et matières premières comporte un risque élevé de perte en capital. Les performances passées d'un robot ou d'un backtest ne garantissent aucunement les résultats futurs."
+        : "No. Leveraged financial trading involves significant capital risk. Past algorithmic performances or backtests do not guarantee future trading results.",
+      tag: language === "fr" ? "Avertissement" : "Risk Disclosure",
+    },
+    {
+      id: 5,
+      category: "vps",
+      q: language === "fr" ? "Un serveur virtuel (VPS) est-il obligatoire ?" : "Is a Virtual Private Server (VPS) mandatory?",
+      a: language === "fr"
+        ? "Un VPS est fortement recommandé. Pour exécuter vos algorithmes 24h/24 sans interruption de connexion internet ni coupure de courant, le terminal MetaTrader 5 doit rester allumé en permanence."
+        : "A VPS is strongly recommended. For 24/7 continuous trade execution without internet or power drops, your MT5 terminal should run uninterrupted on a co-located VPS.",
+      tag: language === "fr" ? "Infrastructure" : "Infrastructure",
+    },
+    {
+      id: 6,
+      category: "billing",
+      q: language === "fr" ? "Puis-je changer de plan ou annuler mon abonnement à tout moment ?" : "Can I upgrade or cancel my plan at any time?",
+      a: language === "fr"
+        ? "Oui, vous bénéficiez d'une liberté totale sans engagement. Vous pouvez mettre à jour ou résilier votre licence directement depuis votre espace client."
+        : "Yes, you have full flexibility with zero lock-in contracts. You can upgrade, pause, or cancel your subscription anytime directly from your billing portal.",
+      tag: language === "fr" ? "Facturation" : "Billing",
+    },
+    {
+      id: 7,
+      category: "vps",
+      q: language === "fr" ? "Quel est le temps de latence recommandé pour le serveur VPS ?" : "What is the recommended VPS latency to broker servers?",
+      a: language === "fr"
+        ? "Pour maximiser la vitesse d'exécution et réduire le slippage, nous recommandons un VPS hébergé dans les mêmes datacenters que votre broker (ex: Equinix LD4 Londres ou NY4 New York avec une latence < 5ms)."
+        : "To maximize execution velocity and minimize slippage, we recommend co-locating your VPS in Equinix NY4 (New York) or LD4 (London) with sub-5ms cross-connect latency.",
+      tag: language === "fr" ? "Performance" : "Performance",
+    },
+  ];
 
   const toggleItem = (id: number) => {
     setOpenItems((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const filteredFaqs = faqs.filter((item) => {
+  const filteredFaqs = faqsList.filter((item) => {
     const matchesCategory = activeCategory === "all" || item.category === activeCategory;
     const matchesSearch =
       item.q.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -76,23 +124,21 @@ function FaqPage() {
 
   return (
     <PageShell>
-      {/* Original PageHeader */}
       <PageHeader
-        eyebrow="CENTRE D'AIDE"
-        title="Questions Fréquentes"
-        description="Toutes les réponses sur les licences robots, la connexion MetaTrader 5, la sécurité de votre compte et la gestion de votre abonnement."
+        eyebrow={t.faq.badge}
+        title={t.faq.title}
+        description={t.faq.subtitle}
       />
 
-      {/* Main Body Section - Bright Modern Hybrid Canvas */}
       <section className="bg-[#f8f9fc] py-12 sm:py-16 px-4">
         <div className="mx-auto max-w-5xl">
-          {/* Interactive Search Bar */}
+          {/* Search Bar */}
           <div className="mb-8 mx-auto max-w-xl relative">
             <Search className="absolute left-4 top-3.5 size-5 text-gray-400" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher une question (ex: VPS, licence, sécurité)..."
+              placeholder={t.faq.searchPlaceholder}
               className="w-full rounded-2xl border-gray-300 bg-white px-12 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66] focus:ring-2 focus:ring-[#00ff66]/20 transition-all shadow-sm"
             />
           </div>
@@ -106,7 +152,7 @@ function FaqPage() {
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     isActive
                       ? "bg-black text-white shadow-lg scale-105"
                       : "bg-white text-gray-700 border border-gray-200/80 hover:bg-gray-100 hover:text-gray-900 shadow-sm"
@@ -119,7 +165,7 @@ function FaqPage() {
             })}
           </div>
 
-          {/* FAQ Accordion Cards List */}
+          {/* Accordion List */}
           <div className="space-y-4">
             {filteredFaqs.length > 0 ? (
               filteredFaqs.map((f) => {
@@ -167,8 +213,9 @@ function FaqPage() {
               })
             ) : (
               <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-500 font-medium">
-                Aucune question ne correspond à votre recherche. Veuillez essayer d'autres mots
-                clés.
+                {language === "fr"
+                  ? "Aucune question ne correspond à votre recherche. Veuillez essayer d'autres mots-clés."
+                  : "No questions match your query. Please try searching with different keywords."}
               </div>
             )}
           </div>
@@ -179,11 +226,10 @@ function FaqPage() {
 
             <div className="relative z-10 space-y-2 text-center sm:text-left">
               <h3 className="text-2xl font-black text-white tracking-tight">
-                Vous avez encore une question ?
+                {t.faq.stillQuestions}
               </h3>
               <p className="text-sm text-gray-300 font-medium max-w-md">
-                Notre équipe d'assistance institutionnelle est disponible 24/7 pour vous aider dans
-                la configuration de vos robots MT5.
+                {t.faq.stillQuestionsDesc}
               </p>
             </div>
 
@@ -192,7 +238,7 @@ function FaqPage() {
               className="relative z-10 bg-[#00ff66] text-black hover:bg-[#00e65c] rounded-xl px-6 py-3.5 text-sm font-black uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(0,255,102,0.4)] shrink-0"
             >
               <Link to="/contact" className="flex items-center gap-2">
-                <span>Contacter le Support</span>
+                <span>{t.faq.contactSupportBtn}</span>
                 <ArrowRight className="size-4" />
               </Link>
             </Button>

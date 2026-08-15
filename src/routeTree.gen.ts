@@ -17,6 +17,7 @@ import { Route as CompositionRouteImport } from './routes/composition'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as EmailPreviewRouteImport } from './routes/email-preview'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
@@ -70,6 +71,11 @@ const CookiesRoute = CookiesRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailPreviewRoute = EmailPreviewRouteImport.update({
+  id: '/email-preview',
+  path: '/email-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
+  '/email-preview': typeof EmailPreviewRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/how-it-works': typeof HowItWorksRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
+  '/email-preview': typeof EmailPreviewRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/how-it-works': typeof HowItWorksRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
   '/dashboard': typeof DashboardRoute
+  '/email-preview': typeof EmailPreviewRoute
   '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/how-it-works': typeof HowItWorksRoute
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/dashboard'
+    | '/email-preview'
     | '/faq'
     | '/forgot-password'
     | '/how-it-works'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/dashboard'
+    | '/email-preview'
     | '/faq'
     | '/forgot-password'
     | '/how-it-works'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookies'
     | '/dashboard'
+    | '/email-preview'
     | '/faq'
     | '/forgot-password'
     | '/how-it-works'
@@ -300,6 +312,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
   DashboardRoute: typeof DashboardRoute
+  EmailPreviewRoute: typeof EmailPreviewRoute
   FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   HowItWorksRoute: typeof HowItWorksRoute
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/email-preview': {
+      id: '/email-preview'
+      path: '/email-preview'
+      fullPath: '/email-preview'
+      preLoaderRoute: typeof EmailPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -484,6 +504,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
   DashboardRoute: DashboardRoute,
+  EmailPreviewRoute: EmailPreviewRoute,
   FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   HowItWorksRoute: HowItWorksRoute,
