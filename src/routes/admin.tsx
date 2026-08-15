@@ -112,6 +112,8 @@ import {
   Wallet,
   Wifi,
   X,
+  Zap,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   sendWelcomeEmail,
