@@ -1662,8 +1662,10 @@ function NexiumAdminDashboard() {
           status: "ACTIVE",
           assigned_advisor: newStaff.department,
         })
-        .then(() => console.log(`Staff ${newStaff.name} synchronisé dans Supabase.`))
-        .catch((err) => console.warn("Supabase staff sync error:", err));
+        .then(
+          () => console.log(`Staff ${newStaff.name} synchronisé dans Supabase.`),
+          (err: any) => console.warn("Supabase staff sync error:", err)
+        );
     }
 
     // Envoi de l'e-mail officiel de nomination / invitation
