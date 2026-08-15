@@ -232,59 +232,37 @@ function RegisterPage() {
           <div className="lg:col-span-7 bg-white p-8 lg:p-10 text-gray-900 flex flex-col justify-between">
             <div>
               {submitted ? (
-                <div className="space-y-6 py-4">
-                  <div className="size-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500">
-                    <Clock className="size-8 animate-pulse" />
+                <div className="space-y-6 py-6">
+                  <div className="size-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600">
+                    <CheckCircle2 className="size-7" />
                   </div>
 
-                  <div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs font-bold uppercase tracking-wider mb-2">
-                      <ShieldCheck className="size-3.5" /> En attente de validation
-                    </div>
+                  <div className="space-y-2">
                     <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                      Dossier Transmis à la Conformité
+                      Demande Enregistrée
                     </h2>
-                    <p className="mt-3 text-sm text-gray-600 leading-relaxed font-medium">
-                      Votre demande d'ouverture de compte institutionnel pour <strong>{email}</strong> a été enregistrée avec succès.
+                    <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                      Un e-mail de confirmation a été envoyé à <strong className="text-gray-900">{email}</strong>.
                     </p>
                   </div>
 
-                  <div className="p-5 rounded-2xl bg-gray-50 border border-gray-200 text-sm space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Mail className="size-5 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-gray-900 block font-bold">E-mail de Prise en Compte Transmis</strong>
-                        <span className="text-gray-600 text-xs">Un accusé de réception officiel vient d'être expédié à <strong>{email}</strong>.</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-gray-900 block font-bold">Vérification Réglementaire & Alerte Direction</strong>
-                        <span className="text-gray-600 text-xs">La Direction et le Desk de Conformité ont reçu l'alerte pour examiner votre dossier.</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <ShieldCheck className="size-5 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-gray-900 block font-bold">Contact & Activation par un Administrateur</strong>
-                        <span className="text-gray-600 text-xs">Dès approbation, votre conseiller dédié vous transmettra vos accès complets et déverrouillera votre Dashboard.</span>
-                      </div>
-                    </div>
+                  <div className="rounded-xl bg-gray-50 border border-gray-200/80 p-4 text-xs font-semibold text-gray-700 flex items-center gap-3">
+                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span>Statut : En cours d'examen par la Direction</span>
                   </div>
 
                   <div className="pt-2 flex flex-col gap-3">
                     <Link
                       to="/login"
-                      className="w-full text-center rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-4 text-sm tracking-wide transition-all shadow-md"
+                      className="w-full text-center rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-3.5 text-sm tracking-wide transition-all shadow-md cursor-pointer"
                     >
-                      Accéder à la Page de Connexion
+                      Aller à la Connexion
                     </Link>
                     <Link
                       to="/"
-                      className="w-full text-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3.5 text-sm transition-all"
+                      className="w-full text-center text-xs font-bold text-gray-500 hover:text-gray-900 py-1 transition-colors"
                     >
-                      Retourner au Site Principal
+                      Retourner à l'accueil
                     </Link>
                   </div>
                 </div>
