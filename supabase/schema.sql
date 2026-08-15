@@ -78,22 +78,37 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. SÉCURITÉ ROW LEVEL SECURITY (RLS)
+-- 7. FONCTION DE SÉCURITÉ POUR ÉVITER LA RÉCURSION RLS
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS text
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT role FROM public.profiles WHERE id = auth.uid();
+$$;
+
+-- 8. SÉCURITÉ ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mt5_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Politiques RLS simples
+DROP POLICY IF EXISTS "Lecture profil par propriétaire ou admin" ON public.profiles;
+DROP POLICY IF EXISTS "Lecture transactions utilisateur" ON public.transactions;
+DROP POLICY IF EXISTS "Lecture messages chat" ON public.chat_messages;
+DROP POLICY IF EXISTS "Lecture journal audit par Direction" ON public.audit_logs;
+
 CREATE POLICY "Lecture profil par propriétaire ou admin" ON public.profiles
-    FOR SELECT USING (auth.uid() = id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
+    FOR ALL USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
 
 CREATE POLICY "Lecture transactions utilisateur" ON public.transactions
-    FOR SELECT USING (auth.uid() = user_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
+    FOR ALL USING (auth.uid() = user_id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
 
 CREATE POLICY "Lecture messages chat" ON public.chat_messages
-    FOR SELECT USING (auth.uid() = client_id OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+    FOR ALL USING (auth.uid() = client_id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
 
 CREATE POLICY "Lecture journal audit par Direction" ON public.audit_logs
-    FOR SELECT USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('OWNER', 'SUPER_ADMIN'));
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN'));
