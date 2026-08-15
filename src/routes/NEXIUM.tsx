@@ -2670,8 +2670,124 @@ function JournalTab({ journal }: { journal: JournalEntry[] }) {
 }
 
 // ----------------------------------------------------
-// 8. MESSAGERIE VIEW (CHAT DIRECT, APPEL PUR & EMAIL)
+// 8. MESSAGERIE VIEW (MESSENGER CHAT, CAPTURES, ÉMOJIS, PRÉDÉFINIS, E-MAIL & APPELS)
 // ----------------------------------------------------
+interface MessengerContact {
+  id: string;
+  name: string;
+  role: string;
+  category: "support" | "expert" | "ai" | "risk";
+  avatar: string;
+  avatarBg: string;
+  statusText: string;
+  isOnline: boolean;
+  sla: string;
+  prompts: { label: string; text: string }[];
+}
+
+const MESSENGER_CONTACTS: MessengerContact[] = [
+  {
+    id: "support-client",
+    name: "Service Client VIP 24/7",
+    role: "Support Compte & Dépôts / Retraits",
+    category: "support",
+    avatar: "SC",
+    avatarBg: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    statusText: "En ligne · Équipe disponible",
+    isOnline: true,
+    sla: "Réponse < 1 min",
+    prompts: [
+      { label: "💳 Dépôt instantané SEPA", text: "Comment effectuer un dépôt instantané par virement SEPA ou carte ECN ?" },
+      { label: "💸 Délais de retrait", text: "Pouvez-vous me confirmer les délais d'exécution pour un retrait vers mon IBAN ?" },
+      { label: "🛡️ Vérification KYC", text: "Mes documents de conformité et justificatifs sont-ils bien validés pour le compte #802194 ?" },
+      { label: "🐞 Signaler un bug", text: "J'aimerais signaler un souci d'affichage sur les flux en direct de mon terminal." },
+    ],
+  },
+  {
+    id: "expert-quant",
+    name: "Dr. Antoine R. (Expert Quant)",
+    role: "Directeur Recherche & Stratégies MQL5",
+    category: "expert",
+    avatar: "AR",
+    avatarBg: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    statusText: "Desk NY4 Actif · En ligne",
+    isOnline: true,
+    sla: "Desk Institutionnel",
+    prompts: [
+      { label: "📊 Signal BUY Gold", text: "Pouvez-vous m'expliquer la logique algorithmique du signal BUY sur Nexium AI Gold ?" },
+      { label: "🔍 Audit de Risque", text: "Pourriez-vous réaliser un audit de risque détaillé sur l'allocation de mes 3 robots ?" },
+      { label: "📉 Volatilité FX Trend", text: "Quel est le comportement prévu du bot lors des annonces économiques majeures (NFP/CPI) ?" },
+      { label: "📈 Optimiser le Sharpe", text: "Quels ajustements recommandez-vous pour maximiser le Sharpe Ratio de mon compte ?" },
+    ],
+  },
+  {
+    id: "ai-bot",
+    name: "Nexium Core IA (Trading Bot)",
+    role: "Assistant Algorithmique Autonome",
+    category: "ai",
+    avatar: "IA",
+    avatarBg: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+    statusText: "⚡ Moteur IA Actif · Latence 0.8ms",
+    isOnline: true,
+    sla: "Instantané · 0.02s",
+    prompts: [
+      { label: "⚡ Résumé des positions", text: "Génère un résumé complet en direct des 3 positions ouvertes et du P&L consolidé." },
+      { label: "📊 Prévision Volatilité", text: "Quelle est l'analyse prédictive de volatilité sur XAUUSD pour les 4 prochaines heures ?" },
+      { label: "🛡️ Vérifier le Drawdown", text: "Quel est le niveau de drawdown maximum et la distance par rapport au coupe-circuit ?" },
+      { label: "🔄 Simuler Rééquilibrage", text: "Simule une allocation 50% AI Gold / 50% FX Trend sur les données historiques." },
+    ],
+  },
+  {
+    id: "risk-governance",
+    name: "Desk Risque & Conformité",
+    role: "Surveillance & Coupe-Circuits MT5",
+    category: "risk",
+    avatar: "CR",
+    avatarBg: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    statusText: "Surveillance Active Equinix",
+    isOnline: true,
+    sla: "Contrôle en continu",
+    prompts: [
+      { label: "🛡️ Marge de sécurité", text: "Pouvez-vous confirmer ma marge de drawdown restante pour la séance en cours ?" },
+      { label: "⚖️ Plafonds d'exposition", text: "Quels sont les plafonds d'exposition autorisés par classe d'actifs sur le compte ECN ?" },
+      { label: "🔒 Coupe-circuit 2%", text: "Comment fonctionne la protection automatique de capital à 2.00% de Drawdown ?" },
+    ],
+  },
+];
+
+const PRESET_SCREENSHOTS = [
+  {
+    id: "sc-gold",
+    name: "Graphique Breakout Gold M15 (NY)",
+    url: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1000&auto=format&fit=crop",
+  },
+  {
+    id: "sc-ecn",
+    name: "Relevé Exécution ECN #802194",
+    url: "https://images.unsplash.com/photo-1642543492481-44e81e3914a7?q=80&w=1000&auto=format&fit=crop",
+  },
+  {
+    id: "sc-fix",
+    name: "Télémétrie FIX Latence NY4",
+    url: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop",
+  },
+];
+
+const EMOJI_CATEGORIES = {
+  trading: {
+    label: "Finance & Trading",
+    emojis: ["🚀", "📈", "📉", "💰", "💎", "⚡", "🔥", "🏆", "📊", "🛡️", "⚖️", "🎯", "💵", "🟢", "🔴"],
+  },
+  emotions: {
+    label: "Réactions & Smileys",
+    emojis: ["😀", "😂", "😎", "🤔", "🤫", "🤯", "🥳", "🤩", "🙌", "👏", "👍", "🤝", "❤️", "✨", "💯"],
+  },
+  tools: {
+    label: "Symboles & Statuts",
+    emojis: ["💡", "🧠", "🤖", "📞", "✉️", "🔒", "⏱️", "📌", "⚠️", "🛠️", "🔎", "📥", "📤", "✅", "💬"],
+  },
+};
+
 function MessagingTab({
   messages,
   onSendMessage,
@@ -2680,41 +2796,253 @@ function MessagingTab({
   onSendMessage: (txt: string) => void;
 }) {
   const [activeChannel, setActiveChannel] = useState<"chat" | "call" | "email">("chat");
+  const [selectedContactId, setSelectedContactId] = useState<string>("support-client");
+  const [searchFilter, setSearchFilter] = useState<string>("");
+  const [filterCategory, setFilterCategory] = useState<"all" | "support" | "expert" | "ai">("all");
 
-  // ---------------- CHAT STATE ----------------
+  // Local thread state with rich features
+  const [chatThreads, setChatThreads] = useState<ChatMessage[]>(messages);
   const [chatInput, setChatInput] = useState("");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [typingContactName, setTypingContactName] = useState("");
 
-  const handleChatSubmit = (e?: React.FormEvent) => {
+  // Emoji, Screenshot & Voice State
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiTab, setEmojiTab] = useState<"trading" | "emotions" | "tools">("trading");
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedImageCaption, setAttachedImageCaption] = useState<string>("");
+  const [showScreenshotMenu, setShowScreenshotMenu] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; caption?: string } | null>(null);
+
+  // Voice recording state
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [voiceDuration, setVoiceDuration] = useState(0);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Keep local threads in sync if parent sends new messages
+  useEffect(() => {
+    setChatThreads((prev) => {
+      const existingIds = new Set(prev.map((m) => m.id));
+      const newFromProps = messages.filter((m) => !existingIds.has(m.id));
+      if (newFromProps.length === 0) return prev;
+      return [...prev, ...newFromProps];
+    });
+  }, [messages]);
+
+  // Voice recording timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isRecordingVoice) {
+      timer = setInterval(() => setVoiceDuration((v) => v + 1), 1000);
+    } else {
+      setVoiceDuration(0);
+    }
+    return () => clearInterval(timer);
+  }, [isRecordingVoice]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatThreads, isTyping]);
+
+  const activeContact = useMemo(() => {
+    return MESSENGER_CONTACTS.find((c) => c.id === selectedContactId) ?? MESSENGER_CONTACTS[0];
+  }, [selectedContactId]);
+
+  const activeMessages = useMemo(() => {
+    return chatThreads.filter((m) => {
+      // If contactId is set, match it. If not set, default to support or active
+      if (m.contactId) return m.contactId === selectedContactId;
+      return selectedContactId === "support-client" || m.sender === "user";
+    });
+  }, [chatThreads, selectedContactId]);
+
+  const filteredContacts = useMemo(() => {
+    return MESSENGER_CONTACTS.filter((contact) => {
+      const matchSearch =
+        contact.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        contact.role.toLowerCase().includes(searchFilter.toLowerCase());
+      const matchCategory =
+        filterCategory === "all" ? true : contact.category === filterCategory;
+      return matchSearch && matchCategory;
+    });
+  }, [searchFilter, filterCategory]);
+
+  // Handle image upload from file system
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setAttachedImage(event.target.result as string);
+        setAttachedImageCaption(file.name);
+        toast.success(`Capture d'écran attachée : ${file.name}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle Preset Screenshot insertion
+  const handleSelectPresetScreenshot = (item: typeof PRESET_SCREENSHOTS[0]) => {
+    setAttachedImage(item.url);
+    setAttachedImageCaption(item.name);
+    setShowScreenshotMenu(false);
+    toast.success(`Capture attachée : ${item.name}`);
+  };
+
+  // Handle Message Submission
+  const handleSendMessageSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() && !attachedImage) return;
 
-    const fullMessage = replyingTo
-      ? `[En réponse à : "${replyingTo.text.slice(0, 50)}..."]\n${chatInput.trim()}`
-      : chatInput.trim();
+    const now = new Date().toLocaleTimeString().slice(0, 5);
+    const userMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      sender: "user",
+      senderName: "Ludovic M.",
+      text: chatInput.trim(),
+      time: now,
+      contactId: selectedContactId,
+      image: attachedImage ?? undefined,
+      imageCaption: attachedImage ? attachedImageCaption : undefined,
+      replyTo: replyingTo ? { senderName: replyingTo.senderName, text: replyingTo.text } : undefined,
+      status: "sent",
+    };
 
-    onSendMessage(fullMessage);
+    setChatThreads((prev) => [...prev, userMsg]);
+    onSendMessage(chatInput.trim() || "[Capture d'écran transmise]");
+
+    // Reset input fields
     setChatInput("");
+    setAttachedImage(null);
+    setAttachedImageCaption("");
     setReplyingTo(null);
+    setShowEmojiPicker(false);
 
+    // Simulate smart dynamic response based on active contact
     setIsTyping(true);
+    setTypingContactName(activeContact.name);
+
     setTimeout(() => {
+      let replyText = "";
+      const lower = userMsg.text.toLowerCase();
+
+      if (selectedContactId === "support-client") {
+        if (lower.includes("dépôt") || lower.includes("depot") || lower.includes("virement")) {
+          replyText = "Les virements SEPA instantanés et cartes ECN sont crédités sans frais sous 1 à 3 minutes. Votre solde actuel s'élève à $24 860.42 USD.";
+        } else if (lower.includes("retrait") || lower.includes("iban")) {
+          replyText = "Votre demande de retrait est traitée avec priorité VIP. Le délai moyen d'exécution bancaire est de 15 à 30 minutes vers les banques européennes.";
+        } else if (lower.includes("kyc") || lower.includes("compte") || lower.includes("document")) {
+          replyText = "Votre compte MT5 #802194 bénéficie du statut Vérifié Institutionnel niveau 2 (Accès complet 0 spread). Tous vos documents sont en règle.";
+        } else {
+          replyText = `Bonjour Ludovic, notre équipe support a bien reçu votre message. Nous prenons en charge votre demande immédiatement. Un conseiller reste à votre écoute.`;
+        }
+      } else if (selectedContactId === "expert-quant") {
+        if (lower.includes("or") || lower.includes("gold") || lower.includes("xauusd")) {
+          replyText = "L'analyse quantitative sur XAUUSD confirme une structure de continuation haussière au-dessus du support 2 374.00. Nexium AI Gold maintient un score algorithmique optimal de 84/100.";
+        } else if (lower.includes("audit") || lower.includes("risque") || lower.includes("drawdown")) {
+          replyText = "L'audit de risque en temps réel indique une corrélation globale de 0.22 entre vos 3 bots, ce qui offre une excellente diversification sans sur-exposition de marge.";
+        } else if (lower.includes("sharpe") || lower.includes("rendement")) {
+          replyText = "Le Sharpe Ratio consolidé sur 30 jours est de 2.68. Pour le stabiliser davantage, nous recommandons de conserver les Take-Profits dynamiques actuels.";
+        } else {
+          replyText = `Bien reçu Ludovic. Le Desk de Recherche analyse votre point et surveille les carnets d'ordres L2 sur le flux Equinix NY4.`;
+        }
+      } else if (selectedContactId === "ai-bot") {
+        replyText = `⚡ Moteur IA Nexium :\n• 3 Bots synchronisés sur serveur NY4 (Latence : 0.8ms)\n• Signaux analysés : 14 setups détectés sur la session\n• Sécurité capital : Drawdown actuel 0.34% (Seuil maximal : 2.00%)\n\nTout est nominal.`;
+      } else {
+        replyText = "Desk Risque : Votre allocation respecte l'ensemble des critères de solvabilité et de marge institutionnelle.";
+      }
+
+      const deskReply: ChatMessage = {
+        id: `reply-${Date.now()}`,
+        sender: selectedContactId === "expert-quant" ? "expert" : selectedContactId === "ai-bot" ? "ai" : "support",
+        senderName: activeContact.name,
+        contactId: selectedContactId,
+        text: replyText,
+        time: new Date().toLocaleTimeString().slice(0, 5),
+        status: "read",
+      };
+
+      setChatThreads((prev) => [...prev, deskReply]);
       setIsTyping(false);
+      setTypingContactName("");
     }, 1200);
   };
 
-  const handleQuickPrompt = (prompt: string) => {
-    onSendMessage(prompt);
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-    }, 1000);
+  // Handle Quick Prompt
+  const handleQuickPromptClick = (text: string) => {
+    setChatInput(text);
+  };
+
+  // Handle Emoji Insertion into Chat Input
+  const handleInsertEmoji = (emoji: string) => {
+    setChatInput((prev) => prev + emoji);
+  };
+
+  // Handle Adding Reactions to a message
+  const handleToggleReaction = (messageId: string, emoji: string) => {
+    setChatThreads((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const currentReactions = m.reactions ?? [];
+        const existing = currentReactions.find((r) => r.emoji === emoji);
+
+        let newReactions;
+        if (existing) {
+          if (existing.byMe) {
+            newReactions = currentReactions
+              .map((r) => (r.emoji === emoji ? { ...r, count: r.count - 1, byMe: false } : r))
+              .filter((r) => r.count > 0);
+          } else {
+            newReactions = currentReactions.map((r) =>
+              r.emoji === emoji ? { ...r, count: r.count + 1, byMe: true } : r
+            );
+          }
+        } else {
+          newReactions = [...currentReactions, { emoji, count: 1, byMe: true }];
+        }
+
+        return { ...m, reactions: newReactions };
+      })
+    );
+  };
+
+  // Handle Voice Note Send
+  const handleSendVoiceNote = () => {
+    if (!isRecordingVoice) {
+      setIsRecordingVoice(true);
+      toast.info("Enregistrement de la note vocale en cours...");
+    } else {
+      setIsRecordingVoice(false);
+      const formatted = `0:${voiceDuration.toString().padStart(2, "0")}`;
+      const now = new Date().toLocaleTimeString().slice(0, 5);
+
+      const voiceMsg: ChatMessage = {
+        id: `voice-${Date.now()}`,
+        sender: "user",
+        senderName: "Ludovic M.",
+        text: `🎙️ Note vocale (${formatted})`,
+        time: now,
+        contactId: selectedContactId,
+        isVoice: true,
+        voiceDuration: formatted,
+        status: "sent",
+      };
+
+      setChatThreads((prev) => [...prev, voiceMsg]);
+      toast.success("Note vocale chiffrée transmise.");
+    }
   };
 
   // ---------------- AUDIO PHONE CALL STATE ----------------
   const [callState, setCallState] = useState<"IDLE" | "CALLING" | "CONNECTED" | "ENDED">("IDLE");
-  const [selectedAgent, setSelectedAgent] = useState({
+  const [callSelectedAgent, setCallSelectedAgent] = useState({
     name: "Dr. Antoine R.",
     role: "Directeur de Recherche Quantitative",
     avatar: "AR",
@@ -2730,9 +3058,7 @@ function MessagingTab({
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (callState === "CONNECTED") {
-      interval = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
+      interval = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
     } else if (callState === "IDLE") {
       setCallDuration(0);
       setDialedDigits("");
@@ -2740,8 +3066,8 @@ function MessagingTab({
     return () => clearInterval(interval);
   }, [callState]);
 
-  const startAudioCall = (agent: typeof selectedAgent) => {
-    setSelectedAgent(agent);
+  const startAudioCall = (agent: typeof callSelectedAgent) => {
+    setCallSelectedAgent(agent);
     setCallState("CALLING");
     toast.info(`Appel sécurisé vers ${agent.name}...`);
 
@@ -2755,9 +3081,7 @@ function MessagingTab({
     setCallState("ENDED");
     setShowKeypad(false);
     toast.warning("Appel téléphonique terminé.");
-    setTimeout(() => {
-      setCallState("IDLE");
-    }, 1500);
+    setTimeout(() => setCallState("IDLE"), 1500);
   };
 
   const formatDuration = (secs: number) => {
@@ -2766,17 +3090,10 @@ function MessagingTab({
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleKeypadPress = (digit: string) => {
-    setDialedDigits((prev) => prev + digit);
-    toast.info(`Touche ${digit} transmise.`);
-  };
-
   // ---------------- EMAIL STATE ----------------
   const [emails, setEmails] = useState<EmailItem[]>(INITIAL_EMAILS);
   const [emailFolder, setEmailFolder] = useState<"inbox" | "sent" | "compose">("inbox");
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(INITIAL_EMAILS[0]);
-
-  // Compose form state
   const [composeTo, setComposeTo] = useState("desk-quant@nexiummarkets.com");
   const [composeSubject, setComposeSubject] = useState("");
   const [composePriority, setComposePriority] = useState<"NORMAL" | "URGENT" | "CRITIQUE">("NORMAL");
@@ -2808,13 +3125,17 @@ function MessagingTab({
     setEmailFolder("sent");
     setComposeSubject("");
     setComposeBody("");
-    toast.success("E-mail transmis au Desk.");
+    toast.success("E-mail officiel transmis au Desk.");
 
     setTimeout(() => {
       const autoReply: EmailItem = {
         id: `mail-reply-${Date.now()}`,
         from: composeTo,
-        fromName: composeTo.includes("quant") ? "Nexium Quant Desk" : "Nexium Risk Governance",
+        fromName: composeTo.includes("quant")
+          ? "Dr. Antoine R. (Nexium Quant)"
+          : composeTo.includes("support")
+          ? "Elena V. (Support VIP)"
+          : "Nexium Risk Governance",
         to: "ludovic.m@investisseur-nexium.com",
         subject: `Re: ${newEmail.subject}`,
         date: `Aujourd'hui · ${new Date().toLocaleTimeString().slice(0, 5)}`,
@@ -2823,255 +3144,942 @@ function MessagingTab({
           "Bonjour Ludovic,",
           `Nous accusons bonne réception de votre message : "${newEmail.subject}".`,
           "Votre gestionnaire de compte et l'équipe technique MT5 traitent votre demande prioritaire.",
-          "Temps de traitement estimé : 15 minutes.",
-          "Cordialement,\nLe Desk Nexium Markets",
+          "Temps de traitement moyen estimé : 10 minutes.",
+          "Cordialement,\nLe Desk Nexium Markets Institutional",
         ],
         unread: true,
         priority: newEmail.priority,
         folder: "inbox",
       };
       setEmails((prev) => [autoReply, ...prev]);
-      toast.info("Nouvel e-mail reçu : Accusé de réception.");
+      toast.info("Nouvel e-mail reçu : Accusé de réception officiel.");
     }, 3000);
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. EN-TÊTE ÉPURÉ AVEC SÉLECTEUR DE CANAL */}
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/[0.08] pb-4">
+      {/* ── 1. EN-TÊTE ULTRA-MODERNE & SÉLECTEUR DE CANAUX ── */}
+      <section className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-white/[0.08] pb-5">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-2xl font-black text-white tracking-tight">
-              Messagerie
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Centre de Messagerie &amp; Support
             </h2>
-            <span className="rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-2.5 py-0.5 text-[11px] font-mono font-bold text-[#00D084]">
-              DESK EN DIRECT
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00D084]/40 bg-[#00D084]/15 px-3 py-1 text-xs font-mono font-bold text-[#00D084]">
+              <span className="size-2 rounded-full bg-[#00D084] animate-pulse" />
+              DESK LIVE 24/7
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Assistance directe, appels et échanges chiffrés avec les ingénieurs quantitatifs.
+          <p className="text-xs sm:text-sm text-gray-400 mt-1">
+            Messenger instantané, captures d'écran, notes vocales, boîte e-mail sécurisée et ligne chiffrée MT5.
           </p>
         </div>
 
-        {/* Sélecteur de canal 3-en-1 harmonisé */}
-        <div className="flex items-center rounded-2xl border border-white/[0.08] bg-[#0c1017] p-1 shadow-md">
+        {/* Sélecteur de canal 3-en-1 avec badge non lu */}
+        <div className="flex items-center rounded-2xl border border-white/[0.08] bg-[#0c1017] p-1.5 shadow-lg">
           <button
             onClick={() => setActiveChannel("chat")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeChannel === "chat"
-                ? "bg-[#00D084] text-black font-black shadow-[0_0_12px_rgba(0,208,132,0.3)]"
+                ? "bg-[#00D084] text-black font-black shadow-[0_0_15px_rgba(0,208,132,0.35)]"
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            <MessageSquare className="size-3.5" />
-            Chat
-            <span className="size-1.5 rounded-full bg-current animate-pulse" />
-          </button>
-
-          <button
-            onClick={() => setActiveChannel("call")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
-              activeChannel === "call"
-                ? "bg-[#00D084] text-black font-black shadow-[0_0_12px_rgba(0,208,132,0.3)]"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            <PhoneCall className="size-3.5" />
-            Appel
-            {callState === "CONNECTED" && (
-              <span className="size-1.5 rounded-full bg-rose-500 animate-ping" />
-            )}
+            <MessageSquare className="size-4" />
+            <span>Messenger Live</span>
+            <span className="size-2 rounded-full bg-current animate-pulse" />
           </button>
 
           <button
             onClick={() => setActiveChannel("email")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition cursor-pointer ${
               activeChannel === "email"
-                ? "bg-[#00D084] text-black font-black shadow-[0_0_12px_rgba(0,208,132,0.3)]"
+                ? "bg-[#00D084] text-black font-black shadow-[0_0_15px_rgba(0,208,132,0.35)]"
                 : "text-gray-400 hover:text-white"
             }`}
           >
-            <Mail className="size-3.5" />
-            E-mail
+            <Mail className="size-4" />
+            <span>E-mail Officiel</span>
             {emails.filter((e) => e.unread).length > 0 && (
-              <span className="rounded-full bg-amber-400 px-1.5 py-0.2 font-mono text-[10px] font-black text-black">
+              <span className="rounded-full bg-amber-400 px-2 py-0.5 font-mono text-[10px] font-black text-black">
                 {emails.filter((e) => e.unread).length}
               </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveChannel("call")}
+            className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition cursor-pointer ${
+              activeChannel === "call"
+                ? "bg-[#00D084] text-black font-black shadow-[0_0_15px_rgba(0,208,132,0.35)]"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <PhoneCall className="size-4" />
+            <span>Ligne Audio</span>
+            {callState === "CONNECTED" && (
+              <span className="size-2 rounded-full bg-rose-500 animate-ping" />
             )}
           </button>
         </div>
       </section>
 
       {/* ========================================================================= */}
-      {/* CANAL 1: CHAT DIRECT */}
+      {/* CANAL 1: MESSENGER LIVE (CHAT DIRECT, CAPTURES, ÉMOJIS, PRÉDÉFINIS) */}
       {/* ========================================================================= */}
       {activeChannel === "chat" && (
-        <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#10141b] shadow-md flex flex-col min-h-[580px]">
-          {/* Chat Header */}
-          <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#0c1017] px-5 py-3.5">
-            <div className="flex items-center gap-3">
-              <div className="grid size-9 place-items-center rounded-xl bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/30">
-                <Bot className="size-4.5" />
+        <section className="grid gap-5 lg:grid-cols-[310px_1fr] min-h-[580px] lg:min-h-[600px] lg:max-h-[660px]">
+          {/* 1.1 SIDEBAR DES CONTACTS ET CANAUX */}
+          <aside className="flex flex-col justify-between rounded-3xl border border-white/[0.08] bg-[#10141b] p-4 shadow-xl space-y-3">
+            <div className="space-y-3">
+              {/* Search contacts */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher un expert ou service..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  className="w-full rounded-2xl border border-white/[0.08] bg-[#0c1017] pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-gray-500 outline-none focus:border-[#00D084] transition"
+                />
               </div>
-              <div>
-                <h3 className="font-bold text-white text-sm">Desk Quantitatif MT5</h3>
-                <div className="flex items-center gap-1.5 text-[11px] text-[#00D084]">
-                  <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
-                  En ligne · Réponses &lt; 30s
-                </div>
-              </div>
-            </div>
 
-            <button
-              onClick={() => {
-                setActiveChannel("call");
-                startAudioCall(selectedAgent);
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-[#00D084]/30 bg-[#00D084]/10 hover:bg-[#00D084]/20 px-3 py-1.5 text-xs font-bold text-[#00D084] transition cursor-pointer"
-            >
-              <Phone className="size-3.5" />
-              Appeler
-            </button>
-          </div>
-
-          {/* Quick Predefined Questions */}
-          <div className="border-b border-white/[0.04] bg-[#080b0f] px-5 py-2.5 space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-              QUESTIONS RAPIDES (1-CLIC) :
-            </span>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-              {[
-                { label: "📊 Logique du signal Gold", text: "Pouvez-vous m'expliquer la logique du signal BUY exécuté sur Nexium AI Gold ?" },
-                { label: "⚙️ Statut Equinix NY4", text: "Quel est le statut de latence et de connectivité sur le flux FIX NY4 ?" },
-                { label: "🛡️ Marge de Drawdown", text: "Pouvez-vous confirmer la marge de drawdown restant disponible aujourd'hui ?" },
-                { label: "📈 Bilan 7 jours", text: "Quel est le bilan consolidé des gains générés par les robots sur 7 jours ?" },
-              ].map((p, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleQuickPrompt(p.text)}
-                  className="rounded-lg border border-white/[0.06] bg-[#12161f] hover:border-[#00D084]/40 hover:bg-[#00D084]/10 px-3 py-1.5 text-xs text-gray-300 hover:text-white transition shrink-0 cursor-pointer"
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Message Stream */}
-          <div className="flex-1 p-5 space-y-4 overflow-y-auto bg-black/20 max-h-[380px]">
-            {messages.map((m) => {
-              const isMe = m.sender === "user";
-              return (
-                <div
-                  key={m.id}
-                  className={`flex flex-col ${isMe ? "items-end" : "items-start"} space-y-1`}
-                >
-                  <div
-                    className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-3.5 sm:p-4 text-xs sm:text-sm leading-relaxed ${
-                      isMe
-                        ? "rounded-tr-sm bg-[#00D084]/15 border border-[#00D084]/35 text-white"
-                        : "rounded-tl-sm bg-[#141a23] border border-white/[0.08] text-gray-200"
+              {/* Category Filter Chips */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-bold">
+                {[
+                  { id: "all", label: "Tous" },
+                  { id: "support", label: "🎧 Support" },
+                  { id: "expert", label: "🧠 Experts" },
+                  { id: "ai", label: "⚡ IA" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setFilterCategory(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-xl transition cursor-pointer shrink-0 ${
+                      filterCategory === tab.id
+                        ? "bg-[#00D084]/20 text-[#00D084] border border-[#00D084]/40 font-black"
+                        : "bg-[#141a23] text-gray-400 hover:text-white border border-white/[0.04]"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-3 mb-1.5 border-b border-white/[0.04] pb-1.5">
-                      <span className="text-[11px] font-bold text-gray-300 flex items-center gap-1.5">
-                        {!isMe && <span className="size-1.5 rounded-full bg-[#00D084]" />}
-                        {m.senderName}
-                      </span>
-                      <span className="font-mono text-[10px] text-gray-400">{m.time}</span>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Contacts List */}
+              <div className="space-y-2 max-h-[380px] lg:max-h-[420px] overflow-y-auto pr-1">
+                {filteredContacts.map((contact) => {
+                  const isSelected = contact.id === selectedContactId;
+                  const lastMsg = chatThreads.filter((m) => m.contactId === contact.id).slice(-1)[0];
+
+                  return (
+                    <div
+                      key={contact.id}
+                      onClick={() => {
+                        setSelectedContactId(contact.id);
+                        setReplyingTo(null);
+                      }}
+                      className={`cursor-pointer rounded-2xl border p-3 transition-all duration-200 ${
+                        isSelected
+                          ? "border-[#00D084] bg-[#00D084]/15 shadow-md ring-1 ring-[#00D084]/50"
+                          : "border-white/[0.06] bg-[#0c1017] hover:border-white/[0.15] hover:bg-[#141a23]/60"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`relative grid size-10 place-items-center rounded-2xl border font-mono text-xs font-black shrink-0 ${contact.avatarBg}`}>
+                          {contact.avatar}
+                          {contact.isOnline && (
+                            <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-[#00D084] border-2 border-[#0c1017]" />
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-xs text-white truncate">
+                              {contact.name}
+                            </h4>
+                            <span className="text-[10px] font-mono text-gray-400">
+                              {lastMsg ? lastMsg.time : "Live"}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                            {contact.role}
+                          </p>
+
+                          <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                            <span className="text-[#00D084] font-medium flex items-center gap-1">
+                              <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
+                              {contact.sla}
+                            </span>
+                            <span className="font-mono text-gray-400 bg-white/[0.04] px-1.5 py-0.2 rounded">
+                              MT5 Live
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
 
-                    <p className="whitespace-pre-line text-gray-100 font-medium">
-                      {m.text}
-                    </p>
+            {/* Account Info Box */}
+            <div className="rounded-2xl border border-white/[0.06] bg-[#080b0f] p-2.5 text-[11px] font-mono text-gray-400 space-y-1">
+              <div className="flex justify-between">
+                <span>Compte MT5 :</span>
+                <strong className="text-white font-bold">#802194</strong>
+              </div>
+              <div className="flex justify-between">
+                <span>Chiffrement :</span>
+                <strong className="text-[#00D084] font-bold">AES-256 GCM</strong>
+              </div>
+            </div>
+          </aside>
 
-                    {!isMe && (
-                      <div className="mt-2.5 border-t border-white/[0.04] pt-1.5 flex items-center justify-between">
-                        <button
-                          onClick={() => {
-                            setReplyingTo(m);
-                            toast.info(`Citation prête pour ${m.senderName}.`);
-                          }}
-                          className="flex items-center gap-1 text-[11px] font-bold text-[#00D084] hover:underline cursor-pointer"
-                        >
-                          <Send className="size-3" /> Répondre
-                        </button>
+          {/* 1.2 MAIN CHAT CONVERSATION AREA */}
+          <main className="flex flex-col justify-between rounded-3xl border border-white/[0.08] bg-[#10141b] shadow-2xl overflow-hidden min-h-[580px] lg:min-h-[600px] lg:max-h-[660px]">
+            {/* ── CHAT HEADER ── */}
+            <div className="flex items-center justify-between border-b border-white/[0.08] bg-[#0c1017] px-5 py-3.5">
+              <div className="flex items-center gap-3">
+                <div className={`grid size-10 place-items-center rounded-2xl border font-mono text-sm font-black ${activeContact.avatarBg}`}>
+                  {activeContact.avatar}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-white text-sm sm:text-base leading-tight">
+                      {activeContact.name}
+                    </h3>
+                    <span className="rounded-full bg-[#00D084]/15 border border-[#00D084]/30 px-2 py-0.2 text-[10px] font-mono font-bold text-[#00D084]">
+                      {activeContact.sla}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
+                    {activeContact.statusText} · {activeContact.role}
+                  </p>
+                </div>
+              </div>
 
-                        <button
-                          onClick={() => handleQuickPrompt("Merci, bien reçu.")}
-                          className="rounded border border-white/[0.06] bg-black/40 px-2 py-0.5 text-[10px] font-mono text-gray-300 hover:text-white cursor-pointer"
-                        >
-                          ✓ Acquitter
-                        </button>
+              {/* Header Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setActiveChannel("call");
+                    startAudioCall(callSelectedAgent);
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl border border-[#00D084]/30 bg-[#00D084]/10 hover:bg-[#00D084]/20 px-3 py-1.5 text-xs font-bold text-[#00D084] transition cursor-pointer shadow-sm"
+                  title="Lancer un appel téléphonique chiffré"
+                >
+                  <Phone className="size-3.5" />
+                  <span className="hidden sm:inline">Appeler</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveChannel("email");
+                    setComposeTo(activeContact.id === "expert-quant" ? "desk-quant@nexiummarkets.com" : "support-vip@nexiummarkets.com");
+                    setEmailFolder("compose");
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#141a23] hover:bg-[#1e2634] px-3 py-1.5 text-xs font-bold text-gray-300 hover:text-white transition cursor-pointer"
+                  title="Envoyer un e-mail officiel"
+                >
+                  <Mail className="size-3.5" />
+                  <span className="hidden sm:inline">E-mail</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── PREDEFINED QUICK QUESTIONS (1-CLICK) ── */}
+            <div className="border-b border-white/[0.06] bg-[#080b0f] px-5 py-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                  <Sparkles className="size-3 text-[#00D084]" />
+                  MESSAGES PRÉDÉFINIS (1-CLIC) :
+                </span>
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                {activeContact.prompts.map((p, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleQuickPromptClick(p.text)}
+                    className="rounded-xl border border-white/[0.08] bg-[#12161f] hover:border-[#00D084]/50 hover:bg-[#00D084]/15 px-3 py-1 text-xs text-gray-200 hover:text-white transition shrink-0 cursor-pointer shadow-sm flex items-center gap-1"
+                  >
+                    <span>{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── MESSAGE STREAM (HAUTEUR OPTIMISÉE SANS SCROLL GLOBAL) ── */}
+            <div className="flex-1 p-5 space-y-3.5 overflow-y-auto bg-black/25 min-h-[300px] max-h-[380px]">
+              {activeMessages.map((m) => {
+                const isMe = m.sender === "user";
+
+                return (
+                  <div
+                    key={m.id}
+                    className={`flex flex-col ${isMe ? "items-end" : "items-start"} space-y-1 group`}
+                  >
+                    {/* Quoted / Reply Preview if any */}
+                    {m.replyTo && (
+                      <div className={`text-[11px] rounded-xl px-3 py-1 mb-0.5 max-w-[80%] border ${
+                        isMe
+                          ? "bg-white/[0.05] border-white/[0.08] text-gray-400 text-right"
+                          : "bg-black/40 border-white/[0.06] text-gray-400 text-left"
+                      }`}>
+                        <span className="font-bold text-gray-300">En réponse à {m.replyTo.senderName} :</span>{" "}
+                        <span className="italic truncate">"{m.replyTo.text.slice(0, 40)}..."</span>
                       </div>
                     )}
+
+                    <div
+                      className={`relative max-w-[88%] sm:max-w-[75%] rounded-3xl p-3.5 text-xs sm:text-sm leading-relaxed shadow-lg ${
+                        isMe
+                          ? "rounded-tr-sm bg-gradient-to-br from-[#00D084]/25 to-[#00D084]/10 border border-[#00D084]/40 text-white"
+                          : "rounded-tl-sm bg-[#141a23] border border-white/[0.08] text-gray-200"
+                      }`}
+                    >
+                      {/* Sender Header */}
+                      <div className="flex items-center justify-between gap-3 mb-1.5 border-b border-white/[0.06] pb-1">
+                        <span className="text-[11px] font-bold text-gray-300 flex items-center gap-1.5">
+                          {!isMe && <span className="size-1.5 rounded-full bg-[#00D084]" />}
+                          {m.senderName}
+                        </span>
+                        <div className="flex items-center gap-1.5 font-mono text-[10px] text-gray-400">
+                          <span>{m.time}</span>
+                          {isMe && <CheckCheck className="size-3.5 text-[#00D084]" />}
+                        </div>
+                      </div>
+
+                      {/* Message Text */}
+                      <p className="whitespace-pre-line text-gray-100 font-medium leading-relaxed">
+                        {m.text}
+                      </p>
+
+                      {/* Image / Screenshot preview if attached */}
+                      {m.image && (
+                        <div className="mt-2.5 overflow-hidden rounded-2xl border border-white/[0.1] bg-black/40">
+                          <img
+                            src={m.image}
+                            alt={m.imageCaption ?? "Capture d'écran"}
+                            onClick={() => setLightboxImage({ url: m.image!, caption: m.imageCaption })}
+                            className="max-h-44 w-full object-cover cursor-pointer hover:scale-102 transition duration-200"
+                          />
+                          {m.imageCaption && (
+                            <div className="p-1.5 text-[10px] font-mono text-gray-300 bg-[#0c1017] flex items-center justify-between">
+                              <span className="truncate flex items-center gap-1.5">
+                                <ImageIcon className="size-3 text-[#00D084]" />
+                                {m.imageCaption}
+                              </span>
+                              <span className="text-[10px] text-gray-500 font-sans">Agrandir ↗</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Voice Note Audio Component */}
+                      {m.isVoice && (
+                        <div className="mt-2 rounded-2xl border border-white/[0.08] bg-[#0c1017] p-2.5 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPlayingVoiceId(playingVoiceId === m.id ? null : m.id);
+                              toast.info(playingVoiceId === m.id ? "Lecture arrêtée." : "Lecture de la note vocale...");
+                            }}
+                            className="grid size-8 place-items-center rounded-xl bg-[#00D084] text-black font-black cursor-pointer hover:scale-105 transition"
+                          >
+                            {playingVoiceId === m.id ? <Pause className="size-3.5" /> : <Play className="size-3.5 ml-0.5" />}
+                          </button>
+
+                          <div className="flex-1">
+                            <div className="flex items-center gap-1 h-4">
+                              {[10, 20, 14, 24, 12, 18, 26, 14, 22, 12, 18, 22, 10, 16].map((h, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`w-1 rounded-full transition-all duration-200 ${
+                                    playingVoiceId === m.id ? "bg-[#00D084] animate-pulse" : "bg-gray-500"
+                                  }`}
+                                  style={{ height: `${h}px` }}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex justify-between text-[10px] text-gray-400 font-mono mt-0.5">
+                              <span>Note vocale chiffrée</span>
+                              <span className="text-white font-bold">{m.voiceDuration ?? "0:06"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reactions bar */}
+                      {m.reactions && m.reactions.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-1 border-t border-white/[0.04]">
+                          {m.reactions.map((r, i) => (
+                            <button
+                              key={i}
+                              onClick={() => handleToggleReaction(m.id, r.emoji)}
+                              className={`flex items-center gap-1 rounded-lg px-2 py-0.2 text-xs font-mono transition cursor-pointer ${
+                                r.byMe
+                                  ? "bg-[#00D084]/20 border border-[#00D084]/40 text-white"
+                                  : "bg-white/[0.06] border border-white/[0.08] text-gray-300 hover:bg-white/[0.1]"
+                              }`}
+                            >
+                              <span>{r.emoji}</span>
+                              <span className="font-bold">{r.count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Quick Action Tools on Message */}
+                      <div className="mt-2 pt-1 border-t border-white/[0.04] flex items-center justify-between opacity-80 group-hover:opacity-100 transition">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setReplyingTo(m);
+                              toast.info(`Citation prête pour ${m.senderName}.`);
+                            }}
+                            className="flex items-center gap-1 text-[11px] font-bold text-[#00D084] hover:underline cursor-pointer"
+                          >
+                            <Reply className="size-3" /> Citer
+                          </button>
+
+                          {/* Quick Emoji Reaction Launcher */}
+                          <div className="flex items-center gap-1 ml-1.5">
+                            {["👍", "❤️", "🚀", "🔥"].map((em) => (
+                              <button
+                                key={em}
+                                onClick={() => handleToggleReaction(m.id, em)}
+                                className="text-xs hover:scale-125 transition cursor-pointer p-0.5"
+                                title={`Réagir avec ${em}`}
+                              >
+                                {em}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {!isMe && (
+                          <button
+                            onClick={() => {
+                              handleToggleReaction(m.id, "✅");
+                              toast.success("Message acquitté avec succès.");
+                            }}
+                            className="rounded-lg border border-white/[0.06] bg-black/40 px-2 py-0.2 text-[10px] font-mono text-gray-300 hover:text-white cursor-pointer"
+                          >
+                            ✓ Acquitter
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Typing indicator */}
+              {isTyping && (
+                <div className="flex items-center gap-2 text-xs text-gray-400 font-mono animate-in fade-in">
+                  <div className="flex items-center gap-1">
+                    <span className="size-1.5 rounded-full bg-[#00D084] animate-bounce" />
+                    <span className="size-1.5 rounded-full bg-[#00D084] animate-bounce [animation-delay:0.2s]" />
+                    <span className="size-1.5 rounded-full bg-[#00D084] animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                  <span>{typingContactName || "L'expert"} rédige une réponse...</span>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* ── ATTACHED IMAGE PREVIEW (BEFORE SENDING) ── */}
+            {attachedImage && (
+              <div className="bg-[#0c1017] border-t border-white/[0.08] px-5 py-2.5 flex items-center justify-between animate-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={attachedImage}
+                    alt="Capture sélectionnée"
+                    className="size-11 rounded-xl object-cover border border-[#00D084]/40"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      📷 {attachedImageCaption || "Capture d'écran prête à l'envoi"}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">Image jointe au message</span>
                   </div>
                 </div>
-              );
-            })}
 
-            {isTyping && (
-              <div className="flex items-center gap-2 text-xs text-gray-400 font-mono">
-                <span className="size-1.5 rounded-full bg-[#00D084] animate-bounce" />
-                <span className="size-1.5 rounded-full bg-[#00D084] animate-bounce [animation-delay:0.2s]" />
-                <span className="size-1.5 rounded-full bg-[#00D084] animate-bounce [animation-delay:0.4s]" />
-                Le Desk rédige une réponse...
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachedImage(null);
+                    setAttachedImageCaption("");
+                  }}
+                  className="text-gray-400 hover:text-rose-400 p-1.5 rounded-lg bg-white/[0.04] cursor-pointer"
+                  title="Supprimer la capture"
+                >
+                  <X className="size-4" />
+                </button>
               </div>
             )}
-          </div>
 
-          {/* Replying Banner */}
-          {replyingTo && (
-            <div className="bg-[#0c1017] border-t border-white/[0.06] px-5 py-2 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 truncate text-gray-300">
-                <span className="font-bold text-[#00D084]">Réponse à {replyingTo.senderName} :</span>
-                <span className="truncate text-gray-400 italic">"{replyingTo.text.slice(0, 50)}..."</span>
+            {/* ── REPLAY BANNER ── */}
+            {replyingTo && (
+              <div className="bg-[#0c1017] border-t border-white/[0.08] px-5 py-1.5 flex items-center justify-between text-xs animate-in fade-in">
+                <div className="flex items-center gap-2 truncate text-gray-300">
+                  <Reply className="size-3 text-[#00D084] shrink-0" />
+                  <span className="font-bold text-[#00D084]">Réponse à {replyingTo.senderName} :</span>
+                  <span className="truncate text-gray-400 italic">"{replyingTo.text.slice(0, 50)}..."</span>
+                </div>
+                <button
+                  onClick={() => setReplyingTo(null)}
+                  className="text-gray-400 hover:text-white p-1 cursor-pointer"
+                >
+                  <X className="size-3.5" />
+                </button>
               </div>
-              <button
-                onClick={() => setReplyingTo(null)}
-                className="text-gray-400 hover:text-white p-0.5 cursor-pointer"
-              >
-                <X className="size-3.5" />
-              </button>
-            </div>
-          )}
+            )}
 
-          {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className="border-t border-white/[0.06] bg-[#10141b] p-3.5 flex gap-2.5">
-            <input
-              type="text"
-              placeholder="Écrivez un message au Desk Quant..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              className="flex-1 rounded-xl border border-white/[0.08] bg-[#0c1017] px-4 py-2.5 text-xs sm:text-sm text-white outline-none focus:border-[#00D084]"
-            />
-            <button
-              type="submit"
-              className="neon-btn rounded-xl px-5 font-bold text-xs uppercase tracking-wider text-black cursor-pointer flex items-center gap-1.5"
-            >
-              <Send className="size-3.5" />
-              ENVOYER
-            </button>
-          </form>
+            {/* ── EMOJI PICKER POPOVER ── */}
+            {showEmojiPicker && (
+              <div className="border-t border-white/[0.08] bg-[#0c1017] p-2.5 space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-1.5">
+                  <div className="flex items-center gap-2">
+                    {(Object.keys(EMOJI_CATEGORIES) as (keyof typeof EMOJI_CATEGORIES)[]).map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setEmojiTab(cat)}
+                        className={`text-xs px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                          emojiTab === cat
+                            ? "bg-[#00D084] text-black"
+                            : "bg-[#141a23] text-gray-300 hover:text-white"
+                        }`}
+                      >
+                        {EMOJI_CATEGORIES[cat].label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker(false)}
+                    className="text-gray-400 hover:text-white p-1 cursor-pointer"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-8 sm:grid-cols-15 gap-1 py-1">
+                  {EMOJI_CATEGORIES[emojiTab].emojis.map((em, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleInsertEmoji(em)}
+                      className="text-base hover:scale-125 transition cursor-pointer p-1 rounded hover:bg-white/[0.08] grid place-items-center"
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── PRESET SCREENSHOT SELECTION POPOVER ── */}
+            {showScreenshotMenu && (
+              <div className="border-t border-white/[0.08] bg-[#0c1017] p-2.5 space-y-2 animate-in fade-in">
+                <div className="flex items-center justify-between border-b border-white/[0.06] pb-1.5">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Camera className="size-3.5 text-[#00D084]" />
+                    Captures d'écran Démo MT5 :
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowScreenshotMenu(false)}
+                    className="text-gray-400 hover:text-white p-1 cursor-pointer"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  {PRESET_SCREENSHOTS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSelectPresetScreenshot(item)}
+                      className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] hover:border-[#00D084]/50 p-2 text-left text-xs text-gray-200 hover:text-white transition cursor-pointer"
+                    >
+                      <img src={item.url} alt={item.name} className="size-9 rounded-lg object-cover" />
+                      <span className="truncate font-medium">{item.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── INPUT TOOLBAR & SUBMISSION FORM ── */}
+            <form onSubmit={handleSendMessageSubmit} className="border-t border-white/[0.08] bg-[#10141b] p-3.5 space-y-2">
+              <div className="flex items-center gap-2">
+                {/* Hidden File Input for Real Screenshot / Image Upload */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                {/* Screenshot Upload Trigger */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="grid size-9 sm:size-10 place-items-center rounded-xl border border-white/[0.08] bg-[#141a23] hover:bg-[#1e2634] text-gray-300 hover:text-white transition cursor-pointer shrink-0"
+                  title="Téléverser une capture d'écran depuis l'ordinateur"
+                >
+                  <FileImage className="size-4 text-[#00D084]" />
+                </button>
+
+                {/* Preset Screenshot Samples */}
+                <button
+                  type="button"
+                  onClick={() => setShowScreenshotMenu((prev) => !prev)}
+                  className={`grid size-9 sm:size-10 place-items-center rounded-xl border transition cursor-pointer shrink-0 ${
+                    showScreenshotMenu
+                      ? "border-[#00D084] bg-[#00D084]/20 text-[#00D084]"
+                      : "border-white/[0.08] bg-[#141a23] hover:bg-[#1e2634] text-gray-300 hover:text-white"
+                  }`}
+                  title="Choisir une capture prédéfinie MT5"
+                >
+                  <Camera className="size-4" />
+                </button>
+
+                {/* Emoji Picker Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker((prev) => !prev)}
+                  className={`grid size-9 sm:size-10 place-items-center rounded-xl border transition cursor-pointer shrink-0 ${
+                    showEmojiPicker
+                      ? "border-[#00D084] bg-[#00D084]/20 text-[#00D084]"
+                      : "border-white/[0.08] bg-[#141a23] hover:bg-[#1e2634] text-gray-300 hover:text-white"
+                  }`}
+                  title="Insérer un émoji"
+                >
+                  <Smile className="size-4 text-amber-400" />
+                </button>
+
+                {/* Voice Note Trigger */}
+                <button
+                  type="button"
+                  onClick={handleSendVoiceNote}
+                  className={`grid size-9 sm:size-10 place-items-center rounded-xl border transition cursor-pointer shrink-0 ${
+                    isRecordingVoice
+                      ? "border-rose-500 bg-rose-500/25 text-rose-400 animate-pulse"
+                      : "border-white/[0.08] bg-[#141a23] hover:bg-[#1e2634] text-gray-300 hover:text-white"
+                  }`}
+                  title={isRecordingVoice ? "Arrêter et envoyer la note vocale" : "Enregistrer une note vocale"}
+                >
+                  <Mic className="size-4" />
+                </button>
+
+                {/* Text Input */}
+                <input
+                  type="text"
+                  placeholder={
+                    isRecordingVoice
+                      ? `Enregistrement (${voiceDuration}s)... Cliquez sur le micro pour envoyer.`
+                      : `Écrire à ${activeContact.name}...`
+                  }
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  disabled={isRecordingVoice}
+                  className="flex-1 rounded-2xl border border-white/[0.08] bg-[#0c1017] px-4 py-2.5 text-xs sm:text-sm text-white placeholder:text-gray-500 outline-none focus:border-[#00D084] transition"
+                />
+
+                {/* Submit Send Button */}
+                <button
+                  type="submit"
+                  className="neon-btn rounded-2xl px-4 sm:px-5 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider text-black cursor-pointer flex items-center gap-1.5 shadow-lg shrink-0"
+                >
+                  <Send className="size-4" />
+                  <span className="hidden sm:inline">ENVOYER</span>
+                </button>
+              </div>
+            </form>
+          </main>
         </section>
       )}
 
       {/* ========================================================================= */}
-      {/* CANAL 2: APPEL AUDIO DIRECT */}
+      {/* CANAL 2: E-MAIL OFFICIEL SÉCURISÉ (BOÎTE DE RÉCEPTION & COMPOSER) */}
+      {/* ========================================================================= */}
+      {activeChannel === "email" && (
+        <section className="grid gap-5 xl:grid-cols-[310px_1fr] min-h-[580px] lg:min-h-[600px] lg:max-h-[660px]">
+          {/* Email Sidebar & Folders */}
+          <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-4.5 shadow-xl flex flex-col justify-between space-y-3.5">
+            <div className="space-y-3.5">
+              <button
+                onClick={() => setEmailFolder("compose")}
+                className="neon-btn w-full rounded-2xl py-3 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer flex items-center justify-center gap-2 shadow-lg"
+              >
+                <Plus className="size-4" />
+                RÉDIGER UN E-MAIL
+              </button>
+
+              {/* Folders List */}
+              <div className="space-y-1">
+                <button
+                  onClick={() => setEmailFolder("inbox")}
+                  className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                    emailFolder === "inbox"
+                      ? "bg-white/[0.1] text-white font-black"
+                      : "text-gray-400 hover:bg-white/[0.03] hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Inbox className="size-4 text-[#00D084]" />
+                    Boîte de réception
+                  </span>
+                  <span className="font-mono text-xs text-gray-300">
+                    {emails.filter((e) => e.folder === "inbox").length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setEmailFolder("sent")}
+                  className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                    emailFolder === "sent"
+                      ? "bg-white/[0.1] text-white font-black"
+                      : "text-gray-400 hover:bg-white/[0.03] hover:text-white"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <Send className="size-4 text-sky-400" />
+                    Messages envoyés
+                  </span>
+                  <span className="font-mono text-xs text-gray-300">
+                    {emails.filter((e) => e.folder === "sent").length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Email List Preview */}
+              <div className="border-t border-white/[0.06] pt-3 space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">
+                  {emailFolder === "sent" ? "Messages envoyés" : "Messages reçus"}
+                </span>
+
+                <div className="space-y-1.5 max-h-[340px] overflow-y-auto pr-1">
+                  {emails
+                    .filter((e) => (emailFolder === "sent" ? e.folder === "sent" : e.folder === "inbox"))
+                    .map((item) => {
+                      const isSelected = selectedEmail?.id === item.id;
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            setSelectedEmail(item);
+                            setEmailFolder(item.folder);
+                          }}
+                          className={`cursor-pointer rounded-2xl border p-3 transition-all ${
+                            isSelected
+                              ? "border-[#00D084]/60 bg-[#00D084]/15 shadow-md"
+                              : "border-white/[0.06] bg-[#0c1017] hover:border-white/[0.15]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-white truncate max-w-[150px]">
+                              {item.fromName}
+                            </span>
+                            <span className="font-mono text-[10px] text-gray-400">
+                              {item.date.split("·")[1] ?? item.date}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium text-gray-200 mt-0.5 truncate">{item.subject}</p>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/[0.06] bg-[#080b0f] p-2.5 text-xs text-gray-400 font-mono">
+              Serveur SMTP : <strong className="text-white">mail.nexiummarkets.com</strong>
+            </div>
+          </article>
+
+          {/* Email View or Compose View */}
+          <article className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-xl flex flex-col justify-between min-h-[580px] lg:min-h-[600px] lg:max-h-[660px]">
+            {emailFolder === "compose" ? (
+              /* COMPOSE FORM */
+              <form onSubmit={handleSendEmail} className="space-y-3.5">
+                <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                  <h3 className="font-black text-base text-white">Rédiger un e-mail officiel</h3>
+                  <span className="rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-2.5 py-0.5 text-xs font-mono text-[#00D084] font-bold">
+                    CANAL SÉCURISÉ
+                  </span>
+                </div>
+
+                <div className="grid gap-3.5 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-black uppercase text-gray-400 mb-1">
+                      DESTINATAIRE
+                    </label>
+                    <select
+                      value={composeTo}
+                      onChange={(e) => setComposeTo(e.target.value)}
+                      className="w-full rounded-2xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084]"
+                    >
+                      <option value="desk-quant@nexiummarkets.com">desk-quant@nexiummarkets.com (Recherche &amp; Stratégies)</option>
+                      <option value="support-vip@nexiummarkets.com">support-vip@nexiummarkets.com (Support Client VIP)</option>
+                      <option value="risk-governor@nexiummarkets.com">risk-governor@nexiummarkets.com (Conformité &amp; Risque)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black uppercase text-gray-400 mb-1">
+                      PRIORITÉ
+                    </label>
+                    <select
+                      value={composePriority}
+                      onChange={(e) => setComposePriority(e.target.value as any)}
+                      className="w-full rounded-2xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084]"
+                    >
+                      <option value="NORMAL">Normal (Traitement sous 1h)</option>
+                      <option value="URGENT">Urgent (Traitement sous 15 min)</option>
+                      <option value="CRITIQUE">Critique (Alerte Desk Immédiate)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase text-gray-400 mb-1">
+                    OBJET DU MESSAGE
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Demande d'ajustement de lot sur Nexium AI Gold..."
+                    value={composeSubject}
+                    onChange={(e) => setComposeSubject(e.target.value)}
+                    className="w-full rounded-2xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase text-gray-400 mb-1">
+                    CORPS DU MESSAGE
+                  </label>
+                  <textarea
+                    rows={7}
+                    placeholder="Rédigez votre demande institutionnelle ici..."
+                    value={composeBody}
+                    onChange={(e) => setComposeBody(e.target.value)}
+                    className="w-full rounded-2xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084] resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 border-t border-white/[0.08] pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setEmailFolder("inbox")}
+                    className="rounded-2xl border border-white/[0.08] bg-[#0c1017] px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="neon-btn rounded-2xl px-5 py-2.5 text-xs font-black uppercase tracking-wider text-black cursor-pointer flex items-center gap-2 shadow-lg"
+                  >
+                    <Send className="size-3.5" />
+                    ENVOYER L'E-MAIL
+                  </button>
+                </div>
+              </form>
+            ) : selectedEmail ? (
+              /* EMAIL DETAIL VIEW */
+              <div className="space-y-4 flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+                    <div>
+                      <h3 className="font-black text-base text-white">{selectedEmail.subject}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                        <span>De : <strong className="text-white">{selectedEmail.fromName}</strong> ({selectedEmail.from})</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-gray-400">{selectedEmail.date}</span>
+                      <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-0.5 text-xs font-mono font-bold text-amber-300">
+                        {selectedEmail.priority}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2.5 text-xs sm:text-sm text-gray-200 leading-relaxed font-medium">
+                    {selectedEmail.body.map((par, i) => (
+                      <p key={i}>{par}</p>
+                    ))}
+                  </div>
+
+                  {/* Attachments if any */}
+                  {selectedEmail.hasAttachment && (
+                    <div className="mt-4 rounded-2xl border border-white/[0.08] bg-[#080b0f] p-3.5 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Paperclip className="size-4 text-[#00D084]" />
+                        <div>
+                          <p className="font-bold text-xs text-white">rapport-arbitrage-xauusd-ny4.pdf</p>
+                          <p className="text-[11px] text-gray-400 font-mono">1.4 MB · Signé numériquement SHA-256</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => toast.success("Téléchargement du rapport PDF en cours...")}
+                        className="rounded-xl border border-white/[0.08] bg-[#141a23] px-3.5 py-1.5 text-xs font-bold text-[#00D084] hover:bg-[#1a2330] transition cursor-pointer"
+                      >
+                        Télécharger
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-white/[0.08] pt-3 flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setComposeTo(selectedEmail.from);
+                      setComposeSubject(`Re: ${selectedEmail.subject}`);
+                      setEmailFolder("compose");
+                    }}
+                    className="flex items-center gap-2 text-xs font-bold text-[#00D084] hover:underline cursor-pointer"
+                  >
+                    <Send className="size-3.5" />
+                    Répondre à cet e-mail officiel
+                  </button>
+                  <span className="text-xs text-gray-500 font-mono">ID: {selectedEmail.id}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="my-auto text-center text-gray-400 text-sm">
+                Sélectionnez un e-mail à gauche pour en afficher le contenu.
+              </div>
+            )}
+          </article>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* CANAL 3: APPEL AUDIO DIRECT CHIFFRÉ */}
       {/* ========================================================================= */}
       {activeChannel === "call" && (
-        <section className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md">
+        <section className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 sm:p-8 shadow-xl">
           {callState === "IDLE" && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-black text-white">Ligne Téléphonique Directe MT5</h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Appelez directement un responsable sur ligne chiffrée.
+                <h3 className="text-xl font-black text-white">Ligne Téléphonique Directe MT5</h3>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                  Appel sécurisé chiffré de bout en bout avec les responsables de stratégie et le desk.
                 </p>
               </div>
 
               {/* Agent selector cards */}
-              <div className="grid gap-3.5 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-3">
                 {[
                   {
                     name: "Dr. Antoine R.",
@@ -3081,34 +4089,34 @@ function MessagingTab({
                     status: "Disponible",
                   },
                   {
+                    name: "Elena V.",
+                    role: "Responsable Support VIP 24/7",
+                    avatar: "EV",
+                    phoneExt: "Ligne directe : +1 (212) 892-0144 · #102",
+                    status: "Disponible",
+                  },
+                  {
                     name: "Sarah Benali",
                     role: "Responsable Risk Governance",
                     avatar: "SB",
                     phoneExt: "Ligne directe : +1 (212) 892-0144 · #108",
                     status: "Disponible",
                   },
-                  {
-                    name: "Marc Lindberg",
-                    role: "Ingénieur Datacenter Equinix NY4",
-                    avatar: "ML",
-                    phoneExt: "Ligne directe : +1 (212) 892-0144 · #112",
-                    status: "En ligne",
-                  },
                 ].map((agent) => {
-                  const isSelected = selectedAgent.name === agent.name;
+                  const isSelected = callSelectedAgent.name === agent.name;
                   return (
                     <div
                       key={agent.name}
-                      onClick={() => setSelectedAgent(agent)}
-                      className={`cursor-pointer rounded-2xl border p-4 transition-all flex flex-col justify-between ${
+                      onClick={() => setCallSelectedAgent(agent as any)}
+                      className={`cursor-pointer rounded-3xl border p-5 transition-all flex flex-col justify-between ${
                         isSelected
-                          ? "border-[#00D084] bg-[#00D084]/10 shadow-md ring-1 ring-[#00D084]"
-                          : "border-white/[0.08] bg-[#0c1017] hover:border-white/[0.15]"
+                          ? "border-[#00D084] bg-[#00D084]/15 shadow-xl ring-1 ring-[#00D084]"
+                          : "border-white/[0.08] bg-[#0c1017] hover:border-white/[0.2]"
                       }`}
                     >
                       <div>
-                        <div className="flex items-center gap-3">
-                          <div className="grid size-11 place-items-center rounded-xl bg-white/[0.08] font-mono text-sm font-black text-white">
+                        <div className="flex items-center gap-3.5">
+                          <div className="grid size-12 place-items-center rounded-2xl bg-white/[0.08] font-mono text-sm font-black text-white">
                             {agent.avatar}
                           </div>
                           <div>
@@ -3117,24 +4125,24 @@ function MessagingTab({
                           </div>
                         </div>
 
-                        <div className="mt-3.5 border-t border-white/[0.06] pt-2.5 text-xs space-y-1">
-                          <div className="flex items-center gap-1.5 text-[#00D084] font-medium text-[11px]">
-                            <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
+                        <div className="mt-4 border-t border-white/[0.06] pt-3 text-xs space-y-1.5">
+                          <div className="flex items-center gap-1.5 text-[#00D084] font-medium text-xs">
+                            <span className="size-2 rounded-full bg-[#00D084] animate-pulse" />
                             {agent.status}
                           </div>
-                          <p className="text-[10px] text-gray-400 font-mono">{agent.phoneExt}</p>
+                          <p className="text-xs text-gray-400 font-mono">{agent.phoneExt}</p>
                         </div>
                       </div>
 
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          startAudioCall(agent);
+                          startAudioCall(agent as any);
                         }}
-                        className="neon-btn mt-4 w-full rounded-xl py-2.5 text-xs font-black uppercase tracking-wider text-black cursor-pointer flex items-center justify-center gap-1.5"
+                        className="neon-btn mt-5 w-full rounded-2xl py-3 text-xs font-black uppercase tracking-wider text-black cursor-pointer flex items-center justify-center gap-2"
                       >
-                        <Phone className="size-3.5" />
-                        APPELER
+                        <Phone className="size-4" />
+                        LANCER L'APPEL
                       </button>
                     </div>
                   );
@@ -3145,46 +4153,46 @@ function MessagingTab({
 
           {/* ACTIVE CALL SCREEN */}
           {(callState === "CALLING" || callState === "CONNECTED" || callState === "ENDED") && (
-            <div className="relative overflow-hidden rounded-2xl border border-white/[0.1] bg-[#080b0f] p-6 min-h-[420px] flex flex-col justify-between items-center text-center">
-              <div className="flex items-center gap-2 rounded-full border border-white/[0.1] bg-black/40 px-3.5 py-1 text-[11px] font-mono text-gray-300">
-                <Lock className="size-3 text-[#00D084]" />
+            <div className="relative overflow-hidden rounded-3xl border border-white/[0.1] bg-[#080b0f] p-8 min-h-[460px] flex flex-col justify-between items-center text-center">
+              <div className="flex items-center gap-2 rounded-full border border-white/[0.1] bg-black/40 px-4 py-1.5 text-xs font-mono text-gray-300">
+                <Lock className="size-3.5 text-[#00D084]" />
                 Ligne Chiffrée 256-bit MT5 · Equinix NY4
               </div>
 
-              <div className="my-auto space-y-4">
-                <div className="relative mx-auto size-24 sm:size-28">
-                  <div className="grid size-full place-items-center rounded-2xl border-2 border-[#00D084] bg-[#10141b] text-2xl sm:text-3xl font-black text-white shadow-[0_0_30px_rgba(0,208,132,0.2)]">
-                    {selectedAgent.avatar}
+              <div className="my-auto space-y-5">
+                <div className="relative mx-auto size-28">
+                  <div className="grid size-full place-items-center rounded-3xl border-2 border-[#00D084] bg-[#10141b] text-3xl font-black text-white shadow-[0_0_30px_rgba(0,208,132,0.25)]">
+                    {callSelectedAgent.avatar}
                   </div>
                   {callState === "CONNECTED" && (
-                    <span className="absolute -bottom-1 -right-1 size-7 rounded-full bg-[#00D084] border-2 border-[#080b0f] grid place-items-center text-black font-black text-xs">
-                      <Phone className="size-3.5" />
+                    <span className="absolute -bottom-1 -right-1 size-8 rounded-full bg-[#00D084] border-2 border-[#080b0f] grid place-items-center text-black font-black text-xs">
+                      <Phone className="size-4" />
                     </span>
                   )}
                 </div>
 
                 <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-white">{selectedAgent.name}</h3>
-                  <p className="text-xs sm:text-sm text-gray-300 mt-0.5">{selectedAgent.role}</p>
+                  <h3 className="text-2xl font-black text-white">{callSelectedAgent.name}</h3>
+                  <p className="text-xs sm:text-sm text-gray-300 mt-0.5">{callSelectedAgent.role}</p>
                 </div>
 
                 {callState === "CALLING" && (
                   <div className="flex items-center justify-center gap-2 text-sm text-sky-400 font-mono animate-pulse">
                     <PhoneIncoming className="size-4 animate-bounce" />
-                    Sonnerie en cours...
+                    Établissement du tunnel sécurisé...
                   </div>
                 )}
 
                 {callState === "CONNECTED" && (
-                  <div className="space-y-3">
-                    <div className="inline-flex items-center gap-2 rounded-xl bg-[#00D084]/15 border border-[#00D084]/30 px-4 py-1.5 font-mono text-sm font-black text-[#00D084]">
-                      <span className="size-2 rounded-full bg-[#00D084] animate-ping" />
+                  <div className="space-y-4">
+                    <div className="inline-flex items-center gap-2 rounded-2xl bg-[#00D084]/15 border border-[#00D084]/30 px-5 py-2 font-mono text-sm font-black text-[#00D084]">
+                      <span className="size-2.5 rounded-full bg-[#00D084] animate-ping" />
                       {formatDuration(callDuration)}
                     </div>
 
                     {/* Audio Waveform */}
-                    <div className="flex items-center justify-center gap-1.5 h-6">
-                      {[10, 24, 16, 28, 14, 26, 18, 12, 22, 15].map((h, i) => (
+                    <div className="flex items-center justify-center gap-1.5 h-8">
+                      {[10, 24, 16, 28, 14, 26, 18, 12, 22, 15, 28, 19, 14, 24].map((h, i) => (
                         <div
                           key={i}
                           className="w-1 bg-[#00D084] rounded-full animate-pulse"
@@ -3198,7 +4206,7 @@ function MessagingTab({
 
                     {dialedDigits && (
                       <p className="text-xs text-amber-400 font-mono">
-                        Touches : <strong>{dialedDigits}</strong>
+                        Touches DTMF : <strong>{dialedDigits}</strong>
                       </p>
                     )}
                   </div>
@@ -3213,13 +4221,16 @@ function MessagingTab({
 
               {/* Keypad popup */}
               {showKeypad && (
-                <div className="my-2 rounded-xl border border-white/[0.08] bg-[#10141b] p-3.5 shadow-xl">
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="my-2 rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 shadow-xl">
+                  <div className="grid grid-cols-3 gap-2.5">
                     {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((d) => (
                       <button
                         key={d}
-                        onClick={() => handleKeypadPress(d)}
-                        className="rounded-lg border border-white/[0.08] bg-[#141a23] hover:bg-[#00D084]/20 hover:text-[#00D084] size-10 font-mono font-bold text-white transition cursor-pointer text-sm"
+                        onClick={() => {
+                          setDialedDigits((prev) => prev + d);
+                          toast.info(`Touche ${d} transmise.`);
+                        }}
+                        className="rounded-xl border border-white/[0.08] bg-[#141a23] hover:bg-[#00D084]/20 hover:text-[#00D084] size-11 font-mono font-bold text-white transition cursor-pointer text-sm"
                       >
                         {d}
                       </button>
@@ -3229,43 +4240,47 @@ function MessagingTab({
               )}
 
               {/* Bottom Call Controls */}
-              <div className="flex items-center justify-center gap-4 border-t border-white/[0.08] pt-4 w-full max-w-md">
+              <div className="flex items-center justify-center gap-4 border-t border-white/[0.08] pt-5 w-full max-w-md">
                 <button
                   onClick={() => setIsMuted((prev) => !prev)}
-                  className={`grid size-11 place-items-center rounded-xl border transition cursor-pointer ${
+                  className={`grid size-12 place-items-center rounded-2xl border transition cursor-pointer ${
                     isMuted
                       ? "border-rose-500/50 bg-rose-500/20 text-rose-400"
                       : "border-white/[0.1] bg-[#141a23] text-white hover:bg-white/[0.1]"
                   }`}
+                  title={isMuted ? "Réactiver le micro" : "Couper le micro"}
                 >
                   {isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
                 </button>
 
                 <button
                   onClick={() => setIsSpeakerOn((prev) => !prev)}
-                  className={`grid size-11 place-items-center rounded-xl border transition cursor-pointer ${
+                  className={`grid size-12 place-items-center rounded-2xl border transition cursor-pointer ${
                     !isSpeakerOn
                       ? "border-amber-500/50 bg-amber-500/20 text-amber-400"
                       : "border-white/[0.1] bg-[#141a23] text-white hover:bg-white/[0.1]"
                   }`}
+                  title={isSpeakerOn ? "Désactiver le haut-parleur" : "Activer le haut-parleur"}
                 >
                   {isSpeakerOn ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
                 </button>
 
                 <button
                   onClick={() => setShowKeypad((prev) => !prev)}
-                  className={`grid size-11 place-items-center rounded-xl border transition cursor-pointer ${
+                  className={`grid size-12 place-items-center rounded-2xl border transition cursor-pointer ${
                     showKeypad
                       ? "border-[#00D084] bg-[#00D084]/20 text-[#00D084]"
                       : "border-white/[0.1] bg-[#141a23] text-white hover:bg-white/[0.1]"
                   }`}
+                  title="Clavier DTMF"
                 >
                   <Sliders className="size-5" />
                 </button>
 
                 <button
                   onClick={endCall}
-                  className="grid size-11 place-items-center rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-md transition cursor-pointer"
+                  className="grid size-12 place-items-center rounded-2xl bg-rose-600 hover:bg-rose-700 text-white shadow-xl transition cursor-pointer"
+                  title="Raccrocher"
                 >
                   <PhoneOff className="size-5" />
                 </button>
@@ -3275,257 +4290,48 @@ function MessagingTab({
         </section>
       )}
 
-      {/* ========================================================================= */}
-      {/* CANAL 3: E-MAIL SÉCURISÉ */}
-      {/* ========================================================================= */}
-      {activeChannel === "email" && (
-        <section className="grid gap-5 xl:grid-cols-[300px_1fr]">
-          {/* Email Sidebar */}
-          <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4.5 shadow-md flex flex-col justify-between space-y-3.5">
-            <div className="space-y-3.5">
+      {/* ── LIGHTBOX MODAL FULL-SCREEN POUR LES CAPTURES D'ÉCRAN ── */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in fade-in"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl border border-white/[0.15] bg-[#10141b] p-4 shadow-2xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <ImageIcon className="size-4 text-[#00D084]" />
+                <span>{lightboxImage.caption || "Capture d'écran haute résolution"}</span>
+              </div>
               <button
-                onClick={() => setEmailFolder("compose")}
-                className="neon-btn w-full rounded-xl py-3 text-xs font-black uppercase tracking-wider text-black cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                onClick={() => setLightboxImage(null)}
+                className="text-gray-400 hover:text-white p-1.5 rounded-xl bg-white/[0.06] cursor-pointer"
               >
-                <Plus className="size-3.5" />
-                RÉDIGER UN E-MAIL
+                <X className="size-5" />
               </button>
-
-              {/* Folder Buttons */}
-              <div className="space-y-1">
-                <button
-                  onClick={() => setEmailFolder("inbox")}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-bold transition cursor-pointer ${
-                    emailFolder === "inbox"
-                      ? "bg-white/[0.1] text-white font-black"
-                      : "text-gray-400 hover:bg-white/[0.03] hover:text-white"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Inbox className="size-3.5 text-[#00D084]" />
-                    Boîte de réception
-                  </span>
-                  <span className="font-mono text-[11px] text-gray-300">
-                    {emails.filter((e) => e.folder === "inbox").length}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setEmailFolder("sent")}
-                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-bold transition cursor-pointer ${
-                    emailFolder === "sent"
-                      ? "bg-white/[0.1] text-white font-black"
-                      : "text-gray-400 hover:bg-white/[0.03] hover:text-white"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Send className="size-3.5 text-sky-400" />
-                    Messages envoyés
-                  </span>
-                  <span className="font-mono text-[11px] text-gray-300">
-                    {emails.filter((e) => e.folder === "sent").length}
-                  </span>
-                </button>
-              </div>
-
-              {/* Email List */}
-              <div className="border-t border-white/[0.06] pt-3 space-y-2">
-                <span className="text-[10px] font-black uppercase text-gray-400">
-                  {emailFolder === "sent" ? "Messages envoyés" : "Messages reçus"}
-                </span>
-
-                <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                  {emails
-                    .filter((e) => (emailFolder === "sent" ? e.folder === "sent" : e.folder === "inbox"))
-                    .map((item) => {
-                      const isSelected = selectedEmail?.id === item.id;
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            setSelectedEmail(item);
-                            setEmailFolder(item.folder);
-                          }}
-                          className={`cursor-pointer rounded-xl border p-2.5 transition-all ${
-                            isSelected
-                              ? "border-[#00D084]/60 bg-[#00D084]/15"
-                              : "border-white/[0.04] bg-[#0c1017] hover:border-white/[0.1]"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-xs text-white truncate max-w-[150px]">
-                              {item.fromName}
-                            </span>
-                            <span className="font-mono text-[10px] text-gray-400">{item.date.split("·")[1] ?? item.date}</span>
-                          </div>
-                          <p className="text-[11px] font-medium text-gray-200 mt-0.5 truncate">{item.subject}</p>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
             </div>
 
-            <div className="rounded-xl border border-white/[0.04] bg-[#080b0f] p-2.5 text-[11px] text-gray-400 font-mono">
-              Serveur : <strong className="text-white">mail.nexiummarkets.com</strong>
+            <div className="overflow-hidden rounded-2xl border border-white/[0.08] max-h-[70vh] flex items-center justify-center bg-black">
+              <img
+                src={lightboxImage.url}
+                alt={lightboxImage.caption ?? "Capture"}
+                className="max-h-[70vh] w-auto object-contain rounded-xl"
+              />
             </div>
-          </article>
 
-          {/* Email View or Compose View */}
-          <article className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 shadow-md flex flex-col justify-between min-h-[480px]">
-            {emailFolder === "compose" ? (
-              /* COMPOSE FORM */
-              <form onSubmit={handleSendEmail} className="space-y-3.5">
-                <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                  <h3 className="font-bold text-base text-white">Rédiger un e-mail officiel</h3>
-                  <span className="rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-2.5 py-0.5 text-[10px] font-mono text-[#00D084] font-bold">
-                    CANAL SÉCURISÉ
-                  </span>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
-                      DESTINATAIRE
-                    </label>
-                    <select
-                      value={composeTo}
-                      onChange={(e) => setComposeTo(e.target.value)}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084]"
-                    >
-                      <option value="desk-quant@nexiummarkets.com">desk-quant@nexiummarkets.com (Recherche)</option>
-                      <option value="risk-governor@nexiummarkets.com">risk-governor@nexiummarkets.com (Risque)</option>
-                      <option value="support-vip@nexiummarkets.com">support-vip@nexiummarkets.com (VIP)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
-                      PRIORITÉ
-                    </label>
-                    <select
-                      value={composePriority}
-                      onChange={(e) => setComposePriority(e.target.value as any)}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084]"
-                    >
-                      <option value="NORMAL">Normal (1h)</option>
-                      <option value="URGENT">Urgent (15 min)</option>
-                      <option value="CRITIQUE">Critique (Immédiat)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
-                    OBJET DU MESSAGE
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Demande d'ajustement de lot..."
-                    value={composeSubject}
-                    onChange={(e) => setComposeSubject(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">
-                    CORPS DU MESSAGE
-                  </label>
-                  <textarea
-                    rows={6}
-                    placeholder="Rédigez votre demande ici..."
-                    value={composeBody}
-                    onChange={(e) => setComposeBody(e.target.value)}
-                    className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] px-3.5 py-2.5 text-xs text-white outline-none focus:border-[#00D084] resize-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2.5 border-t border-white/[0.06] pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setEmailFolder("inbox")}
-                    className="rounded-xl border border-white/[0.08] bg-[#0c1017] px-4 py-2 text-xs font-bold text-gray-400 hover:text-white cursor-pointer"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="neon-btn rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider text-black cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Send className="size-3.5" />
-                    ENVOYER L'E-MAIL
-                  </button>
-                </div>
-              </form>
-            ) : selectedEmail ? (
-              /* EMAIL DETAIL VIEW */
-              <div className="space-y-4 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
-                    <div>
-                      <h3 className="font-bold text-base text-white">{selectedEmail.subject}</h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
-                        <span>De : <strong className="text-white">{selectedEmail.fromName}</strong> ({selectedEmail.from})</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-gray-400">{selectedEmail.date}</span>
-                      <span className="rounded border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-300">
-                        {selectedEmail.priority}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-2.5 text-xs sm:text-sm text-gray-200 leading-relaxed font-medium">
-                    {selectedEmail.body.map((par, i) => (
-                      <p key={i}>{par}</p>
-                    ))}
-                  </div>
-
-                  {/* Attachments if any */}
-                  {selectedEmail.hasAttachment && (
-                    <div className="mt-4 rounded-xl border border-white/[0.06] bg-[#080b0f] p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <Paperclip className="size-4 text-[#00D084]" />
-                        <div>
-                          <p className="font-bold text-xs text-white">rapport-arbitrage-xauusd-ny4.pdf</p>
-                          <p className="text-[10px] text-gray-400 font-mono">1.4 MB · Signé numériquement</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => toast.success("Téléchargement du rapport PDF en cours...")}
-                        className="rounded-lg border border-white/[0.08] bg-[#141a23] px-3 py-1.5 text-xs font-bold text-[#00D084] hover:bg-[#1a2330] transition cursor-pointer"
-                      >
-                        Télécharger
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-white/[0.06] pt-3 flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      setComposeTo(selectedEmail.from);
-                      setComposeSubject(`Re: ${selectedEmail.subject}`);
-                      setEmailFolder("compose");
-                    }}
-                    className="flex items-center gap-1.5 text-xs font-bold text-[#00D084] hover:underline cursor-pointer"
-                  >
-                    <Send className="size-3.5" />
-                    Répondre à cet e-mail
-                  </button>
-                  <span className="text-[10px] text-gray-500 font-mono">ID: {selectedEmail.id}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="my-auto text-center text-gray-400 text-xs">
-                Sélectionnez un e-mail à gauche pour en afficher le contenu.
-              </div>
-            )}
-          </article>
-        </section>
+            <div className="flex items-center justify-between text-xs text-gray-400 pt-1 font-mono">
+              <span>Chiffrement SHA-256</span>
+              <button
+                onClick={() => toast.success("Téléchargement de la capture HD...")}
+                className="rounded-xl border border-white/[0.08] bg-[#141a23] px-3.5 py-1.5 text-xs font-bold text-[#00D084] hover:bg-[#1a2330] cursor-pointer"
+              >
+                Télécharger l'image HD
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
