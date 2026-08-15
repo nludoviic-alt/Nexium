@@ -1713,7 +1713,7 @@ function NexiumAdminDashboard({
           `$${deposit.amount.toLocaleString("fr-FR")} USD`,
           activeClient.mt5.login
         ).then((res) => {
-          if (res.success && !res.simulated) {
+          if (res.success) {
             toast.success(`E-mail de confirmation de dépôt expédié à ${activeClient.email} via Resend.`);
           }
         }).catch((err) => console.warn("Resend deposit email warning:", err));

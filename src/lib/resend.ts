@@ -738,8 +738,8 @@ export function renderContactNotificationHtml(params: {
   email: string;
   subject: string;
   message: string;
-  mt5Account?: string;
-  broker?: string;
+  mt5Account?: string | null | undefined;
+  broker?: string | null | undefined;
 }): string {
   const content = `
     ${renderIntroSection(
@@ -798,8 +798,8 @@ export async function sendContactNotificationEmail(params: {
   email: string;
   subject: string;
   message: string;
-  mt5Account?: string;
-  broker?: string;
+  mt5Account?: string | null | undefined;
+  broker?: string | null | undefined;
 }): Promise<SendEmailResult> {
   const subjectLine = `📨 [CONTACT DESK] ${params.subject} — ${params.fullName}`;
   const html = renderContactNotificationHtml(params);
