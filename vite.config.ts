@@ -31,6 +31,12 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // Routes only ever reached via navigate() or an external redirect (never a
+    // static <Link>) aren't found by crawlLinks, so they'd fall back to the
+    // homepage's prerendered HTML on direct load — a client-side router
+    // hydration mismatch that crashes the app. List them explicitly so the
+    // prerenderer generates real HTML for them too.
+    pages: [{ path: "/composition" }, { path: "/reset-password" }],
     // Generate static HTML for each discoverable route so the site can be hosted via FTP.
     prerender: {
       enabled: true,
