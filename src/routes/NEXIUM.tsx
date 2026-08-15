@@ -4089,33 +4089,43 @@ function NexiumDashboard() {
       {/* DÉPÔT MODAL */}
       {depositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#10141b] p-7 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
-              <h3 className="font-black text-xl text-white">Déposer des fonds</h3>
-              <button onClick={() => setDepositOpen(false)} className="text-gray-400 hover:text-white p-1 cursor-pointer">
+          <div className="w-full max-w-xl rounded-3xl border border-white/[0.1] bg-[#10141b] p-7 sm:p-9 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+              <div>
+                <h3 className="font-black text-2xl text-white">Déposer des fonds</h3>
+                <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Alimentez instantanément votre compte de trading ECN</p>
+              </div>
+              <button onClick={() => setDepositOpen(false)} className="text-gray-400 hover:text-white p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer">
                 <X className="size-5" />
               </button>
             </div>
 
-            <form onSubmit={handleDepositSubmit} className="space-y-4">
+            <form onSubmit={handleDepositSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-1.5">MONTANT DU DÉPÔT (USD)</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  className="w-full rounded-2xl border border-white/[0.08] bg-black/40 px-4 py-3.5 font-mono text-2xl font-bold text-white outline-none focus:border-[#00D084]"
-                />
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">MONTANT DU DÉPÔT (USD)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className="w-full rounded-2xl border border-white/[0.1] bg-black/40 pl-10 pr-4 py-4 font-mono text-2xl sm:text-3xl font-bold text-white outline-none focus:border-[#00D084] transition"
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                {["500", "1000", "5000"].map((amt) => (
+              <div className="grid grid-cols-4 gap-2.5">
+                {["500", "1000", "2500", "5000"].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => setDepositAmount(amt)}
-                    className="rounded-xl border border-white/[0.08] bg-[#141a23] py-2.5 text-xs sm:text-sm font-bold text-gray-200 hover:border-[#00D084]/40 transition cursor-pointer"
+                    className={`rounded-xl border py-2.5 text-xs sm:text-sm font-bold transition cursor-pointer ${
+                      depositAmount === amt
+                        ? "border-[#00D084] bg-[#00D084]/15 text-[#00D084]"
+                        : "border-white/[0.08] bg-[#141a23] text-gray-300 hover:border-[#00D084]/40 hover:text-white"
+                    }`}
                   >
                     +${amt}
                   </button>
@@ -4123,11 +4133,11 @@ function NexiumDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-1.5">MODE DE PAIEMENT SÉCURISÉ</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">MODE DE PAIEMENT SÉCURISÉ</label>
                 <select
                   value={depositMethod}
                   onChange={(e) => setDepositMethod(e.target.value)}
-                  className="w-full rounded-2xl border border-white/[0.08] bg-[#0c1017] px-4 py-3 text-xs sm:text-sm text-white outline-none focus:border-[#00D084]"
+                  className="w-full rounded-2xl border border-white/[0.1] bg-[#0c1017] px-4 py-3.5 text-xs sm:text-sm text-white outline-none focus:border-[#00D084] transition"
                 >
                   <option value="Virement SEPA">Virement Bancaire SEPA Instantané</option>
                   <option value="Carte ECN">Carte de Débit / Crédit ECN</option>
@@ -4135,19 +4145,19 @@ function NexiumDashboard() {
                 </select>
               </div>
 
-              <div className="flex gap-3 pt-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setDepositOpen(false)}
-                  className="flex-1 rounded-2xl border border-white/[0.08] py-3 text-xs sm:text-sm font-bold text-gray-400 hover:text-white transition cursor-pointer"
+                  className="flex-1 rounded-2xl border border-white/[0.08] bg-[#141a23] py-3.5 text-xs sm:text-sm font-bold text-gray-400 hover:text-white hover:bg-[#1a2330] transition cursor-pointer"
                 >
                   ANNULER
                 </button>
                 <button
                   type="submit"
-                  className="neon-btn flex-1 rounded-2xl py-3 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer"
+                  className="neon-btn flex-1 rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer"
                 >
-                  CONFIRMER
+                  CONFIRMER LE DÉPÔT
                 </button>
               </div>
             </form>
@@ -4158,51 +4168,68 @@ function NexiumDashboard() {
       {/* RETRAIT MODAL */}
       {withdrawOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#10141b] p-7 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
-              <h3 className="font-black text-xl text-white">Demande de Retrait</h3>
-              <button onClick={() => setWithdrawOpen(false)} className="text-gray-400 hover:text-white p-1 cursor-pointer">
+          <div className="w-full max-w-xl rounded-3xl border border-white/[0.1] bg-[#10141b] p-7 sm:p-9 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+              <div>
+                <h3 className="font-black text-2xl text-white">Demande de Retrait</h3>
+                <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Retirez vos fonds disponibles vers votre compte bancaire</p>
+              </div>
+              <button onClick={() => setWithdrawOpen(false)} className="text-gray-400 hover:text-white p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer">
                 <X className="size-5" />
               </button>
             </div>
 
-            <form onSubmit={handleWithdrawSubmit} className="space-y-4">
-              <div className="rounded-2xl border border-[#00D084]/20 bg-[#00D084]/10 p-3.5 text-xs sm:text-sm text-gray-300">
-                Solde disponible : <strong className="font-mono text-[#00D084] font-black">${balance.toFixed(2)} USD</strong>
+            <form onSubmit={handleWithdrawSubmit} className="space-y-5">
+              <div className="flex items-center justify-between rounded-2xl border border-[#00D084]/20 bg-[#00D084]/10 px-5 py-4 text-xs sm:text-sm text-gray-300">
+                <span className="font-medium text-gray-300">Solde disponible :</span>
+                <strong className="font-mono text-base sm:text-lg text-[#00D084] font-black">${balance.toFixed(2)} USD</strong>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-1.5">MONTANT DU RETRAIT (USD)</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full rounded-2xl border border-white/[0.08] bg-black/40 px-4 py-3.5 font-mono text-2xl font-bold text-white outline-none focus:border-[#00D084]"
-                />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">MONTANT DU RETRAIT (USD)</label>
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawAmount(balance.toFixed(2))}
+                    className="text-xs font-bold text-[#00D084] hover:underline cursor-pointer"
+                  >
+                    MAX (${balance.toFixed(2)})
+                  </button>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold text-gray-500">$</span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    className="w-full rounded-2xl border border-white/[0.1] bg-black/40 pl-10 pr-4 py-4 font-mono text-2xl sm:text-3xl font-bold text-white outline-none focus:border-[#00D084] transition"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-400 mb-1.5">COORDONNÉES BANCAIRES (IBAN)</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">COORDONNÉES BANCAIRES (IBAN)</label>
                 <input
                   type="text"
                   value={withdrawIban}
                   onChange={(e) => setWithdrawIban(e.target.value)}
-                  className="w-full rounded-2xl border border-white/[0.08] bg-black/40 px-4 py-3 font-mono text-xs sm:text-sm text-white outline-none focus:border-[#00D084]"
+                  placeholder="FR76 3000 6000 0112 3456 7890 189"
+                  className="w-full rounded-2xl border border-white/[0.1] bg-black/40 px-4 py-3.5 font-mono text-xs sm:text-sm text-white outline-none focus:border-[#00D084] transition"
                 />
               </div>
 
-              <div className="flex gap-3 pt-3">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setWithdrawOpen(false)}
-                  className="flex-1 rounded-2xl border border-white/[0.08] py-3 text-xs sm:text-sm font-bold text-gray-400 hover:text-white transition cursor-pointer"
+                  className="flex-1 rounded-2xl border border-white/[0.08] bg-[#141a23] py-3.5 text-xs sm:text-sm font-bold text-gray-400 hover:text-white hover:bg-[#1a2330] transition cursor-pointer"
                 >
                   ANNULER
                 </button>
                 <button
                   type="submit"
-                  className="neon-btn flex-1 rounded-2xl py-3 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer"
+                  className="neon-btn flex-1 rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer"
                 >
                   VALIDER LE RETRAIT
                 </button>

@@ -869,86 +869,49 @@ export function TradingViewSuperchart({
               })}
             </div>
 
-            {/* ── SYMBOL INSPECTOR DETAIL CARD ── */}
-            <div className="p-3 space-y-2.5">
+            {/* ── SYMBOL INSPECTOR DETAIL CARD (SIMPLIFIÉ & ÉPURÉ) ── */}
+            <div className="p-3.5 border-t border-[#2a2e39] bg-[#161a25]/60 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="size-7 rounded-full bg-amber-500/20 grid place-items-center text-amber-400 font-black text-sm">
-                    ₿
+                <div className="flex items-center gap-2.5">
+                  <div className="size-8 rounded-xl bg-amber-500/15 border border-amber-500/30 grid place-items-center text-amber-400 font-black text-sm">
+                    {currentSym.category === "CRYPTO" ? "₿" : "💱"}
                   </div>
                   <div>
-                    <h4 className="font-black text-white text-base leading-tight">{currentSym.symbol}</h4>
-                    <p className="text-[10px] text-gray-400">{currentSym.name} · {currentSym.exchange}</p>
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="font-black text-white text-sm leading-tight">{currentSym.symbol}</h4>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#089981]/20 text-[#089981] font-mono">LIVE</span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-medium">{currentSym.name} · {currentSym.exchange}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-gray-400">
-                  <LayoutGrid className="size-4 hover:text-white cursor-pointer" />
-                  <MoreHorizontal className="size-4 hover:text-white cursor-pointer" />
+
+                <div className="text-right font-mono">
+                  <div className="text-base font-black text-white leading-none">
+                    {dynamicPrice}
+                  </div>
+                  <div className={`text-[10px] font-bold mt-1 ${currentSym.change >= 0 ? "text-[#089981]" : "text-[#f23645]"}`}>
+                    {currentSym.change >= 0 ? `+${currentSym.change}` : currentSym.change} ({currentSym.changePercent >= 0 ? `+${currentSym.changePercent}` : currentSym.changePercent}%)
+                  </div>
                 </div>
               </div>
 
-              <div className="text-[10px] text-gray-400 font-mono">
-                {currentSym.type}
-              </div>
-
-              {/* Big Price Readout */}
-              <div className="flex items-baseline gap-2 font-mono">
-                <span className="text-2xl font-black text-white tracking-tight">
-                  {dynamicPrice}
-                </span>
-                <span className="text-xs text-gray-400">{currentSym.currency}</span>
-                <span className="text-xs font-bold text-[#089981]">
-                  +{currentSym.change} (+{currentSym.changePercent}%)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#089981]">
-                <span className="size-2 rounded-full bg-[#089981] animate-pulse" />
-                <span>MARKET OPEN</span>
-              </div>
-
-              {/* News Ticker Pill */}
-              <div className="flex items-start gap-1.5 rounded bg-[#1e222d] p-2 text-[11px] text-gray-300 leading-snug">
-                <Zap className="size-3.5 text-purple-400 shrink-0 mt-0.5" />
-                <span>
-                  <strong className="text-purple-400 font-normal">7 hours ago</strong> · Bitcoin Price History Rings Bell as BTC Nears Halving
-                </span>
-              </div>
-
-              {/* Ideas / Minds tabs */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button className="flex items-center justify-between rounded bg-[#1e222d] px-2.5 py-1.5 text-xs text-gray-300 hover:text-white transition cursor-pointer">
-                  <span>💡 Ideas</span>
-                  <ChevronRight className="size-3 text-gray-500" />
-                </button>
-                <button className="flex items-center justify-between rounded bg-[#1e222d] px-2.5 py-1.5 text-xs text-gray-300 hover:text-white transition cursor-pointer">
-                  <span>🧠 Minds</span>
-                  <ChevronRight className="size-3 text-gray-500" />
-                </button>
-              </div>
-
-              <button className="w-full text-left text-xs text-gray-400 hover:text-white transition cursor-pointer py-1">
-                + Add note
-              </button>
-
-              {/* Key Stats Grid */}
-              <div className="border-t border-[#2a2e39] pt-2 space-y-1.5 font-mono text-[11px]">
-                <div className="text-[10px] font-bold text-gray-400 uppercase font-sans">Key stats</div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-[10px]">VOLUME</span>
+              {/* Grille 2x2 des statistiques clés */}
+              <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
+                <div className="rounded-xl bg-[#1e222d]/70 p-2.5 border border-white/[0.04]">
+                  <span className="text-gray-400 text-[9px] uppercase block tracking-wider font-sans font-bold mb-0.5">Volume</span>
                   <span className="text-white font-bold">{currentSym.vol}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-[10px]">AVERAGE VOLUME (10)</span>
+                <div className="rounded-xl bg-[#1e222d]/70 p-2.5 border border-white/[0.04]">
+                  <span className="text-gray-400 text-[9px] uppercase block tracking-wider font-sans font-bold mb-0.5">Vol. Moyen</span>
                   <span className="text-white font-bold">{currentSym.avgVol}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-[10px]">MARKET CAP</span>
+                <div className="rounded-xl bg-[#1e222d]/70 p-2.5 border border-white/[0.04]">
+                  <span className="text-gray-400 text-[9px] uppercase block tracking-wider font-sans font-bold mb-0.5">Market Cap</span>
                   <span className="text-white font-bold">{currentSym.marketCap}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-[10px]">FD MARKET CAP</span>
-                  <span className="text-white font-bold">{currentSym.fdMarketCap}</span>
+                <div className="rounded-xl bg-[#1e222d]/70 p-2.5 border border-white/[0.04]">
+                  <span className="text-gray-400 text-[9px] uppercase block tracking-wider font-sans font-bold mb-0.5">Catégorie</span>
+                  <span className="text-gray-300 font-bold">{currentSym.category}</span>
                 </div>
               </div>
             </div>
