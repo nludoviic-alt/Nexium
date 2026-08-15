@@ -354,6 +354,52 @@ export async function updateClientBalance(userId: string, newBalance: number) {
 }
 
 /* ==========================================================================
+   INVITATION DE COMPTE (CLIENT OU STAFF) DEPUIS L'ADMIN
+   ========================================================================== */
+
+/**
+ * Invite une nouvelle personne (client ou staff) : crée son compte de connexion
+ * Supabase Auth + son profil, et lui envoie un e-mail avec un lien pour choisir
+ * son propre mot de passe. Passe par le petit service backend du VPS (seul
+ * endroit autorisé à détenir la clé service_role) — jamais exécuté côté client.
+ */
+export async function inviteUser(params: {
+  name: string;
+  email: string;
+  phone?: string;
+  role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
+}): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: "Supabase n'est pas configuré." };
+  }
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    return { success: false, error: "Session administrateur expirée, reconnectez-vous." };
+  }
+
+  try {
+    const res = await fetch("/api/admin/invite-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data?.error || "Échec de l'invitation." };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Service d'invitation injoignable." };
+  }
+}
+
+/* ==========================================================================
    HELPERS MESSAGERIE & LIVE CHAT EN TEMPS RÉEL
    ========================================================================== */
 

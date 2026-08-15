@@ -148,6 +148,7 @@ import {
   recordTransaction,
   updateTransactionStatus,
   updateClientBalance,
+  inviteUser,
 } from "@/lib/supabase";
 
 export const Route = createFileRoute("/composition")({
@@ -1059,11 +1060,11 @@ function NexiumAdminDashboard({
   };
 
   // Synchronisation des clients réels depuis Supabase
-  useEffect(() => {
+  const refreshClients = useCallback(async () => {
     if (!isSupabaseConfigured) return;
-    getAllClientProfiles().then((supabaseProfiles) => {
-      if (!supabaseProfiles || supabaseProfiles.length === 0) return;
-      setClients((prev) => {
+    const supabaseProfiles = await getAllClientProfiles();
+    if (!supabaseProfiles || supabaseProfiles.length === 0) return;
+    setClients((prev) => {
         const existingIds = new Set(prev.map((c) => c.id));
         const newMapped: UserProfile[] = supabaseProfiles
           .filter((p) => !existingIds.has(p.id))
@@ -1131,8 +1132,11 @@ function NexiumAdminDashboard({
 
         return [...newMapped, ...prev];
       });
-    });
   }, []);
+
+  useEffect(() => {
+    refreshClients();
+  }, [refreshClients]);
 
   // Synchronisation du staff réel depuis Supabase (tout profil hors rôle TRADER)
   const staffDepartmentForRole = (role: AdminSystemRole): StaffAdministrator["department"] => {
@@ -1143,44 +1147,47 @@ function NexiumAdminDashboard({
     return "Conformité & Risque";
   };
 
-  useEffect(() => {
+  const refreshStaffList = useCallback(async () => {
     if (!isSupabaseConfigured) return;
-    getAllStaffProfiles().then((profiles) => {
-      if (!profiles || profiles.length === 0) return;
-      setStaffList(
-        profiles.map((p): StaffAdministrator => ({
-          id: p.id,
-          name: p.name,
-          email: p.email,
-          phone: p.phone || "-",
-          role: p.role as AdminSystemRole,
-          isPrimaryOwner: Boolean(p.is_primary_owner),
-          department: staffDepartmentForRole(p.role as AdminSystemRole),
-          status: p.status as AccountStatus,
-          twoFactorEnabled: false,
-          createdAt: p.created_at ? p.created_at.split("T")[0] : "",
-          lastLogin: "-",
-          lastIp: "-",
-          ipWhitelist: "Toutes les adresses IP",
-          allowedHours: "24/7",
-          deskSignature: `${p.name} — @ Nexium Markets`,
-          assignedAccountsCount: 0,
-          assignedTraders: [],
-          permissions: {
-            canChatWithClients: true,
-            canSendEmails: true,
-            canTakePhoneCalls: true,
-            canApproveFinances: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
-            canManageEngines: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "QUANT",
-            canAdjustPnl: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
-            canUseKillSwitch: p.role === "OWNER" || p.role === "SUPER_ADMIN",
-            canManageStaff: p.role === "OWNER" || p.role === "SUPER_ADMIN",
-            canViewTreasury: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
-          },
-        }))
-      );
-    });
+    const profiles = await getAllStaffProfiles();
+    if (!profiles || profiles.length === 0) return;
+    setStaffList(
+      profiles.map((p): StaffAdministrator => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        phone: p.phone || "-",
+        role: p.role as AdminSystemRole,
+        isPrimaryOwner: Boolean(p.is_primary_owner),
+        department: staffDepartmentForRole(p.role as AdminSystemRole),
+        status: p.status as AccountStatus,
+        twoFactorEnabled: false,
+        createdAt: p.created_at ? p.created_at.split("T")[0] : "",
+        lastLogin: "-",
+        lastIp: "-",
+        ipWhitelist: "Toutes les adresses IP",
+        allowedHours: "24/7",
+        deskSignature: `${p.name} — @ Nexium Markets`,
+        assignedAccountsCount: 0,
+        assignedTraders: [],
+        permissions: {
+          canChatWithClients: true,
+          canSendEmails: true,
+          canTakePhoneCalls: true,
+          canApproveFinances: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
+          canManageEngines: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "QUANT",
+          canAdjustPnl: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
+          canUseKillSwitch: p.role === "OWNER" || p.role === "SUPER_ADMIN",
+          canManageStaff: p.role === "OWNER" || p.role === "SUPER_ADMIN",
+          canViewTreasury: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
+        },
+      }))
+    );
   }, []);
+
+  useEffect(() => {
+    refreshStaffList();
+  }, [refreshStaffList]);
 
   // Synchronisation des transactions réelles depuis Supabase, fusionnées dans
   // chaque client (retraits/dépôts en attente + historique).
@@ -1432,12 +1439,10 @@ function NexiumAdminDashboard({
   };
 
   // Création d'un Membre du Staff / Conseiller / Admin
-  // Nomination d'un membre du staff. Un compte de connexion (auth.users) ne peut être
-  // créé que par la personne elle-même via /register — cette console statique n'a pas
-  // accès à une clé service_role pour provisionner un compte à sa place. On promeut donc
-  // ici un profil déjà inscrit (rôle TRADER) vers un rôle staff, plutôt que de fabriquer
-  // un profil orphelin non relié à un vrai compte (l'ancien code faisait un upsert avec un
-  // UUID aléatoire : la contrainte FK profiles.id -> auth.users.id le rejetait toujours).
+  // Invitation d'un membre du staff : crée son compte de connexion réel via le
+  // service backend dédié (clé service_role, jamais côté client) et lui envoie
+  // un e-mail pour choisir son propre mot de passe. Il est actif immédiatement
+  // après avoir cliqué le lien — aucune étape locale/fictive.
   const handleCreateStaffMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName || !newStaffEmail) {
@@ -1450,73 +1455,21 @@ function NexiumAdminDashboard({
       return;
     }
 
-    if (!isSupabaseConfigured) {
-      toast.error("Supabase n'est pas configuré — impossible de nommer un membre du staff.");
-      return;
-    }
-
-    const existing = await findProfileByEmail(newStaffEmail);
-    if (!existing) {
-      toast.error(
-        `Aucun compte trouvé pour ${newStaffEmail}. La personne doit d'abord créer son compte sur /register, puis vous pourrez la promouvoir ici.`
-      );
-      return;
-    }
-
-    const result = await updateUserProfile(existing.id, {
+    const result = await inviteUser({
       name: newStaffName,
-      phone: newStaffPhone || existing.phone || "-",
+      email: newStaffEmail,
+      ...(newStaffPhone ? { phone: newStaffPhone } : {}),
       role: newStaffRole,
-      status: "ACTIVE",
-      assigned_advisor: newStaffDept,
     });
 
     if (!result.success) {
-      toast.error("Échec de la promotion du membre du staff (droits insuffisants ou compte protégé).");
+      toast.error(result.error || "Échec de l'invitation du membre du staff.");
       return;
     }
 
-    const newStaff: StaffAdministrator = {
-      id: existing.id,
-      name: newStaffName,
-      email: newStaffEmail,
-      phone: newStaffPhone || existing.phone || "-",
-      role: newStaffRole,
-      department: newStaffDept,
-      status: "ACTIVE",
-      twoFactorEnabled: false,
-      createdAt: existing.created_at ? existing.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
-      lastLogin: "-",
-      lastIp: "-",
-      ipWhitelist: newStaffIpWhitelist || "Toutes les adresses IP",
-      allowedHours: newStaffHours || "24/7",
-      deskSignature: newStaffSignature || `${newStaffName} — @ Nexium Markets`,
-      assignedAccountsCount: 0,
-      assignedTraders: [],
-      permissions: {
-        canChatWithClients: newStaffPermChat,
-        canSendEmails: newStaffPermEmail,
-        canTakePhoneCalls: newStaffPermPhone,
-        canApproveFinances: newStaffPermFinance,
-        canManageEngines: newStaffPermEngines,
-        canAdjustPnl: newStaffPermPnl,
-        canUseKillSwitch: newStaffPermKillSwitch,
-        canManageStaff: newStaffPermManageStaff || newStaffRole === "OWNER" || newStaffRole === "SUPER_ADMIN",
-        canViewTreasury: newStaffPermViewTreasury || newStaffRole === "OWNER" || newStaffRole === "SUPER_ADMIN" || newStaffRole === "FINANCE",
-      },
-    };
-
-    setStaffList((prev) => [newStaff, ...prev.filter((s) => s.id !== existing.id)]);
-    addAuditLog("STAFF_CREATED", `${newStaffName} (${existing.email}) promu au rôle ${newStaffRole}.`, existing.email);
-
-    // Envoi de l'e-mail officiel de nomination
-    sendCustomDeskEmail(
-      newStaff.email,
-      `Accréditation & Accès Desk Nexium Markets — Rôle ${newStaffRole}`,
-      `Bonjour ${newStaffName},\n\nVotre compte collaborateur a été activé avec succès sur le Desk Central de Nexium Markets.\n\nRôle attribué : ${newStaffRole}\nDépartement : ${newStaffDept}\n\nVous pouvez vous connecter dès à présent sur https://nexiummarkets.com/login avec votre adresse e-mail.`
-    ).catch((err) => console.warn("Resend staff invitation error:", err));
-
-    toast.success(`${newStaffName} promu au rôle ${newStaffRole} avec succès.`);
+    addAuditLog("STAFF_INVITED", `Invitation envoyée à ${newStaffName} (${newStaffEmail}) — rôle ${newStaffRole}.`, newStaffEmail);
+    toast.success(`Invitation envoyée à ${newStaffName}. Il/elle pourra définir son mot de passe via l'e-mail reçu.`);
+    refreshStaffList();
     setNewStaffName("");
     setNewStaffEmail("");
     setNewStaffPhone("");
@@ -1689,109 +1642,35 @@ function NexiumAdminDashboard({
   };
 
   // Création d'un Client
-  const handleCreateClient = (e: React.FormEvent) => {
+  // Invitation d'un client : crée son compte de connexion réel (auth.users +
+  // profiles, rôle TRADER, statut ACTIF immédiat) via le service backend dédié,
+  // et lui envoie un e-mail pour choisir son propre mot de passe. Plus aucune
+  // fabrication locale — le solde/MT5/courtier se règlent ensuite sur sa fiche.
+  const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClientName || !newClientEmail) {
       toast.error("Veuillez renseigner le nom et l'e-mail du client.");
       return;
     }
 
-    const bal = parseFloat(newClientDeposit) || 0;
-    const bon = parseFloat(newClientBonus) || 0;
-
-    const newCl: UserProfile = {
-      id: `usr-${Date.now()}`,
+    const result = await inviteUser({
       name: newClientName,
       email: newClientEmail,
-      phone: newClientPhone || "+33 6 00 00 00 00",
-      country: newClientCountry || "France 🇫🇷",
-      status: "ACTIVE",
-      createdAt: new Date().toISOString().split("T")[0],
-      lastActive: "Nouveau compte",
-      ip: "127.0.0.1",
-      twoFactorEnabled: false,
-      forcePasswordReset: true,
-      balance: bal,
-      bonusCredit: bon,
-      equity: bal + bon,
-      kycStatus: "PENDING_REVIEW",
-      kycDocuments: {
-        idCardName: "Non soumis",
-        proofOfAddressName: "Non soumis",
-        submittedDate: "-",
-      },
-      maxDailyLossPercent: 3.0,
-      maxSimultaneousTrades: 3,
-      riskGuardAutoStop: true,
-      assignedAdvisor: "Elena Rostova (Desk Support)",
-      sessions: [],
-      crmNotes: [],
-      withdrawalRequests: [],
-      depositRequests: [
-        {
-          id: `dep-${Date.now()}`,
-          date: "Aujourd'hui",
-          amount: bal,
-          method: "VIREMENT_BANCAIRE",
-          reference: `INIT-${Math.floor(100000 + Math.random() * 900000)}`,
-          status: "CREDITED",
-          creditedBy: `Admin (${currentSessionRole})`,
-          note: "Dépôt initial d'ouverture",
-        },
-      ],
-      grossProfitTotal: 0,
-      grossLossTotal: 0,
-      bestTradePnl: 0,
-      worstTradePnl: 0,
-      todayGrossGain: 0,
-      todayGrossLoss: 0,
-      todayPnl: 0,
-      totalNetPnl: 0,
-      winRatePercent: 0,
-      profitFactor: 0,
-      maxDrawdownPercent: 0,
-      tradesCount: 0,
-      winningTradesCount: 0,
-      losingTradesCount: 0,
-      highWaterMark: bal,
-      performanceFeeRate: 20,
-      pendingPerfFee: 0,
-      engines: {
-        aiGold: { active: true, preset: "Conservateur (0.25% risque / SL 1.2 ATR)", maxLot: 0.2, minScore: 82, riskCapPercent: 1.0 },
-        fxTrend: { active: false, preset: "Triple EMA Momentum Standard (0.30% risque)", maxLot: 0.5, minScore: 75, riskCapPercent: 1.0 },
-        indexReversion: { active: false, preset: "Mean Reversion 15M (US30 / NAS100)", maxLot: 0.25, minScore: 82, riskCapPercent: 1.0 },
-      },
-      mt5: {
-        login: newClientMt5Login || `${Math.floor(100000 + Math.random() * 900000)}`,
-        broker: newClientBroker || "Pepperstone ECN",
-        server: newClientServer || "Pepperstone-Edge02",
-        pingMs: 16,
-        status: "ONLINE",
-      },
-      licenseKey: `NX-PRO-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-INIT`,
-      licenseExpires: "2026-12-31",
-      transactions: [
-        { id: `tx-init-${Date.now()}`, date: new Date().toISOString().split("T")[0], type: "DEPOSIT", amount: bal, status: "COMPLETED", method: "Dépôt initial" },
-      ],
-      trades: [],
-      notes: ["Compte client créé."],
-    };
+      ...(newClientPhone ? { phone: newClientPhone } : {}),
+      role: "TRADER",
+    });
 
-    setClients((prev) => [newCl, ...prev]);
-    addAuditLog("CLIENT_CREATED", `Nouveau client créé : ${newClientName}.`, newClientName);
-    
-    // Envoi de l'e-mail de bienvenue via Resend
-    sendWelcomeEmail(newCl.email, newCl.name, newCl.mt5.login)
-      .then((res) => {
-        if (res.success) {
-          toast.success(`E-mail officiel de bienvenue expédié à ${newCl.email} via Resend.`);
-        }
-      })
-      .catch((err) => console.warn("Resend welcome email warning:", err));
+    if (!result.success) {
+      toast.error(result.error || "Échec de l'invitation du client.");
+      return;
+    }
 
-    toast.success(`Client ${newClientName} créé avec succès.`);
+    addAuditLog("CLIENT_INVITED", `Invitation envoyée à ${newClientName} (${newClientEmail}).`, newClientEmail);
+    toast.success(`Invitation envoyée à ${newClientName}. Il/elle pourra définir son mot de passe via l'e-mail reçu et sera connecté immédiatement.`);
+    refreshClients();
     setNewClientName("");
     setNewClientEmail("");
+    setNewClientPhone("");
     setActiveSection("users");
   };
 
@@ -3080,8 +2959,8 @@ function NexiumAdminDashboard({
                   <ArrowLeft className="size-5" />
                 </button>
                 <div>
-                  <h1 className="text-2xl font-bold text-white tracking-tight">Créer un Nouveau Compte Client</h1>
-                  <p className="text-sm text-slate-400 mt-1">Création de fiche, attribution MT5 et dépôt initial.</p>
+                  <h1 className="text-2xl font-bold text-white tracking-tight">Inviter un Nouveau Client</h1>
+                  <p className="text-sm text-slate-400 mt-1">Un e-mail lui est envoyé pour choisir son mot de passe et se connecter immédiatement.</p>
                 </div>
               </div>
 
@@ -3110,68 +2989,14 @@ function NexiumAdminDashboard({
                   </div>
                 </div>
 
-                <div className="grid gap-6 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">TÉLÉPHONE</label>
-                    <input
-                      type="text"
-                      value={newClientPhone}
-                      onChange={(e) => setNewClientPhone(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500/80"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">DÉPÔT INITIAL ($ USD)</label>
-                    <input
-                      type="number"
-                      value={newClientDeposit}
-                      onChange={(e) => setNewClientDeposit(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-white outline-none font-mono font-bold focus:border-emerald-500/80"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">BONUS COMMERCIAL ($ USD)</label>
-                    <input
-                      type="number"
-                      value={newClientBonus}
-                      onChange={(e) => setNewClientBonus(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-amber-300 outline-none font-mono font-bold focus:border-amber-400/80"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-6 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">LOGIN MT5</label>
-                    <input
-                      type="text"
-                      value={newClientMt5Login}
-                      onChange={(e) => setNewClientMt5Login(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-white outline-none font-mono focus:border-emerald-500/80"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">BROKER</label>
-                    <input
-                      type="text"
-                      value={newClientBroker}
-                      onChange={(e) => setNewClientBroker(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500/80"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">SERVEUR BROKER</label>
-                    <input
-                      type="text"
-                      value={newClientServer}
-                      onChange={(e) => setNewClientServer(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500/80"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">TÉLÉPHONE</label>
+                  <input
+                    type="text"
+                    value={newClientPhone}
+                    onChange={(e) => setNewClientPhone(e.target.value)}
+                    className="w-full sm:w-1/2 rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500/80"
+                  />
                 </div>
 
                 <div className="pt-2">
@@ -3179,7 +3004,7 @@ function NexiumAdminDashboard({
                     type="submit"
                     className="admin-btn-primary"
                   >
-                    Valider la Création du Client
+                    Envoyer l'Invitation
                   </button>
                 </div>
               </form>
@@ -4177,12 +4002,16 @@ function NexiumAdminDashboard({
                     <div className="flex items-center justify-between border-b border-slate-700/50 pb-4">
                       <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
                         <UserPlus className="size-5 text-emerald-400" />
-                        Créer un Nouvel Administrateur / Conseiller / Cadre
+                        Inviter un Nouveau Membre du Staff
                       </h2>
                       <span className="text-xs font-mono font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-lg">
                         Attribution Sécurisée
                       </span>
                     </div>
+
+                    <p className="text-xs sm:text-sm text-slate-400">
+                      Un e-mail lui est envoyé immédiatement pour choisir son mot de passe — il/elle est actif dès qu'il l'a fait.
+                    </p>
 
                     <form onSubmit={handleCreateStaffMember} className="space-y-5">
                       <div className="grid gap-5 sm:grid-cols-3">
@@ -4219,129 +4048,20 @@ function NexiumAdminDashboard({
                         </div>
                       </div>
 
-                      <div className="grid gap-5 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">RÔLE SYSTÈME &amp; RANG HIÉRARCHIQUE</label>
-                          <AdminDropdown
-                            value={newStaffRole}
-                            onChange={(r) => {
-                              setNewStaffRole(r);
-                              if (r === "OWNER" || r === "SUPER_ADMIN") {
-                                setNewStaffDept("Direction Générale");
-                                setNewStaffPermFinance(true);
-                                setNewStaffPermEngines(true);
-                                setNewStaffPermPnl(true);
-                                setNewStaffPermKillSwitch(true);
-                                setNewStaffPermManageStaff(true);
-                                setNewStaffPermViewTreasury(true);
-                              } else if (r === "CONSEILLER") {
-                                setNewStaffDept("Desk Support & Conseillers");
-                                setNewStaffPermEngines(true);
-                                setNewStaffPermFinance(false);
-                                setNewStaffPermPnl(false);
-                              } else if (r === "FINANCE") {
-                                setNewStaffDept("Gestion Financière");
-                                setNewStaffPermFinance(true);
-                                setNewStaffPermViewTreasury(true);
-                              } else if (r === "QUANT") {
-                                setNewStaffDept("Recherche Quantitative");
-                                setNewStaffPermEngines(true);
-                                setNewStaffPermPnl(true);
-                              } else if (r === "SUPPORT") {
-                                setNewStaffDept("Desk Support & Conseillers");
-                              }
-                            }}
-                            options={STAFF_ROLE_OPTIONS}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">DÉPARTEMENT / PÔLE OPÉRATIONNEL</label>
-                          <AdminDropdown
-                            value={newStaffDept}
-                            onChange={(d) => setNewStaffDept(d as any)}
-                            options={STAFF_DEPT_OPTIONS}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid gap-5 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">RESTRICTIONS IP (WHITELIST)</label>
-                          <input
-                            type="text"
-                            value={newStaffIpWhitelist}
-                            onChange={(e) => setNewStaffIpWhitelist(e.target.value)}
-                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none font-mono focus:border-indigo-400"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">SIGNATURE DESK OFFICIELLE</label>
-                          <input
-                            type="text"
-                            value={newStaffSignature}
-                            onChange={(e) => setNewStaffSignature(e.target.value)}
-                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="p-5 rounded-xl bg-[#0c121e] border border-slate-700/40 space-y-3.5">
-                        <span className="text-xs sm:text-sm font-bold text-slate-300 uppercase font-mono block">MATRICE DES PERMISSIONS &amp; POUVOIRS :</span>
-                        <div className="grid gap-3.5 sm:grid-cols-3">
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermChat} onChange={(e) => setNewStaffPermChat(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Chat &amp; Support Direct</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermEmail} onChange={(e) => setNewStaffPermEmail(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Envoi d'E-mails Desk</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermPhone} onChange={(e) => setNewStaffPermPhone(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Appels Téléphoniques VoIP</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermFinance} onChange={(e) => setNewStaffPermFinance(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Validation Retraits &amp; Dépôts</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermEngines} onChange={(e) => setNewStaffPermEngines(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Paramétrage des Moteurs MT5</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermPnl} onChange={(e) => setNewStaffPermPnl(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Ajustement Financier de P&amp;L</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermManageStaff} onChange={(e) => setNewStaffPermManageStaff(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Gouvernance &amp; Gestion Staff</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-200 cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermViewTreasury} onChange={(e) => setNewStaffPermViewTreasury(e.target.checked)} className="size-4 rounded accent-indigo-500" />
-                            <span>Accès Trésorerie &amp; Bilan</span>
-                          </label>
-
-                          <label className="flex items-center gap-2.5 text-xs sm:text-sm text-rose-400 font-bold cursor-pointer">
-                            <input type="checkbox" checked={newStaffPermKillSwitch} onChange={(e) => setNewStaffPermKillSwitch(e.target.checked)} className="size-4 rounded accent-rose-500" />
-                            <span>Kill Switch d'Urgence Total</span>
-                          </label>
-                        </div>
+                      <div>
+                        <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">NIVEAU D'ACCÈS</label>
+                        <AdminDropdown
+                          value={newStaffRole}
+                          onChange={(r) => setNewStaffRole(r)}
+                          options={STAFF_ROLE_OPTIONS}
+                        />
                       </div>
 
                       <button
                         type="submit"
                         className="admin-btn-primary py-3 text-sm font-bold"
                       >
-                        Créer le Membre du Staff &amp; Activer les Accès
+                        Envoyer l'Invitation
                       </button>
                     </form>
                   </section>
