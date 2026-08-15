@@ -5,8 +5,42 @@ import { emailAgents, emailAttachments, emailConversations, emailMessages, email
 import type { ConversationStatus } from "../db/schema.js";
 import { canActOnConversation, canReassignFreely, canTransfer } from "../lib/permissions.js";
 import { assignConversation } from "../lib/assignment.js";
+import { sendNew, SendReplyError } from "../lib/smtp.js";
+import { sanitizeEmailHtml, stripHtmlToText } from "../lib/sanitize.js";
 
 export const conversationsRouter = Router();
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Compose un nouvel e-mail depuis zéro (pas une réponse à un fil existant).
+conversationsRouter.post("/conversations", async (req, res) => {
+  const agent = req.agent!;
+  const to = String(req.body?.to ?? "").trim();
+  const subject = String(req.body?.subject ?? "").trim();
+  const text = String(req.body?.text ?? "").trim();
+
+  if (!to || !EMAIL_RE.test(to)) return res.status(400).json({ error: "invalid_recipient" });
+  if (!subject) return res.status(400).json({ error: "missing_subject" });
+  if (!text) return res.status(400).json({ error: "empty_body" });
+
+  const bodyHtml = sanitizeEmailHtml(`<p>${text.replace(/\n/g, "<br/>")}</p>`);
+
+  try {
+    const result = await sendNew({
+      to,
+      subject,
+      bodyText: stripHtmlToText(bodyHtml),
+      bodyHtml,
+      sentByUserId: agent.id,
+    });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    if (err instanceof SendReplyError) {
+      return res.status(502).json({ error: "send_failed", message: err.message });
+    }
+    throw err;
+  }
+});
 
 const FILTER_TO_STATUS: Record<string, ConversationStatus | undefined> = {
   unassigned: "NON_ASSIGNE",

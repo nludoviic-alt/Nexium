@@ -132,6 +132,13 @@ export const emailApi = {
     return request<{ items: EmailConversationListItem[] }>(`/api/conversations?${params}`, userId);
   },
 
+  createConversation(userId: string, to: string, subject: string, text: string) {
+    return request<{ ok: true; conversationId: string }>("/api/conversations", userId, {
+      method: "POST",
+      body: JSON.stringify({ to, subject, text }),
+    });
+  },
+
   getCounts(userId: string) {
     return request<{ inbox: number; mine: number; unassigned: number; inProgress: number; waiting: number; resolved: number }>(
       "/api/conversations/counts",

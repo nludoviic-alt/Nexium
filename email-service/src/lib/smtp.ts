@@ -124,3 +124,76 @@ export async function sendReply(params: {
 
   return { messageId: messageRowId, providerMessageId, sendStatus };
 }
+
+// Compose un nouvel e-mail depuis zéro (pas une réponse à un fil existant) : crée la
+// conversation puis envoie le premier message OUTBOUND, sans en-têtes de threading.
+export async function sendNew(params: {
+  to: string;
+  subject: string;
+  bodyText: string;
+  bodyHtml: string;
+  sentByUserId: string;
+}) {
+  const [account] = await db.select().from(emailAccounts).where(eq(emailAccounts.active, true)).limit(1);
+  if (!account) throw new SendReplyError("Aucun compte e-mail actif configuré.");
+
+  const conversationId = randomUUID();
+  const messageRowId = randomUUID();
+  let providerMessageId = `<pending-${messageRowId}@nexiummarkets.local>`;
+  let sendStatus: "SENT" | "FAILED" = "SENT";
+
+  await db.insert(emailConversations).values({
+    id: conversationId,
+    accountId: account.id,
+    subject: params.subject,
+    customerEmail: params.to,
+    customerName: null,
+    assignedUserId: params.sentByUserId,
+    status: "EN_COURS",
+  });
+
+  try {
+    const info = await getTransporter().sendMail({
+      from: `"${account.displayName}" <${account.emailAddress}>`,
+      to: params.to,
+      subject: params.subject,
+      text: params.bodyText,
+      html: params.bodyHtml,
+    });
+    providerMessageId = info.messageId ?? providerMessageId;
+  } catch (err) {
+    sendStatus = "FAILED";
+    await db.insert(emailMessages).values({
+      id: messageRowId,
+      conversationId,
+      messageId: providerMessageId,
+      direction: "OUTBOUND",
+      fromEmail: account.emailAddress,
+      fromName: account.displayName,
+      toEmail: params.to,
+      subject: params.subject,
+      bodyHtml: params.bodyHtml,
+      bodyText: params.bodyText,
+      sentByUserId: params.sentByUserId,
+      sendStatus,
+    });
+    throw new SendReplyError(`Échec de l'envoi SMTP : ${(err as Error).message}`);
+  }
+
+  await db.insert(emailMessages).values({
+    id: messageRowId,
+    conversationId,
+    messageId: providerMessageId,
+    direction: "OUTBOUND",
+    fromEmail: account.emailAddress,
+    fromName: account.displayName,
+    toEmail: params.to,
+    subject: params.subject,
+    bodyHtml: params.bodyHtml,
+    bodyText: params.bodyText,
+    sentByUserId: params.sentByUserId,
+    sendStatus,
+  });
+
+  return { conversationId, messageId: messageRowId, providerMessageId, sendStatus };
+}

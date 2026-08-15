@@ -720,6 +720,11 @@ function NexiumAdminDashboard({
   const [emailUploadingAttachment, setEmailUploadingAttachment] = useState(false);
   const [emailMobileView, setEmailMobileView] = useState<"list" | "conversation">("list");
   const [emailApiError, setEmailApiError] = useState<string | null>(null);
+  const [showComposeEmailModal, setShowComposeEmailModal] = useState(false);
+  const [composeEmailTo, setComposeEmailTo] = useState("");
+  const [composeEmailSubject, setComposeEmailSubject] = useState("");
+  const [composeEmailText, setComposeEmailText] = useState("");
+  const [composeEmailSending, setComposeEmailSending] = useState(false);
 
   // Modale de Confirmation
   const [confirmModal, setConfirmModal] = useState<ConfirmationModalState>({
@@ -2450,6 +2455,39 @@ function NexiumAdminDashboard({
       toast.error(err instanceof EmailApiError ? `Échec de l'envoi : ${err.message}` : "Échec de l'envoi de l'e-mail.");
     } finally {
       setEmailSending(false);
+    }
+  };
+
+  const handleComposeNewEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!composeEmailTo.trim() || !composeEmailSubject.trim() || !composeEmailText.trim()) {
+      toast.error("Destinataire, sujet et message sont requis.");
+      return;
+    }
+    if (!emailConfigured) {
+      toast.error("Service e-mail non configuré.");
+      return;
+    }
+    setComposeEmailSending(true);
+    try {
+      await emailApi.createConversation(
+        currentEmailAgentId,
+        composeEmailTo.trim(),
+        composeEmailSubject.trim(),
+        composeEmailText.trim()
+      );
+      addAuditLog("EMAIL_COMPOSED", `Nouvel e-mail envoyé à ${composeEmailTo.trim()} : ${composeEmailSubject.trim()}.`);
+      toast.success(`E-mail envoyé à ${composeEmailTo.trim()}.`);
+      setShowComposeEmailModal(false);
+      setComposeEmailTo("");
+      setComposeEmailSubject("");
+      setComposeEmailText("");
+      refreshEmailList();
+      refreshEmailCounts();
+    } catch (err) {
+      toast.error(err instanceof EmailApiError ? `Échec de l'envoi : ${err.message}` : "Échec de l'envoi de l'e-mail.");
+    } finally {
+      setComposeEmailSending(false);
     }
   };
 
@@ -5250,6 +5288,14 @@ function NexiumAdminDashboard({
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowComposeEmailModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-sm cursor-pointer"
+                  >
+                    <PenLine className="size-4" />
+                    <span>Nouveau Message</span>
+                  </button>
                   <Link
                     to="/email-preview"
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold text-xs transition shadow-sm"
@@ -5259,6 +5305,83 @@ function NexiumAdminDashboard({
                   </Link>
                 </div>
               </div>
+
+              {showComposeEmailModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowComposeEmailModal(false)}>
+                  <form
+                    onSubmit={handleComposeNewEmail}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full max-w-lg rounded-2xl border border-slate-700/60 bg-[#0f172a] p-6 space-y-5 shadow-2xl"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-700/50 pb-4">
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2.5">
+                        <PenLine className="size-5 text-emerald-400" />
+                        Nouveau Message
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => setShowComposeEmailModal(false)}
+                        className="text-slate-400 hover:text-white transition cursor-pointer"
+                        aria-label="Fermer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">DESTINATAIRE *</label>
+                      <input
+                        type="email"
+                        required
+                        value={composeEmailTo}
+                        onChange={(e) => setComposeEmailTo(e.target.value)}
+                        placeholder="nom@exemple.com"
+                        className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500/80"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">SUJET *</label>
+                      <input
+                        type="text"
+                        required
+                        value={composeEmailSubject}
+                        onChange={(e) => setComposeEmailSubject(e.target.value)}
+                        className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500/80"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">MESSAGE *</label>
+                      <textarea
+                        required
+                        rows={6}
+                        value={composeEmailText}
+                        onChange={(e) => setComposeEmailText(e.target.value)}
+                        className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm text-white outline-none focus:border-emerald-500/80 resize-none"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowComposeEmailModal(false)}
+                        className="px-4 py-2 rounded-xl border border-slate-700/60 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={composeEmailSending}
+                        className="admin-btn-primary text-xs py-2.5 px-5 disabled:opacity-60"
+                      >
+                        {composeEmailSending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                        <span>{composeEmailSending ? "Envoi…" : "Envoyer"}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
 
               {/* Onglets de filtrage des e-mails */}
               <div className="flex items-center gap-1 rounded-xl border border-slate-700/60 bg-[#121a2d] p-1 overflow-x-auto shrink-0 w-fit max-w-full">
