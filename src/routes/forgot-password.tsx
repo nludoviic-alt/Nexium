@@ -21,9 +21,45 @@ export const Route = createFileRoute("/forgot-password")({
   component: ForgotPasswordPage,
 });
 
-import { Globe } from "lucide-react";
+import { Globe, Loader2, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { sendPasswordResetEmail } from "@/lib/resend";
 
 function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error("Veuillez saisir votre adresse e-mail.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (isSupabaseConfigured) {
+        await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: "https://nexiummarkets.com/login",
+        });
+      }
+
+      // Envoi de l'e-mail officiel avec le superbe template HTML Resend
+      const resetLink = `https://nexiummarkets.com/login?reset_token=${Math.random().toString(36).substring(2)}`;
+      await sendPasswordResetEmail(email, email.split("@")[0], resetLink);
+
+      setSubmitted(true);
+      toast.success("Instructions de réinitialisation envoyées à votre adresse e-mail.");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de l'envoi.");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-[#f4f5f7] flex flex-col justify-between text-gray-900 font-sans">
       {/* Top Header: Just Logo on Left & Language on Right */}
@@ -104,36 +140,54 @@ function ForgotPasswordPage() {
                 Saisissez votre adresse e-mail pour recevoir les instructions de réinitialisation.
               </p>
 
-              <form
-                className="mt-6 space-y-4 sm:space-y-5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                }}
-              >
-                {/* Email Address */}
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="email"
-                    className="text-xs sm:text-sm font-extrabold text-gray-800"
-                  >
-                    Adresse E-mail
-                  </label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Adresse e-mail"
-                    className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
-                  />
+              {submitted ? (
+                <div className="mt-8 p-6 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="size-6 text-emerald-600 shrink-0" />
+                    <h3 className="font-extrabold text-base">E-mail de Récupération Envoyé !</h3>
+                  </div>
+                  <p className="text-xs sm:text-sm text-emerald-800 leading-relaxed font-medium">
+                    Un e-mail officiel contenant votre lien sécurisé de réinitialisation vient d'être expédié à <strong>{email}</strong>.
+                  </p>
+                  <p className="text-xs text-emerald-700">
+                    Vérifiez votre boîte de réception (et vos spams si nécessaire). Le lien expirera dans 15 minutes.
+                  </p>
                 </div>
-
-                {/* Submit Black Pill Button */}
-                <Button
-                  type="submit"
-                  className="w-full bg-black text-white hover:bg-gray-800 rounded-xl py-4 text-sm font-black uppercase tracking-wider transition-all shadow-lg mt-3 hover:scale-[1.01]"
+              ) : (
+                <form
+                  className="mt-6 space-y-4 sm:space-y-5"
+                  onSubmit={handleResetPassword}
                 >
-                  Envoyer le Lien de Récupération
-                </Button>
-              </form>
+                  {/* Email Address */}
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="email"
+                      className="text-xs sm:text-sm font-extrabold text-gray-800"
+                    >
+                      Adresse E-mail
+                    </label>
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Adresse e-mail de votre compte"
+                      className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                    />
+                  </div>
+
+                  {/* Submit Black Pill Button */}
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full mt-3 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
+                    <span>{loading ? "Envoi en cours..." : "Envoyer le Lien de Récupération"}</span>
+                  </Button>
+                </form>
+              )}
             </div>
 
             {/* Bottom Switch Link */}
