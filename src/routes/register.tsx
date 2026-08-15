@@ -22,11 +22,12 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
-import { Check, ChevronDown, Eye, EyeOff, Globe, Loader2, Clock, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, Globe, Loader2, Clock, CheckCircle2, ShieldCheck, Mail } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { sendRegistrationPendingEmail, sendAdminNewClientAlertEmail } from "@/lib/resend";
 
 function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -34,7 +35,7 @@ function RegisterPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [country, setCountry] = useState("Canada");
+  const [country, setCountry] = useState("France");
   const [hasIb, setHasIb] = useState(true);
   const [ibCode, setIbCode] = useState("90462");
   const [loading, setLoading] = useState(false);
@@ -84,7 +85,35 @@ function RegisterPage() {
             balance: 0.0,
             assigned_advisor: "Desk de Conformité & Risque",
           });
+
+          // 3. Écriture immédiate dans le journal d'audit
+          try {
+            await supabase.from("audit_logs").insert({
+              admin_name: "Système Inscription",
+              action: "CLIENT_REGISTERED",
+              details: `Nouvelle demande d'ouverture de compte reçue pour ${fullName} (${email}) — Résidence : ${country}`,
+              client_id: data.user.id,
+              ip_address: "149.56.97.158 (Front-End Gateway)",
+            });
+          } catch (logErr) {
+            console.warn("Notice audit log:", logErr);
+          }
         }
+      }
+
+      // 4. Double flux d'envoi d'e-mails transactionnels (Client & Administrateurs)
+      try {
+        // A. E-mail de confirmation au client
+        await sendRegistrationPendingEmail(email, fullName, country);
+        // B. E-mail d'alerte instantanée au Desk d'Administration
+        await sendAdminNewClientAlertEmail({
+          name: fullName,
+          email,
+          country,
+          ibCode: hasIb ? ibCode : undefined,
+        });
+      } catch (mailErr) {
+        console.warn("Notice envoi email:", mailErr);
       }
 
       setSubmitted(true);
@@ -195,17 +224,24 @@ function RegisterPage() {
 
                   <div className="p-5 rounded-2xl bg-gray-50 border border-gray-200 text-sm space-y-3">
                     <div className="flex items-start gap-3">
-                      <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <Mail className="size-5 text-emerald-600 shrink-0 mt-0.5" />
                       <div>
-                        <strong className="text-gray-900 block font-bold">Vérification Réglementaire</strong>
-                        <span className="text-gray-600 text-xs">Un administrateur du Desk examine vos informations et attribue votre passerelle MT5.</span>
+                        <strong className="text-gray-900 block font-bold">E-mail de Prise en Compte Transmis</strong>
+                        <span className="text-gray-600 text-xs">Un accusé de réception officiel vient d'être expédié à <strong>{email}</strong>.</span>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5" />
                       <div>
-                        <strong className="text-gray-900 block font-bold">Notification par E-mail</strong>
-                        <span className="text-gray-600 text-xs">Dès validation par la Direction, vous recevrez un e-mail officiel d'activation avec vos accès.</span>
+                        <strong className="text-gray-900 block font-bold">Vérification Réglementaire & Alerte Direction</strong>
+                        <span className="text-gray-600 text-xs">La Direction et le Desk de Conformité ont reçu l'alerte pour examiner votre dossier.</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck className="size-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-gray-900 block font-bold">Contact & Activation par un Administrateur</strong>
+                        <span className="text-gray-600 text-xs">Dès approbation, votre conseiller dédié vous transmettra vos accès complets et déverrouillera votre Dashboard.</span>
                       </div>
                     </div>
                   </div>

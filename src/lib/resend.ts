@@ -157,6 +157,135 @@ async function sendViaResendHttp(to: string, subject: string, html: string): Pro
    ========================================================================== */
 
 /**
+ * 0. E-MAIL DE CONFIRMATION D'INSCRIPTION (EN ATTENTE DE VALIDATION CONFORMITÉ)
+ * Envoyé au client immédiatement après création de son compte.
+ */
+export async function sendRegistrationPendingEmail(
+  to: string,
+  clientName: string,
+  country?: string
+): Promise<SendEmailResult> {
+  const subject = "⏳ Prise en compte de votre demande d'ouverture de compte — Nexium Markets";
+  const preheader = "Votre dossier d'ouverture de compte a été transmis à notre Desk de Conformité & Risque.";
+
+  const html = getEmailWrapper(
+    subject,
+    preheader,
+    `
+      <h2 class="h1-title">Bonjour ${clientName},</h2>
+      <p>Nous vous confirmons la bonne réception de votre demande d'ouverture de compte chez <strong>Nexium Markets</strong>.</p>
+      
+      <p>Conformément aux normes réglementaires et de sécurité institutionnelle, votre dossier est actuellement en cours d'examen par notre <strong>Desk de Conformité & Supervision des Risques</strong>.</p>
+
+      <div class="card-box">
+        <div class="card-label">📋 État d'avancement de votre dossier</div>
+        <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 14px; margin-top: 8px;">
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Titulaire :</td>
+            <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold; text-align: right;">${clientName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Pays de résidence :</td>
+            <td style="padding: 6px 0; color: #FFFFFF; text-align: right;">${country || "Non précisé"}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Statut :</td>
+            <td style="padding: 6px 0; color: #F59E0B; font-weight: bold; text-align: right;">⏳ EN ATTENTE DE VALIDATION</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Passerelle Allouée :</td>
+            <td style="padding: 6px 0; color: #00E599; font-weight: bold; text-align: right;">Equinix NY4 FIX 4.4</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid #F59E0B; padding: 14px 18px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 13px; color: #FDE68A; line-height: 1.6;">
+          <strong>Prochaines étapes :</strong> Un administrateur ou conseiller dédié va examiner vos informations et activer votre accès. Dès validation, vous recevrez un e-mail officiel d'activation avec vos identifiants MT5 pour déverrouiller votre Dashboard de trading.
+        </p>
+      </div>
+
+      <p style="margin-top: 20px; font-size: 14px; color: #94A3B8;">Pour toute question relative à votre dossier, notre équipe d'assistance prioritaire reste joignable à <a href="mailto:support@nexiummarkets.com" style="color: #00E599; text-decoration: underline;">support@nexiummarkets.com</a>.</p>
+    `
+  );
+
+  return sendResendEmail({
+    to,
+    subject,
+    html,
+  });
+}
+
+/**
+ * 0.1 ALERTE DE DIFFUSION ADMINISTRATEURS (NOUVEAU CLIENT CRÉÉ)
+ * Diffusé immédiatement au Desk Administrateur / Direction lors d'une nouvelle inscription.
+ */
+export async function sendAdminNewClientAlertEmail(clientData: {
+  name: string;
+  email: string;
+  country?: string;
+  phone?: string;
+  ibCode?: string;
+}): Promise<SendEmailResult> {
+  const subject = `🚨 [NOUVEAU CLIENT] Inscription en attente d'approbation — ${clientData.name}`;
+  const preheader = `Un nouvel investisseur vient de créer son compte : ${clientData.name} (${clientData.email}).`;
+
+  const html = getEmailWrapper(
+    subject,
+    preheader,
+    `
+      <div style="display: inline-block; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 9999px; padding: 4px 14px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #F87171; text-transform: uppercase; margin-bottom: 12px;">
+        NOTIFICATION DIRECTION & CONFORMITÉ
+      </div>
+      <h2 class="h1-title" style="color: #FFFFFF;">Nouveau Client en Attente d'Approbation</h2>
+      <p>Un nouvel utilisateur vient de compléter son formulaire d'inscription sur la plateforme <strong>Nexium Markets</strong> et requiert une validation par l'administration.</p>
+
+      <div class="card-box" style="border-color: rgba(245, 158, 11, 0.4);">
+        <div class="card-label" style="color: #F59E0B;">👤 Fiche d'Inscription Client</div>
+        <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 14px; margin-top: 8px;">
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Nom & Prénom :</td>
+            <td style="padding: 6px 0; color: #FFFFFF; font-weight: bold; text-align: right;">${clientData.name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Adresse E-mail :</td>
+            <td style="padding: 6px 0; color: #00E599; font-weight: bold; text-align: right;">${clientData.email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Pays de Résidence :</td>
+            <td style="padding: 6px 0; color: #FFFFFF; text-align: right;">${clientData.country || "Non renseigné"}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Téléphone :</td>
+            <td style="padding: 6px 0; color: #FFFFFF; text-align: right;">${clientData.phone || "Non renseigné"}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Code IB / Parrain :</td>
+            <td style="padding: 6px 0; color: #E2E8F0; text-align: right;">${clientData.ibCode || "Aucun"}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #94A3B8;">Statut Actuel :</td>
+            <td style="padding: 6px 0; color: #F59E0B; font-weight: bold; text-align: right;">PENDING_APPROVAL</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="text-align: center; margin: 28px 0 16px;">
+        <a href="https://nexiummarkets.com/admin" class="btn-primary" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
+          👑 Ouvrir la Console Admin pour Valider le Compte ➔
+        </a>
+      </div>
+    `
+  );
+
+  return sendResendEmail({
+    to: "support@nexiummarkets.com",
+    subject,
+    html,
+  });
+}
+
+/**
  * 1. E-MAIL DE BIENVENUE & ACCRÉDITATION INVESTISSEUR
  */
 export async function sendWelcomeEmail(to: string, clientName: string, mt5Login?: string): Promise<SendEmailResult> {
