@@ -103,6 +103,9 @@ import {
   isSupabaseConfigured,
   getUserProfile,
   requestPresetActivation,
+  getClientChatMessages,
+  sendChatMessage,
+  subscribeToDirectMessages,
 } from "@/lib/supabase";
 
 export const Route = createFileRoute("/NEXIUM")({
@@ -5303,6 +5306,28 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
     });
   }, [customSlug]);
 
+  // Synchronisation temps réel de la messagerie directe avec le Desk Nexium
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+
+    const loadMessages = async () => {
+      const rows = await getClientChatMessages(currentUserId);
+      setMessages(
+        rows.map((m): ChatMessage => ({
+          id: m.id || `msg-${m.created_at}`,
+          sender: m.sender === "ADMIN" ? "desk" : "user",
+          senderName: m.author_name,
+          text: m.text,
+          time: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR").slice(0, 5) : "",
+        }))
+      );
+    };
+
+    loadMessages();
+    const unsub = subscribeToDirectMessages(loadMessages, currentUserId);
+    return unsub;
+  }, [currentUserId]);
+
   const handleConfirmPresetRequest = async (presetId: string) => {
     setSubmittingPreset(true);
     try {
@@ -5325,7 +5350,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const [positions, setPositions] = useState<PositionItem[]>(INITIAL_POSITIONS);
   const [transactions, setTransactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
   const [journal, setJournal] = useState<JournalEntry[]>(INITIAL_JOURNAL);
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Modals & Detail Views
   const [selectedDetailBot, setSelectedDetailBot] = useState<EngineBot | null>(null);
@@ -5517,35 +5542,30 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
     toast.success(`Retrait de $${val.toFixed(2)} ordonné.`);
   };
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     const now = new Date().toLocaleTimeString().slice(0, 5);
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       sender: "user",
-      senderName: "Ludovic M.",
+      senderName: clientName,
       text,
       time: now,
     };
     setMessages((prev) => [...prev, userMsg]);
 
-    setTimeout(() => {
-      let replyText = "Votre demande est bien reçue par l'équipe technique MT5.";
-      if (text.toLowerCase().includes("or") || text.toLowerCase().includes("gold")) {
-        replyText = "Nexium AI Gold tourne actuellement sur XAUUSD avec 1 position BUY en cours et un score de signal de 84/100.";
-      } else if (text.toLowerCase().includes("forex") || text.toLowerCase().includes("trend")) {
-        replyText = "Nexium FX Trend surveille EURUSD, GBPUSD et USDJPY avec 2 positions ouvertes.";
-      } else if (text.toLowerCase().includes("indice") || text.toLowerCase().includes("reversion")) {
-        replyText = "Nexium Index Reversion est en veille active de setup sur NAS100 et US30.";
+    if (isSupabaseConfigured && currentUserId) {
+      const result = await sendChatMessage({
+        client_id: currentUserId,
+        sender: "CLIENT",
+        author_name: clientName,
+        channel: "CHAT",
+        text,
+        is_read: false,
+      });
+      if (!result.success) {
+        toast.error("Échec de l'envoi du message. Réessayez.");
       }
-      const deskMsg: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        sender: "desk",
-        senderName: "Nexium Desk Institutionnel",
-        text: replyText,
-        time: new Date().toLocaleTimeString().slice(0, 5),
-      };
-      setMessages((prev) => [...prev, deskMsg]);
-    }, 1000);
+    }
   };
 
   // ----------------------------------------------------

@@ -485,9 +485,9 @@ export async function addCrmNote(userId: string, authorName: string, text: strin
 export interface SupabaseChatMessage {
   id?: string;
   client_id: string;
-  sender_type: "CLIENT" | "DESK" | "AI" | "SYSTEM";
-  sender_name: string;
-  message_text: string;
+  sender: "CLIENT" | "ADMIN" | "VISITOR" | "SYSTEM";
+  author_name: string;
+  text: string;
   is_read: boolean;
   channel: "CHAT" | "EMAIL";
   created_at?: string;
@@ -557,5 +557,51 @@ export async function sendChatMessage(msg: Omit<SupabaseChatMessage, "id" | "cre
     return { success: false, error };
   }
   return { success: true, data };
+}
+
+/**
+ * Récupère tous les messages directs (channel CHAT, hors fils visiteurs web
+ * qui n'ont pas de client_id) — utilisé côté admin pour la liste globale.
+ */
+export async function getAllDirectClientMessages(): Promise<SupabaseChatMessage[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select("*")
+    .eq("channel", "CHAT")
+    .not("client_id", "is", null)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Erreur chargement messages clients Supabase:", error);
+    return [];
+  }
+  return data as SupabaseChatMessage[];
+}
+
+/**
+ * Abonnement temps réel aux messages directs d'un client précis (ou de tous
+ * les clients si clientId est omis, pour la vue admin globale).
+ */
+export function subscribeToDirectMessages(callback: () => void, clientId?: string): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel(clientId ? `public:chat_messages:client:${clientId}` : "public:chat_messages:all")
+      .on(
+        "postgres_changes",
+        clientId
+          ? { event: "INSERT", schema: "public", table: "chat_messages", filter: `client_id=eq.${clientId}` }
+          : { event: "INSERT", schema: "public", table: "chat_messages" },
+        callback
+      )
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime messages Supabase:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
 }
 

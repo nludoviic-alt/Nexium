@@ -154,6 +154,9 @@ import {
   killUserSessions,
   getCrmNotes,
   addCrmNote,
+  getAllDirectClientMessages,
+  sendChatMessage,
+  subscribeToDirectMessages,
 } from "@/lib/supabase";
 
 export const Route = createFileRoute("/composition")({
@@ -864,6 +867,30 @@ function NexiumAdminDashboard({
     return unsub;
   }, []);
 
+  // Synchronisation temps réel de la messagerie directe Admin ↔ Client
+  const refreshDirectMessages = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    const rows = await getAllDirectClientMessages();
+    setMessagesList(
+      rows.map((m): ChatMessage => ({
+        id: m.id || `msg-${m.created_at}`,
+        clientId: m.client_id,
+        sender: m.sender === "ADMIN" ? "ADMIN" : "CLIENT",
+        authorName: m.author_name,
+        channel: "CHAT",
+        text: m.text,
+        timestamp: m.created_at ? new Date(m.created_at).toLocaleTimeString("fr-FR").slice(0, 5) : "",
+        isRead: m.is_read,
+      }))
+    );
+  }, []);
+
+  useEffect(() => {
+    refreshDirectMessages();
+    const unsub = subscribeToDirectMessages(refreshDirectMessages);
+    return unsub;
+  }, [refreshDirectMessages]);
+
   const activeWebThread = useMemo(() => {
     if (!selectedWebThreadId) return webThreads[0] || null;
     return webThreads.find((t) => t.id === selectedWebThreadId) || webThreads[0] || null;
@@ -1422,23 +1449,41 @@ function NexiumAdminDashboard({
   // Envoi d'un message dans le chat desk
   // Messagerie = chat uniquement (les e-mails vivent dans leur propre module, voir
   // activeSection "emails" — boîte OVH séparée, gérée par email-service).
-  const handleSendDeskMessage = (e: React.FormEvent) => {
+  const handleSendDeskMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatReplyInput.trim() || !activeClient) return;
+
+    const authorName = `${sessionUser.name} (${currentSessionRole})`;
+    const text = chatReplyInput.trim();
+
+    if (isSupabaseConfigured) {
+      const result = await sendChatMessage({
+        client_id: activeClient.id,
+        sender: "ADMIN",
+        author_name: authorName,
+        channel: "CHAT",
+        text,
+        is_read: true,
+      });
+      if (!result.success) {
+        toast.error("Échec de l'envoi du message côté base de données.");
+        return;
+      }
+    }
 
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       clientId: activeClient.id,
       sender: "ADMIN",
-      authorName: `Conseiller Desk (${currentSessionRole})`,
+      authorName,
       channel: "CHAT",
-      text: chatReplyInput.trim(),
+      text,
       timestamp: new Date().toLocaleTimeString("fr-FR").slice(0, 5),
       isRead: true,
     };
 
     setMessagesList((prev) => [...prev, newMsg]);
-    addAuditLog("DESK_MESSAGE_SENT", `Message transmis à ${activeClient.name}.`, activeClient.name);
+    addAuditLog("DESK_MESSAGE_SENT", `Message transmis à ${activeClient.name}.`, activeClient.email);
     toast.success(`Message transmis à ${activeClient.name}.`);
     setChatReplyInput("");
   };
