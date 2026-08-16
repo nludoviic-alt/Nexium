@@ -56,7 +56,7 @@ function ContactPage() {
       icon: PhoneCall,
       title: language === "fr" ? "Ligne Directe Opérations" : "Operations Direct Line",
       description: language === "fr" ? "Accompagnement téléphonique dédié." : "Dedicated priority phone desk.",
-      contact: "+33 1 89 71 42 00",
+      contact: "",
       badge: language === "fr" ? "Prioritaire" : "Priority",
     },
   ];
@@ -282,9 +282,11 @@ function ContactPage() {
               <p className="mt-1 text-xs text-gray-400 font-medium">
                 {c.description}
               </p>
-              <p className="mt-3 font-mono text-xs font-black text-white break-all">
-                {c.contact}
-              </p>
+              {c.contact && (
+                <p className="mt-3 font-mono text-xs font-black text-white break-all">
+                  {c.contact}
+                </p>
+              )}
             </div>
           ))}
         </div>
