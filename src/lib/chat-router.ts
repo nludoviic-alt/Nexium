@@ -21,7 +21,7 @@ export interface LiveChatThread {
   visitorName: string;
   contact: string; // E-mail ou Téléphone
   language: "fr" | "en";
-  status: "QUEUE" | "ACTIVE" | "RESOLVED";
+  status: "QUEUE" | "ACTIVE" | "RESOLVED" | "ARCHIVED";
   assignedAdvisor: string | null;
   assignedAdvisorRole?: string | undefined;
   createdAt: string;
@@ -246,6 +246,44 @@ export async function resolveLiveChatThread(threadId: string): Promise<LiveChatT
       is_read: true,
     },
   ]);
+
+  const threads = await getLiveChatThreads();
+  return threads.find((t) => t.id === threadId) || null;
+}
+
+/**
+ * Archive un fil (le retire des vues actives sans le supprimer).
+ */
+export async function archiveLiveChatThread(threadId: string): Promise<LiveChatThread | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const { error: updateError } = await supabase
+    .from("live_chat_threads")
+    .update({ status: "ARCHIVED" })
+    .eq("id", threadId);
+  if (updateError) {
+    console.warn("Notice archivage fil Supabase:", updateError);
+    return null;
+  }
+
+  const threads = await getLiveChatThreads();
+  return threads.find((t) => t.id === threadId) || null;
+}
+
+/**
+ * Restaure un fil archivé vers l'état résolu (retour dans les vues actives).
+ */
+export async function unarchiveLiveChatThread(threadId: string): Promise<LiveChatThread | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const { error: updateError } = await supabase
+    .from("live_chat_threads")
+    .update({ status: "RESOLVED" })
+    .eq("id", threadId);
+  if (updateError) {
+    console.warn("Notice restauration fil Supabase:", updateError);
+    return null;
+  }
 
   const threads = await getLiveChatThreads();
   return threads.find((t) => t.id === threadId) || null;

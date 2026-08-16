@@ -127,13 +127,17 @@ CREATE TABLE IF NOT EXISTS public.live_chat_threads (
     visitor_name TEXT NOT NULL,
     contact TEXT NOT NULL,
     language TEXT NOT NULL DEFAULT 'fr' CHECK (language IN ('fr', 'en')),
-    status TEXT NOT NULL DEFAULT 'QUEUE' CHECK (status IN ('QUEUE', 'ACTIVE', 'RESOLVED')),
+    status TEXT NOT NULL DEFAULT 'QUEUE' CHECK (status IN ('QUEUE', 'ACTIVE', 'RESOLVED', 'ARCHIVED')),
     assigned_advisor TEXT,
     assigned_advisor_role TEXT,
     initial_query TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     last_activity TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.live_chat_threads DROP CONSTRAINT IF EXISTS live_chat_threads_status_check;
+ALTER TABLE public.live_chat_threads ADD CONSTRAINT live_chat_threads_status_check
+    CHECK (status IN ('QUEUE', 'ACTIVE', 'RESOLVED', 'ARCHIVED'));
 
 -- 6. TABLE : CHAT_MESSAGES (Messagerie Directe Client / Prospect ↔ Desk)
 CREATE TABLE IF NOT EXISTS public.chat_messages (
@@ -205,7 +209,7 @@ CREATE POLICY "chat_messages_all" ON public.chat_messages FOR ALL USING (true) W
 CREATE TABLE IF NOT EXISTS public.email_conversations (
     id TEXT PRIMARY KEY,
     subject TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'INBOX' CHECK (status IN ('INBOX', 'MINE', 'UNASSIGNED', 'IN_PROGRESS', 'WAITING', 'RESOLVED')),
+    status TEXT NOT NULL DEFAULT 'INBOX' CHECK (status IN ('INBOX', 'MINE', 'UNASSIGNED', 'IN_PROGRESS', 'WAITING', 'RESOLVED', 'ARCHIVED')),
     assigned_agent_id TEXT,
     assigned_agent_name TEXT,
     customer_email TEXT NOT NULL,
@@ -215,6 +219,10 @@ CREATE TABLE IF NOT EXISTS public.email_conversations (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.email_conversations DROP CONSTRAINT IF EXISTS email_conversations_status_check;
+ALTER TABLE public.email_conversations ADD CONSTRAINT email_conversations_status_check
+    CHECK (status IN ('INBOX', 'MINE', 'UNASSIGNED', 'IN_PROGRESS', 'WAITING', 'RESOLVED', 'ARCHIVED'));
 
 CREATE TABLE IF NOT EXISTS public.email_messages (
     id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text,
@@ -280,6 +288,19 @@ AS $$
   SELECT COALESCE((SELECT is_primary_owner FROM public.profiles WHERE id = auth.uid()), FALSE);
 $$;
 
+-- 8bis. TABLE : CONTACT_RATE_LIMITS (anti-spam serveur du formulaire Contact,
+-- utilisée uniquement par la Edge Function supabase/functions/contact-submit
+-- via la clé service_role — aucun accès direct depuis le navigateur).
+CREATE TABLE IF NOT EXISTS public.contact_rate_limits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ip_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_contact_rate_limits_ip_time ON public.contact_rate_limits(ip_hash, created_at);
+ALTER TABLE public.contact_rate_limits ENABLE ROW LEVEL SECURITY;
+-- Aucune policy : ni lecture ni écriture depuis le client (anon/authenticated).
+-- Seule la clé service_role (Edge Function) peut y accéder, ce qui contourne RLS.
+
 -- 9bis. TABLE : ROLE_PERMISSIONS (Niveaux d'accès par rôle — remplace les
 -- anciennes permissions cochées individuellement par membre du staff, qui
 -- n'étaient qu'un affichage sans aucun effet réel).
@@ -326,6 +347,44 @@ CREATE POLICY "role_permissions_select" ON public.role_permissions
 -- modifiable par qui que ce soit d'autre.
 CREATE POLICY "role_permissions_write" ON public.role_permissions
     FOR ALL USING (public.am_i_primary_owner()) WITH CHECK (public.am_i_primary_owner());
+
+-- 9ter. TABLE : PAYMENT_SETTINGS (Coordonnées de paiement affichées au client
+-- lors d'un dépôt — IBAN et adresses de portefeuilles crypto). Ligne unique
+-- (id = 1), vide par défaut : tant que le Desk Finance ne les a pas saisies,
+-- le client voit "Non configuré" plutôt qu'une fausse donnée.
+CREATE TABLE IF NOT EXISTS public.payment_settings (
+    id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    bank_beneficiary TEXT,
+    bank_iban TEXT,
+    bank_bic TEXT,
+    bank_name TEXT,
+    crypto_btc_address TEXT,
+    crypto_eth_address TEXT,
+    crypto_usdt_trc20_address TEXT,
+    crypto_usdt_erc20_address TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_by TEXT
+);
+
+INSERT INTO public.payment_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE public.payment_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "payment_settings_select" ON public.payment_settings;
+DROP POLICY IF EXISTS "payment_settings_write" ON public.payment_settings;
+-- Tout utilisateur connecté peut lire (le client doit voir l'IBAN/l'adresse pour déposer).
+CREATE POLICY "payment_settings_select" ON public.payment_settings
+    FOR SELECT USING (auth.uid() IS NOT NULL);
+-- Seuls Direction et Finance peuvent modifier ces coordonnées.
+CREATE POLICY "payment_settings_write" ON public.payment_settings
+    FOR UPDATE USING (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'FINANCE'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'FINANCE'));
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'payment_settings') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.payment_settings;
+  END IF;
+END $$;
 
 -- 10. PROTECTION DES COLONNES SENSIBLES DE PROFILES ET DU SUPER OWNER
 CREATE OR REPLACE FUNCTION public.protect_privileged_profile_fields()

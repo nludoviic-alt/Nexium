@@ -15,6 +15,8 @@ import {
   claimLiveChatThread,
   sendLiveChatMessage,
   resolveLiveChatThread,
+  archiveLiveChatThread,
+  unarchiveLiveChatThread,
   subscribeToLiveChatUpdates,
   type LiveChatThread,
 } from "@/lib/chat-router";
@@ -27,6 +29,8 @@ import {
   ArrowRightLeft,
   ArrowUpRight,
   Award,
+  Archive,
+  ArchiveRestore,
   Ban,
   BarChart3,
   Bell,
@@ -171,6 +175,11 @@ import {
   subscribeToRolePermissions,
   type RolePermissions,
   type StaffRole,
+  type SupabaseTransaction,
+  getPaymentSettings,
+  updatePaymentSettings,
+  subscribeToPaymentSettings,
+  type PaymentSettings,
 } from "@/lib/supabase";
 
 import { getAdminSlug } from "@/lib/user-slug";
@@ -643,13 +652,14 @@ const CANNED_RESPONSES = [
   { title: "🤖 Optimisation Moteur Gold", text: "Bonjour,\n\nLe preset Conservateur sur Nexium AI Gold a été calibré avec un stop-loss basé sur l'ATR 1.2 pour préserver votre capital en période de forte volatilité de l'Or." },
   { title: "📄 Confirmation KYC & Pièces", text: "Bonjour,\n\nNous vous confirmons la bonne réception et validation de vos pièces justificatives de conformité. Vos plafonds de compte sont désormais débloqués." },
 ];
-const EMAIL_NAV_ITEMS: { key: EmailConversationFilter; label: string; icon: typeof Inbox; countKey: "inbox" | "mine" | "unassigned" | "inProgress" | "waiting" | "resolved" | null }[] = [
+const EMAIL_NAV_ITEMS: { key: EmailConversationFilter; label: string; icon: typeof Inbox; countKey: "inbox" | "mine" | "unassigned" | "inProgress" | "waiting" | "resolved" | "archived" | null }[] = [
   { key: "inbox", label: "Boîte de réception", icon: Inbox, countKey: "inbox" },
   { key: "mine", label: "Mes conversations", icon: User, countKey: "mine" },
   { key: "unassigned", label: "Non assignés", icon: Mail, countKey: "unassigned" },
   { key: "in_progress", label: "En cours", icon: CheckCircle2, countKey: "inProgress" },
   { key: "waiting", label: "En attente", icon: Clock, countKey: "waiting" },
   { key: "resolved", label: "Résolus", icon: Check, countKey: null },
+  { key: "archived", label: "Archivés", icon: Archive, countKey: "archived" },
 ];
 function matchesClient(c: UserProfile, q: string) {
   return (
@@ -833,6 +843,7 @@ function NexiumAdminDashboard({
   // Messagerie State (chat uniquement — les e-mails vivent dans le module "E-mails")
   const [messagingTab, setMessagingTab] = useState<"WEB_QUEUE" | "CLIENTS">("WEB_QUEUE");
   const [webThreads, setWebThreads] = useState<LiveChatThread[]>([]);
+  const [showArchivedThreads, setShowArchivedThreads] = useState(false);
   const [selectedWebThreadId, setSelectedWebThreadId] = useState<string | null>(null);
   const [webThreadReplyInput, setWebThreadReplyInput] = useState("");
   const [channelFilter, setChannelFilter] = useState<"ALL" | "CHAT" | "EMAIL">("ALL");
@@ -848,7 +859,7 @@ function NexiumAdminDashboard({
   const [emailFilter, setEmailFilter] = useState<EmailConversationFilter>("inbox");
   const [emailSearch, setEmailSearch] = useState("");
   const [emailConversationsList, setEmailConversationsList] = useState<EmailConversationListItem[]>([]);
-  const [emailCounts, setEmailCounts] = useState({ inbox: 0, mine: 0, unassigned: 0, inProgress: 0, waiting: 0, resolved: 0 });
+  const [emailCounts, setEmailCounts] = useState({ inbox: 0, mine: 0, unassigned: 0, inProgress: 0, waiting: 0, resolved: 0, archived: 0 });
   const [selectedEmailConversationId, setSelectedEmailConversationId] = useState<string | null>(null);
   const [emailConversationDetail, setEmailConversationDetail] = useState<EmailConversationDetail | null>(null);
   const [emailComposerMode, setEmailComposerMode] = useState<"REPLY" | "NOTE">("REPLY");
@@ -1500,6 +1511,7 @@ function NexiumAdminDashboard({
         );
       }
       refreshClients();
+      getAllTransactions().then((txs) => txs && setAllTransactions(txs));
     });
     return unsub;
   }, [refreshClients]);
@@ -1546,10 +1558,61 @@ function NexiumAdminDashboard({
 
   // Synchronisation des transactions réelles depuis Supabase, fusionnées dans
   // chaque client (retraits/dépôts en attente + historique).
+  const [allTransactions, setAllTransactions] = useState<SupabaseTransaction[]>([]);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
+  const [paymentSettingsDraft, setPaymentSettingsDraft] = useState<Partial<PaymentSettings>>({});
+  const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    getPaymentSettings().then((s) => {
+      setPaymentSettings(s);
+      if (s) setPaymentSettingsDraft(s);
+    });
+    const unsub = subscribeToPaymentSettings((s) => {
+      setPaymentSettings(s);
+      setPaymentSettingsDraft((prev) => (Object.keys(prev).length === 0 && s ? s : prev));
+    });
+    return unsub;
+  }, []);
+
+  const handleSavePaymentSettings = async () => {
+    setSavingPaymentSettings(true);
+    try {
+      const result = await updatePaymentSettings(
+        {
+          bank_beneficiary: paymentSettingsDraft.bank_beneficiary || null,
+          bank_iban: paymentSettingsDraft.bank_iban || null,
+          bank_bic: paymentSettingsDraft.bank_bic || null,
+          bank_name: paymentSettingsDraft.bank_name || null,
+          crypto_btc_address: paymentSettingsDraft.crypto_btc_address || null,
+          crypto_eth_address: paymentSettingsDraft.crypto_eth_address || null,
+          crypto_usdt_trc20_address: paymentSettingsDraft.crypto_usdt_trc20_address || null,
+          crypto_usdt_erc20_address: paymentSettingsDraft.crypto_usdt_erc20_address || null,
+        },
+        sessionUser.name
+      );
+      if (result.success) {
+        toast.success("Coordonnées de paiement mises à jour.");
+        addAuditLog("PAYMENT_SETTINGS_UPDATED", "Coordonnées de paiement (IBAN/crypto) modifiées.");
+      } else {
+        toast.error("Échec de la mise à jour des coordonnées de paiement.");
+      }
+    } finally {
+      setSavingPaymentSettings(false);
+    }
+  };
+
+  const [financeTxSearch, setFinanceTxSearch] = useState("");
+  const [financeTxTypeFilter, setFinanceTxTypeFilter] = useState<"ALL" | SupabaseTransaction["type"]>("ALL");
+  const [financeTxStatusFilter, setFinanceTxStatusFilter] = useState<"ALL" | SupabaseTransaction["status"]>("ALL");
+  const [financeTxMethodFilter, setFinanceTxMethodFilter] = useState("ALL");
+
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     getAllTransactions().then((txs) => {
       if (!txs || txs.length === 0) return;
+      setAllTransactions(txs);
 
       setClients((prev) =>
         prev.map((c) => {
@@ -1793,6 +1856,18 @@ function NexiumAdminDashboard({
     await resolveLiveChatThread(threadId);
     addAuditLog("LIVE_CHAT_RESOLVED", `Fil prospect #${threadId} clôturé.`);
     toast.success("Session de chat clôturée avec succès.");
+  };
+
+  const handleArchiveWebThread = async (threadId: string) => {
+    await archiveLiveChatThread(threadId);
+    addAuditLog("LIVE_CHAT_ARCHIVED", `Fil prospect #${threadId} archivé.`);
+    toast.success("Fil de discussion archivé.");
+  };
+
+  const handleUnarchiveWebThread = async (threadId: string) => {
+    await unarchiveLiveChatThread(threadId);
+    addAuditLog("LIVE_CHAT_UNARCHIVED", `Fil prospect #${threadId} restauré.`);
+    toast.success("Fil de discussion restauré.");
   };
 
   // Insertion d'une réponse rapide prédéfinie
@@ -2654,13 +2729,15 @@ function NexiumAdminDashboard({
     if (isSupabaseConfigured) {
       try {
         const all = await getAdminEmailConversations();
+        const nonArchived = all.filter((c) => c.status !== "ARCHIVED");
         setEmailCounts({
-          inbox: all.length,
-          mine: all.filter((c) => c.assignedUserId === currentEmailAgentId).length,
-          unassigned: all.filter((c) => !c.assignedUserId).length,
-          inProgress: all.filter((c) => c.status === "EN_COURS").length,
-          waiting: all.filter((c) => c.status === "EN_ATTENTE").length,
-          resolved: all.filter((c) => c.status === "RESOLU").length,
+          inbox: nonArchived.length,
+          mine: nonArchived.filter((c) => c.assignedUserId === currentEmailAgentId).length,
+          unassigned: nonArchived.filter((c) => !c.assignedUserId).length,
+          inProgress: nonArchived.filter((c) => c.status === "EN_COURS").length,
+          waiting: nonArchived.filter((c) => c.status === "EN_ATTENTE").length,
+          resolved: nonArchived.filter((c) => c.status === "RESOLU").length,
+          archived: all.filter((c) => c.status === "ARCHIVED").length,
         });
         return;
       } catch {
@@ -2669,7 +2746,7 @@ function NexiumAdminDashboard({
     }
 
     if (!emailConfigured) {
-      setEmailCounts({ inbox: 0, mine: 0, unassigned: 0, inProgress: 0, waiting: 0, resolved: 0 });
+      setEmailCounts({ inbox: 0, mine: 0, unassigned: 0, inProgress: 0, waiting: 0, resolved: 0, archived: 0 });
       return;
     }
     try {
@@ -2687,16 +2764,22 @@ function NexiumAdminDashboard({
         let items = await getAdminEmailConversations();
 
         // Filtre par catégorie
-        if (emailFilter === "unassigned") {
-          items = items.filter((c) => !c.assignedUserId);
-        } else if (emailFilter === "mine") {
-          items = items.filter((c) => c.assignedUserId === currentEmailAgentId);
-        } else if (emailFilter === "in_progress") {
-          items = items.filter((c) => c.status === "EN_COURS");
-        } else if (emailFilter === "waiting") {
-          items = items.filter((c) => c.status === "EN_ATTENTE");
-        } else if (emailFilter === "resolved") {
-          items = items.filter((c) => c.status === "RESOLU");
+        if (emailFilter === "archived") {
+          items = items.filter((c) => c.status === "ARCHIVED");
+        } else {
+          // Les fils archivés ne remontent jamais dans les autres onglets.
+          items = items.filter((c) => c.status !== "ARCHIVED");
+          if (emailFilter === "unassigned") {
+            items = items.filter((c) => !c.assignedUserId);
+          } else if (emailFilter === "mine") {
+            items = items.filter((c) => c.assignedUserId === currentEmailAgentId);
+          } else if (emailFilter === "in_progress") {
+            items = items.filter((c) => c.status === "EN_COURS");
+          } else if (emailFilter === "waiting") {
+            items = items.filter((c) => c.status === "EN_ATTENTE");
+          } else if (emailFilter === "resolved") {
+            items = items.filter((c) => c.status === "RESOLU");
+          }
         }
 
         // Filtre par recherche textuelle
@@ -2851,6 +2934,43 @@ function NexiumAdminDashboard({
     } catch {
       toast.error("Impossible de changer le statut.");
     }
+  };
+
+  // Archivage : distinct de handleSetEmailStatus car "ARCHIVED" (Supabase) et
+  // "ARCHIVE" (micro-service email-service) ne partagent pas le même référentiel
+  // de statuts que les valeurs FR de EmailConversationFilter (EN_COURS, etc.).
+  const handleArchiveEmailConversation = async (conversationId: string) => {
+    if (isSupabaseConfigured) {
+      await adminUpdateEmailStatus(conversationId, "ARCHIVED");
+    } else if (emailConfigured) {
+      try {
+        await emailApi.setStatus(currentEmailAgentId, conversationId, "ARCHIVE");
+      } catch {
+        toast.error("Impossible d'archiver cette conversation.");
+        return;
+      }
+    }
+    toast.success("Conversation archivée.");
+    if (selectedEmailConversationId === conversationId) refreshEmailDetail(conversationId);
+    refreshEmailList();
+    refreshEmailCounts();
+  };
+
+  const handleUnarchiveEmailConversation = async (conversationId: string) => {
+    if (isSupabaseConfigured) {
+      await adminUpdateEmailStatus(conversationId, "RESOLVED");
+    } else if (emailConfigured) {
+      try {
+        await emailApi.setStatus(currentEmailAgentId, conversationId, "RESOLU");
+      } catch {
+        toast.error("Impossible de restaurer cette conversation.");
+        return;
+      }
+    }
+    toast.success("Conversation restaurée.");
+    if (selectedEmailConversationId === conversationId) refreshEmailDetail(conversationId);
+    refreshEmailList();
+    refreshEmailCounts();
   };
 
   const handleUploadEmailAttachment = async (file: File) => {
@@ -3071,6 +3191,66 @@ function NexiumAdminDashboard({
 
   const totalBalance = useMemo(() => clients.reduce((acc, c) => acc + c.balance, 0), [clients]);
   const totalBonus = useMemo(() => clients.reduce((acc, c) => acc + c.bonusCredit, 0), [clients]);
+
+  // Historique global de toutes les transactions (tous clients confondus),
+  // pour la section Finances & Trésorerie — filtrable par statut/type/méthode.
+  const financeTransactionMethods = useMemo(() => {
+    const set = new Set<string>();
+    allTransactions.forEach((t) => t.method && set.add(t.method));
+    return Array.from(set).sort();
+  }, [allTransactions]);
+
+  const financeTransactionRows = useMemo(() => {
+    const q = financeTxSearch.trim().toLowerCase();
+    return allTransactions
+      .map((t) => {
+        const client = clients.find((c) => c.id === t.user_id);
+        return { tx: t, clientName: client?.name || "Client inconnu", clientEmail: client?.email || "-" };
+      })
+      .filter(({ tx, clientName, clientEmail }) => {
+        if (financeTxTypeFilter !== "ALL" && tx.type !== financeTxTypeFilter) return false;
+        if (financeTxStatusFilter !== "ALL" && tx.status !== financeTxStatusFilter) return false;
+        if (financeTxMethodFilter !== "ALL" && tx.method !== financeTxMethodFilter) return false;
+        if (q && !clientName.toLowerCase().includes(q) && !clientEmail.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => (b.tx.created_at || "").localeCompare(a.tx.created_at || ""));
+  }, [allTransactions, clients, financeTxSearch, financeTxTypeFilter, financeTxStatusFilter, financeTxMethodFilter]);
+
+  const TX_TYPE_LABELS: Record<string, string> = {
+    DEPOSIT: "Dépôt",
+    WITHDRAWAL: "Retrait",
+    PERF_FEE: "Frais de Performance",
+    TRADE_PROFIT: "Profit Trading",
+    BONUS: "Bonus",
+    DEBIT: "Débit",
+    PROFIT_SHARE: "Partage de Profit",
+    PNL_ADJUST: "Ajustement P&L",
+  };
+  const TX_STATUS_LABELS: Record<string, string> = {
+    COMPLETED: "Complété",
+    PENDING: "En attente",
+    CANCELLED: "Annulé",
+    REJECTED: "Rejeté",
+  };
+
+  const handleExportFinanceTransactions = () => {
+    const rows: (string | number)[][] = [
+      ["Date", "Client", "E-mail", "Type", "Montant (USD)", "Devise", "Méthode", "Statut"],
+      ...financeTransactionRows.map(({ tx, clientName, clientEmail }) => [
+        tx.created_at || "",
+        clientName,
+        clientEmail,
+        TX_TYPE_LABELS[tx.type] || tx.type,
+        tx.amount,
+        tx.currency || "USD",
+        tx.method || "-",
+        TX_STATUS_LABELS[tx.status] || tx.status,
+      ]),
+    ];
+    downloadCsv(`nexium-transactions-${financeTransactionRows.length}.csv`, rows);
+    toast.success(`Export CSV généré (${financeTransactionRows.length} transactions).`);
+  };
 
   // Supervision Live : remplace intégralement l'interface admin par le vrai
   // dashboard du client ciblé (mêmes composants, mêmes actions), pour que
@@ -5557,16 +5737,33 @@ function NexiumAdminDashboard({
                   <div className="lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
                     <div className="p-3.5 border-b border-slate-700/40 bg-[#0f1626]/80 flex items-center justify-between text-xs font-mono shrink-0">
                       <span className="text-slate-400 font-bold uppercase">Fils Entrants Chatbot</span>
-                      <span className="text-emerald-400 font-bold">{webThreads.length} Total</span>
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          onClick={() => setShowArchivedThreads((v) => !v)}
+                          className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold uppercase transition cursor-pointer ${
+                            showArchivedThreads
+                              ? "bg-slate-700 text-white"
+                              : "bg-transparent text-slate-500 hover:text-slate-300"
+                          }`}
+                        >
+                          <Archive className="size-3" />
+                          Archives ({webThreads.filter((t) => t.status === "ARCHIVED").length})
+                        </button>
+                        <span className="text-emerald-400 font-bold">
+                          {webThreads.filter((t) => (showArchivedThreads ? t.status === "ARCHIVED" : t.status !== "ARCHIVED")).length} Total
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">
-                      {webThreads.length === 0 ? (
+                      {webThreads.filter((t) => (showArchivedThreads ? t.status === "ARCHIVED" : t.status !== "ARCHIVED")).length === 0 ? (
                         <div className="p-8 text-center text-slate-500 text-sm">
-                          Aucun prospect en attente actuellement.
+                          {showArchivedThreads ? "Aucun fil archivé." : "Aucun prospect en attente actuellement."}
                         </div>
                       ) : (
-                        webThreads.map((th) => {
+                        webThreads
+                          .filter((t) => (showArchivedThreads ? t.status === "ARCHIVED" : t.status !== "ARCHIVED"))
+                          .map((th) => {
                           const isSelected = activeWebThread?.id === th.id;
                           const isQueue = th.status === "QUEUE";
                           const isActive = th.status === "ACTIVE";
@@ -5627,6 +5824,11 @@ function NexiumAdminDashboard({
                                       ✓ Résolu
                                     </span>
                                   )}
+                                  {th.status === "ARCHIVED" && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-500 border border-slate-700">
+                                      📦 Archivé
+                                    </span>
+                                  )}
                                   <span className="text-[10px] uppercase font-mono text-slate-500 ml-auto">
                                     {th.language}
                                   </span>
@@ -5655,9 +5857,15 @@ function NexiumAdminDashboard({
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                   activeWebThread.status === "QUEUE"
                                     ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                    : activeWebThread.status === "ARCHIVED"
+                                    ? "bg-slate-800 text-slate-400 border border-slate-700"
                                     : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25"
                                 }`}>
-                                  {activeWebThread.status === "QUEUE" ? "⏳ EN ATTENTE DE CONSEILLER" : "● SESSION EN DIRECT"}
+                                  {activeWebThread.status === "QUEUE"
+                                    ? "⏳ EN ATTENTE DE CONSEILLER"
+                                    : activeWebThread.status === "ARCHIVED"
+                                    ? "📦 ARCHIVÉ"
+                                    : "● SESSION EN DIRECT"}
                                 </span>
                               </div>
                               <p className="text-xs text-slate-400 font-mono">
@@ -5682,6 +5890,25 @@ function NexiumAdminDashboard({
                                   className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs px-3.5 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
                                 >
                                   Clôturer la session
+                                </button>
+                              )
+                            )}
+                            {activeWebThread.status === "ARCHIVED" ? (
+                              <button
+                                onClick={() => handleUnarchiveWebThread(activeWebThread.id)}
+                                className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 cursor-pointer transition"
+                              >
+                                <ArchiveRestore className="size-3.5" />
+                                Restaurer
+                              </button>
+                            ) : (
+                              activeWebThread.status === "RESOLVED" && (
+                                <button
+                                  onClick={() => handleArchiveWebThread(activeWebThread.id)}
+                                  className="flex items-center gap-1.5 rounded-lg border border-slate-600/50 bg-[#0c121e] hover:bg-slate-700/40 px-3 py-1.5 text-xs font-semibold text-slate-300 cursor-pointer transition"
+                                >
+                                  <Archive className="size-3.5" />
+                                  Archiver
                                 </button>
                               )
                             )}
@@ -6183,16 +6410,37 @@ function NexiumAdminDashboard({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <select
-                        value={emailConversationDetail?.conversation.status ?? "EN_COURS"}
-                        onChange={(e) => handleSetEmailStatus(e.target.value as any)}
-                        className="admin-select-field !py-1.5 !px-2 !text-xs w-[110px]"
-                        aria-label="Statut du dossier e-mail"
-                      >
-                        <option value="EN_COURS">En cours</option>
-                        <option value="EN_ATTENTE">En attente</option>
-                        <option value="RESOLU">Résolu</option>
-                      </select>
+                      {(emailConversationDetail?.conversation.status as string) === "ARCHIVED" || emailConversationDetail?.conversation.status === "ARCHIVE" ? (
+                        <button
+                          onClick={() => selectedEmailConversationId && handleUnarchiveEmailConversation(selectedEmailConversationId)}
+                          className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 cursor-pointer transition"
+                          title="Restaurer cette conversation"
+                        >
+                          <ArchiveRestore className="size-3.5" />
+                          Restaurer
+                        </button>
+                      ) : (
+                        <>
+                          <select
+                            value={emailConversationDetail?.conversation.status ?? "EN_COURS"}
+                            onChange={(e) => handleSetEmailStatus(e.target.value as any)}
+                            className="admin-select-field !py-1.5 !px-2 !text-xs w-[110px]"
+                            aria-label="Statut du dossier e-mail"
+                          >
+                            <option value="EN_COURS">En cours</option>
+                            <option value="EN_ATTENTE">En attente</option>
+                            <option value="RESOLU">Résolu</option>
+                          </select>
+                          <button
+                            onClick={() => selectedEmailConversationId && handleArchiveEmailConversation(selectedEmailConversationId)}
+                            className="flex items-center gap-1.5 rounded-lg border border-slate-600/50 bg-[#0c121e] hover:bg-slate-700/40 px-3 py-1.5 text-xs font-semibold text-slate-300 cursor-pointer transition"
+                            title="Archiver cette conversation"
+                          >
+                            <Archive className="size-3.5" />
+                            Archiver
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -6865,6 +7113,259 @@ function NexiumAdminDashboard({
                   </div>
                 </div>
               </div>
+
+              {/* ── Historique global de toutes les transactions (tous clients) ── */}
+              <section className="admin-card-emerald p-6 sm:p-7 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-700/50 pb-4">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
+                      <History className="size-5 text-emerald-400" />
+                      Historique Complet des Transactions
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                      Tous les dépôts, retraits et ajustements de tous les clients — {financeTransactionRows.length} résultat(s).
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleExportFinanceTransactions}
+                    disabled={financeTransactionRows.length === 0}
+                    className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed px-3.5 py-2 text-xs font-bold text-emerald-300 cursor-pointer transition"
+                  >
+                    <Download className="size-3.5" />
+                    Exporter en CSV
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-500" />
+                    <input
+                      type="text"
+                      value={financeTxSearch}
+                      onChange={(e) => setFinanceTxSearch(e.target.value)}
+                      placeholder="Rechercher un client..."
+                      className="admin-select-field !pl-9 w-full !text-xs"
+                    />
+                  </div>
+                  <select
+                    value={financeTxTypeFilter}
+                    onChange={(e) => setFinanceTxTypeFilter(e.target.value as any)}
+                    className="admin-select-field !text-xs"
+                  >
+                    <option value="ALL">Tous les types</option>
+                    {Object.entries(TX_TYPE_LABELS).map(([k, label]) => (
+                      <option key={k} value={k}>{label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={financeTxStatusFilter}
+                    onChange={(e) => setFinanceTxStatusFilter(e.target.value as any)}
+                    className="admin-select-field !text-xs"
+                  >
+                    <option value="ALL">Tous les statuts</option>
+                    {Object.entries(TX_STATUS_LABELS).map(([k, label]) => (
+                      <option key={k} value={k}>{label}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={financeTxMethodFilter}
+                    onChange={(e) => setFinanceTxMethodFilter(e.target.value)}
+                    className="admin-select-field !text-xs"
+                  >
+                    <option value="ALL">Toutes les méthodes</option>
+                    {financeTransactionMethods.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                  <table className="w-full text-left font-mono text-sm">
+                    <thead className="border-b border-slate-700/50 bg-[#0f1626]/90 text-slate-300 text-xs font-bold uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3.5">Date</th>
+                        <th className="px-4 py-3.5">Client</th>
+                        <th className="px-4 py-3.5">Type</th>
+                        <th className="px-4 py-3.5">Montant</th>
+                        <th className="px-4 py-3.5">Méthode</th>
+                        <th className="px-4 py-3.5">Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {financeTransactionRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-slate-500 text-sm font-sans">
+                            Aucune transaction ne correspond à ces filtres.
+                          </td>
+                        </tr>
+                      ) : (
+                        financeTransactionRows.map(({ tx, clientName, clientEmail }) => {
+                          const isPositive = tx.type === "DEPOSIT" || tx.type === "TRADE_PROFIT" || tx.type === "BONUS" || tx.type === "PROFIT_SHARE";
+                          return (
+                            <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
+                              <td className="px-4 py-3 text-slate-300 text-xs">
+                                {tx.created_at ? new Date(tx.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="font-semibold text-white block">{clientName}</span>
+                                <span className="text-[11px] text-slate-500">{clientEmail}</span>
+                              </td>
+                              <td className="px-4 py-3 text-slate-200 text-xs">{TX_TYPE_LABELS[tx.type] || tx.type}</td>
+                              <td className={`px-4 py-3 font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                                {isPositive ? "+" : "-"}${Math.abs(tx.amount).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-4 py-3 text-slate-300 text-xs">{tx.method || "-"}</td>
+                              <td className="px-4 py-3">
+                                <AdminBadge
+                                  variant={tx.status === "COMPLETED" ? "emerald" : tx.status === "PENDING" ? "amber" : "rose"}
+                                  dot={false}
+                                >
+                                  {TX_STATUS_LABELS[tx.status] || tx.status}
+                                </AdminBadge>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {/* ── Coordonnées de paiement affichées au client lors d'un dépôt ── */}
+              <section className="admin-card-cyan p-6 sm:p-7 space-y-5">
+                <div className="border-b border-slate-700/50 pb-4">
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
+                    <CreditCard className="size-5 text-cyan-400" />
+                    Coordonnées de Paiement
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                    Ces informations sont affichées aux clients lorsqu'ils effectuent un dépôt. Laissez un champ vide s'il n'est pas encore configuré — le client verra "Non configuré" plutôt qu'une fausse donnée.
+                  </p>
+                </div>
+
+                {!hasPermission("can_approve_finances") ? (
+                  <p className="text-xs text-slate-400 font-mono">Lecture seule — la modification est réservée à la Direction et au Desk Finance.</p>
+                ) : null}
+
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Virement Bancaire</h3>
+                    <div className="space-y-2.5">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Bénéficiaire</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.bank_beneficiary || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, bank_beneficiary: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          placeholder="Nexium Markets Ltd"
+                          className="admin-select-field w-full !text-xs disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Nom de la banque</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.bank_name || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, bank_name: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          className="admin-select-field w-full !text-xs disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">IBAN</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.bank_iban || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, bank_iban: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          placeholder="FRxx xxxx xxxx xxxx xxxx xxxx xxx"
+                          className="admin-select-field w-full !text-xs font-mono disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">BIC / SWIFT</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.bank_bic || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, bank_bic: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          className="admin-select-field w-full !text-xs font-mono disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Adresses Crypto</h3>
+                    <div className="space-y-2.5">
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">USDT (Réseau TRC20)</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.crypto_usdt_trc20_address || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, crypto_usdt_trc20_address: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          placeholder="T..."
+                          className="admin-select-field w-full !text-xs font-mono disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">USDT (Réseau ERC20)</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.crypto_usdt_erc20_address || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, crypto_usdt_erc20_address: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          placeholder="0x..."
+                          className="admin-select-field w-full !text-xs font-mono disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Bitcoin (BTC)</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.crypto_btc_address || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, crypto_btc_address: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          placeholder="bc1..."
+                          className="admin-select-field w-full !text-xs font-mono disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">Ethereum (ETH)</label>
+                        <input
+                          type="text"
+                          value={paymentSettingsDraft.crypto_eth_address || ""}
+                          onChange={(e) => setPaymentSettingsDraft((p) => ({ ...p, crypto_eth_address: e.target.value }))}
+                          disabled={!hasPermission("can_approve_finances")}
+                          placeholder="0x..."
+                          className="admin-select-field w-full !text-xs font-mono disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {hasPermission("can_approve_finances") && (
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-700/40">
+                    {paymentSettings?.updated_at && (
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        Dernière modification : {new Date(paymentSettings.updated_at).toLocaleString("fr-FR")}
+                        {paymentSettings.updated_by ? ` par ${paymentSettings.updated_by}` : ""}
+                      </span>
+                    )}
+                    <button
+                      onClick={handleSavePaymentSettings}
+                      disabled={savingPaymentSettings}
+                      className="admin-btn-primary text-xs font-bold py-2 px-5 ml-auto disabled:opacity-50"
+                    >
+                      {savingPaymentSettings ? "Enregistrement..." : "Enregistrer les Coordonnées"}
+                    </button>
+                  </div>
+                )}
+              </section>
             </div>
             )
           )}

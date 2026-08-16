@@ -5,7 +5,7 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 // référentiel de rôles, on s'aligne sur l'existant en attendant la vraie authentification.
 export type AgentRole = "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
 export type AgentAvailability = "DISPONIBLE" | "OCCUPE" | "PAUSE" | "HORS_LIGNE";
-export type ConversationStatus = "NON_ASSIGNE" | "EN_COURS" | "EN_ATTENTE" | "RESOLU";
+export type ConversationStatus = "NON_ASSIGNE" | "EN_COURS" | "EN_ATTENTE" | "RESOLU" | "ARCHIVE";
 export type MessageDirection = "INBOUND" | "OUTBOUND";
 export type SendStatus = "PENDING" | "SENT" | "FAILED";
 export type AssignmentReason = "AUTO_ROUTING" | "MANUAL_CLAIM" | "TRANSFER" | "MANUAL_ASSIGN";

@@ -329,6 +329,68 @@ export function subscribeToRolePermissions(callback: (rows: RolePermissions[]) =
   };
 }
 
+/* ==========================================================================
+   COORDONNÉES DE PAIEMENT (IBAN + adresses crypto affichées au client lors
+   d'un dépôt). Ligne unique éditable par la Direction/Finance uniquement.
+   ========================================================================== */
+
+export interface PaymentSettings {
+  id: number;
+  bank_beneficiary: string | null;
+  bank_iban: string | null;
+  bank_bic: string | null;
+  bank_name: string | null;
+  crypto_btc_address: string | null;
+  crypto_eth_address: string | null;
+  crypto_usdt_trc20_address: string | null;
+  crypto_usdt_erc20_address: string | null;
+  updated_at?: string;
+  updated_by?: string | null;
+}
+
+export async function getPaymentSettings(): Promise<PaymentSettings | null> {
+  if (!isSupabaseConfigured) return null;
+  const { data, error } = await supabase.from("payment_settings").select("*").eq("id", 1).single();
+  if (error) {
+    console.error("Erreur récupération payment_settings:", error);
+    return null;
+  }
+  return data as PaymentSettings;
+}
+
+export async function updatePaymentSettings(updates: Partial<Omit<PaymentSettings, "id">>, updatedBy: string) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const { data, error } = await supabase
+    .from("payment_settings")
+    .update({ ...updates, updated_at: new Date().toISOString(), updated_by: updatedBy })
+    .eq("id", 1)
+    .select()
+    .single();
+  if (error) {
+    console.error("Erreur mise à jour payment_settings:", error);
+    return { success: false, error };
+  }
+  return { success: true, data };
+}
+
+export function subscribeToPaymentSettings(callback: (settings: PaymentSettings | null) => void): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel("public:payment_settings")
+      .on("postgres_changes", { event: "*", schema: "public", table: "payment_settings" }, () => {
+        getPaymentSettings().then(callback);
+      })
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime payment_settings:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
 /**
  * Recherche un profil existant par e-mail (utilisé pour promouvoir un compte
  * déjà inscrit vers un rôle staff, plutôt que de fabriquer un profil orphelin
@@ -718,7 +780,7 @@ export async function getUserTransactions(userId: string): Promise<SupabaseTrans
 /**
  * Crée une demande de dépôt pour un client (statut PENDING en attente de validation).
  */
-export async function createDepositRequest(userId: string, amount: number, method = "Virement SEPA") {
+export async function createDepositRequest(userId: string, amount: number, method = "Virement SEPA", reference?: string) {
   return recordTransaction({
     user_id: userId,
     type: "DEPOSIT",
@@ -726,6 +788,7 @@ export async function createDepositRequest(userId: string, amount: number, metho
     currency: "USD",
     status: "PENDING",
     method,
+    ...(reference ? { reference_tx: reference } : {}),
   });
 }
 

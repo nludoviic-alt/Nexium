@@ -12,7 +12,7 @@
 const API_URL = import.meta.env.VITE_EMAIL_API_URL ?? "";
 const API_KEY = import.meta.env.VITE_EMAIL_API_KEY ?? "";
 
-export type ConversationStatus = "NON_ASSIGNE" | "EN_COURS" | "EN_ATTENTE" | "RESOLU";
+export type ConversationStatus = "NON_ASSIGNE" | "EN_COURS" | "EN_ATTENTE" | "RESOLU" | "ARCHIVE";
 export type AgentAvailability = "DISPONIBLE" | "OCCUPE" | "PAUSE" | "HORS_LIGNE";
 export type MessageDirection = "INBOUND" | "OUTBOUND";
 
@@ -81,7 +81,7 @@ export interface EmailAgentSummary {
   activeConversations: number;
 }
 
-export type EmailConversationFilter = "inbox" | "mine" | "unassigned" | "in_progress" | "waiting" | "resolved";
+export type EmailConversationFilter = "inbox" | "mine" | "unassigned" | "in_progress" | "waiting" | "resolved" | "archived";
 
 export class EmailApiError extends Error {
   constructor(
@@ -140,7 +140,7 @@ export const emailApi = {
   },
 
   getCounts(userId: string) {
-    return request<{ inbox: number; mine: number; unassigned: number; inProgress: number; waiting: number; resolved: number }>(
+    return request<{ inbox: number; mine: number; unassigned: number; inProgress: number; waiting: number; resolved: number; archived: number }>(
       "/api/conversations/counts",
       userId
     );

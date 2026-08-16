@@ -47,6 +47,7 @@ const FILTER_TO_STATUS: Record<string, ConversationStatus | undefined> = {
   in_progress: "EN_COURS",
   waiting: "EN_ATTENTE",
   resolved: "RESOLU",
+  archived: "ARCHIVE",
 };
 
 // §3 : compteurs pour la colonne de navigation.
@@ -58,16 +59,17 @@ conversationsRouter.get("/conversations/counts", async (req, res) => {
     return row?.n ?? 0;
   };
 
-  const [inbox, mine, unassigned, inProgress, waiting, resolved] = await Promise.all([
-    countWhere(undefined),
+  const [inbox, mine, unassigned, inProgress, waiting, resolved, archived] = await Promise.all([
+    countWhere(sql`${emailConversations.status} != 'ARCHIVE'`),
     countWhere(eq(emailConversations.assignedUserId, agentId)),
     countWhere(eq(emailConversations.status, "NON_ASSIGNE")),
     countWhere(eq(emailConversations.status, "EN_COURS")),
     countWhere(eq(emailConversations.status, "EN_ATTENTE")),
     countWhere(eq(emailConversations.status, "RESOLU")),
+    countWhere(eq(emailConversations.status, "ARCHIVE")),
   ]);
 
-  res.json({ inbox, mine, unassigned, inProgress, waiting, resolved });
+  res.json({ inbox, mine, unassigned, inProgress, waiting, resolved, archived });
 });
 
 // §3 : liste des conversations (colonne 2), avec recherche et filtres par onglet.
@@ -79,7 +81,8 @@ conversationsRouter.get("/conversations", async (req, res) => {
   const conditions = [];
   if (filter === "mine") conditions.push(eq(emailConversations.assignedUserId, agentId));
   else if (FILTER_TO_STATUS[filter]) conditions.push(eq(emailConversations.status, FILTER_TO_STATUS[filter]!));
-  // filter === "inbox" => pas de condition, toute la boîte partagée.
+  else if (filter === "inbox") conditions.push(sql`${emailConversations.status} != 'ARCHIVE'`);
+  // Les fils archivés ne remontent que via filter === "archived", jamais dans "inbox".
 
   if (search) {
     const like_ = `%${search.toLowerCase()}%`;
@@ -220,7 +223,7 @@ conversationsRouter.patch("/conversations/:id/status", async (req, res) => {
   const { id } = req.params;
   const agent = req.agent!;
   const status = req.body?.status as ConversationStatus | undefined;
-  const VALID: ConversationStatus[] = ["NON_ASSIGNE", "EN_COURS", "EN_ATTENTE", "RESOLU"];
+  const VALID: ConversationStatus[] = ["NON_ASSIGNE", "EN_COURS", "EN_ATTENTE", "RESOLU", "ARCHIVE"];
   if (!status || !VALID.includes(status)) return res.status(400).json({ error: "invalid_status" });
 
   const [conversation] = await db.select().from(emailConversations).where(eq(emailConversations.id, id)).limit(1);

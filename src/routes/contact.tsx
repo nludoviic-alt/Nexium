@@ -156,6 +156,29 @@ function ContactPage() {
       return;
     }
 
+    // 5. Anti-Spam Check serveur : rejoue honeypot + délai + limite par IP,
+    // côté Edge Function où ça ne peut pas être contourné (contrairement au
+    // localStorage utilisé ci-dessus). Fail-open si la fonction n'est pas
+    // encore déployée ou injoignable, pour ne jamais bloquer un client
+    // légitime à cause d'un souci d'infrastructure côté anti-spam.
+    if (isSupabaseConfigured) {
+      try {
+        const { data: gate } = await supabase.functions.invoke("contact-submit", {
+          body: { honeypot, elapsedSeconds },
+        });
+        if (gate && gate.allowed === false) {
+          toast.error(
+            language === "fr"
+              ? "Impossible de transmettre votre message pour le moment. Veuillez réessayer plus tard."
+              : "Unable to send your message right now. Please try again later."
+          );
+          return;
+        }
+      } catch {
+        // Fonction non déployée / injoignable : on laisse passer (fail-open).
+      }
+    }
+
     setIsSubmitting(true);
 
     try {

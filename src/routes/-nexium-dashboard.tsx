@@ -19,6 +19,11 @@ import {
   CheckCheck,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  Coins,
+  Copy,
+  CreditCard,
+  Landmark,
   ChevronRight,
   Clock,
   Cpu,
@@ -116,6 +121,9 @@ import {
   getClientEmailConversations,
   sendClientEmailMessage,
   subscribeToClientEmails,
+  getPaymentSettings,
+  subscribeToPaymentSettings,
+  type PaymentSettings,
 } from "@/lib/supabase";
 
 
@@ -5389,6 +5397,14 @@ export function NexiumDashboard({
     return unsub;
   }, [currentUserId]);
 
+  // Coordonnées de paiement (IBAN / adresses crypto) affichées dans le parcours de dépôt.
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    getPaymentSettings().then(setPaymentSettings);
+    const unsub = subscribeToPaymentSettings(setPaymentSettings);
+    return unsub;
+  }, []);
+
   const handleConfirmPresetRequest = async (presetIds: string[]) => {
     if (presetIds.length === 0) return;
     setSubmittingPreset(true);
@@ -5430,7 +5446,11 @@ export function NexiumDashboard({
   const [selectedDetailBot, setSelectedDetailBot] = useState<EngineBot | null>(null);
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("1000");
-  const [depositMethod, setDepositMethod] = useState("Virement SEPA");
+  const [depositStep, setDepositStep] = useState<"METHOD" | "BANK" | "CARD" | "CRYPTO">("METHOD");
+  const [depositCryptoNetwork, setDepositCryptoNetwork] = useState<"USDT_TRC20" | "USDT_ERC20" | "BTC" | "ETH">("USDT_TRC20");
+  const [depositReference] = useState(() => `NXM-${Math.random().toString(36).slice(2, 8).toUpperCase()}`);
+  const [depositSubmitting, setDepositSubmitting] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
 
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("500");
@@ -5590,37 +5610,69 @@ export function NexiumDashboard({
     toast.error("Coupe-circuit activé ! Toutes les positions sont fermées et les moteurs sont en pause.");
   };
 
-  const handleDepositSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const openDepositModal = () => {
+    setDepositStep("METHOD");
+    setDepositOpen(true);
+  };
+
+  const closeDepositModal = () => {
+    setDepositOpen(false);
+    setDepositStep("METHOD");
+  };
+
+  const submitDepositRequest = async (method: string, reference?: string) => {
     const val = parseFloat(depositAmount);
     if (isNaN(val) || val <= 0) {
       toast.error("Veuillez saisir un montant valide.");
       return;
     }
 
-    if (isSupabaseConfigured && currentUserId) {
-      const res = await createDepositRequest(currentUserId, val, depositMethod);
-      if (!res.success) {
-        toast.error("Erreur lors de la transmission de la demande de dépôt.");
-        return;
+    setDepositSubmitting(true);
+    try {
+      if (isSupabaseConfigured && currentUserId) {
+        const res = await createDepositRequest(currentUserId, val, method, reference);
+        if (!res.success) {
+          toast.error("Erreur lors de la transmission de la demande de dépôt.");
+          return;
+        }
       }
-    }
 
-    const now = new Date().toLocaleTimeString();
-    const newTx: TransactionItem = {
-      id: `tx-${Date.now()}`,
-      date: `Aujourd'hui · ${now.slice(0, 5)}`,
-      type: "Dépôt en attente",
-      amount: `+$${val.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
-      amountNum: val,
-      currency: "USD",
-      status: "En attente",
-      method: depositMethod,
-      color: "#f59e0b",
-    };
-    setTransactions((prev) => [newTx, ...prev]);
-    setDepositOpen(false);
-    toast.success(`Demande de dépôt de $${val.toFixed(2)} (${depositMethod}) transmise à l'Administration pour crédit.`);
+      const now = new Date().toLocaleTimeString();
+      const newTx: TransactionItem = {
+        id: `tx-${Date.now()}`,
+        date: `Aujourd'hui · ${now.slice(0, 5)}`,
+        type: "Dépôt en attente",
+        amount: `+$${val.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
+        amountNum: val,
+        currency: "USD",
+        status: "En attente",
+        method,
+        color: "#f59e0b",
+      };
+      setTransactions((prev) => [newTx, ...prev]);
+      closeDepositModal();
+      toast.success(`Demande de dépôt de $${val.toFixed(2)} (${method}) transmise à l'Administration pour vérification et crédit.`);
+    } finally {
+      setDepositSubmitting(false);
+    }
+  };
+
+  const CRYPTO_NETWORKS: Record<
+    "USDT_TRC20" | "USDT_ERC20" | "BTC" | "ETH",
+    { label: string; addressField: keyof PaymentSettings }
+  > = {
+    USDT_TRC20: { label: "USDT (TRC20)", addressField: "crypto_usdt_trc20_address" },
+    USDT_ERC20: { label: "USDT (ERC20)", addressField: "crypto_usdt_erc20_address" },
+    BTC: { label: "Bitcoin (BTC)", addressField: "crypto_btc_address" },
+    ETH: { label: "Ethereum (ETH)", addressField: "crypto_eth_address" },
+  };
+
+  const handleCopyToClipboard = (value: string, label: string) => {
+    if (!value) return;
+    navigator.clipboard
+      .writeText(value)
+      .then(() => toast.success(`${label} copié(e) dans le presse-papiers.`))
+      .catch(() => toast.error("Impossible de copier."));
   };
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
@@ -6399,7 +6451,7 @@ export function NexiumDashboard({
             </StatusPill>
 
             <button
-              onClick={() => setDepositOpen(true)}
+              onClick={openDepositModal}
               className="hidden sm:flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] px-4 py-2 text-sm font-mono font-black text-[#00D084] hover:bg-[#1a2330] transition cursor-pointer"
             >
               ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD
@@ -6515,7 +6567,7 @@ export function NexiumDashboard({
               bots={bots}
               positions={positions}
               onClosePosition={handleClosePosition}
-              onOpenDeposit={() => setDepositOpen(true)}
+              onOpenDeposit={openDepositModal}
               onOpenWithdraw={() => setWithdrawOpen(true)}
               onOpenEngine={() => setActiveNav("Auto-Trader")}
               onOpenRisk={() => setActiveNav("Risque")}
@@ -6541,7 +6593,7 @@ export function NexiumDashboard({
             <PortfolioTab
               balance={balance}
               transactions={transactions}
-              onOpenDeposit={() => setDepositOpen(true)}
+              onOpenDeposit={openDepositModal}
               onOpenWithdraw={() => setWithdrawOpen(true)}
             />
           )}
@@ -6733,78 +6785,222 @@ export function NexiumDashboard({
       {/* DÉPÔT MODAL */}
       {depositOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-xl rounded-3xl border border-white/[0.1] bg-[#10141b] p-7 sm:p-9 shadow-2xl space-y-6">
+          <div className="w-full max-w-xl rounded-3xl border border-white/[0.1] bg-[#10141b] p-7 sm:p-9 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
-              <div>
-                <h3 className="font-black text-2xl text-white">Déposer des fonds</h3>
-                <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Alimentez instantanément votre compte de trading ECN</p>
+              <div className="flex items-center gap-3">
+                {depositStep !== "METHOD" && (
+                  <button
+                    onClick={() => setDepositStep("METHOD")}
+                    className="text-gray-400 hover:text-white p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer shrink-0"
+                    title="Retour"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                )}
+                <div>
+                  <h3 className="font-black text-2xl text-white">Déposer des fonds</h3>
+                  <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+                    {depositStep === "METHOD"
+                      ? "Alimentez instantanément votre compte de trading ECN"
+                      : "Suivez les instructions ci-dessous pour finaliser votre dépôt"}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setDepositOpen(false)} className="text-gray-400 hover:text-white p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer">
+              <button onClick={closeDepositModal} className="text-gray-400 hover:text-white p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer shrink-0">
                 <X className="size-5" />
               </button>
             </div>
 
-            <form onSubmit={handleDepositSubmit} className="space-y-5">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">MONTANT DU DÉPÔT (USD)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold text-gray-500">$</span>
-                  <input
-                    type="number"
-                    step="any"
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    className="w-full rounded-2xl border border-white/[0.1] bg-black/40 pl-10 pr-4 py-4 font-mono text-2xl sm:text-3xl font-bold text-white outline-none focus:border-[#00D084] transition"
-                  />
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">MONTANT DU DÉPÔT (USD)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold text-gray-500">$</span>
+                <input
+                  type="number"
+                  step="any"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  disabled={depositStep !== "METHOD"}
+                  className="w-full rounded-2xl border border-white/[0.1] bg-black/40 pl-10 pr-4 py-4 font-mono text-2xl sm:text-3xl font-bold text-white outline-none focus:border-[#00D084] transition disabled:opacity-60"
+                />
+              </div>
+              {depositStep === "METHOD" && (
+                <div className="grid grid-cols-4 gap-2.5 mt-3">
+                  {["500", "1000", "2500", "5000"].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setDepositAmount(amt)}
+                      className={`rounded-xl border py-2.5 text-xs sm:text-sm font-bold transition cursor-pointer ${
+                        depositAmount === amt
+                          ? "border-[#00D084] bg-[#00D084]/15 text-[#00D084]"
+                          : "border-white/[0.08] bg-[#141a23] text-gray-300 hover:border-[#00D084]/40 hover:text-white"
+                      }`}
+                    >
+                      +${amt}
+                    </button>
+                  ))}
                 </div>
-              </div>
+              )}
+            </div>
 
-              <div className="grid grid-cols-4 gap-2.5">
-                {["500", "1000", "2500", "5000"].map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => setDepositAmount(amt)}
-                    className={`rounded-xl border py-2.5 text-xs sm:text-sm font-bold transition cursor-pointer ${
-                      depositAmount === amt
-                        ? "border-[#00D084] bg-[#00D084]/15 text-[#00D084]"
-                        : "border-white/[0.08] bg-[#141a23] text-gray-300 hover:border-[#00D084]/40 hover:text-white"
-                    }`}
-                  >
-                    +${amt}
-                  </button>
-                ))}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">MODE DE PAIEMENT SÉCURISÉ</label>
-                <select
-                  value={depositMethod}
-                  onChange={(e) => setDepositMethod(e.target.value)}
-                  className="w-full rounded-2xl border border-white/[0.1] bg-[#0c1017] px-4 py-3.5 text-xs sm:text-sm text-white outline-none focus:border-[#00D084] transition"
-                >
-                  <option value="Virement SEPA">Virement Bancaire SEPA Instantané</option>
-                  <option value="Carte ECN">Carte de Débit / Crédit ECN</option>
-                  <option value="USDT TRC20">Crypto USDT (TRC20 / ERC20)</option>
-                </select>
-              </div>
-
-              <div className="flex gap-3 pt-2">
+            {depositStep === "METHOD" && (
+              <div className="space-y-2.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">CHOISISSEZ UN MODE DE PAIEMENT</label>
                 <button
-                  type="button"
-                  onClick={() => setDepositOpen(false)}
-                  className="flex-1 rounded-2xl border border-white/[0.08] bg-[#141a23] py-3.5 text-xs sm:text-sm font-bold text-gray-400 hover:text-white hover:bg-[#1a2330] transition cursor-pointer"
+                  onClick={() => setDepositStep("BANK")}
+                  className="w-full flex items-center gap-3.5 rounded-2xl border border-white/[0.1] bg-[#141a23] hover:border-[#00D084]/40 p-4 text-left transition cursor-pointer"
                 >
-                  ANNULER
+                  <div className="grid size-11 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 shrink-0">
+                    <Landmark className="size-5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-white">Virement Bancaire</p>
+                    <p className="text-xs text-gray-400">IBAN/BIC · crédité après réception</p>
+                  </div>
+                  <ChevronDown className="size-4 text-gray-500 -rotate-90" />
                 </button>
                 <button
-                  type="submit"
-                  className="neon-btn flex-1 rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer"
+                  onClick={() => setDepositStep("CARD")}
+                  className="w-full flex items-center gap-3.5 rounded-2xl border border-white/[0.1] bg-[#141a23] hover:border-[#00D084]/40 p-4 text-left transition cursor-pointer"
                 >
-                  CONFIRMER LE DÉPÔT
+                  <div className="grid size-11 place-items-center rounded-xl bg-purple-500/15 text-purple-400 shrink-0">
+                    <CreditCard className="size-5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-white">Carte Bancaire</p>
+                    <p className="text-xs text-gray-400">Débit / Crédit · lien de paiement envoyé par le Desk</p>
+                  </div>
+                  <ChevronDown className="size-4 text-gray-500 -rotate-90" />
+                </button>
+                <button
+                  onClick={() => setDepositStep("CRYPTO")}
+                  className="w-full flex items-center gap-3.5 rounded-2xl border border-white/[0.1] bg-[#141a23] hover:border-[#00D084]/40 p-4 text-left transition cursor-pointer"
+                >
+                  <div className="grid size-11 place-items-center rounded-xl bg-amber-500/15 text-amber-400 shrink-0">
+                    <Coins className="size-5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-white">Cryptomonnaie</p>
+                    <p className="text-xs text-gray-400">USDT · BTC · ETH</p>
+                  </div>
+                  <ChevronDown className="size-4 text-gray-500 -rotate-90" />
                 </button>
               </div>
-            </form>
+            )}
+
+            {depositStep === "BANK" && (
+              <div className="space-y-4">
+                {paymentSettings?.bank_iban ? (
+                  <div className="rounded-2xl border border-white/[0.1] bg-[#0c1017] p-4 space-y-3 font-mono text-sm">
+                    {[
+                      ["Bénéficiaire", paymentSettings.bank_beneficiary],
+                      ["Banque", paymentSettings.bank_name],
+                      ["IBAN", paymentSettings.bank_iban],
+                      ["BIC / SWIFT", paymentSettings.bank_bic],
+                      ["Référence à indiquer", depositReference],
+                    ].map(([label, value]) =>
+                      value ? (
+                        <div key={label} className="flex items-center justify-between gap-3">
+                          <span className="text-gray-500 text-xs shrink-0">{label}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-white font-bold truncate">{value}</span>
+                            <button onClick={() => handleCopyToClipboard(value, label as string)} className="text-gray-500 hover:text-[#00D084] transition cursor-pointer shrink-0">
+                              <Copy className="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : null
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300">
+                    Les coordonnées bancaires ne sont pas encore configurées. Transmettez votre demande ci-dessous : notre équipe vous contactera avec les instructions de virement.
+                  </div>
+                )}
+                <p className="text-xs text-gray-400">
+                  Une fois le virement de <strong className="text-white">${(parseFloat(depositAmount) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong> effectué, confirmez ci-dessous. Votre solde sera crédité après réception et vérification par le Desk (1 à 3 jours ouvrés).
+                </p>
+                <button
+                  onClick={() => submitDepositRequest("Virement Bancaire", depositReference)}
+                  disabled={depositSubmitting}
+                  className="neon-btn w-full rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer disabled:opacity-50"
+                >
+                  {depositSubmitting ? "ENVOI EN COURS..." : "J'AI EFFECTUÉ LE VIREMENT"}
+                </button>
+              </div>
+            )}
+
+            {depositStep === "CARD" && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-4 text-xs text-purple-200">
+                  Le paiement par carte automatisé est en cours d'activation. Transmettez votre demande de <strong className="text-white">${(parseFloat(depositAmount) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong> ci-dessous : notre équipe vous enverra un lien de paiement sécurisé par carte sous peu.
+                </div>
+                <button
+                  onClick={() => submitDepositRequest("Carte Bancaire (demande manuelle)")}
+                  disabled={depositSubmitting}
+                  className="neon-btn w-full rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer disabled:opacity-50"
+                >
+                  {depositSubmitting ? "ENVOI EN COURS..." : "TRANSMETTRE MA DEMANDE"}
+                </button>
+              </div>
+            )}
+
+            {depositStep === "CRYPTO" && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(CRYPTO_NETWORKS) as Array<keyof typeof CRYPTO_NETWORKS>).map((net) => (
+                    <button
+                      key={net}
+                      onClick={() => setDepositCryptoNetwork(net)}
+                      className={`rounded-xl border py-2.5 text-xs font-bold transition cursor-pointer ${
+                        depositCryptoNetwork === net
+                          ? "border-[#00D084] bg-[#00D084]/15 text-[#00D084]"
+                          : "border-white/[0.08] bg-[#141a23] text-gray-300 hover:border-[#00D084]/40 hover:text-white"
+                      }`}
+                    >
+                      {CRYPTO_NETWORKS[net].label}
+                    </button>
+                  ))}
+                </div>
+
+                {paymentSettings?.[CRYPTO_NETWORKS[depositCryptoNetwork].addressField] ? (
+                  <div className="rounded-2xl border border-white/[0.1] bg-[#0c1017] p-4 space-y-2">
+                    <span className="text-gray-500 text-xs">Adresse de dépôt ({CRYPTO_NETWORKS[depositCryptoNetwork].label})</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-mono text-xs sm:text-sm break-all flex-1">
+                        {paymentSettings[CRYPTO_NETWORKS[depositCryptoNetwork].addressField]}
+                      </span>
+                      <button
+                        onClick={() =>
+                          handleCopyToClipboard(
+                            String(paymentSettings[CRYPTO_NETWORKS[depositCryptoNetwork].addressField]),
+                            "Adresse"
+                          )
+                        }
+                        className="text-gray-500 hover:text-[#00D084] transition cursor-pointer shrink-0"
+                      >
+                        <Copy className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300">
+                    L'adresse {CRYPTO_NETWORKS[depositCryptoNetwork].label} n'est pas encore configurée. Transmettez votre demande ci-dessous : notre équipe vous communiquera l'adresse à utiliser.
+                  </div>
+                )}
+                <p className="text-xs text-gray-400">
+                  Envoyez exactement le montant correspondant à <strong className="text-white">${(parseFloat(depositAmount) || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong> sur le réseau <strong className="text-white">{CRYPTO_NETWORKS[depositCryptoNetwork].label}</strong> uniquement — tout autre réseau entraîne une perte de fonds. Votre solde sera crédité après confirmation on-chain.
+                </p>
+                <button
+                  onClick={() => submitDepositRequest(`Crypto ${CRYPTO_NETWORKS[depositCryptoNetwork].label}`, depositReference)}
+                  disabled={depositSubmitting}
+                  className="neon-btn w-full rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black transition cursor-pointer disabled:opacity-50"
+                >
+                  {depositSubmitting ? "ENVOI EN COURS..." : "J'AI ENVOYÉ LES FONDS"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
