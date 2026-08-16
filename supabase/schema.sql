@@ -283,6 +283,7 @@ SET search_path = public
 AS $$
 DECLARE
   caller_is_primary_owner BOOLEAN;
+  engines_active_only BOOLEAN;
 BEGIN
   IF auth.uid() IS NULL THEN
     RETURN NEW;
@@ -357,7 +358,37 @@ BEGIN
     NEW.max_daily_loss_percent := OLD.max_daily_loss_percent;
     NEW.max_simultaneous_trades := OLD.max_simultaneous_trades;
     NEW.risk_guard_auto_stop := OLD.risk_guard_auto_stop;
-    NEW.engines_config := OLD.engines_config;
+
+    -- Exception : un client (TRADER) peut librement mettre en pause / reprendre
+    -- SES PROPRES moteurs (le champ "active" de chaque moteur dans
+    -- engines_config) — c'est un contrôle de sécurité personnel légitime.
+    -- Il ne peut en revanche pas modifier le preset, la taille de lot, le
+    -- score minimal ou le plafond de risque de ces moteurs : ça reste une
+    -- décision du Desk (validation initiale du Preset, réglages de risque).
+    IF OLD.engines_config IS NOT NULL AND NEW.engines_config IS NOT NULL THEN
+      engines_active_only := (
+        jsonb_set(
+          jsonb_set(
+            jsonb_set(
+              OLD.engines_config,
+              '{aiGold,active}',
+              COALESCE(NEW.engines_config #> '{aiGold,active}', OLD.engines_config #> '{aiGold,active}', 'null'::jsonb)
+            ),
+            '{fxTrend,active}',
+            COALESCE(NEW.engines_config #> '{fxTrend,active}', OLD.engines_config #> '{fxTrend,active}', 'null'::jsonb)
+          ),
+          '{indexReversion,active}',
+          COALESCE(NEW.engines_config #> '{indexReversion,active}', OLD.engines_config #> '{indexReversion,active}', 'null'::jsonb)
+        ) = NEW.engines_config
+      );
+    ELSE
+      engines_active_only := (NEW.engines_config IS NOT DISTINCT FROM OLD.engines_config);
+    END IF;
+
+    IF NOT engines_active_only THEN
+      NEW.engines_config := OLD.engines_config;
+    END IF;
+
     NEW.license_key := OLD.license_key;
     NEW.license_expires := OLD.license_expires;
   END IF;
