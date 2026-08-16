@@ -90,6 +90,7 @@ import {
   VideoOff,
   Volume2,
   VolumeX,
+  Gift,
   Wallet,
   Wifi,
   X,
@@ -1810,7 +1811,7 @@ function EngineTab({
                       <Calculator className="size-3.5 text-emerald-400" />
                       1. Dimensionnement de la Mise
                     </span>
-                    <span className="text-[11px] font-mono text-slate-400">Capital: $24 860</span>
+                    <span className="text-[11px] font-mono text-slate-400">Capital: ${balance.toLocaleString("fr-FR")}</span>
                   </div>
 
                   {/* Sizing Mode Tabs */}
@@ -2454,6 +2455,7 @@ function EngineTab({
 function OverviewTab({
   clientName,
   balance,
+  bonus,
   running,
   onToggleRunning,
   bots,
@@ -2466,6 +2468,7 @@ function OverviewTab({
 }: {
   clientName: string;
   balance: number;
+  bonus: number;
   running: boolean;
   onToggleRunning: () => void;
   bots: EngineBot[];
@@ -2615,7 +2618,39 @@ function OverviewTab({
       </section>
 
       {/* KPI Cards (Harmonisées avec les Cartes Analytiques de Gains et Pertes du Profil) */}
-      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 font-mono">
+      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 font-mono">
+        <article className="admin-card-indigo p-5 sm:p-6 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">SOLDE TOTAL</span>
+            <div className="grid size-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+              <Wallet className="size-4.5" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-white">
+            ${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+          </p>
+          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-indigo-500/20 font-sans">
+            <span className="text-slate-400">Solde cash</span>
+            <span className="font-mono font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+          </div>
+        </article>
+
+        <article className="admin-card-amber p-5 sm:p-6 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">BONUS CRÉDITÉ</span>
+            <div className="grid size-9 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <Gift className="size-4.5" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-amber-300">
+            ${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+          </p>
+          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-amber-500/20 font-sans">
+            <span className="text-slate-400">Statut</span>
+            <span className="font-mono font-bold text-white">{bonus > 0 ? "Bonus actif" : "Aucun bonus"}</span>
+          </div>
+        </article>
+
         <article className="admin-card-emerald p-5 sm:p-6 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">VALEUR DU COMPTE (EQUITY)</span>
@@ -5017,6 +5052,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("Auto-Trader");
   const [balance, setBalance] = useState(0);
+  const [bonus, setBonus] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -5074,6 +5110,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
       if (profile) {
         if (profile.name) setClientName(profile.name);
         if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
+        if (profile.bonus_credit !== undefined && profile.bonus_credit !== null) setBonus(Number(profile.bonus_credit));
         if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
         if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
         if (profile.license_status) {
@@ -5145,6 +5182,9 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
     const unsubProfile = subscribeToUserProfile(currentUserId, (updatedProfile) => {
       if (updatedProfile.balance !== undefined && updatedProfile.balance !== null) {
         setBalance(Number(updatedProfile.balance));
+      }
+      if (updatedProfile.bonus_credit !== undefined && updatedProfile.bonus_credit !== null) {
+        setBonus(Number(updatedProfile.bonus_credit));
       }
       if (updatedProfile.status === "REVOKED" || updatedProfile.status === "BANNED" || updatedProfile.status === "SUSPENDED") {
         toast.error("Votre compte a été restreint par l'administration.");
@@ -6410,6 +6450,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
             <OverviewTab
               clientName={clientName}
               balance={balance}
+              bonus={bonus}
               running={running}
               onToggleRunning={handleToggleEngine}
               bots={bots}
