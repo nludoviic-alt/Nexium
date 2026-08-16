@@ -1246,7 +1246,7 @@ function NexiumAdminDashboard({
             maxDailyLossPercent: p.max_daily_loss_percent ?? 3.0,
             maxSimultaneousTrades: p.max_simultaneous_trades ?? 3,
             riskGuardAutoStop: p.risk_guard_auto_stop ?? true,
-            assignedAdvisor: p.assigned_advisor || "Dr. Antoine R.",
+            assignedAdvisor: p.assigned_advisor || "Expert Trading",
             sessions: [],
             crmNotes: [],
             withdrawalRequests: [],
@@ -3119,7 +3119,7 @@ function NexiumAdminDashboard({
                       <div>
                         {isSuperAdmin ? (
                           <select
-                            value={c.assignedAdvisor || "Dr. Antoine R."}
+                            value={c.assignedAdvisor || "Expert Trading"}
                             onChange={(e) => handleAssignAdvisor(c, e.target.value)}
                             className="text-xs font-semibold rounded-lg bg-black/40 border border-slate-700 text-slate-200 px-2 py-1 focus:border-emerald-500 focus:outline-none cursor-pointer"
                           >

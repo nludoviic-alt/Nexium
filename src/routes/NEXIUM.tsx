@@ -636,7 +636,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: "m-2",
     sender: "expert",
-    senderName: "Dr. Antoine R. (Expert Quant)",
+    senderName: "Expert Trading (Desk Quant)",
     contactId: "expert-quant",
     text: "Bonjour Ludovic. La session New York montre un breakout algorithmique de volatilité sur XAUUSD. Le moteur AI Gold a validé le setup à 2 384.20 avec un ratio risque/rendement de 1:2.4. Ci-joint l'analyse graphique du signal.",
     time: "14:22",
@@ -707,7 +707,7 @@ const INITIAL_EMAILS: EmailItem[] = [
       "Le filtre du Risk Governor a validé un dimensionnement strict à 0.20 lot, avec un Stop-Loss positionné à 2 374.00 et un Take-Profit à 2 405.00.",
       "La position génère actuellement un P&L positif latent. Nos ingénieurs surveillent le carnet d'ordres L2 sur le flux Equinix NY4.",
       "Restant à votre entière disposition sur le Desk ou par appel direct.",
-      "Bien cordialement,\nDr. Antoine R. — Head of Quantitative Trading",
+      "Bien cordialement,\nExpert Trading — Desk de Recherche Quantitative",
     ],
     unread: true,
     priority: "URGENT",
@@ -3629,8 +3629,8 @@ const MESSENGER_CONTACTS: MessengerContact[] = [
   },
   {
     id: "expert-quant",
-    name: "Dr. Antoine R.",
-    role: "Recherche Quantitative",
+    name: "Expert Trading",
+    role: "Desk de Trading Algorithmique",
     category: "expert",
     avatar: "AR",
     avatarBg: "bg-purple-500/20 text-purple-400 border-purple-500/30",
@@ -3966,9 +3966,9 @@ function MessagingTab({
   // ---------------- AUDIO PHONE CALL STATE ----------------
   const [callState, setCallState] = useState<"IDLE" | "CALLING" | "CONNECTED" | "ENDED">("IDLE");
   const [callSelectedAgent, setCallSelectedAgent] = useState({
-    name: "Dr. Antoine R.",
-    role: "Directeur de Recherche Quantitative",
-    avatar: "AR",
+    name: "Expert Trading",
+    role: "Desk de Trading Algorithmique",
+    avatar: "ET",
     phoneExt: "Ligne directe : +1 (212) 892-0144 · Poste #104",
     status: "Disponible immédiatement",
   });
@@ -4967,9 +4967,9 @@ function MessagingTab({
               <div className="grid gap-4 md:grid-cols-3">
                 {[
                   {
-                    name: "Dr. Antoine R.",
-                    role: "Directeur Recherche Quantitative",
-                    avatar: "AR",
+                    name: "Expert Trading",
+                    role: "Desk de Trading Algorithmique",
+                    avatar: "ET",
                     phoneExt: "Ligne directe : +1 (212) 892-0144 · #104",
                     status: "Disponible",
                   },
@@ -5238,7 +5238,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const [clientName, setClientName] = useState("Ludovic M.");
   const [clientEmail, setClientEmail] = useState("ludovic@nexium.io");
   const [mt5AccountNumber, setMt5AccountNumber] = useState("802194");
-  const [assignedAdvisor, setAssignedAdvisor] = useState("Dr. Antoine R. (Quant Desk)");
+  const [assignedAdvisor, setAssignedAdvisor] = useState("Expert Trading (Desk Quant)");
   const [licenseStatus, setLicenseStatus] = useState<"NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE">("ACTIVE");
   const [requestedPreset, setRequestedPreset] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -5799,9 +5799,14 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   // ----------------------------------------------------
   if (licenseStatus !== "ACTIVE") {
     return (
-      <div className="min-h-screen bg-[#080a0e] text-white flex flex-col font-sans selection:bg-[#00D084]/30">
+      <div className="min-h-screen bg-[#05070a] text-white flex flex-col font-sans selection:bg-[#00D084]/30 relative overflow-x-hidden">
+        {/* Lueurs et Dégradés d'Ambiance Riches */}
+        <div className="absolute top-0 right-0 size-[650px] bg-gradient-to-bl from-[#00D084]/10 via-[#00D084]/5 to-transparent rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute top-[25%] left-[-5%] size-[600px] bg-gradient-to-tr from-cyan-500/10 via-blue-600/5 to-transparent rounded-full blur-[160px] pointer-events-none" />
+        <div className="absolute bottom-[5%] right-[15%] size-[700px] bg-gradient-to-tl from-purple-500/10 via-emerald-900/5 to-transparent rounded-full blur-[180px] pointer-events-none" />
+
         {/* Top Header Harmonisé */}
-        <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-white/[0.08] bg-[#0b0d10]/95 px-4 sm:px-8 backdrop-blur-2xl">
+        <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-white/[0.08] bg-[#070a0f]/90 px-4 sm:px-8 backdrop-blur-2xl">
           <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-3">
               <span className="font-mono text-xl sm:text-2xl font-black tracking-[0.25em] text-white">NEXIUM</span>
@@ -5823,13 +5828,13 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
 
           <div className="flex items-center gap-3">
             {/* Statut ECN Live */}
-            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-mono font-bold text-emerald-400">
+            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-mono font-bold text-emerald-400">
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>MT5 RAW ECN : #{mt5AccountNumber}</span>
             </div>
 
             {/* Solde Ségrégué */}
-            <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] px-3.5 py-1.5 text-xs sm:text-sm font-mono font-black text-[#00D084]">
+            <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#111722] px-4 py-2 text-xs sm:text-sm font-mono font-black text-[#00D084] shadow-lg shadow-black/40">
               ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD
             </div>
 
@@ -5837,7 +5842,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2.5 rounded-xl border border-white/[0.1] bg-[#141a23] px-2.5 py-1.5 hover:border-white/20 transition cursor-pointer"
+                className="flex items-center gap-2.5 rounded-xl border border-white/[0.1] bg-[#111722] px-3 py-1.5 hover:border-white/20 transition cursor-pointer"
                 title="Menu profil"
               >
                 <div className="grid size-7 sm:size-8 place-items-center rounded-lg bg-[#00D084]/15 border border-[#00D084]/30 text-xs font-black text-[#00D084]">
@@ -5850,13 +5855,13 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                 </div>
                 <div className="hidden md:flex flex-col text-left leading-none">
                   <span className="text-xs font-black text-white">{clientName}</span>
-                  <span className="text-[10px] font-mono text-slate-400">Titulaire</span>
+                  <span className="text-[10px] font-mono text-slate-400">Titulaire Vérifié</span>
                 </div>
                 <ChevronDown className="size-3 text-slate-400" />
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-white/[0.1] bg-[#10141b] p-2 shadow-2xl z-50 backdrop-blur-xl">
+                <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-white/[0.1] bg-[#0e141e] p-2 shadow-2xl z-50 backdrop-blur-xl">
                   <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
                     <p className="text-xs font-bold text-white">{clientName}</p>
                     <p className="text-[10px] font-mono text-[#00D084]">Compte MT5 #{mt5AccountNumber}</p>
@@ -5894,59 +5899,101 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
         </header>
 
         {/* Corps Principal */}
-        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-8 py-8 w-full space-y-8">
-          {/* Bandeau Institutionnel des 4 Indicateurs Compte */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
-              <div className="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center shrink-0">
-                <ShieldCheck className="size-5" />
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-8 py-8 w-full space-y-8 relative z-10">
+          {/* ── 1. GRANDE CARTE INSTITUTIONNELLE (4 CHAMPS AGRANDIS) ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            {/* Champ 1 : Compte Titulaire */}
+            <div className="p-6 rounded-3xl border border-white/[0.08] bg-gradient-to-b from-[#0e141f]/90 to-[#090d14]/90 backdrop-blur-xl shadow-2xl hover:border-emerald-500/40 transition duration-300 group flex flex-col justify-between min-h-[140px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400">
+                  COMPTE TITULAIRE
+                </span>
+                <div className="size-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center group-hover:scale-105 transition">
+                  <ShieldCheck className="size-6" />
+                </div>
               </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-slate-400 uppercase font-mono block">Compte Titulaire</span>
-                <strong className="text-xs text-white truncate block">MT5 #{mt5AccountNumber}</strong>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
-              <div className="size-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 grid place-items-center shrink-0">
-                <Wifi className="size-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-slate-400 uppercase font-mono block">Passerelle FIX</span>
-                <strong className="text-xs text-cyan-300 truncate block">Equinix NY4 Cross-Connect</strong>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
-              <div className="size-10 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 grid place-items-center shrink-0">
-                <Activity className="size-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-slate-400 uppercase font-mono block">Conseiller Référent</span>
-                <strong className="text-xs text-white truncate block">{assignedAdvisor}</strong>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
-              <div className="size-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 grid place-items-center shrink-0">
-                <Lock className="size-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] text-slate-400 uppercase font-mono block">Statut Stratégie</span>
-                <strong className="text-xs text-amber-400 truncate block">
-                  {licenseStatus === "PENDING_PRESET_APPROVAL" ? "En cours de validation Desk" : "En attente d'activation"}
+              <div className="mt-3">
+                <strong className="text-base sm:text-lg font-black text-white tracking-tight block">
+                  MT5 #{mt5AccountNumber}
                 </strong>
+                <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Titularisation ECN Active
+                </span>
+              </div>
+            </div>
+
+            {/* Champ 2 : Passerelle FIX */}
+            <div className="p-6 rounded-3xl border border-white/[0.08] bg-gradient-to-b from-[#0e141f]/90 to-[#090d14]/90 backdrop-blur-xl shadow-2xl hover:border-cyan-500/40 transition duration-300 group flex flex-col justify-between min-h-[140px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400">
+                  PASSERELLE FIX
+                </span>
+                <div className="size-11 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 grid place-items-center group-hover:scale-105 transition">
+                  <Wifi className="size-6" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <strong className="text-base sm:text-lg font-black text-white tracking-tight block truncate">
+                  Equinix NY4
+                </strong>
+                <span className="text-[11px] font-mono text-cyan-300 flex items-center gap-1.5 mt-0.5">
+                  <span className="size-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  Cross-Connect FIX 4.4 (16ms)
+                </span>
+              </div>
+            </div>
+
+            {/* Champ 3 : Conseiller Référent */}
+            <div className="p-6 rounded-3xl border border-white/[0.08] bg-gradient-to-b from-[#0e141f]/90 to-[#090d14]/90 backdrop-blur-xl shadow-2xl hover:border-purple-500/40 transition duration-300 group flex flex-col justify-between min-h-[140px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400">
+                  CONSEILLER RÉFÉRENT
+                </span>
+                <div className="size-11 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400 grid place-items-center group-hover:scale-105 transition">
+                  <Activity className="size-6" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <strong className="text-base sm:text-lg font-black text-white tracking-tight block truncate">
+                  Expert Trading
+                </strong>
+                <span className="text-[11px] font-mono text-purple-300 flex items-center gap-1.5 mt-0.5">
+                  <span className="size-1.5 rounded-full bg-purple-400 animate-pulse" />
+                  Supervision Quant Dédiée 24/7
+                </span>
+              </div>
+            </div>
+
+            {/* Champ 4 : Statut Privilégié / Stratégie */}
+            <div className="p-6 rounded-3xl border border-white/[0.08] bg-gradient-to-b from-[#0e141f]/90 to-[#090d14]/90 backdrop-blur-xl shadow-2xl hover:border-amber-500/40 transition duration-300 group flex flex-col justify-between min-h-[140px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-black uppercase tracking-widest text-slate-400">
+                  STATUT PRIVILÉGIÉ
+                </span>
+                <div className="size-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 grid place-items-center group-hover:scale-105 transition">
+                  <Lock className="size-6" />
+                </div>
+              </div>
+              <div className="mt-3">
+                <strong className="text-base sm:text-lg font-black text-amber-300 tracking-tight block truncate">
+                  {licenseStatus === "PENDING_PRESET_APPROVAL" ? "Validation en cours" : "En attente d'activation"}
+                </strong>
+                <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1.5 mt-0.5">
+                  <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  Accès Moteurs Algorithmiques
+                </span>
               </div>
             </div>
           </div>
 
           {/* Stepper Pipeline si Demande en cours */}
           {licenseStatus === "PENDING_PRESET_APPROVAL" ? (
-            <div className="p-6 sm:p-8 rounded-3xl bg-[#0c1017] border border-amber-500/40 backdrop-blur-xl shadow-2xl space-y-6 animate-in fade-in">
+            <div className="p-6 sm:p-7 rounded-3xl bg-[#0a0e16]/90 border border-amber-500/40 backdrop-blur-xl shadow-2xl space-y-5 animate-in fade-in">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className="size-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 grid place-items-center shrink-0">
-                    <Clock className="size-6 animate-spin" style={{ animationDuration: "8s" }} />
+                  <div className="size-11 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 grid place-items-center shrink-0">
+                    <Clock className="size-5 animate-spin" style={{ animationDuration: "8s" }} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -5955,41 +6002,41 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                       </span>
                       <span className="text-xs text-slate-400 font-mono">Protocole FIX 4.4</span>
                     </div>
-                    <h2 className="text-xl font-bold text-white mt-1">
+                    <h2 className="text-lg font-bold text-white mt-1">
                       Demande transmise au Desk d'Administration
                     </h2>
-                    <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                      Votre demande pour le <strong>{OFFICIAL_PRESETS.find(p => p.id === requestedPreset)?.name || requestedPreset}</strong> a été enregistrée. Votre gestionnaire <strong>{assignedAdvisor}</strong> procède à la vérification de conformité et à l'affectation du flux de liquidité.
+                    <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                      Votre demande pour le <strong>{OFFICIAL_PRESETS.find(p => p.id === requestedPreset)?.name || requestedPreset}</strong> a été transmise. Votre gestionnaire <strong>{assignedAdvisor}</strong> procède à la validation de conformité et à l'affectation du flux.
                     </p>
                   </div>
                 </div>
 
-                <div className="px-4 py-2 rounded-xl bg-black/50 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold flex items-center gap-2 shrink-0">
+                <div className="px-3.5 py-1.5 rounded-xl bg-black/50 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold flex items-center gap-2 shrink-0">
                   <span className="size-2 rounded-full bg-amber-400 animate-ping" />
                   <span>Validation Desk en attente</span>
                 </div>
               </div>
 
               {/* Barre de Progression Visuelle */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
-                  <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
+                  <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
                   <div>
                     <strong className="text-xs text-emerald-300 block">1. Choix du Preset</strong>
                     <span className="text-[10px] text-slate-400">Soumission confirmée</span>
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center gap-3 shadow-lg shadow-amber-500/10">
-                  <Clock className="size-5 text-amber-400 animate-spin shrink-0" />
+                <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center gap-3 shadow-lg shadow-amber-500/10">
+                  <Clock className="size-4 text-amber-400 animate-spin shrink-0" />
                   <div>
                     <strong className="text-xs text-amber-300 block">2. Examen Conformité Desk</strong>
                     <span className="text-[10px] text-amber-200/80">Revue du Super Admin en cours</span>
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex items-center gap-3 opacity-60">
-                  <Lock className="size-5 text-slate-400 shrink-0" />
+                <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex items-center gap-3 opacity-60">
+                  <Lock className="size-4 text-slate-400 shrink-0" />
                   <div>
                     <strong className="text-xs text-slate-300 block">3. Déploiement Live NY4</strong>
                     <span className="text-[10px] text-slate-500">Déverrouillage Dashboard</span>
@@ -5998,22 +6045,30 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               </div>
             </div>
           ) : (
-            <div className="text-center max-w-3xl mx-auto space-y-3 pt-2">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider font-mono">
-                <Sparkles className="size-3.5" />
-                <span>Sélection de la Stratégie Initiale</span>
+            /* ── 2. PETITE CARTE COMPACTE : ABONNEMENT ALGORITHMIQUE ── */
+            <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-[#0b1018]/95 via-[#0e1522]/95 to-[#0b1018]/95 border border-white/[0.1] shadow-2xl backdrop-blur-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold uppercase tracking-wider">
+                  <Sparkles className="size-3" />
+                  <span>ABONNEMENT ALGORITHMIQUE INSTITUTIONNEL</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Activez votre Stratégie de Trading Certifiée
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                  Sélectionnez l'un des 3 algorithmes propriétaires ci-dessous. Dès validation par l'Administration, l'intégralité du centre de pilotage et l'accès MT5 s'activeront instantanément.
+                </p>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                Activez votre Abonnement Algorithmique
-              </h2>
-              <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-                Votre compte de trading MT5 <strong>#{mt5AccountNumber}</strong> est opérationnel et prêt pour l'exécution institutionnelle. Veuillez choisir la stratégie algorithmique à déployer. Dès validation par l'Administration, l'intégralité de votre Dashboard de trading en direct sera déverrouillée.
-              </p>
+
+              <div className="shrink-0 px-4 py-2 rounded-2xl bg-black/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold flex items-center gap-2">
+                <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Prêt pour Déploiement NY4</span>
+              </div>
             </div>
           )}
 
-          {/* Grille des 3 Presets Officiels */}
-          <div className="grid md:grid-cols-3 gap-6 pt-2">
+          {/* ── 3. GRILLE DES 3 PRESETS (HAUTEUR OPTIMISÉE & COMPACTE) ── */}
+          <div className="grid md:grid-cols-3 gap-5 pt-1">
             {OFFICIAL_PRESETS.map((preset) => {
               const isSelected = requestedPreset === preset.id;
               const isPending = licenseStatus === "PENDING_PRESET_APPROVAL" && isSelected;
@@ -6021,68 +6076,68 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               return (
                 <div
                   key={preset.id}
-                  className={`rounded-3xl border bg-[#0d121a] backdrop-blur-xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 shadow-2xl ${preset.borderClass} ${
-                    isSelected ? "ring-2 ring-emerald-400/50" : ""
+                  className={`rounded-3xl border bg-gradient-to-b from-[#0d131d]/95 to-[#090d14]/95 backdrop-blur-xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-300 shadow-2xl ${preset.borderClass} ${
+                    isSelected ? "ring-2 ring-emerald-400/50 scale-[1.01]" : "hover:scale-[1.01]"
                   }`}
                 >
-                  <div className="space-y-5">
-                    {/* Header Carte */}
+                  <div className="space-y-3.5">
+                    {/* Header Carte Compact */}
                     <div className="flex items-center justify-between">
-                      <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${preset.accentBg}`}>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${preset.accentBg}`}>
                         {preset.badge}
                       </span>
-                      <span className="text-[11px] font-mono text-slate-400">{preset.timeframe}</span>
+                      <span className="text-[10px] font-mono text-slate-400">{preset.timeframe}</span>
                     </div>
 
                     <div>
-                      <h3 className="text-xl font-black text-white tracking-tight">{preset.name}</h3>
-                      <p className="text-xs text-slate-400 font-mono mt-0.5">{preset.subtitle}</p>
+                      <h3 className="text-lg font-black text-white tracking-tight">{preset.name}</h3>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">{preset.subtitle}</p>
                     </div>
 
-                    <p className="text-xs text-slate-300 leading-relaxed min-h-[48px]">
+                    <p className="text-xs text-slate-300 leading-relaxed min-h-[38px]">
                       {preset.description}
                     </p>
 
-                    {/* Métriques Clés */}
-                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/[0.08] font-mono">
-                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
-                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Marché Clé</span>
-                        <strong className="text-xs text-white">{preset.market}</strong>
+                    {/* Métriques Clés Compactes */}
+                    <div className="grid grid-cols-2 gap-2 pt-2.5 border-t border-white/[0.08] font-mono text-xs">
+                      <div className="p-2 rounded-xl bg-black/40 border border-white/[0.05]">
+                        <span className="text-[9px] text-slate-400 block uppercase font-sans">Marché</span>
+                        <strong className="text-xs text-white truncate block">{preset.market}</strong>
                       </div>
-                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
-                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Objectif Mensuel</span>
-                        <strong className="text-xs text-emerald-400">{preset.targetReturn}</strong>
+                      <div className="p-2 rounded-xl bg-black/40 border border-white/[0.05]">
+                        <span className="text-[9px] text-slate-400 block uppercase font-sans">Objectif</span>
+                        <strong className="text-xs text-emerald-400 block">{preset.targetReturn}</strong>
                       </div>
-                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
-                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Drawdown Max</span>
-                        <strong className="text-xs text-amber-300">{preset.maxDrawdown}</strong>
+                      <div className="p-2 rounded-xl bg-black/40 border border-white/[0.05]">
+                        <span className="text-[9px] text-slate-400 block uppercase font-sans">Drawdown</span>
+                        <strong className="text-xs text-amber-300 block">{preset.maxDrawdown}</strong>
                       </div>
-                      <div className="p-3 rounded-2xl bg-black/40 border border-white/[0.06]">
-                        <span className="text-[10px] text-slate-400 block uppercase font-sans">Win Rate Testé</span>
-                        <strong className="text-xs text-cyan-300">{preset.winRate}</strong>
+                      <div className="p-2 rounded-xl bg-black/40 border border-white/[0.05]">
+                        <span className="text-[9px] text-slate-400 block uppercase font-sans">Win Rate</span>
+                        <strong className="text-xs text-cyan-300 block">{preset.winRate}</strong>
                       </div>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
-                      <Wifi className="size-3.5 text-emerald-400 shrink-0" />
+                    <div className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono pt-1">
+                      <Wifi className="size-3 text-emerald-400 shrink-0" />
                       <span className="truncate">{preset.gateway}</span>
                     </div>
                   </div>
 
-                  {/* Bouton d'Action */}
-                  <div className="pt-6">
+                  {/* Bouton d'Action Compact */}
+                  <div className="pt-4">
                     {isPending ? (
-                      <div className="w-full py-3.5 px-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold text-center flex items-center justify-center gap-2">
-                        <Clock className="size-4 animate-spin" />
+                      <div className="w-full py-3 px-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold text-center flex items-center justify-center gap-2">
+                        <Clock className="size-3.5 animate-spin" />
                         <span>Demande en cours d'approbation</span>
                       </div>
                     ) : (
                       <button
                         onClick={() => setSelectedPresetModal(preset)}
-                        className={`w-full py-3.5 px-4 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg ${preset.btnClass}`}
+                        className={`w-full py-3 px-4 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg ${preset.btnClass}`}
                       >
                         <span>Demander l'Activation de ce Preset</span>
-                        <ChevronRight className="size-4" />
+                        <ChevronRight className="size-3.5" />
                       </button>
                     )}
                   </div>
@@ -6092,12 +6147,12 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
           </div>
 
           {/* Section Frosted Preview des Fonctionnalités Verrouillées */}
-          <div className="relative rounded-3xl border border-white/[0.08] bg-[#0c1017] p-6 sm:p-8 overflow-hidden">
+          <div className="relative rounded-3xl border border-white/[0.08] bg-[#0a0e16]/90 p-6 sm:p-8 overflow-hidden shadow-2xl">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-6 space-y-3">
-              <div className="size-14 rounded-2xl bg-white/[0.08] border border-white/[0.15] text-white grid place-items-center shadow-2xl">
-                <Lock className="size-7 text-[#00D084]" />
+              <div className="size-12 rounded-2xl bg-white/[0.08] border border-white/[0.15] text-white grid place-items-center shadow-2xl">
+                <Lock className="size-6 text-[#00D084]" />
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
                 Centre de Pilotage &amp; Graphiques de Trading en Direct
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
@@ -6108,18 +6163,18 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
             <div className="opacity-20 pointer-events-none space-y-4 filter blur-[2px]">
               <div className="h-10 bg-white/[0.06] rounded-xl w-full" />
               <div className="grid grid-cols-3 gap-4">
-                <div className="h-36 bg-white/[0.04] rounded-2xl" />
-                <div className="h-36 bg-white/[0.04] rounded-2xl" />
-                <div className="h-36 bg-white/[0.04] rounded-2xl" />
+                <div className="h-32 bg-white/[0.04] rounded-2xl" />
+                <div className="h-32 bg-white/[0.04] rounded-2xl" />
+                <div className="h-32 bg-white/[0.04] rounded-2xl" />
               </div>
-              <div className="h-64 bg-white/[0.04] rounded-2xl" />
+              <div className="h-56 bg-white/[0.04] rounded-2xl" />
             </div>
           </div>
 
           {/* Section d'Assistance Conseiller & Support Direct */}
-          <div className="p-6 rounded-3xl border border-white/[0.08] bg-[#0c1017] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+          <div className="p-5 sm:p-6 rounded-3xl border border-white/[0.08] bg-[#0a0e16]/90 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 shadow-xl">
             <div className="flex items-center gap-3">
-              <div className="size-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 grid place-items-center text-emerald-400">
+              <div className="size-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 grid place-items-center text-emerald-400 shrink-0">
                 <ShieldCheck className="size-5" />
               </div>
               <div>
@@ -6166,6 +6221,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                   <li>• Stratégie : <strong className="text-white">{selectedPresetModal.subtitle}</strong></li>
                   <li>• Marché Ciblé : <strong className="text-white">{selectedPresetModal.market}</strong></li>
                   <li>• Passerelle d'exécution : <strong className="text-white">{selectedPresetModal.gateway}</strong></li>
+                  <li>• Conseiller Référent : <strong className="text-purple-300">Expert Trading</strong></li>
                   <li>• Régulation : <strong className="text-emerald-400">Validation obligatoire par l'Administrateur</strong></li>
                 </ul>
               </div>

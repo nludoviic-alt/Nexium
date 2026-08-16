@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     balance NUMERIC(14, 2) NOT NULL DEFAULT 0.00,
     gross_profit_total NUMERIC(14, 2) DEFAULT 0.00,
     gross_loss_total NUMERIC(14, 2) DEFAULT 0.00,
-    assigned_advisor TEXT DEFAULT 'Dr. Antoine R.',
+    assigned_advisor TEXT DEFAULT 'Expert Trading',
     license_status TEXT DEFAULT 'NOT_REQUESTED' CHECK (license_status IN ('NOT_REQUESTED', 'PENDING_PRESET_APPROVAL', 'ACTIVE', 'EXPIRED')),
     requested_preset TEXT,
     active_preset TEXT,
