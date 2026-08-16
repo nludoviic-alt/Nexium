@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Check } from "lucide-react";
 
 export interface DropdownOption<T extends string = string> {
@@ -28,17 +29,23 @@ export function AdminDropdown<T extends string = string>({
   ariaLabel,
 }: AdminDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<{ openUp: boolean; maxHeight: number }>({
+  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; width: number; openUp: boolean; maxHeight: number }>({
+    top: 0,
+    left: 0,
+    width: 0,
     openUp: false,
     maxHeight: MENU_PREFERRED_HEIGHT,
   });
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value) || options[0];
 
-  // Décide si le menu doit s'ouvrir vers le haut ou vers le bas selon la place
-  // réellement disponible à l'écran, et limite sa hauteur pour qu'il ne soit
-  // jamais coupé — quel que soit l'endroit où se trouve le champ sur la page.
+  // Le menu est rendu dans un portail (document.body) en position fixe — ainsi
+  // il ne peut jamais être rogné par un ancêtre en overflow-hidden/auto (modale,
+  // panneau scrollable, etc.). On calcule sa position/hauteur à partir de
+  // l'espace réellement disponible à l'écran, et on bascule vers le haut si
+  // la place manque en bas, pour que les 7 rôles restent toujours visibles.
   const recalcPosition = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -48,7 +55,13 @@ export function AdminDropdown<T extends string = string>({
 
     const openUp = spaceBelow < MENU_PREFERRED_HEIGHT && spaceAbove > spaceBelow;
     const available = openUp ? spaceAbove : spaceBelow;
-    setMenuPosition({ openUp, maxHeight: Math.max(120, Math.min(MENU_PREFERRED_HEIGHT, available)) });
+    setMenuStyle({
+      top: openUp ? rect.top - MENU_MARGIN : rect.bottom + MENU_MARGIN,
+      left: rect.left,
+      width: rect.width,
+      openUp,
+      maxHeight: Math.max(120, Math.min(MENU_PREFERRED_HEIGHT, available)),
+    });
   }, []);
 
   useLayoutEffect(() => {
@@ -67,7 +80,10 @@ export function AdminDropdown<T extends string = string>({
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const insideTrigger = containerRef.current?.contains(target);
+      const insideMenu = menuRef.current?.contains(target);
+      if (!insideTrigger && !insideMenu) {
         setIsOpen(false);
       }
     }
@@ -114,59 +130,65 @@ export function AdminDropdown<T extends string = string>({
         </span>
         <ChevronDown
           className={`size-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-            isOpen && !menuPosition.openUp ? "rotate-180 text-blue-400" : isOpen ? "text-blue-400" : ""
+            isOpen && !menuStyle.openUp ? "rotate-180 text-blue-400" : isOpen ? "text-blue-400" : ""
           }`}
         />
       </button>
 
-      {/* Floating Menu Popover — s'ouvre vers le haut si la place manque en bas */}
-      {isOpen && (
-        <div
-          className={`absolute left-0 w-full min-w-[240px] rounded-xl border border-slate-700/80 bg-[#0c1424]/95 backdrop-blur-md p-1.5 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150 ${
-            menuPosition.openUp ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]"
-          }`}
-        >
+      {/* Floating Menu Popover — rendu dans un portail en position fixe pour ne
+          jamais être rogné par une modale/panneau en overflow-hidden, et bascule
+          vers le haut quand la place manque en bas. */}
+      {isOpen &&
+        createPortal(
           <div
-            className="overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-700"
-            style={{ maxHeight: menuPosition.maxHeight }}
+            ref={menuRef}
+            className={`fixed min-w-[240px] rounded-xl border border-slate-700/80 bg-[#0c1424]/95 backdrop-blur-md p-1.5 shadow-2xl shadow-black/80 z-[9999] animate-in fade-in zoom-in-95 duration-150 ${
+              menuStyle.openUp ? "-translate-y-full" : ""
+            }`}
+            style={{ top: menuStyle.top, left: menuStyle.left, width: Math.max(menuStyle.width, 240) }}
           >
-            {options.map((opt) => {
-              const isSelected = opt.value === value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between gap-2.5 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-medium transition-all text-left cursor-pointer ${
-                    isSelected
-                      ? "bg-blue-600/20 text-blue-300 font-bold border border-blue-500/30"
-                      : "text-slate-300 hover:bg-slate-800/70 hover:text-white"
-                  }`}
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="truncate">{opt.label}</span>
-                    {opt.badge && (
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                          isSelected
-                            ? "bg-blue-500/25 border border-blue-400/40 text-blue-200"
-                            : "bg-slate-700/50 border border-slate-600/50 text-slate-400"
-                        }`}
-                      >
-                        {opt.badge}
-                      </span>
-                    )}
-                  </span>
-                  {isSelected && <Check className="size-4 text-blue-400 shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+            <div
+              className="overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-700"
+              style={{ maxHeight: menuStyle.maxHeight }}
+            >
+              {options.map((opt) => {
+                const isSelected = opt.value === value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between gap-2.5 rounded-lg px-3 py-2.5 text-xs sm:text-sm font-medium transition-all text-left cursor-pointer ${
+                      isSelected
+                        ? "bg-blue-600/20 text-blue-300 font-bold border border-blue-500/30"
+                        : "text-slate-300 hover:bg-slate-800/70 hover:text-white"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="truncate">{opt.label}</span>
+                      {opt.badge && (
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                            isSelected
+                              ? "bg-blue-500/25 border border-blue-400/40 text-blue-200"
+                              : "bg-slate-700/50 border border-slate-600/50 text-slate-400"
+                          }`}
+                        >
+                          {opt.badge}
+                        </span>
+                      )}
+                    </span>
+                    {isSelected && <Check className="size-4 text-blue-400 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
