@@ -285,7 +285,12 @@ BEGIN
     NEW.mt5_server := OLD.mt5_server;
     NEW.mt5_investor_pass := OLD.mt5_investor_pass;
     NEW.assigned_advisor := OLD.assigned_advisor;
-    NEW.license_status := OLD.license_status;
+    -- Exception : un client (TRADER) peut lui-même déclencher une demande
+    -- d'activation de Preset (NOT_REQUESTED -> PENDING_PRESET_APPROVAL).
+    -- Toute autre valeur (ex: passage direct à ACTIVE) reste réservée au staff.
+    IF NOT (NEW.license_status = 'PENDING_PRESET_APPROVAL' AND OLD.license_status = 'NOT_REQUESTED') THEN
+      NEW.license_status := OLD.license_status;
+    END IF;
     NEW.active_preset := OLD.active_preset;
     NEW.max_daily_loss_percent := OLD.max_daily_loss_percent;
     NEW.max_simultaneous_trades := OLD.max_simultaneous_trades;

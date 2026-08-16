@@ -1298,8 +1298,29 @@ function NexiumAdminDashboard({
     if (!isSupabaseConfigured) return;
     const supabaseProfiles = await getAllClientProfiles();
     if (!supabaseProfiles || supabaseProfiles.length === 0) return;
+    const profileById = new Map(supabaseProfiles.map((p) => [p.id, p]));
     setClients((prev) => {
         const existingIds = new Set(prev.map((c) => c.id));
+
+        // Fusionne les champs "vivants" venus de Supabase (statut, licence, preset...)
+        // dans les clients déjà chargés, sans écraser leurs données purement locales
+        // (sessions, notes, historique) — sinon une simple synchro Realtime n'a
+        // jamais d'effet visible tant que la page n'est pas rechargée entièrement.
+        const updatedExisting: UserProfile[] = prev.map((c) => {
+          const p = profileById.get(c.id);
+          if (!p) return c;
+          return {
+            ...c,
+            status: (p.status as AccountStatus) ?? c.status,
+            kycStatus: (p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW") as UserProfile["kycStatus"],
+            licenseStatus: ((p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED")) as UserProfile["licenseStatus"],
+            requestedPreset: p.requested_preset,
+            activePreset: p.active_preset,
+            balance: p.balance ?? c.balance,
+            assignedAdvisor: p.assigned_advisor || c.assignedAdvisor,
+          } as UserProfile;
+        });
+
         const newMapped: UserProfile[] = supabaseProfiles
           .filter((p) => !existingIds.has(p.id))
           .map((p) => ({
@@ -1374,7 +1395,7 @@ function NexiumAdminDashboard({
             notes: [],
           }));
 
-        return [...newMapped, ...prev];
+        return [...newMapped, ...updatedExisting];
       });
   }, []);
 

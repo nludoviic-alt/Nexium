@@ -5499,7 +5499,12 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
     setSubmittingPreset(true);
     try {
       if (isSupabaseConfigured && currentUserId) {
-        await requestPresetActivation(currentUserId, presetId);
+        const result = await requestPresetActivation(currentUserId, presetId);
+        if (result && (result as any).success === false) {
+          toast.error("Impossible de transmettre la demande. Veuillez réessayer ou contacter le support.");
+          setSubmittingPreset(false);
+          return;
+        }
       }
       setLicenseStatus("PENDING_PRESET_APPROVAL");
       setRequestedPreset(presetId);
