@@ -180,6 +180,8 @@ import {
   updatePaymentSettings,
   subscribeToPaymentSettings,
   type PaymentSettings,
+  getRecentPageViews,
+  type PageView,
 } from "@/lib/supabase";
 
 import { getAdminSlug } from "@/lib/user-slug";
@@ -818,7 +820,7 @@ function NexiumAdminDashboard({
 
   // Navigation
   const [activeSection, setActiveSection] = useState<
-    "administrators" | "users" | "user-detail" | "create-user" | "messaging" | "emails" | "engines" | "finances" | "gateways" | "security" | "news-guard" | "perf-fees" | "logs" | "impersonation" | "access-levels"
+    "administrators" | "users" | "user-detail" | "create-user" | "messaging" | "emails" | "engines" | "finances" | "gateways" | "security" | "news-guard" | "perf-fees" | "logs" | "impersonation" | "access-levels" | "analytics"
   >("users");
 
   // Rôle Admin Session — dérivé de la session Supabase réelle par CompositionAccessGate,
@@ -993,6 +995,7 @@ function NexiumAdminDashboard({
     { key: "engines", label: "Moteurs & Auto-Trader" },
     { key: "finances", label: "Finances & Dépôts" },
     { key: "logs", label: "Journal d'Audit" },
+    { key: "analytics", label: "Visiteurs" },
   ];
   const [accessLevelsSelectedRole, setAccessLevelsSelectedRole] = useState<StaffRole>("ADMIN");
   const [draftRolePerms, setDraftRolePerms] = useState<Omit<RolePermissions, "role"> | null>(null);
@@ -1632,6 +1635,44 @@ function NexiumAdminDashboard({
       setSavingPaymentSettings(false);
     }
   };
+
+  // Suivi des visiteurs (page Visiteurs) — fenêtre glissante rechargée à
+  // chaque changement de période, pour ne pas tout charger d'un coup.
+  const [pageViews, setPageViews] = useState<PageView[]>([]);
+  const [pageViewsWindow, setPageViewsWindow] = useState<"24h" | "7d" | "30d">("7d");
+  const [pageViewsLoading, setPageViewsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || activeSection !== "analytics") return;
+    const hours = pageViewsWindow === "24h" ? 24 : pageViewsWindow === "7d" ? 24 * 7 : 24 * 30;
+    const sinceIso = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    setPageViewsLoading(true);
+    getRecentPageViews(sinceIso)
+      .then(setPageViews)
+      .finally(() => setPageViewsLoading(false));
+  }, [activeSection, pageViewsWindow]);
+
+  const pageViewStats = useMemo(() => {
+    const uniqueSessions = new Set(pageViews.map((v) => v.session_id));
+    const byPath = new Map<string, { views: number; sessions: Set<string> }>();
+    for (const v of pageViews) {
+      const entry = byPath.get(v.path) || { views: 0, sessions: new Set<string>() };
+      entry.views += 1;
+      entry.sessions.add(v.session_id);
+      byPath.set(v.path, entry);
+    }
+    const topPages = Array.from(byPath.entries())
+      .map(([path, { views, sessions }]) => ({ path, views, uniqueVisitors: sessions.size }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 15);
+
+    return {
+      totalViews: pageViews.length,
+      uniqueVisitors: uniqueSessions.size,
+      topPages,
+      topPage: topPages[0]?.path || "—",
+    };
+  }, [pageViews]);
 
   const [financeTxSearch, setFinanceTxSearch] = useState("");
   const [financeTxTypeFilter, setFinanceTxTypeFilter] = useState<"ALL" | SupabaseTransaction["type"]>("ALL");
@@ -3508,6 +3549,7 @@ function NexiumAdminDashboard({
                   ]
                 : []),
               { key: "logs", label: "Journal d'Audit", icon: Terminal, isActive: activeSection === "logs" },
+              { key: "analytics", label: "Visiteurs", icon: Eye, isActive: activeSection === "analytics" },
             ].filter((item) => isPrimaryOwner || !(rolePermissions[currentSessionRole]?.hidden_pages || []).includes(item.key))}
             onSelect={(key) => setActiveSection(key as typeof activeSection)}
           />
@@ -7499,6 +7541,122 @@ function NexiumAdminDashboard({
                 totalPages={auditLogsTable.totalPages}
                 onPageChange={auditLogsTable.setPage}
               />
+            </div>
+          )}
+
+          {/* ===================================================================== */}
+          {/* 🌟 12. SUIVI DES VISITEURS (`analytics`)                              */}
+          {/* ===================================================================== */}
+          {activeSection === "analytics" && (
+            <div className="space-y-6 animate-in fade-in">
+              <div className="border-b border-slate-700/50 pb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                    <Eye className="size-7 text-emerald-400" />
+                    <span>Visiteurs</span>
+                  </h1>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Fréquentation du site public et de l'application — uniquement les visiteurs ayant accepté les cookies de mesure d'audience.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#0c121e] p-1">
+                  {(["24h", "7d", "30d"] as const).map((w) => (
+                    <button
+                      key={w}
+                      onClick={() => setPageViewsWindow(w)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        pageViewsWindow === w ? "bg-emerald-500 text-black" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {w === "24h" ? "24 heures" : w === "7d" ? "7 jours" : "30 jours"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-3 font-mono">
+                <div className="admin-card-emerald p-5 space-y-2">
+                  <span className="text-xs text-slate-300 uppercase font-semibold font-sans">Pages Vues</span>
+                  <p className="text-2xl font-bold text-emerald-400">{pageViewStats.totalViews.toLocaleString("fr-FR")}</p>
+                </div>
+                <div className="admin-card-cyan p-5 space-y-2">
+                  <span className="text-xs text-slate-300 uppercase font-semibold font-sans">Visiteurs Uniques</span>
+                  <p className="text-2xl font-bold text-cyan-300">{pageViewStats.uniqueVisitors.toLocaleString("fr-FR")}</p>
+                </div>
+                <div className="admin-card-amber p-5 space-y-2">
+                  <span className="text-xs text-slate-300 uppercase font-semibold font-sans">Page la Plus Visitée</span>
+                  <p className="text-lg font-bold text-amber-300 truncate" title={pageViewStats.topPage}>{pageViewStats.topPage}</p>
+                </div>
+              </div>
+
+              <section className="admin-card p-6 sm:p-7 space-y-4">
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
+                  <BarChart3 className="size-5 text-emerald-400" />
+                  Pages les Plus Visitées
+                </h2>
+                <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                  <table className="w-full text-left font-mono text-sm">
+                    <thead className="border-b border-slate-700/50 bg-[#0f1626]/90 text-slate-300 text-xs font-bold uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Page</th>
+                        <th className="px-4 py-3">Vues</th>
+                        <th className="px-4 py-3">Visiteurs Uniques</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {pageViewsLoading ? (
+                        <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500 text-sm font-sans">Chargement...</td></tr>
+                      ) : pageViewStats.topPages.length === 0 ? (
+                        <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-500 text-sm font-sans">Aucune visite enregistrée sur cette période.</td></tr>
+                      ) : (
+                        pageViewStats.topPages.map((p) => (
+                          <tr key={p.path} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="px-4 py-2.5 text-white font-semibold">{p.path}</td>
+                            <td className="px-4 py-2.5 text-emerald-400">{p.views}</td>
+                            <td className="px-4 py-2.5 text-slate-300">{p.uniqueVisitors}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="admin-card p-6 sm:p-7 space-y-4">
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
+                  <History className="size-5 text-emerald-400" />
+                  Activité Récente
+                </h2>
+                <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e] max-h-[500px] overflow-y-auto">
+                  <table className="w-full text-left font-mono text-sm">
+                    <thead className="border-b border-slate-700/50 bg-[#0f1626]/90 text-slate-300 text-xs font-bold uppercase tracking-wider sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3">Horodatage</th>
+                        <th className="px-4 py-3">Page</th>
+                        <th className="px-4 py-3">Provenance</th>
+                        <th className="px-4 py-3">Session</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {pageViews.length === 0 ? (
+                        <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500 text-sm font-sans">Aucune visite enregistrée sur cette période.</td></tr>
+                      ) : (
+                        pageViews.slice(0, 300).map((v) => (
+                          <tr key={v.id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="px-4 py-2 text-slate-400 text-xs">
+                              {new Date(v.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td className="px-4 py-2 text-white text-xs">{v.path}</td>
+                            <td className="px-4 py-2 text-slate-400 text-xs truncate max-w-[200px]">{v.referrer || "Direct"}</td>
+                            <td className="px-4 py-2 text-slate-500 text-[11px]">{v.session_id.slice(0, 8)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
           )}
         </main>

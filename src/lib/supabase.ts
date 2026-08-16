@@ -392,6 +392,58 @@ export function subscribeToPaymentSettings(callback: (settings: PaymentSettings 
   };
 }
 
+/* ==========================================================================
+   SUIVI DES VISITEURS (page_views) — statistiques de fréquentation du site
+   et de l'application, consultables dans la console admin.
+   ========================================================================== */
+
+export interface PageView {
+  id: string;
+  session_id: string;
+  path: string;
+  referrer: string | null;
+  user_agent: string | null;
+  language: string | null;
+  user_id: string | null;
+  created_at: string;
+}
+
+export async function recordPageView(entry: {
+  session_id: string;
+  path: string;
+  referrer?: string | null;
+  user_agent?: string | null;
+  language?: string | null;
+  user_id?: string | null;
+}) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const { error } = await supabase.from("page_views").insert([entry]);
+  if (error) {
+    console.warn("Notice enregistrement page_views:", error);
+    return { success: false, error };
+  }
+  return { success: true };
+}
+
+/**
+ * Récupère les visites récentes (fenêtre glissante) pour la page Visiteurs
+ * de la console admin. `sinceIso` filtre les visites les plus anciennes.
+ */
+export async function getRecentPageViews(sinceIso: string, limit = 3000): Promise<PageView[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("page_views")
+    .select("*")
+    .gte("created_at", sinceIso)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("Erreur récupération page_views:", error);
+    return [];
+  }
+  return data as PageView[];
+}
+
 /**
  * Recherche un profil existant par e-mail (utilisé pour promouvoir un compte
  * déjà inscrit vers un rôle staff, plutôt que de fabriquer un profil orphelin

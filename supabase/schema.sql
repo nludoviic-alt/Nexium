@@ -794,3 +794,32 @@ BEGIN
   END IF;
 END $$;
 
+-- 14. TABLE : PAGE_VIEWS (Suivi des visiteurs du site & de l'application)
+-- Aucune IP stockée (respect de la vie privée) ; l'écriture n'est déclenchée
+-- côté client que si le visiteur a accepté les cookies de mesure d'audience
+-- (bannière RGPD existante, catégorie "telemetry").
+CREATE TABLE IF NOT EXISTS public.page_views (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL,
+    path TEXT NOT NULL,
+    referrer TEXT,
+    user_agent TEXT,
+    language TEXT,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_views_created_at ON public.page_views(created_at);
+CREATE INDEX IF NOT EXISTS idx_page_views_session ON public.page_views(session_id);
+CREATE INDEX IF NOT EXISTS idx_page_views_path ON public.page_views(path);
+
+ALTER TABLE public.page_views ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "page_views_insert" ON public.page_views;
+DROP POLICY IF EXISTS "page_views_select" ON public.page_views;
+-- Écriture ouverte : un visiteur anonyme (pas encore connecté) doit pouvoir
+-- enregistrer sa propre visite.
+CREATE POLICY "page_views_insert" ON public.page_views FOR INSERT WITH CHECK (true);
+-- Lecture réservée au personnel connecté (staff/admin), jamais aux visiteurs.
+CREATE POLICY "page_views_select" ON public.page_views
+    FOR SELECT USING (public.get_my_role() IS NOT NULL);
+
