@@ -415,6 +415,7 @@ interface UserProfile {
   twoFactorEnabled: boolean;
   forcePasswordReset: boolean;
   balance: number;
+  equity: number;
   bonusCredit: number;
   kycStatus: KycStatus;
   licenseStatus?: "NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE" | "EXPIRED";
@@ -1341,6 +1342,9 @@ function NexiumAdminDashboard({
             licenseExpires: p.license_expires || "",
             tradingHistory: [],
             livePositions: [],
+            transactions: [],
+            trades: [],
+            notes: [],
           }));
 
         return [...newMapped, ...prev];
