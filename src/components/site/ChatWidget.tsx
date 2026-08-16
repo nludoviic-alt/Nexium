@@ -601,9 +601,7 @@ export function ChatWidget() {
           <div className="hidden sm:flex items-center gap-2 bg-[#070b14]/95 text-slate-200 text-xs font-semibold px-3.5 py-1.5 rounded-full shadow-2xl border border-[#00D084]/25 backdrop-blur-md group-hover:border-[#00D084] group-hover:shadow-[0_0_20px_rgba(0,208,132,0.2)] transition-all">
             <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
             <span>
-              {language === "fr"
-                ? "Besoin d'aide ? Assistant & Opérateur en ligne"
-                : "Need assistance? AI & Live Desk Online"}
+              {language === "fr" ? "Besoin d'aide ?" : "Need help?"}
             </span>
           </div>
 
