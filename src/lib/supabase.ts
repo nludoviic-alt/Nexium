@@ -60,6 +60,7 @@ export interface SupabaseUserProfile {
   mt5_server?: string;
   mt5_investor_pass?: string;
   balance?: number;
+  bonus_credit?: number;
   gross_profit_total?: number;
   gross_loss_total?: number;
   assigned_advisor?: string;

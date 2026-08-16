@@ -54,6 +54,10 @@ UPDATE public.profiles SET balance = 0 WHERE balance IS NULL;
 ALTER TABLE public.profiles ALTER COLUMN balance SET NOT NULL;
 ALTER TABLE public.profiles ALTER COLUMN balance SET DEFAULT 0.00;
 
+-- Bonus commercial crédité par le Desk — jusqu'ici uniquement en mémoire côté
+-- client React (jamais persisté), perdu à chaque rafraîchissement de la page.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bonus_credit NUMERIC(14, 2) NOT NULL DEFAULT 0.00;
+
 -- Colonnes pour la gestion totale et réelle du profil client depuis /composition
 -- (auparavant simulées en local uniquement : rien ne survivait au rechargement).
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS country TEXT;
@@ -137,6 +141,32 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Réparation d'une dérive de schéma : la table de production avait été créée
+-- avant ce renommage (sender_type/sender_name/message_text) et le
+-- CREATE TABLE IF NOT EXISTS ci-dessus n'a donc jamais pu l'appliquer.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'chat_messages' AND column_name = 'sender_type') THEN
+    ALTER TABLE public.chat_messages RENAME COLUMN sender_type TO sender;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'chat_messages' AND column_name = 'sender_name') THEN
+    ALTER TABLE public.chat_messages RENAME COLUMN sender_name TO author_name;
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'chat_messages' AND column_name = 'message_text') THEN
+    ALTER TABLE public.chat_messages RENAME COLUMN message_text TO text;
+  END IF;
+END $$;
+
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS thread_id TEXT REFERENCES public.live_chat_threads(id) ON DELETE CASCADE;
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.chat_messages ALTER COLUMN channel SET DEFAULT 'CHAT';
+
+ALTER TABLE public.chat_messages DROP CONSTRAINT IF EXISTS chat_messages_sender_check;
+ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_sender_check CHECK (sender IN ('CLIENT', 'VISITOR', 'ADMIN', 'SYSTEM'));
+
+ALTER TABLE public.chat_messages DROP CONSTRAINT IF EXISTS chat_messages_channel_check;
+ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_channel_check CHECK (channel IN ('CHAT', 'EMAIL'));
 
 -- 7. TABLES DU MODULE E-MAILS & SUPPORT COLLABORATIF
 CREATE TABLE IF NOT EXISTS public.email_conversations (
@@ -258,6 +288,7 @@ BEGIN
     NEW.kyc_status := OLD.kyc_status;
     NEW.is_primary_owner := OLD.is_primary_owner;
     NEW.balance := OLD.balance;
+    NEW.bonus_credit := OLD.bonus_credit;
     NEW.gross_profit_total := OLD.gross_profit_total;
     NEW.gross_loss_total := OLD.gross_loss_total;
     NEW.mt5_login := OLD.mt5_login;
@@ -281,6 +312,7 @@ BEGIN
     NEW.status := OLD.status;
     NEW.kyc_status := OLD.kyc_status;
     NEW.balance := OLD.balance;
+    NEW.bonus_credit := OLD.bonus_credit;
     NEW.gross_profit_total := OLD.gross_profit_total;
     NEW.gross_loss_total := OLD.gross_loss_total;
     NEW.mt5_login := OLD.mt5_login;

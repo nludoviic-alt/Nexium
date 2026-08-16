@@ -117,6 +117,7 @@ import {
   UserPlus,
   Users,
   Video,
+  Gift,
   Wallet,
   Wifi,
   X,
@@ -1317,6 +1318,8 @@ function NexiumAdminDashboard({
             requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
             activePreset: p.active_preset,
             balance: p.balance ?? c.balance,
+            bonusCredit: p.bonus_credit ?? c.bonusCredit,
+            equity: (p.balance ?? c.balance) + (p.bonus_credit ?? c.bonusCredit),
             assignedAdvisor: p.assigned_advisor || c.assignedAdvisor,
           } as UserProfile;
         });
@@ -1336,8 +1339,8 @@ function NexiumAdminDashboard({
             twoFactorEnabled: false,
             forcePasswordReset: false,
             balance: p.balance || 0,
-            bonusCredit: 0,
-            equity: p.balance || 0,
+            bonusCredit: p.bonus_credit || 0,
+            equity: (p.balance || 0) + (p.bonus_credit || 0),
             kycStatus: p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW",
             licenseStatus: (p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED"),
             requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
@@ -2198,8 +2201,9 @@ function NexiumAdminDashboard({
               method,
               ...(creditNote ? { reference_tx: creditNote } : {}),
             }),
-            // Le bonus n'a pas de colonne dédiée en base — seul le solde balance impacte la persistance.
-            creditType !== "BONUS" ? updateClientBalance(activeClient.id, newBalance) : Promise.resolve({ success: true }),
+            creditType === "BONUS"
+              ? updateUserProfile(activeClient.id, { bonus_credit: newBonus })
+              : updateClientBalance(activeClient.id, newBalance),
           ]);
           if (!txResult.success || !balResult.success) {
             toast.error("Échec de l'opération financière côté base de données.");
@@ -3710,7 +3714,39 @@ function NexiumAdminDashboard({
                   Cartes Analytiques de Gains et de Pertes
                 </h2>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 font-mono">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 font-mono">
+                  <div className="admin-card-indigo p-5 space-y-2.5">
+                    <div className="flex justify-between items-start">
+                      <span className="text-xs text-slate-300 uppercase font-semibold">Solde du Compte</span>
+                      <div className="grid size-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
+                        <Wallet className="size-4" />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold text-white">
+                      {isSuperAdmin ? `$${activeClient.balance.toLocaleString("fr-FR")} USD` : "••••••"}
+                    </p>
+                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                      <span>Équité (Solde + Bonus) :</span>
+                      <strong className="text-white">{isSuperAdmin ? `$${activeClient.equity.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
+                    </div>
+                  </div>
+
+                  <div className="admin-card-amber p-5 space-y-2.5">
+                    <div className="flex justify-between items-start">
+                      <span className="text-xs text-slate-300 uppercase font-semibold">Bonus Crédité</span>
+                      <div className="grid size-8 place-items-center rounded-lg bg-amber-500/15 text-amber-300">
+                        <Gift className="size-4" />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold text-amber-300">
+                      {isSuperAdmin ? `$${activeClient.bonusCredit.toLocaleString("fr-FR")} USD` : "••••••"}
+                    </p>
+                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                      <span>Statut :</span>
+                      <strong className="text-white">{activeClient.bonusCredit > 0 ? "Bonus actif" : "Aucun bonus"}</strong>
+                    </div>
+                  </div>
+
                   <div className="admin-card-emerald p-5 space-y-2.5">
                     <div className="flex justify-between items-start">
                       <span className="text-xs text-slate-300 uppercase font-semibold">Gains Bruts Cumulés</span>
