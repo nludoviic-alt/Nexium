@@ -495,49 +495,6 @@ interface EmailItem {
   hasAttachment?: boolean;
 }
 
-const INITIAL_EMAILS: EmailItem[] = [
-  {
-    id: "mail-1",
-    from: "desk-quant@nexiummarkets.com",
-    fromName: "Nexium Quant Research Desk",
-    to: "ludovic.m@investisseur-nexium.com",
-    subject: "Rapport d'arbitrage XAUUSD & Performance MQL5 — Session New York",
-    date: "Aujourd'hui · 14:15",
-    preview: "Veuillez trouver ci-joint l'analyse quantitative du signal BUY XAUUSD exécuté à 2 384.20...",
-    body: [
-      "Bonjour Ludovic,",
-      "Le moteur Nexium AI Gold a identifié une opportunité de cassure de range sur l'or (XAUUSD) avec un score algorithmique de 84/100 lors de l'ouverture de New York.",
-      "Le filtre du Risk Governor a validé un dimensionnement strict à 0.20 lot, avec un Stop-Loss positionné à 2 374.00 et un Take-Profit à 2 405.00.",
-      "La position génère actuellement un P&L positif latent. Nos ingénieurs surveillent le carnet d'ordres L2 sur le flux Equinix NY4.",
-      "Restant à votre entière disposition sur le Desk ou par appel direct.",
-      "Bien cordialement,\nExpert Trading — Desk de Recherche Quantitative",
-    ],
-    unread: true,
-    priority: "URGENT",
-    folder: "inbox",
-    hasAttachment: true,
-  },
-  {
-    id: "mail-2",
-    from: "risk-governor@nexiummarkets.com",
-    fromName: "Nexium Risk Governance Office",
-    to: "ludovic.m@investisseur-nexium.com",
-    subject: "Validation de conformité : Seuil de Drawdown Max (2.00%)",
-    date: "Hier · 18:30",
-    preview: "Votre compte MT5 #802194 respecte l'ensemble des règles de sécurité de capital institutionnel...",
-    body: [
-      "Cher Monsieur,",
-      "Le système de surveillance automatisée a procédé à la revue quotidienne de vos 3 moteurs de trading.",
-      "Le drawdown maximum enregistré sur les dernières 24h s'établit à 0.34%, très largement inférieur à votre limite de sécurité de 2.00%.",
-      "Aucun coupe-circuit d'urgence n'a été requis. Vos allocations demeurent optimales.",
-      "L'équipe Risk Governance",
-    ],
-    unread: false,
-    priority: "NORMAL",
-    folder: "inbox",
-  },
-];
-
 function downloadCsv(filename: string, rows: (string | number)[][]) {
   const csvContent =
     "data:text/csv;charset=utf-8," +
@@ -1181,12 +1138,16 @@ function LatencyDerivMeter({ connected }: { connected: boolean }) {
 function EngineTab({
   bots,
   positions,
+  balance,
+  mt5AccountNumber,
   onOpenBotDetail,
   onToggleBotPause,
   onClosePosition,
 }: {
   bots: EngineBot[];
   positions: PositionItem[];
+  balance: number;
+  mt5AccountNumber: string;
   onOpenBotDetail: (bot: EngineBot) => void;
   onToggleBotPause: (botId: EngineBot["id"]) => void;
   onClosePosition: (pos: PositionItem) => void;
@@ -1230,7 +1191,7 @@ function EngineTab({
       const pipValue = lotSize * 10;
       return Number((stopLossPips * pipValue).toFixed(2));
     } else if (sizingMode === "risk_percent") {
-      return Number((24860.42 * (riskPercentPerTrade / 100)).toFixed(2));
+      return Number((balance * (riskPercentPerTrade / 100)).toFixed(2));
     } else {
       return fixedUsdPerTrade;
     }
@@ -1456,7 +1417,7 @@ function EngineTab({
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-mono mt-0.5">
-                Exécution algorithmique MT5 · Compte ECN Direct #802194
+                Exécution algorithmique MT5 · Compte ECN Direct #{mt5AccountNumber}
               </p>
             </div>
           </div>
@@ -2186,7 +2147,7 @@ function EngineTab({
                   -${calculatedRiskUsd.toFixed(2)}
                 </p>
                 <p className="text-[10px] text-rose-300/80 font-sans">
-                  -{((calculatedRiskUsd / 24860.42) * 100).toFixed(2)}% du solde
+                  -{(balance > 0 ? (calculatedRiskUsd / balance) * 100 : 0).toFixed(2)}% du solde
                 </p>
               </div>
 
@@ -2198,7 +2159,7 @@ function EngineTab({
                   +${calculatedRewardUsd.toFixed(2)}
                 </p>
                 <p className="text-[10px] text-emerald-300/80 font-sans">
-                  +{((calculatedRewardUsd / 24860.42) * 100).toFixed(2)}% du solde
+                  +{(balance > 0 ? (calculatedRewardUsd / balance) * 100 : 0).toFixed(2)}% du solde
                 </p>
               </div>
 
@@ -3521,8 +3482,9 @@ function MessagingTab({
   onSendMessage,
   clientName = "Client",
   clientEmail = "",
-  mt5AccountNumber = "802194",
-  clientEmails = INITIAL_EMAILS,
+  mt5AccountNumber = "",
+  clientEmails = [],
+  balance = 0,
 }: {
   messages: ChatMessage[];
   onSendMessage: (txt: string) => void;
@@ -3530,6 +3492,7 @@ function MessagingTab({
   clientEmail?: string;
   mt5AccountNumber?: string;
   clientEmails?: EmailItem[];
+  balance?: number;
 }) {
   const [activeChannel, setActiveChannel] = useState<"chat" | "call" | "email">("chat");
   const [selectedContactId, setSelectedContactId] = useState<string>("support-client");
@@ -3641,7 +3604,7 @@ function MessagingTab({
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       sender: "user",
-      senderName: "Ludovic M.",
+      senderName: clientName,
       text: chatInput.trim(),
       time: now,
       contactId: selectedContactId,
@@ -3671,13 +3634,13 @@ function MessagingTab({
 
       if (selectedContactId === "support-client") {
         if (lower.includes("dépôt") || lower.includes("depot") || lower.includes("virement")) {
-          replyText = "Les virements SEPA instantanés et cartes ECN sont crédités sans frais sous 1 à 3 minutes. Votre solde actuel s'élève à $24 860.42 USD.";
+          replyText = `Les virements SEPA instantanés et cartes ECN sont crédités sans frais sous 1 à 3 minutes. Votre solde actuel s'élève à $${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD.`;
         } else if (lower.includes("retrait") || lower.includes("iban")) {
           replyText = "Votre demande de retrait est traitée avec priorité VIP. Le délai moyen d'exécution bancaire est de 15 à 30 minutes vers les banques européennes.";
         } else if (lower.includes("kyc") || lower.includes("compte") || lower.includes("document")) {
-          replyText = "Votre compte MT5 #802194 bénéficie du statut Vérifié Institutionnel niveau 2 (Accès complet 0 spread). Tous vos documents sont en règle.";
+          replyText = `Votre compte MT5 #${mt5AccountNumber} bénéficie du statut Vérifié Institutionnel niveau 2 (Accès complet 0 spread). Tous vos documents sont en règle.`;
         } else {
-          replyText = `Bonjour Ludovic, notre équipe support a bien reçu votre message. Nous prenons en charge votre demande immédiatement. Un conseiller reste à votre écoute.`;
+          replyText = `Bonjour ${clientName}, notre équipe support a bien reçu votre message. Nous prenons en charge votre demande immédiatement. Un conseiller reste à votre écoute.`;
         }
       } else if (selectedContactId === "expert-quant") {
         if (lower.includes("or") || lower.includes("gold") || lower.includes("xauusd")) {
@@ -3687,7 +3650,7 @@ function MessagingTab({
         } else if (lower.includes("sharpe") || lower.includes("rendement")) {
           replyText = "Le Sharpe Ratio consolidé sur 30 jours est de 2.68. Pour le stabiliser davantage, nous recommandons de conserver les Take-Profits dynamiques actuels.";
         } else {
-          replyText = `Bien reçu Ludovic. Le Desk de Recherche analyse votre point et surveille les carnets d'ordres L2 sur le flux Equinix NY4.`;
+          replyText = `Bien reçu ${clientName}. Le Desk de Recherche analyse votre point et surveille les carnets d'ordres L2 sur le flux Equinix NY4.`;
         }
       } else if (selectedContactId === "ai-bot") {
         replyText = `⚡ Moteur IA Nexium :\n• 3 Bots synchronisés sur serveur NY4 (Latence : 0.8ms)\n• Signaux analysés : 14 setups détectés sur la session\n• Sécurité capital : Drawdown actuel 0.34% (Seuil maximal : 2.00%)\n\nTout est nominal.`;
@@ -3762,7 +3725,7 @@ function MessagingTab({
       const voiceMsg: ChatMessage = {
         id: `voice-${Date.now()}`,
         sender: "user",
-        senderName: "Ludovic M.",
+        senderName: clientName,
         text: `🎙️ Note vocale (${formatted})`,
         time: now,
         contactId: selectedContactId,
@@ -4051,7 +4014,7 @@ function MessagingTab({
 
             {/* Discreet Security Footer */}
             <div className="shrink-0 flex items-center justify-between text-xs font-mono text-slate-400 px-1 pt-2 border-t border-slate-700/50">
-              <span>MT5 #802194</span>
+              <span>MT5 #{mt5AccountNumber}</span>
               <span className="text-emerald-400 font-medium flex items-center gap-1.5">
                 <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
                 Chiffré AES-256
@@ -5057,7 +5020,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
-  const [clientEmails, setClientEmails] = useState<EmailItem[]>(INITIAL_EMAILS);
+  const [clientEmails, setClientEmails] = useState<EmailItem[]>([]);
   const [mt5AccountNumber, setMt5AccountNumber] = useState("");
   const [assignedAdvisor, setAssignedAdvisor] = useState("Expert Trading (Desk Quant)");
   const [licenseStatus, setLicenseStatus] = useState<"NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE">("ACTIVE");
@@ -6226,7 +6189,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
         {/* Account Info */}
         <div className="mt-7 rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 sm:p-5">
           <p className="text-xs font-black tracking-wider text-gray-400 uppercase">COMPTE CONNECTÉ</p>
-          <p className="mt-1 text-base font-black text-white font-mono">Nexium Live · #802194</p>
+          <p className="mt-1 text-base font-black text-white font-mono">Nexium Live · #{mt5AccountNumber}</p>
           <div className="mt-2.5 flex items-center gap-2 text-xs font-bold text-[#00D084]">
             <Wifi className="size-4" /> Equinix NY4 · 21 ms (0% Perte)
           </div>
@@ -6435,6 +6398,8 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
             <EngineTab
               bots={bots}
               positions={positions}
+              balance={balance}
+              mt5AccountNumber={mt5AccountNumber}
               onOpenBotDetail={(bot) => setSelectedDetailBot(bot)}
               onToggleBotPause={handleToggleBotPause}
               onClosePosition={handleClosePosition}
@@ -6493,6 +6458,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               clientEmail={clientEmail}
               mt5AccountNumber={mt5AccountNumber}
               clientEmails={clientEmails}
+              balance={balance}
             />
           )}
         </main>
@@ -6832,7 +6798,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               <div className="rounded-2xl border border-white/[0.06] bg-[#0c1017] p-4 space-y-2 text-gray-300">
                 <p className="font-bold text-white">Informations de Connexion :</p>
                 <p>• Serveur : <strong>NexiumMarkets-Live01</strong></p>
-                <p>• Login MT5 : <strong>802194</strong></p>
+                <p>• Login MT5 : <strong>{mt5AccountNumber}</strong></p>
                 <p>• Type de compte : <strong>ECN Zero Spread</strong></p>
               </div>
 
