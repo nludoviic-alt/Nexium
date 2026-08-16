@@ -1474,9 +1474,19 @@ function EngineTab({
                     <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 tracking-tight">{bot.name}</h3>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
-                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    ACTIF
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold ${
+                      bot.statusBadge === "ACTIF"
+                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                        : "border-rose-500/40 bg-rose-500/15 text-rose-400"
+                    }`}
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${
+                        bot.statusBadge === "ACTIF" ? "bg-emerald-400 animate-ping" : "bg-rose-400"
+                      }`}
+                    />
+                    {bot.statusBadge}
                   </span>
                 </div>
 
@@ -1506,12 +1516,14 @@ function EngineTab({
                     setSelectedBotId(bot.id);
                   }}
                   className={`flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
-                    isSelected
+                    !isSelected
+                      ? "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
+                      : bot.statusBadge === "ACTIF"
                       ? "admin-btn-primary shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-                      : "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
+                      : "border border-rose-500/60 bg-rose-500/20 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.2)]"
                   }`}
                 >
-                  {isSelected ? "● Actif" : "Choisir"}
+                  {!isSelected ? "Choisir" : bot.statusBadge === "ACTIF" ? "● Actif" : "● En Pause"}
                 </button>
                 <button
                   onClick={(e) => {
@@ -1549,9 +1561,19 @@ function EngineTab({
                     <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 tracking-tight">{bot.name}</h3>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
-                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    ACTIF
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold ${
+                      bot.statusBadge === "ACTIF"
+                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                        : "border-rose-500/40 bg-rose-500/15 text-rose-400"
+                    }`}
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${
+                        bot.statusBadge === "ACTIF" ? "bg-emerald-400 animate-ping" : "bg-rose-400"
+                      }`}
+                    />
+                    {bot.statusBadge}
                   </span>
                 </div>
 
@@ -1581,12 +1603,14 @@ function EngineTab({
                     setSelectedBotId(bot.id);
                   }}
                   className={`flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
-                    isSelected
+                    !isSelected
+                      ? "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
+                      : bot.statusBadge === "ACTIF"
                       ? "admin-btn-primary shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-                      : "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
+                      : "border border-rose-500/60 bg-rose-500/20 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.2)]"
                   }`}
                 >
-                  {isSelected ? "● Actif" : "Choisir"}
+                  {!isSelected ? "Choisir" : bot.statusBadge === "ACTIF" ? "● Actif" : "● En Pause"}
                 </button>
                 <button
                   onClick={(e) => {
@@ -1624,9 +1648,19 @@ function EngineTab({
                     <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 tracking-tight">{bot.name}</h3>
                   </div>
 
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
-                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    ACTIF
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold ${
+                      bot.statusBadge === "ACTIF"
+                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                        : "border-rose-500/40 bg-rose-500/15 text-rose-400"
+                    }`}
+                  >
+                    <span
+                      className={`size-1.5 rounded-full ${
+                        bot.statusBadge === "ACTIF" ? "bg-emerald-400 animate-ping" : "bg-rose-400"
+                      }`}
+                    />
+                    {bot.statusBadge}
                   </span>
                 </div>
 
@@ -1656,12 +1690,14 @@ function EngineTab({
                     setSelectedBotId(bot.id);
                   }}
                   className={`flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
-                    isSelected
+                    !isSelected
+                      ? "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
+                      : bot.statusBadge === "ACTIF"
                       ? "admin-btn-primary shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-                      : "border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-200"
+                      : "border border-rose-500/60 bg-rose-500/20 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.2)]"
                   }`}
                 >
-                  {isSelected ? "● Actif" : "Choisir"}
+                  {!isSelected ? "Choisir" : bot.statusBadge === "ACTIF" ? "● Actif" : "● En Pause"}
                 </button>
                 <button
                   onClick={(e) => {
