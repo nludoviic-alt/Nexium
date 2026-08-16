@@ -878,12 +878,219 @@ export function subscribeToClientEmails(callback: () => void): () => void {
       .channel("public:email_messages:client")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "email_messages" },
+        { event: "*", schema: "public", table: "email_messages" },
+        callback
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "email_conversations" },
         callback
       )
       .subscribe();
   } catch (err) {
     console.warn("Notice Realtime email messages Supabase:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Récupère toutes les conversations e-mails pour le Desk Admin depuis Supabase.
+ */
+export async function getAdminEmailConversations(): Promise<any[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("email_conversations")
+    .select("*")
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) {
+    console.warn("Notice getAdminEmailConversations Supabase:", error);
+    return [];
+  }
+
+  return data.map((c) => ({
+    id: c.id,
+    subject: c.subject || "(Sans objet)",
+    customerName: c.customer_name || null,
+    customerEmail: c.customer_email || "visiteur@nexiummarkets.com",
+    status: (c.status || "NON_ASSIGNE") as any,
+    assignedUserId: c.assigned_agent_id || null,
+    assignedAgentName: c.assigned_agent_name || null,
+    lastMessageAt: c.updated_at || c.created_at || new Date().toISOString(),
+    lastMessagePreview: c.preview || "",
+    attachmentCount: 0,
+    unread: Boolean(c.unread),
+  }));
+}
+
+/**
+ * Récupère le détail complet d'une conversation e-mail pour le Desk Admin.
+ */
+export async function getAdminEmailConversationDetail(conversationId: string): Promise<any | null> {
+  if (!isSupabaseConfigured || !conversationId) return null;
+
+  const { data: conv, error: convErr } = await supabase
+    .from("email_conversations")
+    .select("*")
+    .eq("id", conversationId)
+    .single();
+
+  if (convErr || !conv) return null;
+
+  const { data: msgs } = await supabase
+    .from("email_messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true });
+
+  const { data: notes } = await supabase
+    .from("email_notes")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true });
+
+  return {
+    conversation: {
+      id: conv.id,
+      accountId: "acc-main",
+      subject: conv.subject || "(Sans objet)",
+      customerName: conv.customer_name || null,
+      customerEmail: conv.customer_email || "visiteur@nexiummarkets.com",
+      status: (conv.status || "NON_ASSIGNE") as any,
+      assignedUserId: conv.assigned_agent_id || null,
+      assignedAgentName: conv.assigned_agent_name || null,
+      lastMessageAt: conv.updated_at || conv.created_at || new Date().toISOString(),
+      lastMessagePreview: conv.preview || "",
+      attachmentCount: 0,
+      unread: Boolean(conv.unread),
+      createdAt: conv.created_at,
+      updatedAt: conv.updated_at,
+    },
+    messages: (msgs || []).map((m) => ({
+      id: m.id,
+      conversationId: m.conversation_id,
+      messageId: `msg-${m.id}`,
+      direction: (m.direction || "INBOUND") as any,
+      fromEmail: m.from_address,
+      fromName: m.direction === "OUTBOUND" ? "Desk Nexium Markets" : conv.customer_name || m.from_address,
+      toEmail: m.to_address,
+      subject: m.subject || conv.subject,
+      bodyHtml: null,
+      bodyText: m.body_text || "",
+      sentByUserId: null,
+      sendStatus: "SENT" as any,
+      receivedAt: m.created_at,
+    })),
+    notes: (notes || []).map((n) => ({
+      id: n.id,
+      conversationId: n.conversation_id,
+      userId: n.author_id || "admin",
+      authorName: n.author_name || "Conseiller Desk",
+      content: n.content,
+      createdAt: n.created_at,
+    })),
+    attachments: [],
+  };
+}
+
+/**
+ * Répondre à une conversation e-mail depuis le Desk Admin.
+ */
+export async function adminReplyEmail(params: {
+  conversationId: string;
+  fromAddress?: string;
+  toAddress: string;
+  subject: string;
+  bodyText: string;
+  agentName?: string;
+}) {
+  if (!isSupabaseConfigured) return { success: true };
+
+  const { error: msgErr } = await supabase.from("email_messages").insert([
+    {
+      conversation_id: params.conversationId,
+      from_address: params.fromAddress || "support@nexiummarkets.com",
+      to_address: params.toAddress,
+      subject: params.subject,
+      body_text: params.bodyText,
+      direction: "OUTBOUND",
+    },
+  ]);
+
+  if (msgErr) {
+    console.error("Erreur enregistrement réponse e-mail:", msgErr);
+    return { success: false, error: msgErr };
+  }
+
+  // Mettre à jour le statut de la conversation
+  await supabase
+    .from("email_conversations")
+    .update({
+      unread: false,
+      status: "EN_COURS",
+      preview: params.bodyText.slice(0, 100),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.conversationId);
+
+  return { success: true };
+}
+
+/**
+ * Mettre à jour le statut d'une conversation e-mail (NON_ASSIGNE, EN_COURS, EN_ATTENTE, RESOLU).
+ */
+export async function adminUpdateEmailStatus(conversationId: string, status: string) {
+  if (!isSupabaseConfigured) return { success: true };
+  const { error } = await supabase
+    .from("email_conversations")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", conversationId);
+  return { success: !error, error };
+}
+
+/**
+ * Ajouter une note interne sur une conversation e-mail.
+ */
+export async function adminAddEmailNote(params: {
+  conversationId: string;
+  authorName: string;
+  content: string;
+}) {
+  if (!isSupabaseConfigured) return { success: true };
+  const { error } = await supabase.from("email_notes").insert([
+    {
+      conversation_id: params.conversationId,
+      author_name: params.authorName,
+      content: params.content,
+    },
+  ]);
+  return { success: !error, error };
+}
+
+/**
+ * Abonnement temps réel pour le Desk Admin à toutes les réceptions et réponses e-mails.
+ */
+export function subscribeToAdminEmails(callback: () => void): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel("public:admin:emails:all")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "email_conversations" },
+        callback
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "email_messages" },
+        callback
+      )
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime Admin Emails:", err);
   }
   return () => {
     if (channel) supabase.removeChannel(channel);

@@ -396,31 +396,57 @@ CREATE POLICY "chat_messages_all" ON public.chat_messages
 
 -- Politiques MODULE E-MAILS
 DROP POLICY IF EXISTS "email_conversations_all" ON public.email_conversations;
-CREATE POLICY "email_conversations_all" ON public.email_conversations
-    FOR ALL USING (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
-        OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
-    )
-    WITH CHECK (
+DROP POLICY IF EXISTS "email_conversations_select" ON public.email_conversations;
+DROP POLICY IF EXISTS "email_conversations_insert" ON public.email_conversations;
+DROP POLICY IF EXISTS "email_conversations_update" ON public.email_conversations;
+DROP POLICY IF EXISTS "email_conversations_delete" ON public.email_conversations;
+
+CREATE POLICY "email_conversations_select" ON public.email_conversations
+    FOR SELECT USING (
         public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
         OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
     );
 
+CREATE POLICY "email_conversations_insert" ON public.email_conversations
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "email_conversations_update" ON public.email_conversations
+    FOR UPDATE USING (
+        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "email_conversations_delete" ON public.email_conversations
+    FOR DELETE USING (
+        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+    );
+
 DROP POLICY IF EXISTS "email_messages_all" ON public.email_messages;
-CREATE POLICY "email_messages_all" ON public.email_messages
-    FOR ALL USING (
+DROP POLICY IF EXISTS "email_messages_select" ON public.email_messages;
+DROP POLICY IF EXISTS "email_messages_insert" ON public.email_messages;
+DROP POLICY IF EXISTS "email_messages_update" ON public.email_messages;
+DROP POLICY IF EXISTS "email_messages_delete" ON public.email_messages;
+
+CREATE POLICY "email_messages_select" ON public.email_messages
+    FOR SELECT USING (
         public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
         OR EXISTS (
             SELECT 1 FROM public.email_conversations
             WHERE id = conversation_id AND customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
         )
-    )
-    WITH CHECK (
+    );
+
+CREATE POLICY "email_messages_insert" ON public.email_messages
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "email_messages_update" ON public.email_messages
+    FOR UPDATE USING (
         public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
-        OR EXISTS (
-            SELECT 1 FROM public.email_conversations
-            WHERE id = conversation_id AND customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
-        )
+    );
+
+CREATE POLICY "email_messages_delete" ON public.email_messages
+    FOR DELETE USING (
+        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
     );
 
 DROP POLICY IF EXISTS "email_notes_all" ON public.email_notes;

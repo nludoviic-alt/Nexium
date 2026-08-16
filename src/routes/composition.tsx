@@ -159,16 +159,21 @@ import {
   subscribeToDirectMessages,
   subscribeToProfiles,
   subscribeToTransactions,
+  getAdminEmailConversations,
+  getAdminEmailConversationDetail,
+  adminReplyEmail,
+  adminUpdateEmailStatus,
+  adminAddEmailNote,
+  subscribeToAdminEmails,
 } from "@/lib/supabase";
+
+import { getAdminSlug } from "@/lib/user-slug";
 
 export const Route = createFileRoute("/composition")({
   component: CompositionAccessGate,
 });
 
 const ADMIN_CONSOLE_ROLES: ReadonlyArray<string> = ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
-
-/**
-import { getAdminSlug } from "@/lib/user-slug";
 
 /**
  * Garde d'accès de /composition / /desk/$slug. Le build étant statique,
@@ -689,6 +694,12 @@ function matchesAuditEntry(l: AuditEntry, q: string) {
     l.details.toLowerCase().includes(q)
   );
 }
+interface DropdownOption<T> {
+  value: T;
+  label: string;
+  badge?: string;
+}
+
 const STAFF_ROLE_OPTIONS: DropdownOption<AdminSystemRole>[] = [
   { value: "OWNER", label: "Owner", badge: "Fondateur" },
   { value: "SUPER_ADMIN", label: "Super Admin", badge: "Direction" },
@@ -711,21 +722,31 @@ const KYC_STATUS_OPTIONS: DropdownOption<KycStatus>[] = [
   { value: "REJECTED", label: "Non conforme / Rejeté" },
 ];
 
-const FALLBACK_CLIENT: UserProfile = {
+const FALLBACK_CLIENT: any = {
   id: "client-preview",
   name: "Client",
   email: "client@nexiummarkets.com",
-  role: "TRADER",
+  phone: "+33 6 00 00 00 00",
+  country: "France",
   status: "ACTIVE",
-  kycStatus: "VERIFIED",
-  mt5Account: "802194",
-  mt5Broker: "Nexium ECN Live",
+  createdAt: new Date().toISOString(),
+  lastActive: "En ligne",
+  ip: "127.0.0.1",
+  twoFactorEnabled: false,
+  forcePasswordReset: false,
   balance: 0,
-  equity: 0,
   bonusCredit: 0,
-  todayPnl: 0,
+  kycStatus: "VERIFIED",
+  kycDocuments: { idCardName: "", proofOfAddressName: "", submittedDate: "" },
   grossProfitTotal: 0,
   grossLossTotal: 0,
+  bestTradePnl: 0,
+  worstTradePnl: 0,
+  todayGrossGain: 0,
+  todayGrossLoss: 0,
+  todayPnl: 0,
+  totalNetPnl: 0,
+  winRatePercent: 0,
   engines: {
     aiGold: { active: true, preset: "AI_GOLD", maxLot: 1.0, minScore: 75, riskCapPercent: 2 },
     fxTrend: { active: true, preset: "FX_TREND", maxLot: 1.5, minScore: 70, riskCapPercent: 2 },
@@ -739,6 +760,10 @@ const FALLBACK_CLIENT: UserProfile = {
   crmNotes: [],
   withdrawalRequests: [],
   depositRequests: [],
+  transactions: [],
+  trades: [],
+  notes: [],
+  livePositions: [],
 };
 
 /* ========================================================================= */
@@ -2441,10 +2466,27 @@ function NexiumAdminDashboard({
     );
   };
 
-  // ── Module E-mails : chargement et interactions avec fallback de simulation ─────────
+  // ── Module E-mails : chargement et interactions synchronisés avec Supabase & Resend ─────────
   const emailConfigured = isEmailApiConfigured();
 
   const refreshEmailCounts = useCallback(async () => {
+    if (isSupabaseConfigured) {
+      try {
+        const all = await getAdminEmailConversations();
+        setEmailCounts({
+          inbox: all.length,
+          mine: all.filter((c) => c.assignedUserId === currentEmailAgentId).length,
+          unassigned: all.filter((c) => !c.assignedUserId).length,
+          inProgress: all.filter((c) => c.status === "EN_COURS").length,
+          waiting: all.filter((c) => c.status === "EN_ATTENTE").length,
+          resolved: all.filter((c) => c.status === "RESOLU").length,
+        });
+        return;
+      } catch {
+        // Fallback
+      }
+    }
+
     if (!emailConfigured) {
       setEmailCounts({ inbox: 0, mine: 0, unassigned: 0, inProgress: 0, waiting: 0, resolved: 0 });
       return;
@@ -2458,13 +2500,46 @@ function NexiumAdminDashboard({
   }, [emailConfigured, currentEmailAgentId]);
 
   const refreshEmailList = useCallback(async () => {
-    if (!emailConfigured) {
-      setEmailConversationsList([]);
-      return;
-    }
-
     setEmailListLoading(true);
     try {
+      if (isSupabaseConfigured) {
+        let items = await getAdminEmailConversations();
+
+        // Filtre par catégorie
+        if (emailFilter === "unassigned") {
+          items = items.filter((c) => !c.assignedUserId);
+        } else if (emailFilter === "mine") {
+          items = items.filter((c) => c.assignedUserId === currentEmailAgentId);
+        } else if (emailFilter === "in_progress") {
+          items = items.filter((c) => c.status === "EN_COURS");
+        } else if (emailFilter === "waiting") {
+          items = items.filter((c) => c.status === "EN_ATTENTE");
+        } else if (emailFilter === "resolved") {
+          items = items.filter((c) => c.status === "RESOLU");
+        }
+
+        // Filtre par recherche textuelle
+        if (emailSearch.trim()) {
+          const q = emailSearch.toLowerCase();
+          items = items.filter(
+            (c) =>
+              c.subject.toLowerCase().includes(q) ||
+              c.customerEmail.toLowerCase().includes(q) ||
+              (c.customerName && c.customerName.toLowerCase().includes(q)) ||
+              c.lastMessagePreview.toLowerCase().includes(q)
+          );
+        }
+
+        setEmailConversationsList(items);
+        setEmailApiError(null);
+        return;
+      }
+
+      if (!emailConfigured) {
+        setEmailConversationsList([]);
+        return;
+      }
+
       const { items } = await emailApi.listConversations(currentEmailAgentId, emailFilter, emailSearch);
       setEmailConversationsList(items);
       setEmailApiError(null);
@@ -2477,13 +2552,21 @@ function NexiumAdminDashboard({
 
   const refreshEmailDetail = useCallback(
     async (conversationId: string) => {
-      if (!emailConfigured) {
-        setEmailConversationDetail(null);
-        return;
-      }
-
       setEmailDetailLoading(true);
       try {
+        if (isSupabaseConfigured) {
+          const detail = await getAdminEmailConversationDetail(conversationId);
+          if (detail) {
+            setEmailConversationDetail(detail);
+            return;
+          }
+        }
+
+        if (!emailConfigured) {
+          setEmailConversationDetail(null);
+          return;
+        }
+
         const detail = await emailApi.getConversation(currentEmailAgentId, conversationId);
         setEmailConversationDetail(detail);
       } catch {
@@ -2497,28 +2580,18 @@ function NexiumAdminDashboard({
 
   useEffect(() => {
     refreshEmailCounts();
-    if (emailConfigured) {
-      emailApi
-        .listAgents(currentEmailAgentId)
-        .then((r) => setEmailAgentsList(r.agents))
-        .catch(() => {});
-      const interval = setInterval(refreshEmailCounts, 20_000);
-      return () => clearInterval(interval);
-    } else {
-      setEmailAgentsList([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailConfigured, currentEmailAgentId]);
+    const unsub = subscribeToAdminEmails(() => {
+      refreshEmailCounts();
+      refreshEmailList();
+      if (selectedEmailConversationId) refreshEmailDetail(selectedEmailConversationId);
+    });
+    return unsub;
+  }, [refreshEmailCounts, refreshEmailList, refreshEmailDetail, selectedEmailConversationId]);
 
   useEffect(() => {
     if (activeSection !== "emails") return;
     refreshEmailList();
-    if (emailConfigured) {
-      const interval = setInterval(refreshEmailList, 15_000);
-      return () => clearInterval(interval);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emailConfigured, activeSection, emailFilter, emailSearch]);
+  }, [activeSection, emailFilter, emailSearch, refreshEmailList]);
 
   useEffect(() => {
     if (selectedEmailConversationId) {
@@ -2526,8 +2599,7 @@ function NexiumAdminDashboard({
     } else {
       setEmailConversationDetail(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEmailConversationId]);
+  }, [selectedEmailConversationId, refreshEmailDetail]);
 
   const handleSelectEmailConversation = (id: string) => {
     setSelectedEmailConversationId(id);
@@ -2540,6 +2612,22 @@ function NexiumAdminDashboard({
 
   const handleAssignEmailConversation = async (targetUserId: string) => {
     if (!selectedEmailConversationId || !targetUserId) return;
+    if (isSupabaseConfigured) {
+      const staffMember = staffList.find((s) => s.id === targetUserId);
+      await supabase
+        .from("email_conversations")
+        .update({
+          assigned_agent_id: targetUserId,
+          assigned_agent_name: staffMember?.name || "Conseiller",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", selectedEmailConversationId);
+      toast.success("Conversation assignée.");
+      refreshEmailDetail(selectedEmailConversationId);
+      refreshEmailList();
+      refreshEmailCounts();
+      return;
+    }
     if (!emailConfigured) {
       toast.error("Service e-mail non configuré.");
       return;
@@ -2562,6 +2650,14 @@ function NexiumAdminDashboard({
 
   const handleSetEmailStatus = async (status: EmailConversationDetail["conversation"]["status"]) => {
     if (!selectedEmailConversationId) return;
+    if (isSupabaseConfigured) {
+      await adminUpdateEmailStatus(selectedEmailConversationId, status);
+      toast.success(`Statut mis à jour : ${status}`);
+      refreshEmailDetail(selectedEmailConversationId);
+      refreshEmailList();
+      refreshEmailCounts();
+      return;
+    }
     if (!emailConfigured) {
       toast.error("Service e-mail non configuré.");
       return;
@@ -2610,31 +2706,43 @@ function NexiumAdminDashboard({
     if (!selectedEmailConversationId || !emailReplyText.trim()) return;
     setEmailSending(true);
     try {
-      if (emailConfigured) {
+      const targetEmail = emailConversationDetail?.conversation.customerEmail || "client@nexiummarkets.com";
+      const subject = `Re: ${emailConversationDetail?.conversation.subject || "Votre demande Nexium Markets"}`;
+
+      if (isSupabaseConfigured) {
+        await adminReplyEmail({
+          conversationId: selectedEmailConversationId,
+          toAddress: targetEmail,
+          subject,
+          bodyText: emailReplyText.trim(),
+          agentName: currentDeskSignature,
+        });
+
+        // Envoi optionnel via Resend si clé renseignée
+        if (isResendConfigured) {
+          await sendCustomDeskEmail(
+            targetEmail,
+            subject,
+            emailReplyText.trim(),
+            currentDeskSignature
+          ).catch((e) => console.warn("Notice Resend sendCustomDeskEmail:", e));
+        }
+      } else if (emailConfigured) {
         await emailApi.reply(
           currentEmailAgentId,
           selectedEmailConversationId,
           emailReplyText.trim(),
           emailPendingAttachments.map((a) => a.id)
         );
-      } else {
-        // Mode direct via Resend & Supabase
-        const targetEmail = emailConversationDetail?.conversation.customerEmail || "client@nexiummarkets.com";
-        const subject = `Re: ${emailConversationDetail?.conversation.subject || "Votre demande Nexium Markets"}`;
-        await sendCustomDeskEmail(
-          targetEmail,
-          subject,
-          emailReplyText.trim(),
-          `Conseiller Desk (${currentSessionRole})`
-        );
       }
 
-      addAuditLog("EMAIL_REPLY_SENT", `Réponse e-mail envoyée pour le dossier #${selectedEmailConversationId}.`);
+      addAuditLog("EMAIL_REPLY_SENT", `Réponse e-mail transmise pour le dossier #${selectedEmailConversationId}.`);
       toast.success("E-mail envoyé avec succès au destinataire !");
       setEmailReplyText("");
       setEmailPendingAttachments([]);
       refreshEmailDetail(selectedEmailConversationId);
       refreshEmailList();
+      refreshEmailCounts();
     } catch (err) {
       toast.error(err instanceof EmailApiError ? `Échec de l'envoi : ${err.message}` : "Échec de l'envoi de l'e-mail.");
     } finally {
@@ -2648,18 +2756,49 @@ function NexiumAdminDashboard({
       toast.error("Destinataire, sujet et message sont requis.");
       return;
     }
-    if (!emailConfigured) {
-      toast.error("Service e-mail non configuré.");
-      return;
-    }
     setComposeEmailSending(true);
     try {
-      await emailApi.createConversation(
-        currentEmailAgentId,
-        composeEmailTo.trim(),
-        composeEmailSubject.trim(),
-        composeEmailText.trim()
-      );
+      if (isSupabaseConfigured) {
+        const convId = `thread-${Date.now().toString().slice(-6)}`;
+        await supabase.from("email_conversations").insert([
+          {
+            id: convId,
+            subject: composeEmailSubject.trim(),
+            status: "EN_COURS",
+            customer_email: composeEmailTo.trim().toLowerCase(),
+            customer_name: composeEmailTo.split("@")[0],
+            preview: composeEmailText.trim().slice(0, 100),
+            unread: false,
+          },
+        ]);
+        await supabase.from("email_messages").insert([
+          {
+            conversation_id: convId,
+            from_address: "support@nexiummarkets.com",
+            to_address: composeEmailTo.trim().toLowerCase(),
+            subject: composeEmailSubject.trim(),
+            body_text: composeEmailText.trim(),
+            direction: "OUTBOUND",
+          },
+        ]);
+
+        if (isResendConfigured) {
+          await sendCustomDeskEmail(
+            composeEmailTo.trim(),
+            composeEmailSubject.trim(),
+            composeEmailText.trim(),
+            currentDeskSignature
+          ).catch((e) => console.warn("Notice Resend sendCustomDeskEmail:", e));
+        }
+      } else if (emailConfigured) {
+        await emailApi.createConversation(
+          currentEmailAgentId,
+          composeEmailTo.trim(),
+          composeEmailSubject.trim(),
+          composeEmailText.trim()
+        );
+      }
+
       addAuditLog("EMAIL_COMPOSED", `Nouvel e-mail envoyé à ${composeEmailTo.trim()} : ${composeEmailSubject.trim()}.`);
       toast.success(`E-mail envoyé à ${composeEmailTo.trim()}.`);
       setShowComposeEmailModal(false);
@@ -2680,6 +2819,17 @@ function NexiumAdminDashboard({
     if (!selectedEmailConversationId || !emailNoteText.trim()) return;
     setEmailSending(true);
     try {
+      if (isSupabaseConfigured) {
+        await adminAddEmailNote({
+          conversationId: selectedEmailConversationId,
+          authorName: currentDeskSignature,
+          content: emailNoteText.trim(),
+        });
+        toast.success("Note interne ajoutée.");
+        setEmailNoteText("");
+        refreshEmailDetail(selectedEmailConversationId);
+        return;
+      }
       if (!emailConfigured) {
         toast.error("Service e-mail non configuré.");
         return;
@@ -2697,6 +2847,12 @@ function NexiumAdminDashboard({
   };
 
   const handleTriggerEmailSync = async () => {
+    if (isSupabaseConfigured) {
+      await refreshEmailList();
+      await refreshEmailCounts();
+      toast.success("Actualisation des e-mails terminée.");
+      return;
+    }
     if (!emailConfigured) {
       toast.error("Service e-mail non configuré.");
       return;

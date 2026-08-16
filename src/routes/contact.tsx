@@ -165,28 +165,33 @@ function ContactPage() {
       // A. Enregistrement dans Supabase si configuré
       if (isSupabaseConfigured) {
         try {
-          await supabase.from("email_conversations").insert([
+          const customerEmail = formData.email.trim().toLowerCase();
+          const subjectTitle = formData.subject ? `[Contact] ${formData.subject}` : "[Contact] Demande générale";
+
+          const { error: convErr } = await supabase.from("email_conversations").insert([
             {
               id: convId,
-              subject: `[Contact] ${formData.subject}`,
+              subject: subjectTitle,
               status: "INBOX",
-              customer_email: formData.email.trim(),
+              customer_email: customerEmail,
               customer_name: formData.fullName.trim(),
               preview: previewText,
               unread: true,
             },
           ]);
+          if (convErr) console.warn("Notice email_conversations insert:", convErr);
 
-          await supabase.from("email_messages").insert([
+          const { error: msgErr } = await supabase.from("email_messages").insert([
             {
               conversation_id: convId,
-              from_address: formData.email.trim(),
+              from_address: customerEmail,
               to_address: "support@nexiummarkets.com",
-              subject: formData.subject,
+              subject: subjectTitle,
               body_text: formData.message.trim(),
               direction: "INBOUND",
             },
           ]);
+          if (msgErr) console.warn("Notice email_messages insert:", msgErr);
         } catch (dbErr) {
           console.warn("Notice Supabase contact submission:", dbErr);
         }
