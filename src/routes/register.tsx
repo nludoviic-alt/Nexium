@@ -194,8 +194,20 @@ function RegisterPage() {
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#00ff66]/20 via-transparent to-transparent pointer-events-none" />
 
             <div className="relative z-10">
-              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                {language === "fr" ? "Automatisez Votre Trading" : "Automate Your Trading"}
+              <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight text-white">
+                {language === "fr" ? (
+                  <>
+                    Automatisez
+                    <br />
+                    Votre Trading
+                  </>
+                ) : (
+                  <>
+                    Automate
+                    <br />
+                    Your Trading
+                  </>
+                )}
               </h2>
 
               <ul className="mt-6 space-y-3.5 text-sm sm:text-base font-semibold">
