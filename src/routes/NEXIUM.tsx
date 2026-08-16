@@ -102,7 +102,7 @@ import {
   supabase,
   isSupabaseConfigured,
   getUserProfile,
-  requestPresetActivation,
+  requestPresetsActivation,
   getClientChatMessages,
   sendChatMessage,
   subscribeToDirectMessages,
@@ -276,8 +276,8 @@ const INITIAL_BOTS: EngineBot[] = [
     name: "Nexium AI Gold",
     specialty: "Spécialiste de l'Or Spot (XAUUSD)",
     subtitle: "Trading algorithmique spécialisé sur l'or et les ruptures de volatilité.",
-    statusBadge: "ACTIF",
-    mainState: "POSITION OPEN",
+    statusBadge: "EN PAUSE",
+    mainState: "WAITING FOR SETUP",
     markets: "XAUUSD",
     primarySymbol: "XAUUSD",
     strategy: "Trend Pullback / Breakout",
@@ -345,8 +345,8 @@ const INITIAL_BOTS: EngineBot[] = [
     name: "Nexium FX Trend",
     specialty: "Spécialiste des tendances Forex Majeures",
     subtitle: "Moteur de suivi de tendance dédié aux paires majeures Forex.",
-    statusBadge: "ACTIF",
-    mainState: "POSITION OPEN",
+    statusBadge: "EN PAUSE",
+    mainState: "WAITING FOR SETUP",
     markets: "EURUSD • GBPUSD • USDJPY",
     primarySymbol: "EURUSD",
     strategy: "Trend Following",
@@ -414,7 +414,7 @@ const INITIAL_BOTS: EngineBot[] = [
     name: "Nexium Index Reversion",
     specialty: "Spécialiste du retour à la moyenne sur indices",
     subtitle: "Moteur de retour à la moyenne haute fréquence conçu pour le Nasdaq et le Dow Jones.",
-    statusBadge: "ACTIF",
+    statusBadge: "EN PAUSE",
     mainState: "WAITING FOR SETUP",
     markets: "NAS100 • US30",
     primarySymbol: "NAS100",
@@ -477,203 +477,6 @@ const INITIAL_BOTS: EngineBot[] = [
     },
     version: "v1.9.0 MQL5 ECN",
     uptime: "99.95% (Equinix NY4)",
-  },
-];
-
-const INITIAL_POSITIONS: PositionItem[] = [
-  {
-    id: "pos-1",
-    ticket: "#892104",
-    side: "BUY",
-    strategy: "Trend Following",
-    symbol: "EURUSD",
-    volume: "0.50 lot",
-    entry: "1.08450",
-    currentPrice: "1.08584",
-    sl: "1.08150",
-    tp: "1.09100",
-    pnlNum: 67.0,
-    pnl: "+$67.00",
-    openTime: "14:12:05",
-    botId: "nexium-fx-trend",
-  },
-  {
-    id: "pos-2",
-    ticket: "#892119",
-    side: "BUY",
-    strategy: "Trend Pullback / Breakout",
-    symbol: "XAUUSD",
-    volume: "0.20 lot",
-    entry: "2 384.20",
-    currentPrice: "2 388.90",
-    sl: "2 374.00",
-    tp: "2 405.00",
-    pnlNum: 126.4,
-    pnl: "+$126.40",
-    openTime: "14:28:40",
-    botId: "nexium-ai-gold",
-  },
-  {
-    id: "pos-3",
-    ticket: "#892135",
-    side: "BUY",
-    strategy: "Mean Reversion",
-    symbol: "NAS100",
-    volume: "0.10 lot",
-    entry: "19 820.00",
-    currentPrice: "19 814.50",
-    sl: "19 750.00",
-    tp: "19 950.00",
-    pnlNum: -22.6,
-    pnl: "-$22.60",
-    openTime: "14:35:10",
-    botId: "nexium-index-reversion",
-  },
-];
-
-const INITIAL_TRANSACTIONS: TransactionItem[] = [
-  {
-    id: "tx-1",
-    date: "14 août 2026 · 14:02",
-    type: "Dépôt validé",
-    amount: "+$5,000.00",
-    amountNum: 5000,
-    currency: "USD",
-    status: "Confirmé",
-    method: "Virement Bancaire SEPA",
-    color: "#00D084",
-  },
-  {
-    id: "tx-2",
-    date: "13 août 2026 · 18:45",
-    type: "Gain trading MT5",
-    amount: "+$342.80",
-    amountNum: 342.8,
-    currency: "USD",
-    status: "Confirmé",
-    method: "Robot MQL5",
-    color: "#00D084",
-  },
-  {
-    id: "tx-3",
-    date: "11 août 2026 · 09:15",
-    type: "Retrait traité",
-    amount: "-$1,200.00",
-    amountNum: -1200,
-    currency: "USD",
-    status: "Confirmé",
-    method: "Virement SWIFT",
-    color: "#f43f5e",
-  },
-];
-
-const INITIAL_JOURNAL: JournalEntry[] = [
-  {
-    id: "j-1",
-    time: "14:50:18",
-    event: "MARKET_TICK",
-    symbol: "XAUUSD",
-    detail: "Cotation 2 388.90 reçue du flux Equinix NY4. Normalisation FIX réussie.",
-    status: "INFO",
-    statusVariant: "slate",
-  },
-  {
-    id: "j-2",
-    time: "14:48:16",
-    event: "SETUP_VALID",
-    symbol: "XAUUSD",
-    detail: "Nexium AI Gold : signal BUY validé avec score IA 84/100. Passage au filtre Risk Manager.",
-    status: "VALIDÉ",
-    statusVariant: "emerald",
-  },
-  {
-    id: "j-3",
-    time: "14:48:15",
-    event: "RISK_CHECK_PASSED",
-    detail: "Vérification Risk Governor : exposition totale 0.80 lot (limite 3.00 lots). Risque conforme.",
-    status: "VALIDÉ",
-    statusVariant: "emerald",
-  },
-  {
-    id: "j-4",
-    time: "14:28:40",
-    event: "ORDER_EXECUTED",
-    symbol: "XAUUSD",
-    detail: "Nexium AI Gold : ordre BUY 0.20 lot exécuté au cours 2 384.20 (Ticket #892119).",
-    status: "EXÉCUTÉ",
-    statusVariant: "sky",
-  },
-  {
-    id: "j-5",
-    time: "14:20:10",
-    event: "SIGNAL_REJECTED",
-    symbol: "EURUSD",
-    detail: "Nexium FX Trend : signal SELL rejeté (Score 74/100 < seuil minimal 78/100).",
-    status: "ALERTE",
-    statusVariant: "amber",
-  },
-  {
-    id: "j-6",
-    time: "13:48:39",
-    event: "POSITION_CLOSED_TP",
-    symbol: "GBPUSD",
-    detail: "Nexium FX Trend : position BUY clôturée sur Take-Profit à 1.28450 (+ $42.50).",
-    status: "CLÔTURÉ",
-    statusVariant: "purple",
-  },
-];
-
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: "m-1",
-    sender: "support",
-    senderName: "Elena V. (Support Client 24/7)",
-    contactId: "support-client",
-    text: "Bonjour Ludovic 👋 Bienvenue sur votre support prioritaire Nexium. Votre compte MT5 ECN #802194 est actif et vérifié. Comment pouvons-nous vous aider aujourd'hui ?",
-    time: "14:10",
-    status: "read",
-  },
-  {
-    id: "m-2",
-    sender: "expert",
-    senderName: "Expert Trading (Desk Quant)",
-    contactId: "expert-quant",
-    text: "Bonjour Ludovic. La session New York montre un breakout algorithmique de volatilité sur XAUUSD. Le moteur AI Gold a validé le setup à 2 384.20 avec un ratio risque/rendement de 1:2.4. Ci-joint l'analyse graphique du signal.",
-    time: "14:22",
-    image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1000&auto=format&fit=crop",
-    imageCaption: "Graphique Breakout MQL5 — XAUUSD M15 (NY Session)",
-    reactions: [{ emoji: "🚀", count: 2, byMe: true }, { emoji: "📈", count: 1 }],
-    status: "read",
-  },
-  {
-    id: "m-3",
-    sender: "ai",
-    senderName: "Nexium Core IA (Assistant Trading)",
-    contactId: "ai-bot",
-    text: "⚡ Télémétrie en direct :\n• 3 Robots actifs sur serveur Equinix NY4 (Latence : 0.8ms)\n• P&L Journalier cumulé : +$167.30 (+0.67%)\n• Drawdown max enregistré aujourd'hui : 0.34% (Seuil d'alerte : 2.00%)\n\nTous les voyants sont au vert pour la séance.",
-    time: "14:28",
-    reactions: [{ emoji: "⚡", count: 3, byMe: true }, { emoji: "🛡️", count: 1 }],
-    status: "read",
-  },
-  {
-    id: "m-4",
-    sender: "desk",
-    senderName: "Desk Conformité & Risque",
-    contactId: "risk-governance",
-    text: "🛡️ Audit de conformité institutionnelle validé pour votre compte MT5 #802194.\n• Coupe-circuit automatique configuré à -2.00% journalier.\n• Exposition maximale autorisée : 5.0 lots simultanés.\n• Télémétrie des Stop-Loss synchronisée en temps réel avec le pont ECN Equinix NY4.",
-    time: "14:30",
-    reactions: [{ emoji: "🛡️", count: 2, byMe: true }, { emoji: "✅", count: 1 }],
-    status: "read",
-  },
-  {
-    id: "m-5",
-    sender: "desk",
-    senderName: "Desk Conformité & Risque",
-    contactId: "risk-governance",
-    text: "Rappel de sécurité : Aucun dépassement de marge n'a été détecté au cours des dernières 72 heures. Vos fonds propres sont protégés par la politique de ségrégation bancaire Tier-1.",
-    time: "14:32",
-    reactions: [{ emoji: "🔒", count: 1 }],
-    status: "read",
   },
 ];
 
@@ -2688,6 +2491,7 @@ function EngineTab({
 // 2. OVERVIEW VIEW
 // ----------------------------------------------------
 function OverviewTab({
+  clientName,
   balance,
   running,
   onToggleRunning,
@@ -2699,6 +2503,7 @@ function OverviewTab({
   onOpenEngine,
   onOpenRisk,
 }: {
+  clientName: string;
   balance: number;
   running: boolean;
   onToggleRunning: () => void;
@@ -2790,7 +2595,7 @@ function OverviewTab({
               TABLEAU DE BORD EXÉCUTIF MT5
             </div>
             <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
-              Bonjour, <span className="text-emerald-400">Ludovic</span>
+              Bonjour, <span className="text-emerald-400">{clientName.split(" ")[0] || clientName}</span>
             </h2>
             <p className="max-w-xl text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
               Vos 3 moteurs institutionnels (AI Gold, FX Trend, Index Reversion) sont synchronisés avec le serveur <strong className="text-white font-mono">Equinix NY4</strong>.
@@ -5248,17 +5053,19 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("Auto-Trader");
-  const [balance, setBalance] = useState(24860.42);
+  const [balance, setBalance] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [clientName, setClientName] = useState("Ludovic M.");
-  const [clientEmail, setClientEmail] = useState("ludovic@nexium.io");
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
   const [clientEmails, setClientEmails] = useState<EmailItem[]>(INITIAL_EMAILS);
-  const [mt5AccountNumber, setMt5AccountNumber] = useState("802194");
+  const [mt5AccountNumber, setMt5AccountNumber] = useState("");
   const [assignedAdvisor, setAssignedAdvisor] = useState("Expert Trading (Desk Quant)");
   const [licenseStatus, setLicenseStatus] = useState<"NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE">("ACTIVE");
-  const [requestedPreset, setRequestedPreset] = useState<string | null>(null);
+  const [requestedPresets, setRequestedPresets] = useState<string[]>([]);
   const [activePreset, setActivePreset] = useState<string | null>(null);
-  const [selectedPresetModal, setSelectedPresetModal] = useState<any | null>(null);
+  // Sélection en cours (avant envoi) sur l'écran de choix des presets — le client peut cocher 1, 2 ou 3.
+  const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
+  const [showPresetConfirmModal, setShowPresetConfirmModal] = useState(false);
   const [submittingPreset, setSubmittingPreset] = useState(false);
 
   // Chargement dynamique & Protection stricte de l'espace client
@@ -5313,8 +5120,50 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
         } else {
           setLicenseStatus("NOT_REQUESTED");
         }
-        if (profile.requested_preset) setRequestedPreset(profile.requested_preset);
+        if (profile.requested_presets && profile.requested_presets.length > 0) {
+          setRequestedPresets(profile.requested_presets);
+        } else if (profile.requested_preset) {
+          setRequestedPresets([profile.requested_preset]);
+        }
         if (profile.active_preset) setActivePreset(profile.active_preset);
+
+        // Synchronisation initiale des moteurs (AI Gold / FX Trend / Index Reversion)
+        // avec l'état réel enregistré côté admin — sinon chaque carte reste figée sur
+        // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
+        if (profile.engines_config) {
+          const cfg = profile.engines_config as any;
+          setBots((prev) =>
+            prev.map((bot) => {
+              if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
+                return {
+                  ...bot,
+                  statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
+                  mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+                  risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
+                };
+              }
+              if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
+                return {
+                  ...bot,
+                  statusBadge: cfg.fxTrend.active ? "ACTIF" : "EN PAUSE",
+                  mainState: cfg.fxTrend.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+                  risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
+                };
+              }
+              if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
+                return {
+                  ...bot,
+                  statusBadge: cfg.indexReversion.active ? "ACTIF" : "EN PAUSE",
+                  mainState: cfg.indexReversion.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+                  risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
+                };
+              }
+              return { ...bot, statusBadge: "EN PAUSE", mainState: "WAITING FOR SETUP" };
+            })
+          );
+        } else {
+          setBots((prev) => prev.map((bot) => ({ ...bot, statusBadge: "EN PAUSE", mainState: "WAITING FOR SETUP" })));
+        }
 
         // Vérification du slug personnalisé dans l'URL
         const ownSlug = getUserSlug({ name: profile.name, email: user.email, id: user.id });
@@ -5495,11 +5344,12 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
     return unsub;
   }, [currentUserId]);
 
-  const handleConfirmPresetRequest = async (presetId: string) => {
+  const handleConfirmPresetRequest = async (presetIds: string[]) => {
+    if (presetIds.length === 0) return;
     setSubmittingPreset(true);
     try {
       if (isSupabaseConfigured && currentUserId) {
-        const result = await requestPresetActivation(currentUserId, presetId);
+        const result = await requestPresetsActivation(currentUserId, presetIds);
         if (result && (result as any).success === false) {
           toast.error("Impossible de transmettre la demande. Veuillez réessayer ou contacter le support.");
           setSubmittingPreset(false);
@@ -5507,9 +5357,14 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
         }
       }
       setLicenseStatus("PENDING_PRESET_APPROVAL");
-      setRequestedPreset(presetId);
-      setSelectedPresetModal(null);
-      toast.success("Demande d'attribution de Preset transmise au Desk d'Administration !");
+      setRequestedPresets(presetIds);
+      setSelectedPresetIds([]);
+      setShowPresetConfirmModal(false);
+      toast.success(
+        presetIds.length > 1
+          ? "Demande d'attribution des Presets transmise au Desk d'Administration !"
+          : "Demande d'attribution de Preset transmise au Desk d'Administration !"
+      );
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la transmission de la demande.");
     } finally {
@@ -5518,10 +5373,12 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   };
 
   // States
+  // Positions/journal : aucune table de trades réels n'existe encore (MT5 pas encore
+  // connecté) — on démarre donc à vide plutôt que d'afficher une activité fictive.
   const [bots, setBots] = useState<EngineBot[]>(INITIAL_BOTS);
-  const [positions, setPositions] = useState<PositionItem[]>(INITIAL_POSITIONS);
-  const [transactions, setTransactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
-  const [journal, setJournal] = useState<JournalEntry[]>(INITIAL_JOURNAL);
+  const [positions, setPositions] = useState<PositionItem[]>([]);
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Modals & Detail Views
@@ -6026,7 +5883,13 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                       Demande transmise au Desk d'Administration
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                      Votre demande pour le <strong>{OFFICIAL_PRESETS.find(p => p.id === requestedPreset)?.name || requestedPreset}</strong> a été transmise. Votre gestionnaire <strong>{assignedAdvisor}</strong> procède à la validation de conformité et à l'affectation du flux.
+                      Votre demande pour {requestedPresets.length > 1 ? "les presets" : "le preset"}{" "}
+                      <strong>
+                        {requestedPresets
+                          .map((id) => OFFICIAL_PRESETS.find((p) => p.id === id)?.name || id)
+                          .join(", ")}
+                      </strong>{" "}
+                      a été transmise. Votre gestionnaire <strong>{assignedAdvisor}</strong> procède à la validation de conformité et à l'affectation du flux.
                     </p>
                   </div>
                 </div>
@@ -6090,14 +5953,15 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
           {/* ── 3. GRILLE DES 3 PRESETS (HAUTEUR OPTIMISÉE & COMPACTE) ── */}
           <div className="grid md:grid-cols-3 gap-5 pt-1">
             {OFFICIAL_PRESETS.map((preset) => {
-              const isSelected = requestedPreset === preset.id;
-              const isPending = licenseStatus === "PENDING_PRESET_APPROVAL" && isSelected;
+              const isAlreadyRequested = requestedPresets.includes(preset.id);
+              const isPending = licenseStatus === "PENDING_PRESET_APPROVAL" && isAlreadyRequested;
+              const isChecked = selectedPresetIds.includes(preset.id);
 
               return (
                 <div
                   key={preset.id}
                   className={`rounded-3xl border bg-gradient-to-b from-[#0d131d]/95 to-[#090d14]/95 backdrop-blur-xl p-5 sm:p-6 flex flex-col justify-between transition-all duration-300 shadow-2xl ${preset.borderClass} ${
-                    isSelected ? "ring-2 ring-emerald-400/50 scale-[1.01]" : "hover:scale-[1.01]"
+                    isChecked || isPending ? "ring-2 ring-emerald-400/50 scale-[1.01]" : "hover:scale-[1.01]"
                   }`}
                 >
                   <div className="space-y-3.5">
@@ -6153,11 +6017,28 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                       </div>
                     ) : (
                       <button
-                        onClick={() => setSelectedPresetModal(preset)}
-                        className={`w-full py-3 px-4 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg ${preset.btnClass}`}
+                        onClick={() =>
+                          setSelectedPresetIds((prev) =>
+                            prev.includes(preset.id) ? prev.filter((id) => id !== preset.id) : [...prev, preset.id]
+                          )
+                        }
+                        className={`w-full py-3 px-4 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg ${
+                          isChecked
+                            ? "bg-emerald-500/20 border border-emerald-500/50 text-emerald-300"
+                            : preset.btnClass
+                        }`}
                       >
-                        <span>Demander l'Activation de ce Preset</span>
-                        <ChevronRight className="size-3.5" />
+                        {isChecked ? (
+                          <>
+                            <CheckCircle2 className="size-3.5" />
+                            <span>Sélectionné</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Sélectionner ce Preset</span>
+                            <ChevronRight className="size-3.5" />
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
@@ -6165,6 +6046,22 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               );
             })}
           </div>
+
+          {/* Bouton d'envoi groupé — actif dès qu'au moins un preset est coché */}
+          {selectedPresetIds.length > 0 && (
+            <div className="sticky bottom-4 z-20 flex justify-center animate-in fade-in slide-in-from-bottom-2">
+              <button
+                onClick={() => setShowPresetConfirmModal(true)}
+                className="px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-black transition flex items-center gap-2.5 cursor-pointer shadow-2xl shadow-emerald-500/30"
+              >
+                <CheckCircle2 className="size-4" />
+                <span>
+                  Transmettre la demande pour {selectedPresetIds.length} preset{selectedPresetIds.length > 1 ? "s" : ""}
+                </span>
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          )}
 
           {/* Section Frosted Preview des Fonctionnalités Verrouillées */}
           <div className="relative rounded-3xl border border-white/[0.08] bg-[#0a0e16]/90 p-6 sm:p-8 overflow-hidden shadow-2xl">
@@ -6209,8 +6106,8 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
           </div>
         </main>
 
-        {/* Modale de Confirmation de Demande de Preset */}
-        {selectedPresetModal && (
+        {/* Modale de Confirmation de Demande de Preset(s) */}
+        {showPresetConfirmModal && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md grid place-items-center p-4 animate-in fade-in">
             <div className="w-full max-w-lg rounded-3xl border border-white/[0.12] bg-[#0f141d] p-6 sm:p-8 shadow-2xl space-y-6">
               <div className="flex items-center justify-between">
@@ -6219,12 +6116,14 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                     <CheckCircle2 className="size-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">Validation du Preset</h3>
-                    <p className="text-xs text-slate-400 font-mono">{selectedPresetModal.name}</p>
+                    <h3 className="text-lg font-bold text-white">Validation du/des Preset(s)</h3>
+                    <p className="text-xs text-slate-400 font-mono">
+                      {selectedPresetIds.length} preset{selectedPresetIds.length > 1 ? "s" : ""} sélectionné{selectedPresetIds.length > 1 ? "s" : ""}
+                    </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelectedPresetModal(null)}
+                  onClick={() => setShowPresetConfirmModal(false)}
                   className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
                 >
                   <X className="size-5" />
@@ -6233,29 +6132,38 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
 
               <div className="space-y-3 text-xs text-slate-300 leading-relaxed bg-black/40 p-4 rounded-2xl border border-white/[0.06]">
                 <p>
-                  Vous êtes sur le point de soumettre la demande d'activation pour le{" "}
-                  <strong className="text-white">{selectedPresetModal.name}</strong> sur votre compte MT5{" "}
-                  <strong className="text-emerald-400">#{mt5AccountNumber}</strong>.
+                  Vous êtes sur le point de soumettre la demande d'activation pour votre compte MT5{" "}
+                  <strong className="text-emerald-400">#{mt5AccountNumber}</strong> :
                 </p>
-                <ul className="space-y-1.5 text-slate-400 pt-2 border-t border-white/[0.06]">
-                  <li>• Stratégie : <strong className="text-white">{selectedPresetModal.subtitle}</strong></li>
-                  <li>• Marché Ciblé : <strong className="text-white">{selectedPresetModal.market}</strong></li>
-                  <li>• Passerelle d'exécution : <strong className="text-white">{selectedPresetModal.gateway}</strong></li>
-                  <li>• Conseiller Référent : <strong className="text-purple-300">Expert Trading</strong></li>
-                  <li>• Régulation : <strong className="text-emerald-400">Validation obligatoire par l'Administrateur</strong></li>
+                <ul className="space-y-2.5 text-slate-400 pt-2 border-t border-white/[0.06]">
+                  {selectedPresetIds.map((id) => {
+                    const p = OFFICIAL_PRESETS.find((preset) => preset.id === id);
+                    if (!p) return null;
+                    return (
+                      <li key={id}>
+                        • <strong className="text-white">{p.name}</strong> — {p.subtitle} ({p.market})
+                      </li>
+                    );
+                  })}
+                  <li className="pt-1">
+                    Conseiller Référent : <strong className="text-purple-300">Expert Trading</strong>
+                  </li>
+                  <li>
+                    Régulation : <strong className="text-emerald-400">Validation obligatoire par l'Administrateur</strong>
+                  </li>
                 </ul>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
-                  onClick={() => setSelectedPresetModal(null)}
+                  onClick={() => setShowPresetConfirmModal(false)}
                   className="px-4 py-2.5 rounded-xl border border-white/[0.1] text-xs font-bold text-slate-300 hover:bg-white/[0.06] transition cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   disabled={submittingPreset}
-                  onClick={() => handleConfirmPresetRequest(selectedPresetModal.id)}
+                  onClick={() => handleConfirmPresetRequest(selectedPresetIds)}
                   className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                 >
                   {submittingPreset ? (
@@ -6535,6 +6443,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
 
           {activeNav === "Vue d’ensemble" && (
             <OverviewTab
+              clientName={clientName}
               balance={balance}
               running={running}
               onToggleRunning={handleToggleEngine}

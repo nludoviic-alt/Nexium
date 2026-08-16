@@ -36,6 +36,9 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS license_status TEXT DEFAULT
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS requested_preset TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS active_preset TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_primary_owner BOOLEAN NOT NULL DEFAULT FALSE;
+-- Sélection multiple de presets par le client (1, 2 ou 3 à la fois) ;
+-- l'activation par moteur reste pilotée individuellement via engines_config.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS requested_presets TEXT[] DEFAULT '{}';
 
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_single_primary_owner
     ON public.profiles (is_primary_owner)

@@ -134,7 +134,7 @@ import {
   isSupabaseConfigured,
   approveClientAccount,
   rejectClientAccount,
-  approvePresetActivation,
+  approvePresetSelection,
   assignAdvisorToClient,
   getAllClientProfiles,
   getUserProfile,
@@ -419,7 +419,7 @@ interface UserProfile {
   bonusCredit: number;
   kycStatus: KycStatus;
   licenseStatus?: "NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE" | "EXPIRED";
-  requestedPreset?: string;
+  requestedPresets?: string[];
   activePreset?: string;
   kycDocuments: {
     idCardName: string;
@@ -1314,7 +1314,7 @@ function NexiumAdminDashboard({
             status: (p.status as AccountStatus) ?? c.status,
             kycStatus: (p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW") as UserProfile["kycStatus"],
             licenseStatus: ((p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED")) as UserProfile["licenseStatus"],
-            requestedPreset: p.requested_preset,
+            requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
             activePreset: p.active_preset,
             balance: p.balance ?? c.balance,
             assignedAdvisor: p.assigned_advisor || c.assignedAdvisor,
@@ -1340,7 +1340,7 @@ function NexiumAdminDashboard({
             equity: p.balance || 0,
             kycStatus: p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW",
             licenseStatus: (p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED"),
-            requestedPreset: p.requested_preset,
+            requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
             activePreset: p.active_preset,
             kycDocuments: {
               idCardName: "En cours d'examen",
@@ -1419,8 +1419,11 @@ function NexiumAdminDashboard({
         payload.old?.license_status !== "PENDING_PRESET_APPROVAL"
       ) {
         const client = payload.new;
+        const presetsLabel = (client?.requested_presets && client.requested_presets.length > 0
+          ? client.requested_presets.join(", ")
+          : client?.requested_preset) || "Preset";
         toast.info(
-          `⚡ Nouvelle demande d'activation de Preset : ${client?.name || "Client"} (${client?.email || ""}) — ${client?.requested_preset || "Preset"}`,
+          `⚡ Nouvelle demande d'activation de Preset : ${client?.name || "Client"} (${client?.email || ""}) — ${presetsLabel}`,
           { duration: 9000 }
         );
       }
@@ -1598,18 +1601,25 @@ function NexiumAdminDashboard({
     toast.error(`La demande de compte de ${client.name} a été refusée.`);
   };
 
-  // Validation & Activation d'un Preset de Trading (SOUVERAINETÉ EXCLUSIVE DU SUPER ADMIN)
-  const handleApproveClientPreset = async (client: UserProfile, presetKey?: string) => {
+  // Validation & Activation individuelle des Presets de Trading (SOUVERAINETÉ EXCLUSIVE DU SUPER ADMIN)
+  // activePresetKeys : la liste des presets (parmi ceux demandés) que le Super Admin choisit d'activer
+  // maintenant — le client peut n'en cocher qu'une partie ; le reste reste "Non activé" côté dashboard.
+  const handleApproveClientPreset = async (client: UserProfile, activePresetKeys: string[]) => {
     if (!isSuperAdmin) {
       toast.error("Privilège insuffisant : Seul le Super Administrateur / Direction peut valider et activer les Presets.");
       return;
     }
 
-    const finalPreset = presetKey || client.requestedPreset || "AI_GOLD";
+    if (activePresetKeys.length === 0) {
+      toast.error("Sélectionnez au moins un preset à activer.");
+      return;
+    }
 
     if (isSupabaseConfigured) {
-      await approvePresetActivation(client.id, finalPreset);
+      await approvePresetSelection(client.id, activePresetKeys);
     }
+
+    const presetsLabel = activePresetKeys.join(", ");
 
     setClients((prev) =>
       prev.map((c) => {
@@ -1617,8 +1627,13 @@ function NexiumAdminDashboard({
           return {
             ...c,
             licenseStatus: "ACTIVE",
-            activePreset: finalPreset,
+            activePreset: presetsLabel,
             status: "ACTIVE",
+            engines: {
+              aiGold: { ...(c.engines?.aiGold || {}), active: activePresetKeys.includes("AI_GOLD") },
+              fxTrend: { ...(c.engines?.fxTrend || {}), active: activePresetKeys.includes("FX_TREND") },
+              indexReversion: { ...(c.engines?.indexReversion || {}), active: activePresetKeys.includes("INDEX_REVERSION") },
+            },
           };
         }
         return c;
@@ -1628,16 +1643,16 @@ function NexiumAdminDashboard({
     // Envoi de l'e-mail officiel d'activation de la licence via Resend
     sendCustomDeskEmail(
       client.email,
-      `Activation de votre Stratégie Algorithmique (${finalPreset})`,
-      `Bonjour ${client.name},\n\nVotre demande d'activation pour le Preset Algorithmique [${finalPreset}] a été validée par la Direction des Opérations.\n\nVotre Dashboard de Trading en direct (flux Equinix NY4 FIX 4.4) est désormais déverrouillé et opérationnel sur votre compte MT5 #${client.mt5?.login || "—"}.\n\nConnectez-vous dès maintenant pour suivre vos exécutions et vos performances en temps réel : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+      `Activation de votre Stratégie Algorithmique (${presetsLabel})`,
+      `Bonjour ${client.name},\n\nVotre demande d'activation pour le${activePresetKeys.length > 1 ? "s" : ""} Preset${activePresetKeys.length > 1 ? "s" : ""} Algorithmique${activePresetKeys.length > 1 ? "s" : ""} [${presetsLabel}] a été validée par la Direction des Opérations.\n\nVotre Dashboard de Trading en direct (flux Equinix NY4 FIX 4.4) est désormais déverrouillé et opérationnel sur votre compte MT5 #${client.mt5?.login || "—"}.\n\nConnectez-vous dès maintenant pour suivre vos exécutions et vos performances en temps réel : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
     ).catch((err) => console.warn("Resend email error:", err));
 
     addAuditLog(
       "PRESET_APPROVED",
-      `Preset [${finalPreset}] validé et activé pour ${client.name} (${client.email}) par le Super Admin. Dashboard déverrouillé.`,
+      `Preset(s) [${presetsLabel}] validé(s) et activé(s) pour ${client.name} (${client.email}) par le Super Admin. Dashboard déverrouillé.`,
       client.name
     );
-    toast.success(`Preset [${finalPreset}] validé ! Le Dashboard de ${client.name} est maintenant totalement accessible.`);
+    toast.success(`Preset(s) [${presetsLabel}] validé(s) ! Le Dashboard de ${client.name} est maintenant accessible.`);
   };
 
   // Attribution d'un client à un Administrateur / Conseiller Dédié
@@ -3368,7 +3383,7 @@ function NexiumAdminDashboard({
                           {c.status === "PENDING_APPROVAL"
                             ? "⏳ COMPTE EN ATTENTE"
                             : c.licenseStatus === "PENDING_PRESET_APPROVAL"
-                            ? `🎯 PRESET : ${c.requestedPreset || "AI_GOLD"}`
+                            ? `🎯 PRESET : ${(c.requestedPresets && c.requestedPresets.length > 0 ? c.requestedPresets.join(", ") : "AI_GOLD")}`
                             : c.status}
                         </AdminBadge>
                         <span className="text-[11px] text-indigo-300 font-mono block">
@@ -3458,11 +3473,12 @@ function NexiumAdminDashboard({
                           <>
                             {isSuperAdmin ? (
                               <button
-                                onClick={() => handleApproveClientPreset(c, c.requestedPreset)}
+                                onClick={() => handleApproveClientPreset(c, c.requestedPresets || [])}
+                                title={`Active ${c.requestedPresets && c.requestedPresets.length > 0 ? c.requestedPresets.join(", ") : "le preset demandé"} — pour n'en activer qu'une partie, utilisez la Fiche client`}
                                 className="rounded-xl border border-cyan-400 bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black py-1.5 px-3 transition cursor-pointer inline-flex items-center gap-1 shadow-md shadow-cyan-500/20"
                               >
                                 <Zap className="size-3.5" />
-                                <span>Valider Preset &amp; Déverrouiller</span>
+                                <span>Valider Preset{c.requestedPresets && c.requestedPresets.length > 1 ? "s" : ""} &amp; Déverrouiller</span>
                               </button>
                             ) : (
                               <span className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-[11px] font-bold py-1.5 px-2.5 inline-flex items-center gap-1">

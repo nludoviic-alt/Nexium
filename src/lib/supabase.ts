@@ -53,6 +53,7 @@ export interface SupabaseUserProfile {
   is_primary_owner?: boolean;
   license_status?: "NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE" | "EXPIRED";
   requested_preset?: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION" | string;
+  requested_presets?: string[];
   active_preset?: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION" | string;
   mt5_login?: string;
   mt5_broker?: string;
@@ -194,25 +195,46 @@ export async function rejectClientAccount(userId: string) {
   });
 }
 
+/** Correspondance entre l'identifiant public d'un Preset et sa clé dans engines_config. */
+export const PRESET_TO_ENGINE_KEY: Record<string, "aiGold" | "fxTrend" | "indexReversion"> = {
+  AI_GOLD: "aiGold",
+  FX_TREND: "fxTrend",
+  INDEX_REVERSION: "indexReversion",
+};
+
 /**
- * Demande d'activation d'un preset par le client.
+ * Demande d'activation d'un ou plusieurs presets par le client (1, 2 ou 3 à la fois).
  */
-export async function requestPresetActivation(userId: string, presetKey: string) {
+export async function requestPresetsActivation(userId: string, presetKeys: string[]) {
   return updateUserProfile(userId, {
     license_status: "PENDING_PRESET_APPROVAL",
-    requested_preset: presetKey,
-  });
+    requested_presets: presetKeys,
+  } as any);
 }
 
 /**
- * Validation et activation d'un preset par le Super Administrateur.
+ * Activation individuelle des moteurs par le Super Administrateur : seuls les
+ * presets présents dans `activePresetKeys` passent à `active: true` dans
+ * engines_config, les autres restent (ou repassent) inactifs. Le client voit
+ * le dashboard complet dès la première approbation, mais chaque compartiment
+ * reste "Non activé" tant que son moteur précis n'est pas coché ici.
  */
-export async function approvePresetActivation(userId: string, presetKey?: string) {
+export async function approvePresetSelection(userId: string, activePresetKeys: string[]) {
   const profile = await getUserProfile(userId);
-  const finalPreset = presetKey || profile?.requested_preset || "AI_GOLD";
+  const currentConfig = (profile?.engines_config as any) || {};
+
+  const nextConfig = { ...currentConfig };
+  for (const [presetId, engineKey] of Object.entries(PRESET_TO_ENGINE_KEY)) {
+    nextConfig[engineKey] = {
+      ...(currentConfig[engineKey] || {}),
+      active: activePresetKeys.includes(presetId),
+    };
+  }
+
   return updateUserProfile(userId, {
     license_status: "ACTIVE",
-    active_preset: finalPreset,
+    active_preset: activePresetKeys.join(","),
+    engines_config: nextConfig,
   });
 }
 
