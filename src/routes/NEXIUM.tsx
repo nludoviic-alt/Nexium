@@ -3522,7 +3522,7 @@ function MessagingTab({
   balance = 0,
 }: {
   messages: ChatMessage[];
-  onSendMessage: (txt: string) => void;
+  onSendMessage: (txt: string, id?: string) => void;
   clientName?: string;
   clientEmail?: string;
   mt5AccountNumber?: string;
@@ -3557,13 +3557,31 @@ function MessagingTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Keep local threads in sync if parent sends new messages
+  // Keep local threads in sync if parent sends new messages. Un message "user"
+  // qu'on vient d'envoyer existe déjà localement avec un id temporaire ; quand
+  // sa version confirmée revient de Supabase (id réel différent), on remplace
+  // la copie optimiste au lieu d'en ajouter une deuxième — sinon le message
+  // apparaît deux fois dès que l'aller-retour serveur se termine.
   useEffect(() => {
     setChatThreads((prev) => {
       const existingIds = new Set(prev.map((m) => m.id));
       const newFromProps = messages.filter((m) => !existingIds.has(m.id));
       if (newFromProps.length === 0) return prev;
-      return [...prev, ...newFromProps];
+
+      const next = [...prev];
+      const toAppend: ChatMessage[] = [];
+      for (const m of newFromProps) {
+        const localIdx =
+          m.sender === "user"
+            ? next.findIndex((t) => t.sender === "user" && t.text === m.text && t.id.startsWith("msg-"))
+            : -1;
+        if (localIdx !== -1) {
+          next[localIdx] = { ...next[localIdx], id: m.id } as ChatMessage;
+        } else {
+          toAppend.push(m);
+        }
+      }
+      return [...next, ...toAppend];
     });
   }, [messages]);
 
@@ -3650,7 +3668,7 @@ function MessagingTab({
     };
 
     setChatThreads((prev) => [...prev, userMsg]);
-    onSendMessage(chatInput.trim() || "[Capture d'écran transmise]");
+    onSendMessage(chatInput.trim() || "[Capture d'écran transmise]", userMsg.id);
 
     // Reset input fields
     setChatInput("");
@@ -5590,10 +5608,10 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
     toast.success(`Demande de retrait de $${val.toFixed(2)} transmise au Desk Finance pour traitement.`);
   };
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, id?: string) => {
     const now = new Date().toLocaleTimeString().slice(0, 5);
     const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
+      id: id || `msg-${Date.now()}`,
       sender: "user",
       senderName: clientName,
       text,
