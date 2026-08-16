@@ -541,16 +541,32 @@ function RegisterPage() {
                     </div>
 
                     {/* Legal Policy Links */}
-                    <p className="text-xs sm:text-sm leading-relaxed text-gray-600 font-medium pt-1">
-                      En continuant, vous confirmez avoir lu et accepté nos{" "}
-                      <Link to="/terms" className="font-extrabold text-gray-900 underline">
-                        Conditions Générales
-                      </Link>{" "}
-                      et notre{" "}
-                      <Link to="/privacy" className="font-extrabold text-gray-900 underline">
-                        Politique de Confidentialité
-                      </Link>
-                      .
+                    <p className="text-xs text-gray-500 font-medium pt-1">
+                      {language === "fr" ? (
+                        <>
+                          En vous inscrivant, vous acceptez nos{" "}
+                          <Link to="/terms" className="font-bold text-gray-900 underline hover:text-[#00c853]">
+                            CGU
+                          </Link>{" "}
+                          et notre{" "}
+                          <Link to="/privacy" className="font-bold text-gray-900 underline hover:text-[#00c853]">
+                            Politique de Confidentialité
+                          </Link>
+                          .
+                        </>
+                      ) : (
+                        <>
+                          By signing up, you agree to our{" "}
+                          <Link to="/terms" className="font-bold text-gray-900 underline hover:text-[#00c853]">
+                            Terms
+                          </Link>{" "}
+                          and{" "}
+                          <Link to="/privacy" className="font-bold text-gray-900 underline hover:text-[#00c853]">
+                            Privacy Policy
+                          </Link>
+                          .
+                        </>
+                      )}
                     </p>
 
                     {/* Create Account Black Pill Button */}
