@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
 export interface DropdownOption<T extends string = string> {
@@ -16,6 +16,9 @@ interface AdminDropdownProps<T extends string = string> {
   ariaLabel?: string;
 }
 
+const MENU_MARGIN = 8; // marge de sécurité par rapport au bord de l'écran
+const MENU_PREFERRED_HEIGHT = 288; // ~ max-h-72
+
 export function AdminDropdown<T extends string = string>({
   value,
   onChange,
@@ -25,9 +28,42 @@ export function AdminDropdown<T extends string = string>({
   ariaLabel,
 }: AdminDropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ openUp: boolean; maxHeight: number }>({
+    openUp: false,
+    maxHeight: MENU_PREFERRED_HEIGHT,
+  });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedOption = options.find((opt) => opt.value === value) || options[0];
+
+  // Décide si le menu doit s'ouvrir vers le haut ou vers le bas selon la place
+  // réellement disponible à l'écran, et limite sa hauteur pour qu'il ne soit
+  // jamais coupé — quel que soit l'endroit où se trouve le champ sur la page.
+  const recalcPosition = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - MENU_MARGIN;
+    const spaceAbove = rect.top - MENU_MARGIN;
+
+    const openUp = spaceBelow < MENU_PREFERRED_HEIGHT && spaceAbove > spaceBelow;
+    const available = openUp ? spaceAbove : spaceBelow;
+    setMenuPosition({ openUp, maxHeight: Math.max(120, Math.min(MENU_PREFERRED_HEIGHT, available)) });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (isOpen) recalcPosition();
+  }, [isOpen, recalcPosition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener("resize", recalcPosition);
+    window.addEventListener("scroll", recalcPosition, true);
+    return () => {
+      window.removeEventListener("resize", recalcPosition);
+      window.removeEventListener("scroll", recalcPosition, true);
+    };
+  }, [isOpen, recalcPosition]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -78,15 +114,22 @@ export function AdminDropdown<T extends string = string>({
         </span>
         <ChevronDown
           className={`size-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-            isOpen ? "rotate-180 text-blue-400" : ""
+            isOpen && !menuPosition.openUp ? "rotate-180 text-blue-400" : isOpen ? "text-blue-400" : ""
           }`}
         />
       </button>
 
-      {/* Floating Menu Popover */}
+      {/* Floating Menu Popover — s'ouvre vers le haut si la place manque en bas */}
       {isOpen && (
-        <div className="absolute left-0 top-[calc(100%+6px)] w-full min-w-[240px] rounded-xl border border-slate-700/80 bg-[#0c1424]/95 backdrop-blur-md p-1.5 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150">
-          <div className="max-h-72 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-700">
+        <div
+          className={`absolute left-0 w-full min-w-[240px] rounded-xl border border-slate-700/80 bg-[#0c1424]/95 backdrop-blur-md p-1.5 shadow-2xl shadow-black/80 z-50 animate-in fade-in zoom-in-95 duration-150 ${
+            menuPosition.openUp ? "bottom-[calc(100%+6px)]" : "top-[calc(100%+6px)]"
+          }`}
+        >
+          <div
+            className="overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-700"
+            style={{ maxHeight: menuPosition.maxHeight }}
+          >
             {options.map((opt) => {
               const isSelected = opt.value === value;
               return (
