@@ -65,12 +65,6 @@ export function SiteFooter() {
               {t.nav.performance}
             </Link>
             <Link
-              to="/pricing"
-              className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
-            >
-              {language === "fr" ? "Tarifs & Licences" : "Pricing & Licenses"}
-            </Link>
-            <Link
               to="/portal"
               className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
             >
