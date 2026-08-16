@@ -204,7 +204,7 @@ function ContactPage() {
       sendContactNotificationEmail({
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
-        subject: formData.subject,
+        subject: formData.subject || "Demande générale",
         message: formData.message.trim(),
         mt5Account: formData.mt5Account.trim() || undefined,
         broker: formData.broker.trim() || undefined,

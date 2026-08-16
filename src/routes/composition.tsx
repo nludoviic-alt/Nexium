@@ -711,6 +711,36 @@ const KYC_STATUS_OPTIONS: DropdownOption<KycStatus>[] = [
   { value: "REJECTED", label: "Non conforme / Rejeté" },
 ];
 
+const FALLBACK_CLIENT: UserProfile = {
+  id: "client-preview",
+  name: "Client",
+  email: "client@nexiummarkets.com",
+  role: "TRADER",
+  status: "ACTIVE",
+  kycStatus: "VERIFIED",
+  mt5Account: "802194",
+  mt5Broker: "Nexium ECN Live",
+  balance: 0,
+  equity: 0,
+  bonusCredit: 0,
+  todayPnl: 0,
+  grossProfitTotal: 0,
+  grossLossTotal: 0,
+  engines: {
+    aiGold: { active: true, preset: "AI_GOLD", maxLot: 1.0, minScore: 75, riskCapPercent: 2 },
+    fxTrend: { active: true, preset: "FX_TREND", maxLot: 1.5, minScore: 70, riskCapPercent: 2 },
+    indexReversion: { active: false, preset: "INDEX_REVERSION", maxLot: 0.5, minScore: 80, riskCapPercent: 1.5 },
+  },
+  maxDailyLossPercent: 3.0,
+  maxSimultaneousTrades: 3,
+  riskGuardAutoStop: true,
+  assignedAdvisor: "Expert Trading",
+  sessions: [],
+  crmNotes: [],
+  withdrawalRequests: [],
+  depositRequests: [],
+};
+
 /* ========================================================================= */
 /* COMPOSANT PRINCIPAL : ADMINISTRATION NEXIUM                               */
 /* ========================================================================= */
@@ -890,8 +920,8 @@ function NexiumAdminDashboard({
   const vpnTable = useTableQuery(vpnAccounts, matchesVpnAccount);
 
   // Profil Client Sélectionné
-  const activeClient = useMemo(() => {
-    return clients.find((c) => c.id === selectedUserId) ?? clients[0];
+  const activeClient: UserProfile = useMemo(() => {
+    return clients.find((c) => c.id === selectedUserId) ?? clients[0] ?? FALLBACK_CLIENT;
   }, [clients, selectedUserId]);
 
   const impersonatedClient = useMemo(() => {

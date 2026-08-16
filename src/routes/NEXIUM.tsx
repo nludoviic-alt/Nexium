@@ -222,11 +222,11 @@ interface PositionItem {
 interface TransactionItem {
   id: string;
   date: string;
-  type: "Dépôt validé" | "Retrait traité" | "Gain trading MT5" | "Clôture position";
+  type: string;
   amount: string;
   amountNum: number;
   currency: string;
-  status: "Confirmé" | "En cours" | "Exécuté";
+  status: "Confirmé" | "En cours" | "Exécuté" | "En attente" | "Rejeté";
   method?: string;
   color: string;
 }
@@ -793,7 +793,7 @@ function TradingViewEngineChart({
 }: {
   bot: EngineBot;
   onClosePosition?: (pos: PositionItem) => void;
-  position?: PositionItem;
+  position?: PositionItem | undefined;
 }) {
   // Preset Selection
   const [activePreset, setActivePreset] = useState<
@@ -3714,9 +3714,17 @@ const EMOJI_CATEGORIES = {
 function MessagingTab({
   messages,
   onSendMessage,
+  clientName = "Client",
+  clientEmail = "",
+  mt5AccountNumber = "802194",
+  clientEmails = INITIAL_EMAILS,
 }: {
   messages: ChatMessage[];
   onSendMessage: (txt: string) => void;
+  clientName?: string;
+  clientEmail?: string;
+  mt5AccountNumber?: string;
+  clientEmails?: EmailItem[];
 }) {
   const [activeChannel, setActiveChannel] = useState<"chat" | "call" | "email">("chat");
   const [selectedContactId, setSelectedContactId] = useState<string>("support-client");
@@ -4014,9 +4022,16 @@ function MessagingTab({
   };
 
   // ---------------- EMAIL STATE ----------------
-  const [emails, setEmails] = useState<EmailItem[]>(INITIAL_EMAILS);
+  const [emails, setEmails] = useState<EmailItem[]>(clientEmails);
   const [emailFolder, setEmailFolder] = useState<"inbox" | "sent" | "compose">("inbox");
-  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(INITIAL_EMAILS[0] ?? null);
+  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(clientEmails[0] ?? null);
+
+  useEffect(() => {
+    if (clientEmails && clientEmails.length > 0) {
+      setEmails(clientEmails);
+      setSelectedEmail((prev) => prev ?? clientEmails[0] ?? null);
+    }
+  }, [clientEmails]);
   const [composeTo, setComposeTo] = useState("desk-quant@nexiummarkets.com");
   const [composeSubject, setComposeSubject] = useState("");
   const [composePriority, setComposePriority] = useState<"NORMAL" | "URGENT" | "CRITIQUE">("NORMAL");
@@ -5237,6 +5252,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("Ludovic M.");
   const [clientEmail, setClientEmail] = useState("ludovic@nexium.io");
+  const [clientEmails, setClientEmails] = useState<EmailItem[]>(INITIAL_EMAILS);
   const [mt5AccountNumber, setMt5AccountNumber] = useState("802194");
   const [assignedAdvisor, setAssignedAdvisor] = useState("Expert Trading (Desk Quant)");
   const [licenseStatus, setLicenseStatus] = useState<"NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE">("ACTIVE");
@@ -5341,7 +5357,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               return {
                 ...bot,
                 statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.aiGold.active ? "POSITION OPEN" : "PAUSED",
+                mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
                 risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
               };
             }
@@ -5349,7 +5365,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               return {
                 ...bot,
                 statusBadge: cfg.fxTrend.active ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.fxTrend.active ? "POSITION OPEN" : "PAUSED",
+                mainState: cfg.fxTrend.active ? "POSITION OPEN" : "WAITING FOR SETUP",
                 risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
               };
             }
@@ -5357,7 +5373,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               return {
                 ...bot,
                 statusBadge: cfg.indexReversion.active ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.indexReversion.active ? "POSITION OPEN" : "PAUSED",
+                mainState: cfg.indexReversion.active ? "POSITION OPEN" : "WAITING FOR SETUP",
                 risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
               };
             }
@@ -5403,8 +5419,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
         });
 
         if (mappedEmails.length > 0) {
-          setEmails(mappedEmails);
-          if (!selectedEmail) setSelectedEmail(mappedEmails[0]);
+          setClientEmails(mappedEmails);
         }
       }
     };
@@ -6560,6 +6575,10 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
             <MessagingTab
               messages={messages}
               onSendMessage={handleSendMessage}
+              clientName={clientName}
+              clientEmail={clientEmail}
+              mt5AccountNumber={mt5AccountNumber}
+              clientEmails={clientEmails}
             />
           )}
         </main>

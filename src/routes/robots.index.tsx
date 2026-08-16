@@ -42,7 +42,7 @@ function RobotsPage() {
   );
 
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<string>(categories[0]);
+  const [category, setCategory] = useState<string>(categories[0] || "Tous");
 
   const filteredRobots = useMemo(() => {
     const isAll = category === "Tous" || category === "All";

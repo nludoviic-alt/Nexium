@@ -120,7 +120,7 @@ function TradingHero({
     },
   ];
 
-  const currentSlide = slides[activeSlide] ?? slides[0];
+  const currentSlide = (slides[activeSlide] ?? slides[0])!;
 
   const staticHeroFeatures = [
     {
