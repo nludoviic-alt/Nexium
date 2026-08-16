@@ -2259,8 +2259,28 @@ function NexiumAdminDashboard({
       `Appliquer ${pnlAdjustDirection === "PROFIT" ? "+ $" : "- $"}${amount.toLocaleString("fr-FR")} USD au compte de ${activeClient.name} ?`,
       "Appliquer l'Ajustement",
       "WARNING",
-      () => {
+      async () => {
         const signedAmount = pnlAdjustDirection === "PROFIT" ? amount : -amount;
+        const newBalance = activeClient.balance + signedAmount;
+
+        if (isSupabaseConfigured) {
+          const [txResult, balResult] = await Promise.all([
+            recordTransaction({
+              user_id: activeClient.id,
+              type: "PNL_ADJUST",
+              amount: Math.abs(signedAmount),
+              status: "COMPLETED",
+              method: signedAmount >= 0 ? "Ajustement Gain Desk" : "Ajustement Perte Desk",
+              ...(pnlAdjustReason ? { reference_tx: pnlAdjustReason } : {}),
+            }),
+            updateClientBalance(activeClient.id, newBalance),
+          ]);
+          if (!txResult.success || !balResult.success) {
+            toast.error("Échec de l'ajustement P&L côté base de données.");
+            return;
+          }
+        }
+
         setClients((prev) =>
           prev.map((c) => {
             if (c.id === activeClient.id) {
@@ -2269,7 +2289,7 @@ function NexiumAdminDashboard({
                 todayPnl: c.todayPnl + signedAmount,
                 totalNetPnl: c.totalNetPnl + signedAmount,
                 equity: c.equity + signedAmount,
-                balance: c.balance + signedAmount,
+                balance: newBalance,
               };
             }
             return c;
