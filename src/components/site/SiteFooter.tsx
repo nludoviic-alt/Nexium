@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
-import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
 
 export function SiteFooter() {
@@ -203,8 +202,7 @@ export function SiteFooter() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-4">
-            <LanguageSelector variant="footer" />
+          <div>
             <p className="text-xs text-gray-400 font-bold">
               © {new Date().getFullYear()} Nexium Markets. {t.footer.rights}
             </p>
