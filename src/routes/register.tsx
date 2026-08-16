@@ -306,10 +306,9 @@ function RegisterPage() {
                     <div className="space-y-1.5">
                       <label
                         htmlFor="country"
-                        className="text-xs sm:text-sm font-extrabold text-gray-800 flex items-center justify-between"
+                        className="block text-xs sm:text-sm font-extrabold text-gray-800"
                       >
-                        <span>Pays de Résidence *</span>
-                        <span className="text-[11px] text-gray-500 font-medium font-mono">195+ Pays Disponibles</span>
+                        {language === "fr" ? "Pays de Résidence *" : "Country of Residence *"}
                       </label>
                       <div className="relative">
                         <select
