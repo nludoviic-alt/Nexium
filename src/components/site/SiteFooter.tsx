@@ -65,10 +65,16 @@ export function SiteFooter() {
               {t.nav.performance}
             </Link>
             <Link
-              to="/portal"
+              to="/login"
               className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
             >
-              {t.nav.clientArea}
+              {language === "fr" ? "Espace Client" : "Client Portal"}
+            </Link>
+            <Link
+              to="/register"
+              className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
+            >
+              {language === "fr" ? "Ouvrir un Compte" : "Open an Account"}
             </Link>
           </div>
 
@@ -112,20 +118,8 @@ export function SiteFooter() {
           {/* Column 3: Compte & Légal */}
           <div className="flex flex-col gap-3.5 text-sm sm:text-base">
             <h4 className="text-base font-black text-white tracking-wider uppercase border-b border-gray-800/80 pb-2">
-              {t.footer.colLegal}
+              {language === "fr" ? "Conformité & Légal" : "Compliance & Legal"}
             </h4>
-            <Link
-              to="/login"
-              className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
-            >
-              {t.nav.login}
-            </Link>
-            <Link
-              to="/register"
-              className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
-            >
-              {t.nav.openAccount}
-            </Link>
             <Link
               to="/terms"
               className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
