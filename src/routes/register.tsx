@@ -116,9 +116,10 @@ function RegisterPage() {
             name: fullName,
             role: "TRADER",
             status: "PENDING_APPROVAL", // En attente de validation par l'administrateur
+            license_status: "NOT_REQUESTED", // En attente de sélection de preset
             kyc_status: "PENDING",
             balance: 0.0,
-            assigned_advisor: "Desk de Conformité & Risque",
+            assigned_advisor: "Expert Trading",
           });
         } catch (profileErr) {
           console.warn("Notice enregistrement profil Supabase:", profileErr);
