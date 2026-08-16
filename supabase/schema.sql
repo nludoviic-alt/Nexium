@@ -162,11 +162,38 @@ ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS thread_id TEXT REFEREN
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE;
 ALTER TABLE public.chat_messages ALTER COLUMN channel SET DEFAULT 'CHAT';
 
-ALTER TABLE public.chat_messages DROP CONSTRAINT IF EXISTS chat_messages_sender_check;
-ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_sender_check CHECK (sender IN ('CLIENT', 'VISITOR', 'ADMIN', 'SYSTEM'));
+-- Le RENAME COLUMN ci-dessus ne renomme pas les contraintes CHECK associées :
+-- l'ancienne "chat_messages_sender_type_check" (héritée de sender_type, qui
+-- n'autorisait pas 'ADMIN'/'SYSTEM') restait active sur la colonne renommée
+-- "sender" et bloquait toute insertion. On supprime dynamiquement toutes les
+-- contraintes CHECK historiques de la table avant de recréer les bonnes.
+DO $$
+DECLARE con RECORD;
+BEGIN
+  FOR con IN
+    SELECT conname FROM pg_constraint
+    WHERE conrelid = 'public.chat_messages'::regclass AND contype = 'c'
+  LOOP
+    EXECUTE format('ALTER TABLE public.chat_messages DROP CONSTRAINT %I', con.conname);
+  END LOOP;
+END $$;
 
-ALTER TABLE public.chat_messages DROP CONSTRAINT IF EXISTS chat_messages_channel_check;
+ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_sender_check CHECK (sender IN ('CLIENT', 'VISITOR', 'ADMIN', 'SYSTEM'));
 ALTER TABLE public.chat_messages ADD CONSTRAINT chat_messages_channel_check CHECK (channel IN ('CHAT', 'EMAIL'));
+
+-- Même dérive possible côté RLS : la politique permissive de schema.sql n'avait
+-- jamais été appliquée en production (table encore protégée par les policies
+-- par défaut, qui bloquent tout sans policy explicite).
+DO $$
+DECLARE pol RECORD;
+BEGIN
+  FOR pol IN SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'chat_messages' LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.chat_messages', pol.policyname);
+  END LOOP;
+END $$;
+
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "chat_messages_all" ON public.chat_messages FOR ALL USING (true) WITH CHECK (true);
 
 -- 7. TABLES DU MODULE E-MAILS & SUPPORT COLLABORATIF
 CREATE TABLE IF NOT EXISTS public.email_conversations (
