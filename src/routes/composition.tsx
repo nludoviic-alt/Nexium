@@ -992,10 +992,26 @@ function NexiumAdminDashboard({
     });
   }, [clients, searchContactQuery]);
 
-  // Synchronisation temps réel avec le Routeur Chatbot Web
+  // Synchronisation temps réel avec le Routeur Chatbot Web + alertes sur nouveaux fils
+  const seenChatThreadIdsRef = useRef<Set<string> | null>(null);
   useEffect(() => {
-    getLiveChatThreads().then(setWebThreads);
+    getLiveChatThreads().then((threads) => {
+      seenChatThreadIdsRef.current = new Set(threads.map((t) => t.id));
+      setWebThreads(threads);
+    });
     const unsub = subscribeToLiveChatUpdates((threads) => {
+      if (seenChatThreadIdsRef.current) {
+        const newThreads = threads.filter(
+          (t) => t.status === "QUEUE" && !seenChatThreadIdsRef.current!.has(t.id)
+        );
+        newThreads.forEach((t) => {
+          toast.info(
+            `💬 Nouvelle demande de chat en direct : ${t.visitorName} (${t.contact}) — ${t.initialQuery.slice(0, 90)}`,
+            { duration: 9000 }
+          );
+        });
+      }
+      seenChatThreadIdsRef.current = new Set(threads.map((t) => t.id));
       setWebThreads(threads);
     });
     return unsub;
@@ -1366,7 +1382,7 @@ function NexiumAdminDashboard({
     refreshClients();
   }, [refreshClients]);
 
-  // Abonnement Realtime pour alertes instantanées sur nouvelles inscriptions
+  // Abonnement Realtime pour alertes instantanées sur nouvelles inscriptions et demandes de Preset
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const unsub = subscribeToProfiles((payload) => {
@@ -1374,6 +1390,16 @@ function NexiumAdminDashboard({
         const newClient = payload.new;
         toast.info(
           `🚨 Nouvelle demande d'ouverture de compte reçue : ${newClient?.name || "Client"} (${newClient?.email || ""})`,
+          { duration: 9000 }
+        );
+      } else if (
+        payload.eventType === "UPDATE" &&
+        payload.new?.license_status === "PENDING_PRESET_APPROVAL" &&
+        payload.old?.license_status !== "PENDING_PRESET_APPROVAL"
+      ) {
+        const client = payload.new;
+        toast.info(
+          `⚡ Nouvelle demande d'activation de Preset : ${client?.name || "Client"} (${client?.email || ""}) — ${client?.requested_preset || "Preset"}`,
           { duration: 9000 }
         );
       }
