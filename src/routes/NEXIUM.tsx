@@ -5078,7 +5078,7 @@ export function NexiumDashboard({
   const [running, setRunning] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [activeNav, setActiveNav] = useState("Auto-Trader");
+  const [activeNav, setActiveNav] = useState("Vue d’ensemble");
   const [balance, setBalance] = useState(0);
   const [bonus, setBonus] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
