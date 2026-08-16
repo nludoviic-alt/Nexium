@@ -295,11 +295,11 @@ function RegisterPage() {
               ) : (
                 <>
                   <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                    Créer Votre Compte
+                    {language === "fr" ? "Créer Votre Compte" : "Create Your Account"}
                   </h1>
 
                   <form
-                    className="mt-6 space-y-4 sm:space-y-5"
+                    className="mt-6 space-y-4"
                     onSubmit={handleRegister}
                   >
                     {/* Country of Residence */}
@@ -315,7 +315,7 @@ function RegisterPage() {
                           id="country"
                           value={country}
                           onChange={(e) => setCountry(e.target.value)}
-                          className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00D084] focus:outline-none focus:ring-2 focus:ring-[#00D084]/20 cursor-pointer"
+                          className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00c853] focus:outline-none focus:ring-2 focus:ring-[#00c853]/20 cursor-pointer transition-all"
                         >
                           <optgroup label="Principaux Pays Francophones &amp; Institutionnels">
                             <option value="France">🇫🇷 France</option>
@@ -435,21 +435,21 @@ function RegisterPage() {
                     </div>
 
                     {/* First Name & Last Name */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3.5">
                       <div className="space-y-1.5">
                         <label
                           htmlFor="firstName"
                           className="text-xs sm:text-sm font-extrabold text-gray-800"
                         >
-                          Prénom *
+                          {language === "fr" ? "Prénom *" : "First Name *"}
                         </label>
                         <Input
                           id="firstName"
                           required
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
-                          placeholder="Prénom"
-                          className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                          placeholder="Jean"
+                          className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00c853] focus:ring-2 focus:ring-[#00c853]/20 transition-all"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -457,14 +457,14 @@ function RegisterPage() {
                           htmlFor="lastName"
                           className="text-xs sm:text-sm font-extrabold text-gray-800"
                         >
-                          Nom
+                          {language === "fr" ? "Nom" : "Last Name"}
                         </label>
                         <Input
                           id="lastName"
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
-                          placeholder="Nom"
-                          className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                          placeholder="Dupont"
+                          className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00c853] focus:ring-2 focus:ring-[#00c853]/20 transition-all"
                         />
                       </div>
                     </div>
@@ -475,7 +475,7 @@ function RegisterPage() {
                         htmlFor="email"
                         className="text-xs sm:text-sm font-extrabold text-gray-800"
                       >
-                        Adresse E-mail *
+                        {language === "fr" ? "Adresse E-mail *" : "Email Address *"}
                       </label>
                       <Input
                         id="email"
@@ -483,8 +483,8 @@ function RegisterPage() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Adresse e-mail"
-                        className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                        placeholder="nom@exemple.com"
+                        className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00c853] focus:ring-2 focus:ring-[#00c853]/20 transition-all"
                       />
                     </div>
 
@@ -494,7 +494,7 @@ function RegisterPage() {
                         htmlFor="password"
                         className="text-xs sm:text-sm font-extrabold text-gray-800"
                       >
-                        Mot de Passe *
+                        {language === "fr" ? "Mot de Passe *" : "Password *"}
                       </label>
                       <div className="relative">
                         <Input
@@ -503,15 +503,15 @@ function RegisterPage() {
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Mot de passe sécurisé (min. 8 caractères, 1 chiffre)"
-                          className="rounded-xl border-gray-300 bg-white px-4 py-3.5 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                          placeholder={language === "fr" ? "Min. 8 caractères, 1 chiffre" : "Min. 8 characters, 1 digit"}
+                          className="rounded-xl border-gray-300 bg-white px-4 py-3 pr-11 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00c853] focus:ring-2 focus:ring-[#00c853]/20 transition-all"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-800 cursor-pointer"
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 cursor-pointer"
                         >
-                          {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                          {showPassword ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
                         </button>
                       </div>
                     </div>
@@ -522,7 +522,7 @@ function RegisterPage() {
                         htmlFor="confirmPassword"
                         className="text-xs sm:text-sm font-extrabold text-gray-800"
                       >
-                        Confirmer le Mot de Passe *
+                        {language === "fr" ? "Confirmer le Mot de Passe *" : "Confirm Password *"}
                       </label>
                       <Input
                         id="confirmPassword"
@@ -530,8 +530,8 @@ function RegisterPage() {
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Ressaisissez le mot de passe"
-                        className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
+                        placeholder="••••••••"
+                        className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00c853] focus:ring-2 focus:ring-[#00c853]/20 transition-all"
                       />
                     </div>
 
@@ -568,10 +568,18 @@ function RegisterPage() {
                     <Button
                       type="submit"
                       disabled={loading}
-                      className="w-full mt-3 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-6 text-sm sm:text-base tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
                       {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
-                      <span>{loading ? "Création en cours..." : "Créer Mon Compte"}</span>
+                      <span>
+                        {loading
+                          ? language === "fr"
+                            ? "Création en cours..."
+                            : "Creating account..."
+                          : language === "fr"
+                          ? "Créer Mon Compte"
+                          : "Create Account"}
+                      </span>
                     </Button>
                   </form>
                 </>
@@ -579,10 +587,12 @@ function RegisterPage() {
             </div>
 
             {/* Bottom Switch Link */}
-            <div className="mt-8 pt-4 text-center text-xs sm:text-sm font-semibold text-gray-600 border-t border-gray-100">
-              Vous avez déjà un compte ?{" "}
-              <Link to="/login" className="font-extrabold text-gray-900 underline">
-                Se connecter
+            <div className="mt-8 pt-4 text-center text-xs sm:text-sm font-semibold text-gray-600 border-t border-gray-100 flex justify-between items-center">
+              <Link to="/login" className="font-extrabold text-gray-900 underline hover:text-[#00c853]">
+                {language === "fr" ? "Déjà un compte ? Se connecter" : "Already have an account? Sign in"}
+              </Link>
+              <Link to="/" className="text-gray-500 hover:text-gray-900">
+                {language === "fr" ? "← Accueil" : "← Home"}
               </Link>
             </div>
           </div>
