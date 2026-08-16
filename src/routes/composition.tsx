@@ -167,6 +167,11 @@ import {
   adminUpdateEmailStatus,
   adminAddEmailNote,
   subscribeToAdminEmails,
+  getAllRolePermissions,
+  updateRolePermissions,
+  subscribeToRolePermissions,
+  type RolePermissions,
+  type StaffRole,
 } from "@/lib/supabase";
 
 import { getAdminSlug } from "@/lib/user-slug";
@@ -499,17 +504,6 @@ interface StaffAdministrator {
   deskSignature: string;
   assignedAccountsCount: number;
   assignedTraders?: string[];
-  permissions: {
-    canChatWithClients: boolean;
-    canSendEmails: boolean;
-    canTakePhoneCalls: boolean;
-    canApproveFinances: boolean;
-    canManageEngines: boolean;
-    canAdjustPnl: boolean;
-    canUseKillSwitch: boolean;
-    canManageStaff?: boolean;
-    canViewTreasury?: boolean;
-  };
 }
 
 interface AdminNotification {
@@ -802,7 +796,7 @@ function NexiumAdminDashboard({
 
   // Navigation
   const [activeSection, setActiveSection] = useState<
-    "administrators" | "users" | "user-detail" | "create-user" | "messaging" | "emails" | "engines" | "finances" | "gateways" | "security" | "news-guard" | "perf-fees" | "logs" | "impersonation"
+    "administrators" | "users" | "user-detail" | "create-user" | "messaging" | "emails" | "engines" | "finances" | "gateways" | "security" | "news-guard" | "perf-fees" | "logs" | "impersonation" | "access-levels"
   >("users");
 
   // Rôle Admin Session — dérivé de la session Supabase réelle par CompositionAccessGate,
@@ -884,15 +878,6 @@ function NexiumAdminDashboard({
   const [newStaffIpWhitelist, setNewStaffIpWhitelist] = useState("");
   const [newStaffHours, setNewStaffHours] = useState("");
   const [newStaffSignature, setNewStaffSignature] = useState("");
-  const [newStaffPermChat, setNewStaffPermChat] = useState(true);
-  const [newStaffPermEmail, setNewStaffPermEmail] = useState(true);
-  const [newStaffPermPhone, setNewStaffPermPhone] = useState(true);
-  const [newStaffPermFinance, setNewStaffPermFinance] = useState(false);
-  const [newStaffPermEngines, setNewStaffPermEngines] = useState(false);
-  const [newStaffPermPnl, setNewStaffPermPnl] = useState(false);
-  const [newStaffPermKillSwitch, setNewStaffPermKillSwitch] = useState(false);
-  const [newStaffPermManageStaff, setNewStaffPermManageStaff] = useState(false);
-  const [newStaffPermViewTreasury, setNewStaffPermViewTreasury] = useState(false);
 
   // Édition & Gestion Approfondie d'un Membre du Staff / Conseiller / Super Admin
   const [editingStaffMember, setEditingStaffMember] = useState<StaffAdministrator | null>(null);
@@ -906,15 +891,6 @@ function NexiumAdminDashboard({
   const [editStaffHours, setEditStaffHours] = useState("");
   const [editStaffSignature, setEditStaffSignature] = useState("");
   const [editStaffAssignedCount, setEditStaffAssignedCount] = useState<number>(0);
-  const [editStaffPermChat, setEditStaffPermChat] = useState(true);
-  const [editStaffPermEmail, setEditStaffPermEmail] = useState(true);
-  const [editStaffPermPhone, setEditStaffPermPhone] = useState(true);
-  const [editStaffPermFinance, setEditStaffPermFinance] = useState(false);
-  const [editStaffPermEngines, setEditStaffPermEngines] = useState(false);
-  const [editStaffPermPnl, setEditStaffPermPnl] = useState(false);
-  const [editStaffPermKillSwitch, setEditStaffPermKillSwitch] = useState(false);
-  const [editStaffPermManageStaff, setEditStaffPermManageStaff] = useState(false);
-  const [editStaffPermViewTreasury, setEditStaffPermViewTreasury] = useState(false);
 
   // Formulaire Création Client
   const [newClientName, setNewClientName] = useState("");
@@ -934,6 +910,65 @@ function NexiumAdminDashboard({
   const isSuperAdmin = currentSessionRole === "SUPER_ADMIN" || currentSessionRole === "OWNER";
   const currentStaffMember = useMemo(() => staffList.find((s) => s.role === currentSessionRole), [staffList, currentSessionRole]);
   const [advisorFilter, setAdvisorFilter] = useState<string>("ALL");
+
+  // Niveaux d'accès par rôle — source de vérité unique pour ce que chaque
+  // rôle a le droit de faire (remplace les anciennes cases à cocher
+  // individuelles, qui n'avaient aucun effet réel).
+  const [rolePermissions, setRolePermissions] = useState<Record<string, RolePermissions>>({});
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const applyRows = (rows: RolePermissions[]) => {
+      setRolePermissions(Object.fromEntries(rows.map((r) => [r.role, r])));
+    };
+    getAllRolePermissions().then(applyRows);
+    const unsub = subscribeToRolePermissions(applyRows);
+    return unsub;
+  }, []);
+
+  const hasPermission = useCallback(
+    (key: keyof Omit<RolePermissions, "role">) => {
+      if (isPrimaryOwner) return true;
+      const perms = rolePermissions[currentSessionRole];
+      return perms ? perms[key] : false;
+    },
+    [rolePermissions, currentSessionRole, isPrimaryOwner]
+  );
+
+  // Page "Niveaux d'Accès" — édition du jeu de permissions d'un rôle
+  const ALL_STAFF_ROLES: StaffRole[] = ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
+  const [accessLevelsSelectedRole, setAccessLevelsSelectedRole] = useState<StaffRole>("ADMIN");
+  const [draftRolePerms, setDraftRolePerms] = useState<Omit<RolePermissions, "role"> | null>(null);
+  const [savingRolePerms, setSavingRolePerms] = useState(false);
+
+  useEffect(() => {
+    const current = rolePermissions[accessLevelsSelectedRole];
+    if (current) {
+      const { role: _role, ...rest } = current;
+      setDraftRolePerms(rest);
+    }
+  }, [accessLevelsSelectedRole, rolePermissions]);
+
+  const handleSaveRolePermissions = async () => {
+    if (!draftRolePerms) return;
+    setSavingRolePerms(true);
+    try {
+      const result = await updateRolePermissions(accessLevelsSelectedRole, draftRolePerms);
+      if (!result.success) {
+        toast.error("Échec de l'enregistrement des permissions côté base de données.");
+        return;
+      }
+      setRolePermissions((prev) => ({ ...prev, [accessLevelsSelectedRole]: { role: accessLevelsSelectedRole, ...draftRolePerms } }));
+      addAuditLog(
+        "ROLE_PERMISSIONS_UPDATED",
+        `Niveaux d'accès du rôle ${accessLevelsSelectedRole} mis à jour — appliqué à tous les collaborateurs de ce rôle.`,
+        accessLevelsSelectedRole
+      );
+      toast.success(`Niveaux d'accès enregistrés pour le rôle ${accessLevelsSelectedRole}.`);
+    } finally {
+      setSavingRolePerms(false);
+    }
+  };
 
   // Filtrage des clients : les conseillers ne voient que leur portefeuille assigné
   const visibleClients = useMemo(() => {
@@ -1485,17 +1520,6 @@ function NexiumAdminDashboard({
         deskSignature: `${p.name} — @ Nexium Markets`,
         assignedAccountsCount: 0,
         assignedTraders: [],
-        permissions: {
-          canChatWithClients: true,
-          canSendEmails: true,
-          canTakePhoneCalls: true,
-          canApproveFinances: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
-          canManageEngines: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "QUANT",
-          canAdjustPnl: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
-          canUseKillSwitch: p.role === "OWNER" || p.role === "SUPER_ADMIN",
-          canManageStaff: p.role === "OWNER" || p.role === "SUPER_ADMIN",
-          canViewTreasury: p.role === "OWNER" || p.role === "SUPER_ADMIN" || p.role === "FINANCE",
-        },
       }))
     );
   }, []);
@@ -1790,6 +1814,10 @@ function NexiumAdminDashboard({
   // après avoir cliqué le lien — aucune étape locale/fictive.
   const handleCreateStaffMember = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission("can_manage_staff")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas créer de collaborateurs.");
+      return;
+    }
     if (!newStaffName || !newStaffEmail) {
       toast.error("Veuillez renseigner au minimum le nom et l'e-mail.");
       return;
@@ -1842,15 +1870,6 @@ function NexiumAdminDashboard({
     setEditStaffHours(st.allowedHours);
     setEditStaffSignature(st.deskSignature);
     setEditStaffAssignedCount(st.assignedAccountsCount);
-    setEditStaffPermChat(st.permissions.canChatWithClients);
-    setEditStaffPermEmail(st.permissions.canSendEmails);
-    setEditStaffPermPhone(st.permissions.canTakePhoneCalls);
-    setEditStaffPermFinance(st.permissions.canApproveFinances);
-    setEditStaffPermEngines(st.permissions.canManageEngines);
-    setEditStaffPermPnl(st.permissions.canAdjustPnl);
-    setEditStaffPermKillSwitch(st.permissions.canUseKillSwitch);
-    setEditStaffPermManageStaff(st.permissions.canManageStaff ?? (st.role === "OWNER" || st.role === "SUPER_ADMIN"));
-    setEditStaffPermViewTreasury(st.permissions.canViewTreasury ?? (st.role === "OWNER" || st.role === "SUPER_ADMIN" || st.role === "FINANCE"));
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "instant" });
     }
@@ -1859,6 +1878,11 @@ function NexiumAdminDashboard({
   const handleSaveEditStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaffMember) return;
+
+    if (!hasPermission("can_manage_staff")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas modifier les collaborateurs.");
+      return;
+    }
 
     // Verrou Super Owner : personne d'autre que lui-même ne peut modifier ce
     // compte (déjà bloqué à l'ouverture de la fiche par handleOpenEditStaff).
@@ -1910,17 +1934,6 @@ function NexiumAdminDashboard({
           allowedHours: editStaffHours || "24/7",
           deskSignature: editStaffSignature || `${editStaffName} — @ Nexium Markets`,
           assignedAccountsCount: editStaffAssignedCount,
-          permissions: {
-            canChatWithClients: editStaffPermChat,
-            canSendEmails: editStaffPermEmail,
-            canTakePhoneCalls: editStaffPermPhone,
-            canApproveFinances: editStaffPermFinance,
-            canManageEngines: editStaffPermEngines,
-            canAdjustPnl: editStaffPermPnl,
-            canUseKillSwitch: editStaffPermKillSwitch,
-            canManageStaff: editStaffPermManageStaff || editStaffRole === "OWNER" || editStaffRole === "SUPER_ADMIN",
-            canViewTreasury: editStaffPermViewTreasury || editStaffRole === "OWNER" || editStaffRole === "SUPER_ADMIN" || editStaffRole === "FINANCE",
-          },
         };
       })
     );
@@ -1967,6 +1980,10 @@ function NexiumAdminDashboard({
   };
 
   const handleDeleteStaffMember = (st: StaffAdministrator) => {
+    if (!hasPermission("can_manage_staff")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas supprimer de collaborateurs.");
+      return;
+    }
     if (st.isPrimaryOwner) {
       toast.error("Compte Super Owner protégé : suppression impossible, y compris pour vous-même.");
       return;
@@ -2033,6 +2050,10 @@ function NexiumAdminDashboard({
 
   // Validation Retrait
   const handleApproveWithdrawal = (withdrawal: ClientWithdrawal) => {
+    if (!hasPermission("can_approve_finances")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas valider de retraits.");
+      return;
+    }
     requestConfirmation(
       `Valider le Retrait de $${withdrawal.amount.toLocaleString("fr-FR")} USD`,
       `Êtes-vous certain de vouloir approuver ce retrait pour ${activeClient.name} ? Le solde MT5 sera débité de $${withdrawal.amount.toLocaleString("fr-FR")} USD.`,
@@ -2076,6 +2097,10 @@ function NexiumAdminDashboard({
   };
 
   const handleRejectWithdrawal = (withdrawal: ClientWithdrawal) => {
+    if (!hasPermission("can_approve_finances")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas rejeter de retraits.");
+      return;
+    }
     requestConfirmation(
       `Rejeter le Retrait de $${withdrawal.amount.toLocaleString("fr-FR")} USD`,
       `Cette demande de retrait pour ${activeClient.name} sera rejetée.`,
@@ -2110,6 +2135,10 @@ function NexiumAdminDashboard({
 
   // Validation Dépôt
   const handleApproveDeposit = (deposit: ClientDeposit) => {
+    if (!hasPermission("can_approve_finances")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas créditer de dépôts.");
+      return;
+    }
     requestConfirmation(
       `Valider & Créditer le Dépôt de $${deposit.amount.toLocaleString("fr-FR")} USD`,
       `Créditer immédiatement $${deposit.amount.toLocaleString("fr-FR")} USD sur le compte de ${activeClient.name} ?`,
@@ -2168,6 +2197,10 @@ function NexiumAdminDashboard({
   // Crédit ou Débit Manuel
   const handleCreditOrDebit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission("can_approve_finances")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas effectuer d'opérations financières.");
+      return;
+    }
     const amount = parseFloat(creditAmountInput);
     if (isNaN(amount) || amount <= 0) {
       toast.error("Veuillez saisir un montant valide.");
@@ -2249,6 +2282,10 @@ function NexiumAdminDashboard({
   // Ajustement P&L
   const handleApplyPnlAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission("can_adjust_pnl")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas ajuster le P&L.");
+      return;
+    }
     const amount = parseFloat(pnlAdjustAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error("Veuillez saisir un montant valide.");
@@ -2308,6 +2345,10 @@ function NexiumAdminDashboard({
   // Fixer Directement le P&L du Jour
   const handleSetExactTodayPnl = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission("can_adjust_pnl")) {
+      toast.error("Privilège insuffisant : votre rôle ne peut pas ajuster le P&L.");
+      return;
+    }
     const val = parseFloat(exactPnlInput);
     if (isNaN(val)) {
       toast.error("Veuillez saisir une valeur numérique.");
@@ -2506,6 +2547,10 @@ function NexiumAdminDashboard({
   };
 
   const handleGlobalKillSwitch = () => {
+    if (!hasPermission("can_use_kill_switch")) {
+      toast.error("Privilège insuffisant : votre rôle n'a pas accès au Kill Switch.");
+      return;
+    }
     requestConfirmation(
       "🛑 KILL SWITCH GÉNÉRAL D'URGENCE",
       "Cette action va stopper immédiatement TOUTES les positions ouvertes et mettre en pause l'ensemble des 3 moteurs sur TOUS les comptes clients.",
@@ -3196,7 +3241,7 @@ function NexiumAdminDashboard({
               { key: "news-guard", label: "News Guard Macro", icon: Newspaper, isActive: activeSection === "news-guard" },
               { key: "perf-fees", label: "Performance Fees", icon: Receipt, isActive: activeSection === "perf-fees" },
               { key: "engines", label: "Moteurs & Auto-Trader", icon: Bot, isActive: activeSection === "engines" },
-              ...(isSuperAdmin
+              ...(hasPermission("can_view_treasury")
                 ? [
                     {
                       key: "finances",
@@ -3206,12 +3251,22 @@ function NexiumAdminDashboard({
                     } as const,
                   ]
                 : []),
+              ...(isSuperAdmin
+                ? [
+                    {
+                      key: "access-levels",
+                      label: "Niveaux d'Accès",
+                      icon: Key,
+                      isActive: activeSection === "access-levels",
+                    } as const,
+                  ]
+                : []),
               { key: "logs", label: "Journal d'Audit", icon: Terminal, isActive: activeSection === "logs" },
             ]}
             onSelect={(key) => setActiveSection(key as typeof activeSection)}
           />
 
-          {isSuperAdmin && (
+          {hasPermission("can_view_treasury") && (
             <AdminPanel padding="p-4" className="text-xs font-mono space-y-2.5 text-slate-300 shadow-md">
               <div className="flex justify-between items-center">
                 <span className="text-slate-400 font-medium">Total Dépôts :</span>
@@ -4596,6 +4651,117 @@ function NexiumAdminDashboard({
           )}
 
           {/* ===================================================================== */}
+          {/* 🌟 NIVEAUX D'ACCÈS PAR RÔLE (`access-levels`)                         */}
+          {/* ===================================================================== */}
+          {activeSection === "access-levels" && isSuperAdmin && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              <div className="border-b border-slate-700/50 pb-5">
+                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                  <Key className="size-7 text-emerald-400" />
+                  <span>Niveaux d'Accès</span>
+                </h1>
+                <p className="mt-2 text-sm text-slate-300 max-w-2xl">
+                  Définissez une fois pour toutes ce qu'un rôle peut faire. Choisissez un rôle, cochez ses
+                  permissions, enregistrez — tous les collaborateurs actuels et futurs de ce rôle héritent
+                  automatiquement de ce jeu de permissions, sans exception individuelle.
+                </p>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+                {/* Sélecteur de rôle */}
+                <div className="space-y-2">
+                  {ALL_STAFF_ROLES.map((role) => {
+                    const count = staffList.filter((s) => s.role === role).length;
+                    return (
+                      <button
+                        key={role}
+                        onClick={() => setAccessLevelsSelectedRole(role)}
+                        className={`w-full text-left px-4 py-3.5 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer ${
+                          accessLevelsSelectedRole === role
+                            ? "border-emerald-500/60 bg-emerald-500/10 shadow-lg shadow-emerald-500/10"
+                            : "border-slate-700/60 bg-[#0c121e] hover:border-slate-600"
+                        }`}
+                      >
+                        <span className={`text-sm font-bold ${accessLevelsSelectedRole === role ? "text-emerald-300" : "text-white"}`}>
+                          {role.replace("_", " ")}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400">
+                          {count} {count > 1 ? "personnes" : "personne"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Matrice de permissions du rôle sélectionné */}
+                <div className="admin-card-emerald p-6 sm:p-8 space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-700/50 pb-4">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-bold text-white uppercase font-mono tracking-wider">
+                        Permissions : {accessLevelsSelectedRole.replace("_", " ")}
+                      </h2>
+                      <p className="text-xs text-slate-300 mt-1">
+                        S'applique instantanément à {staffList.filter((s) => s.role === accessLevelsSelectedRole).length} collaborateur(s) de ce rôle.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={savingRolePerms || !draftRolePerms}
+                      onClick={handleSaveRolePermissions}
+                      className="admin-btn-primary text-xs sm:text-sm py-2.5 px-5 font-bold disabled:opacity-50"
+                    >
+                      {savingRolePerms ? "Enregistrement..." : "Enregistrer"}
+                    </button>
+                  </div>
+
+                  {draftRolePerms && (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {(
+                        [
+                          ["can_chat_with_clients", "Chat Direct Traders", "Répondre aux messages en direct"],
+                          ["can_send_emails", "E-mails Desk Officiels", "Envoyer des e-mails officiels"],
+                          ["can_take_phone_calls", "Appels Téléphoniques", "Passer des appels directs desk"],
+                          ["can_approve_finances", "Validation Retraits & Dépôts", "Créditer les comptes et valider"],
+                          ["can_manage_engines", "Paramétrage Moteurs MT5", "Piloter robots & lots max"],
+                          ["can_adjust_pnl", "Ajustements P&L Desk", "Corriger gains & pertes journaliers"],
+                          ["can_manage_staff", "Gestion & Gouvernance Staff", "Créer et administrer les comptes"],
+                          ["can_view_treasury", "Accès Trésorerie & Bilan", "Consulter soldes & marges broker"],
+                          ["can_use_kill_switch", "Kill Switch d'Urgence Total", "Pouvoir d'arrêt global immédiat"],
+                        ] as [keyof Omit<RolePermissions, "role">, string, string][]
+                      ).map(([key, label, desc]) => (
+                        <div
+                          key={key}
+                          className={`p-4 rounded-2xl border flex items-center justify-between gap-3 transition ${
+                            key === "can_use_kill_switch"
+                              ? "border-rose-500/30 bg-rose-500/5 hover:border-rose-500/50"
+                              : "border-slate-700/60 bg-[#0c121e] hover:border-emerald-500/40"
+                          }`}
+                        >
+                          <div className="space-y-0.5">
+                            <strong className={`text-xs sm:text-sm font-bold block ${key === "can_use_kill_switch" ? "text-rose-400" : "text-white"}`}>
+                              {label}
+                            </strong>
+                            <span className="text-[11px] text-slate-400 block">{desc}</span>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={draftRolePerms[key]}
+                              onChange={(e) => setDraftRolePerms((prev) => (prev ? { ...prev, [key]: e.target.checked } : prev))}
+                              className="sr-only peer"
+                            />
+                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===================================================================== */}
           {/* 🌟 4. ADMINISTRATION & GOUVERNANCE DU STAFF (`administrators`)       */}
           {/* ===================================================================== */}
           {activeSection === "administrators" && (
@@ -4816,12 +4982,12 @@ function NexiumAdminDashboard({
                           header: "PERMISSIONS ACTIVÉES",
                           render: (st: StaffAdministrator) => (
                             <div className="flex flex-wrap gap-1.5 max-w-xs font-sans text-xs">
-                              {st.permissions.canChatWithClients && <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700/50 text-slate-300 text-[11px]">Chat</span>}
-                              {st.permissions.canApproveFinances && <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold">Finances</span>}
-                              {st.permissions.canManageEngines && <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold">Robots</span>}
-                              {st.permissions.canAdjustPnl && <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold">P&amp;L</span>}
-                              {st.permissions.canManageStaff && <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-semibold">Staff</span>}
-                              {st.permissions.canUseKillSwitch && <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold">Kill Switch</span>}
+                              {rolePermissions[st.role]?.can_chat_with_clients && <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700/50 text-slate-300 text-[11px]">Chat</span>}
+                              {rolePermissions[st.role]?.can_approve_finances && <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-semibold">Finances</span>}
+                              {rolePermissions[st.role]?.can_manage_engines && <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[11px] font-semibold">Robots</span>}
+                              {rolePermissions[st.role]?.can_adjust_pnl && <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold">P&amp;L</span>}
+                              {rolePermissions[st.role]?.can_manage_staff && <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-semibold">Staff</span>}
+                              {rolePermissions[st.role]?.can_use_kill_switch && <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold">Kill Switch</span>}
                             </div>
                           ),
                         },
@@ -5107,131 +5273,55 @@ function NexiumAdminDashboard({
                       </div>
                     </div>
 
-                    {/* Section 3 : Matrice Visuelle & Intuitive des Permissions */}
-                    <div className="admin-card-emerald p-6 sm:p-8 space-y-6">
+                    {/* Section 3 : Permissions du rôle (lecture seule — gérées par rôle) */}
+                    <div className="admin-card-emerald p-6 sm:p-8 space-y-5">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-700/50 pb-4">
                         <div>
                           <h3 className="text-sm sm:text-base font-bold text-white uppercase font-mono tracking-wider flex items-center gap-2.5">
                             <Sliders className="size-5 text-emerald-400" />
-                            <span>3. Matrice Granulaire des Permissions &amp; Pouvoirs MT5</span>
+                            <span>3. Permissions du rôle {editStaffRole}</span>
                           </h3>
                           <p className="text-xs text-slate-300 mt-1">
-                            Activez ou désactivez les privilèges opérationnels attribués à ce collaborateur.
+                            Les permissions sont désormais définies par rôle, pas par individu — tout collaborateur {editStaffRole} a exactement les mêmes.
                           </p>
                         </div>
+                        {isSuperAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveSection("access-levels")}
+                            className="admin-btn-secondary text-xs whitespace-nowrap"
+                          >
+                            Modifier dans Niveaux d'Accès
+                          </button>
+                        )}
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {/* Chat */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-emerald-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">Chat Direct Traders</strong>
-                            <span className="text-[11px] text-slate-400 block">Répondre aux messages en direct</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermChat} onChange={(e) => setEditStaffPermChat(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                          </label>
-                        </div>
-
-                        {/* Email */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-emerald-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">E-mails Desk Officiels</strong>
-                            <span className="text-[11px] text-slate-400 block">Envoyer des e-mails officiels</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermEmail} onChange={(e) => setEditStaffPermEmail(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                          </label>
-                        </div>
-
-                        {/* Phone VoIP */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-emerald-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">Appels Téléphoniques VoIP</strong>
-                            <span className="text-[11px] text-slate-400 block">Passer des appels directs desk</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermPhone} onChange={(e) => setEditStaffPermPhone(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                          </label>
-                        </div>
-
-                        {/* Validation Retraits / Dépôts */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-emerald-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">Validation Retraits &amp; Dépôts</strong>
-                            <span className="text-[11px] text-slate-400 block">Créditer les comptes et valider</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermFinance} onChange={(e) => setEditStaffPermFinance(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
-                          </label>
-                        </div>
-
-                        {/* Moteurs MT5 */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-indigo-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">Paramétrage Moteurs MT5</strong>
-                            <span className="text-[11px] text-slate-400 block">Piloter robots &amp; lots max</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermEngines} onChange={(e) => setEditStaffPermEngines(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500"></div>
-                          </label>
-                        </div>
-
-                        {/* P&L */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-amber-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">Ajustements P&amp;L Desk</strong>
-                            <span className="text-[11px] text-slate-400 block">Corriger gains &amp; pertes journaliers</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermPnl} onChange={(e) => setEditStaffPermPnl(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-400"></div>
-                          </label>
-                        </div>
-
-                        {/* Gestion Staff */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-purple-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">Gestion &amp; Gouvernance Staff</strong>
-                            <span className="text-[11px] text-slate-400 block">Créer et administrer les comptes</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermManageStaff} onChange={(e) => setEditStaffPermManageStaff(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
-                          </label>
-                        </div>
-
-                        {/* Trésorerie */}
-                        <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#0c121e] flex items-center justify-between gap-3 hover:border-cyan-500/40 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-white block">Accès Trésorerie &amp; Bilan</strong>
-                            <span className="text-[11px] text-slate-400 block">Consulter soldes &amp; marges broker</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermViewTreasury} onChange={(e) => setEditStaffPermViewTreasury(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-400"></div>
-                          </label>
-                        </div>
-
-                        {/* Kill Switch */}
-                        <div className="p-4 rounded-2xl border border-rose-500/30 bg-rose-500/5 flex items-center justify-between gap-3 hover:border-rose-500/50 transition">
-                          <div className="space-y-0.5">
-                            <strong className="text-xs sm:text-sm font-bold text-rose-400 block flex items-center gap-1.5">
-                              <AlertTriangle className="size-3.5" />
-                              <span>Kill Switch d'Urgence Total</span>
-                            </strong>
-                            <span className="text-[11px] text-rose-300/80 block">Pouvoir d'arrêt global immédiat</span>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                            <input type="checkbox" checked={editStaffPermKillSwitch} onChange={(e) => setEditStaffPermKillSwitch(e.target.checked)} className="sr-only peer" />
-                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500"></div>
-                          </label>
-                        </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          ["can_chat_with_clients", "Chat"],
+                          ["can_send_emails", "E-mails"],
+                          ["can_take_phone_calls", "Téléphone"],
+                          ["can_approve_finances", "Finances"],
+                          ["can_manage_engines", "Robots"],
+                          ["can_adjust_pnl", "P&L"],
+                          ["can_manage_staff", "Staff"],
+                          ["can_view_treasury", "Trésorerie"],
+                          ["can_use_kill_switch", "Kill Switch"],
+                        ].map(([key, label]) => {
+                          const granted = Boolean(rolePermissions[editStaffRole]?.[key as keyof RolePermissions]);
+                          return (
+                            <span
+                              key={key}
+                              className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                                granted
+                                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                  : "bg-slate-800/60 text-slate-500 border-slate-700/50 line-through"
+                              }`}
+                            >
+                              {label}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -6586,13 +6676,15 @@ function NexiumAdminDashboard({
                   </h1>
                 </div>
 
-                <button
-                  onClick={handleGlobalKillSwitch}
-                  className="rounded-xl bg-rose-600 hover:bg-rose-700 px-5 py-2.5 text-xs font-bold text-white uppercase tracking-wider transition cursor-pointer shadow-lg flex items-center gap-2"
-                >
-                  <AlertOctagon className="size-4" />
-                  <span>KILL SWITCH GÉNÉRAL 🛑</span>
-                </button>
+                {hasPermission("can_use_kill_switch") && (
+                  <button
+                    onClick={handleGlobalKillSwitch}
+                    className="rounded-xl bg-rose-600 hover:bg-rose-700 px-5 py-2.5 text-xs font-bold text-white uppercase tracking-wider transition cursor-pointer shadow-lg flex items-center gap-2"
+                  >
+                    <AlertOctagon className="size-4" />
+                    <span>KILL SWITCH GÉNÉRAL 🛑</span>
+                  </button>
+                )}
               </div>
 
               <div className="grid gap-5 lg:grid-cols-3 font-mono">
@@ -6651,7 +6743,7 @@ function NexiumAdminDashboard({
           {/* 🌟 10. FINANCES & DÉPÔTS GLOBAUX (`finances`)                         */}
           {/* ===================================================================== */}
           {activeSection === "finances" && (
-            !isSuperAdmin ? (
+            !hasPermission("can_view_treasury") ? (
               <div className="p-8 rounded-2xl border border-slate-700/50 bg-[#0c121e] text-center space-y-3 animate-in fade-in">
                 <div className="size-12 rounded-2xl bg-amber-500/10 text-amber-400 grid place-items-center mx-auto">
                   <Lock className="size-6" />

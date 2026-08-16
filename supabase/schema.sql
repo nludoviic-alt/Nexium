@@ -274,6 +274,42 @@ AS $$
   SELECT COALESCE((SELECT is_primary_owner FROM public.profiles WHERE id = auth.uid()), FALSE);
 $$;
 
+-- 9bis. TABLE : ROLE_PERMISSIONS (Niveaux d'accès par rôle — remplace les
+-- anciennes permissions cochées individuellement par membre du staff, qui
+-- n'étaient qu'un affichage sans aucun effet réel).
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+    role TEXT PRIMARY KEY CHECK (role IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT')),
+    can_chat_with_clients BOOLEAN NOT NULL DEFAULT FALSE,
+    can_send_emails BOOLEAN NOT NULL DEFAULT FALSE,
+    can_take_phone_calls BOOLEAN NOT NULL DEFAULT FALSE,
+    can_approve_finances BOOLEAN NOT NULL DEFAULT FALSE,
+    can_manage_engines BOOLEAN NOT NULL DEFAULT FALSE,
+    can_adjust_pnl BOOLEAN NOT NULL DEFAULT FALSE,
+    can_use_kill_switch BOOLEAN NOT NULL DEFAULT FALSE,
+    can_manage_staff BOOLEAN NOT NULL DEFAULT FALSE,
+    can_view_treasury BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO public.role_permissions (role, can_chat_with_clients, can_send_emails, can_take_phone_calls, can_approve_finances, can_manage_engines, can_adjust_pnl, can_use_kill_switch, can_manage_staff, can_view_treasury)
+VALUES
+    ('OWNER',       TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+    ('SUPER_ADMIN', TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+    ('ADMIN',       TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+    ('CONSEILLER',  TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+    ('SUPPORT',     TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+    ('FINANCE',     TRUE, TRUE, TRUE, TRUE,  FALSE, TRUE,  FALSE, FALSE, TRUE),
+    ('QUANT',       TRUE, TRUE, TRUE, FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE)
+ON CONFLICT (role) DO NOTHING;
+
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "role_permissions_select" ON public.role_permissions;
+DROP POLICY IF EXISTS "role_permissions_write" ON public.role_permissions;
+CREATE POLICY "role_permissions_select" ON public.role_permissions
+    FOR SELECT USING (public.get_my_role() IS NOT NULL);
+CREATE POLICY "role_permissions_write" ON public.role_permissions
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN')) WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN'));
+
 -- 10. PROTECTION DES COLONNES SENSIBLES DE PROFILES ET DU SUPER OWNER
 CREATE OR REPLACE FUNCTION public.protect_privileged_profile_fields()
 RETURNS TRIGGER
@@ -660,4 +696,14 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.live_chat_threads;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.email_conversations;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.email_messages;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'role_permissions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.role_permissions;
+  END IF;
+END $$;
 

@@ -266,6 +266,69 @@ export async function getAllStaffProfiles(): Promise<SupabaseUserProfile[]> {
   return data as SupabaseUserProfile[];
 }
 
+/* ==========================================================================
+   NIVEAUX D'ACCÈS PAR RÔLE (remplace les anciennes permissions cochées
+   individuellement par membre du staff, qui n'avaient aucun effet réel)
+   ========================================================================== */
+
+export type StaffRole = "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
+
+export interface RolePermissions {
+  role: StaffRole;
+  can_chat_with_clients: boolean;
+  can_send_emails: boolean;
+  can_take_phone_calls: boolean;
+  can_approve_finances: boolean;
+  can_manage_engines: boolean;
+  can_adjust_pnl: boolean;
+  can_use_kill_switch: boolean;
+  can_manage_staff: boolean;
+  can_view_treasury: boolean;
+}
+
+export async function getAllRolePermissions(): Promise<RolePermissions[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase.from("role_permissions").select("*");
+  if (error) {
+    console.error("Erreur récupération role_permissions:", error);
+    return [];
+  }
+  return data as RolePermissions[];
+}
+
+export async function updateRolePermissions(role: StaffRole, perms: Omit<RolePermissions, "role">) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const { data, error } = await supabase
+    .from("role_permissions")
+    .update({ ...perms, updated_at: new Date().toISOString() })
+    .eq("role", role)
+    .select()
+    .single();
+  if (error) {
+    console.error("Erreur mise à jour role_permissions:", error);
+    return { success: false, error };
+  }
+  return { success: true, data };
+}
+
+export function subscribeToRolePermissions(callback: (rows: RolePermissions[]) => void): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel("public:role_permissions")
+      .on("postgres_changes", { event: "*", schema: "public", table: "role_permissions" }, () => {
+        getAllRolePermissions().then(callback);
+      })
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime role_permissions:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
 /**
  * Recherche un profil existant par e-mail (utilisé pour promouvoir un compte
  * déjà inscrit vers un rôle staff, plutôt que de fabriquer un profil orphelin
