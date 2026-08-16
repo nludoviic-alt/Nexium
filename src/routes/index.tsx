@@ -203,7 +203,7 @@ function TradingHero({
       </div>
 
       {/* Center Hero Content Container */}
-      <div className="relative z-20 flex flex-col items-center justify-center text-center px-4 pt-32 sm:pt-36 pb-8 max-w-5xl mx-auto my-auto select-none w-full">
+      <div className="relative z-20 flex flex-col items-center justify-center text-center px-4 pt-32 sm:pt-36 md:pt-40 pb-10 sm:pb-14 max-w-5xl mx-auto my-auto select-none w-full">
         <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full">
           {/* Eyebrow badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/35 bg-[#00D084]/10 px-4 py-1.5 text-xs font-black tracking-[0.16em] text-[#00D084] uppercase shadow-[0_0_15px_rgba(0,208,132,0.15)] backdrop-blur-md">
@@ -211,23 +211,23 @@ function TradingHero({
             {currentSlide.badge}
           </div>
 
-          {/* Main heading - Clean 2-Line Structure */}
-          <h1 className="mt-5 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-tight leading-[1.08]">
+          {/* Main heading - Clean 2-Line Structure with Harmonized Line Height */}
+          <h1 className="mt-6 sm:mt-8 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-tight leading-[1.18] sm:leading-[1.15]">
             <span className="block text-white whitespace-normal sm:whitespace-nowrap">
               {currentSlide.titlePrefix}
             </span>
-            <span className="block text-[#00D084] drop-shadow-[0_0_25px_rgba(0,208,132,0.4)] mt-1 sm:mt-2 whitespace-nowrap">
+            <span className="block text-[#00D084] drop-shadow-[0_0_25px_rgba(0,208,132,0.4)] mt-2 sm:mt-3 whitespace-nowrap">
               {currentSlide.titleHighlight}
             </span>
           </h1>
 
           {/* Value proposition paragraph */}
-          <p className="mt-4 text-sm sm:text-base md:text-lg text-gray-200 font-medium max-w-2xl leading-relaxed mx-auto min-h-[48px] sm:min-h-[56px] flex items-center justify-center">
+          <p className="mt-6 sm:mt-7 text-sm sm:text-base md:text-lg text-gray-200/90 font-medium max-w-2xl leading-relaxed sm:leading-[1.75] mx-auto min-h-[48px] sm:min-h-[56px] flex items-center justify-center">
             {currentSlide.description}
           </p>
 
           {/* Call to Actions */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3.5 sm:gap-4">
+          <div className="mt-8 sm:mt-9 flex flex-wrap items-center justify-center gap-4 sm:gap-5">
             <Button
               asChild
               className="hero-watch-btn rounded-full px-8 py-3.5 text-sm sm:text-base font-black text-white tracking-wide cursor-pointer hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,208,132,0.3)]"
@@ -248,7 +248,7 @@ function TradingHero({
         </div>
 
         {/* Carousel Indicators */}
-        <div className="mt-8 flex items-center justify-center gap-3">
+        <div className="mt-10 sm:mt-12 flex items-center justify-center gap-3">
           <div className="flex items-center gap-2.5">
             {slides.map((_, idx) => (
               <button
