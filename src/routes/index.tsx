@@ -179,29 +179,6 @@ function TradingHero({
         </svg>
       </div>
 
-      {/* Side Navigation Arrows */}
-      <div className="absolute inset-y-0 left-4 lg:left-8 hidden sm:flex items-center z-30 pointer-events-auto">
-        <button
-          type="button"
-          onClick={onPrevious}
-          aria-label="Previous slide"
-          className="size-11 rounded-full border border-white/15 bg-[#0b0d10]/80 text-gray-300 hover:text-[#00D084] hover:border-[#00D084] hover:bg-[#00D084]/10 backdrop-blur-md flex items-center justify-center transition-all duration-200 cursor-pointer shadow-lg hover:scale-110"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-      </div>
-
-      <div className="absolute inset-y-0 right-4 lg:right-8 hidden sm:flex items-center z-30 pointer-events-auto">
-        <button
-          type="button"
-          onClick={onNext}
-          aria-label="Next slide"
-          className="size-11 rounded-full border border-white/15 bg-[#0b0d10]/80 text-gray-300 hover:text-[#00D084] hover:border-[#00D084] hover:bg-[#00D084]/10 backdrop-blur-md flex items-center justify-center transition-all duration-200 cursor-pointer shadow-lg hover:scale-110"
-        >
-          <ChevronRight className="size-5" />
-        </button>
-      </div>
-
       {/* Center Hero Content Container */}
       <div className="relative z-20 flex flex-col items-center justify-center text-center px-4 pt-32 sm:pt-36 md:pt-40 pb-10 sm:pb-14 max-w-5xl mx-auto my-auto select-none w-full">
         <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full">
