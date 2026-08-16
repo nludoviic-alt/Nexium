@@ -284,6 +284,7 @@ export interface RolePermissions {
   can_use_kill_switch: boolean;
   can_manage_staff: boolean;
   can_view_treasury: boolean;
+  hidden_pages: string[];
 }
 
 export async function getAllRolePermissions(): Promise<RolePermissions[]> {

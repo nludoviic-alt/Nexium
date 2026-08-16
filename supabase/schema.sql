@@ -315,6 +315,7 @@ CREATE TABLE IF NOT EXISTS public.role_permissions (
     can_use_kill_switch BOOLEAN NOT NULL DEFAULT FALSE,
     can_manage_staff BOOLEAN NOT NULL DEFAULT FALSE,
     can_view_treasury BOOLEAN NOT NULL DEFAULT FALSE,
+    hidden_pages TEXT[] NOT NULL DEFAULT '{}',
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -323,6 +324,10 @@ CREATE TABLE IF NOT EXISTS public.role_permissions (
 ALTER TABLE public.role_permissions DROP CONSTRAINT IF EXISTS role_permissions_role_check;
 ALTER TABLE public.role_permissions ADD CONSTRAINT role_permissions_role_check
     CHECK (role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT'));
+
+-- La table role_permissions existait déjà avant l'ajout de cette colonne :
+-- l'ajouter explicitement pour les bases déjà migrées.
+ALTER TABLE public.role_permissions ADD COLUMN IF NOT EXISTS hidden_pages TEXT[] NOT NULL DEFAULT '{}';
 
 INSERT INTO public.role_permissions (role, can_chat_with_clients, can_send_emails, can_take_phone_calls, can_approve_finances, can_manage_engines, can_adjust_pnl, can_use_kill_switch, can_manage_staff, can_view_treasury)
 VALUES

@@ -962,8 +962,38 @@ function NexiumAdminDashboard({
     [rolePermissions, currentSessionRole, isPrimaryOwner]
   );
 
+  // Si la page actuellement affichée vient d'être masquée pour ce rôle (par le
+  // Super Owner, en direct ou avant même la connexion), on renvoie vers
+  // "Comptes Clients" plutôt que de laisser une page inaccessible affichée.
+  useEffect(() => {
+    if (isPrimaryOwner) return;
+    const hidden = rolePermissions[currentSessionRole]?.hidden_pages || [];
+    if (hidden.length === 0) return;
+    const sectionPageKey = ["user-detail", "create-user", "impersonation"].includes(activeSection) ? "users" : activeSection;
+    if (hidden.includes(sectionPageKey)) {
+      const fallback = MANAGEABLE_PAGES.find((p) => !hidden.includes(p.key))?.key as typeof activeSection | undefined;
+      setActiveSection(fallback || "logs");
+      toast.error("Cette page n'est plus accessible avec votre rôle actuel.");
+    }
+  }, [rolePermissions, currentSessionRole, isPrimaryOwner, activeSection]);
+
   // Page "Niveaux d'Accès" — édition du jeu de permissions d'un rôle
   const ALL_STAFF_ROLES: StaffRole[] = ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
+  // Pages du menu admin qu'on peut masquer par rôle (hors "access-levels", qui
+  // reste de toute façon réservée au Super Owner quoi qu'il arrive).
+  const MANAGEABLE_PAGES: { key: string; label: string }[] = [
+    { key: "users", label: "Comptes Clients" },
+    { key: "administrators", label: "Administration" },
+    { key: "messaging", label: "Chat" },
+    { key: "emails", label: "E-mails" },
+    { key: "gateways", label: "Passerelles MT5 & VPS" },
+    { key: "security", label: "Sécurité & Accès VPN" },
+    { key: "news-guard", label: "News Guard Macro" },
+    { key: "perf-fees", label: "Performance Fees" },
+    { key: "engines", label: "Moteurs & Auto-Trader" },
+    { key: "finances", label: "Finances & Dépôts" },
+    { key: "logs", label: "Journal d'Audit" },
+  ];
   const [accessLevelsSelectedRole, setAccessLevelsSelectedRole] = useState<StaffRole>("ADMIN");
   const [draftRolePerms, setDraftRolePerms] = useState<Omit<RolePermissions, "role"> | null>(null);
   const [savingRolePerms, setSavingRolePerms] = useState(false);
@@ -972,7 +1002,7 @@ function NexiumAdminDashboard({
     const current = rolePermissions[accessLevelsSelectedRole];
     if (current) {
       const { role: _role, ...rest } = current;
-      setDraftRolePerms(rest);
+      setDraftRolePerms({ ...rest, hidden_pages: rest.hidden_pages || [] });
     }
   }, [accessLevelsSelectedRole, rolePermissions]);
 
@@ -3478,7 +3508,7 @@ function NexiumAdminDashboard({
                   ]
                 : []),
               { key: "logs", label: "Journal d'Audit", icon: Terminal, isActive: activeSection === "logs" },
-            ]}
+            ].filter((item) => isPrimaryOwner || !(rolePermissions[currentSessionRole]?.hidden_pages || []).includes(item.key))}
             onSelect={(key) => setActiveSection(key as typeof activeSection)}
           />
 
@@ -4943,7 +4973,7 @@ function NexiumAdminDashboard({
                           ["can_manage_staff", "Gestion & Gouvernance Staff", "Créer et administrer les comptes"],
                           ["can_view_treasury", "Accès Trésorerie & Bilan", "Consulter soldes & marges broker"],
                           ["can_use_kill_switch", "Kill Switch d'Urgence Total", "Pouvoir d'arrêt global immédiat"],
-                        ] as [keyof Omit<RolePermissions, "role">, string, string][]
+                        ] as [Exclude<keyof Omit<RolePermissions, "role">, "hidden_pages">, string, string][]
                       ).map(([key, label, desc]) => (
                         <div
                           key={key}
@@ -4973,6 +5003,54 @@ function NexiumAdminDashboard({
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Pages visibles dans le menu pour ce rôle */}
+              <div className="admin-card p-6 sm:p-8 space-y-5">
+                <div className="border-b border-slate-700/50 pb-4">
+                  <h2 className="text-base sm:text-lg font-bold text-white uppercase font-mono tracking-wider">
+                    Pages Visibles : {roleLabel(accessLevelsSelectedRole)}
+                  </h2>
+                  <p className="text-xs text-slate-300 mt-1">
+                    Décochez une page pour qu'elle disparaisse entièrement du menu de ce rôle — les collaborateurs
+                    concernés n'y auront plus du tout accès.
+                  </p>
+                </div>
+
+                {draftRolePerms && (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {MANAGEABLE_PAGES.map(({ key, label }) => {
+                      const isVisible = !draftRolePerms.hidden_pages.includes(key);
+                      return (
+                        <div
+                          key={key}
+                          className="p-3.5 rounded-2xl border border-slate-700/60 bg-[#0c121e] hover:border-emerald-500/40 flex items-center justify-between gap-3 transition"
+                        >
+                          <strong className={`text-xs sm:text-sm font-bold ${isVisible ? "text-white" : "text-slate-500"}`}>
+                            {label}
+                          </strong>
+                          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={isVisible}
+                              onChange={(e) =>
+                                setDraftRolePerms((prev) => {
+                                  if (!prev) return prev;
+                                  const nextHidden = e.target.checked
+                                    ? prev.hidden_pages.filter((k) => k !== key)
+                                    : [...prev.hidden_pages, key];
+                                  return { ...prev, hidden_pages: nextHidden };
+                                })
+                              }
+                              className="sr-only peer"
+                            />
+                            <div className="w-10 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
