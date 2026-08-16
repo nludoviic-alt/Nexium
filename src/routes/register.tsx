@@ -40,8 +40,6 @@ function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [country, setCountry] = useState("France");
-  const [hasIb, setHasIb] = useState(true);
-  const [ibCode, setIbCode] = useState("90462");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const { language, setLanguage } = useLanguage();
@@ -79,12 +77,7 @@ function RegisterPage() {
             data: {
               name: fullName,
               country,
-              ib_code: hasIb ? ibCode : null,
             },
-            // Sans ceci, Supabase retombe sur le "Site URL" configuré dans le
-            // tableau de bord (Authentication → URL Configuration) pour tout
-            // le lien de confirmation — s'il est resté sur localhost, l'e-mail
-            // envoyé pointe vers localhost quel que soit ce paramètre côté code.
             emailRedirectTo: "https://nexiummarkets.com/login",
           },
         });
@@ -153,7 +146,6 @@ function RegisterPage() {
           name: fullName,
           email,
           country,
-          ibCode: hasIb ? ibCode : undefined,
         });
       } catch (mailErr) {
         console.warn("Notice envoi email Resend:", mailErr);
@@ -330,120 +322,120 @@ function RegisterPage() {
                           onChange={(e) => setCountry(e.target.value)}
                           className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base font-semibold text-gray-900 focus:border-[#00D084] focus:outline-none focus:ring-2 focus:ring-[#00D084]/20 cursor-pointer"
                         >
-                          <optgroup label="Principaux Pays Francophones & Institutionnels">
-                            <option value="France">France 🇫🇷 (+33)</option>
-                            <option value="Canada">Canada 🇨🇦 (+1)</option>
-                            <option value="Suisse">Suisse 🇨🇭 (+41)</option>
-                            <option value="Belgique">Belgique 🇧🇪 (+32)</option>
-                            <option value="Luxembourg">Luxembourg 🇱🇺 (+352)</option>
-                            <option value="Monaco">Monaco 🇲🇨 (+377)</option>
-                            <option value="Royaume-Uni">Royaume-Uni 🇬🇧 (+44)</option>
-                            <option value="États-Unis">États-Unis 🇺🇸 (+1)</option>
-                            <option value="Émirats Arabes Unis">Émirats Arabes Unis 🇦🇪 (+971)</option>
-                            <option value="Singapour">Singapour 🇸🇬 (+65)</option>
+                          <optgroup label="Principaux Pays Francophones &amp; Institutionnels">
+                            <option value="France">France 🇫🇷</option>
+                            <option value="Canada">Canada 🇨🇦</option>
+                            <option value="Suisse">Suisse 🇨🇭</option>
+                            <option value="Belgique">Belgique 🇧🇪</option>
+                            <option value="Luxembourg">Luxembourg 🇱🇺</option>
+                            <option value="Monaco">Monaco 🇲🇨</option>
+                            <option value="Royaume-Uni">Royaume-Uni 🇬🇧</option>
+                            <option value="États-Unis">États-Unis 🇺🇸</option>
+                            <option value="Émirats Arabes Unis">Émirats Arabes Unis 🇦🇪</option>
+                            <option value="Singapour">Singapour 🇸🇬</option>
                           </optgroup>
                           <optgroup label="Europe">
-                            <option value="Allemagne">Allemagne 🇩🇪 (+49)</option>
-                            <option value="Andorre">Andorre 🇦🇩 (+376)</option>
-                            <option value="Autriche">Autriche 🇦🇹 (+43)</option>
-                            <option value="Bulgarie">Bulgarie 🇧🇬 (+359)</option>
-                            <option value="Chypre">Chypre 🇨🇾 (+357)</option>
-                            <option value="Croatie">Croatie 🇭🇷 (+385)</option>
-                            <option value="Danemark">Danemark 🇩🇰 (+45)</option>
-                            <option value="Espagne">Espagne 🇪🇸 (+34)</option>
-                            <option value="Estonie">Estonie 🇪🇪 (+372)</option>
-                            <option value="Finlande">Finlande 🇫🇮 (+358)</option>
-                            <option value="Gibraltar">Gibraltar 🇬🇮 (+350)</option>
-                            <option value="Grèce">Grèce 🇬🇷 (+30)</option>
-                            <option value="Hongrie">Hongrie 🇭🇺 (+36)</option>
-                            <option value="Irlande">Irlande 🇮🇪 (+353)</option>
-                            <option value="Islande">Islande 🇮🇸 (+354)</option>
-                            <option value="Italie">Italie 🇮🇹 (+39)</option>
-                            <option value="Lettonie">Lettonie 🇱🇻 (+371)</option>
-                            <option value="Liechtenstein">Liechtenstein 🇱🇮 (+423)</option>
-                            <option value="Lituanie">Lituanie 🇱🇹 (+370)</option>
-                            <option value="Malte">Malte 🇲🇹 (+356)</option>
-                            <option value="Norvège">Norvège 🇳🇴 (+47)</option>
-                            <option value="Pays-Bas">Pays-Bas 🇳🇱 (+31)</option>
-                            <option value="Pologne">Pologne 🇵🇱 (+48)</option>
-                            <option value="Portugal">Portugal 🇵🇹 (+351)</option>
-                            <option value="République Tchèque">République Tchèque 🇨🇿 (+420)</option>
-                            <option value="Roumanie">Roumanie 🇷🇴 (+40)</option>
-                            <option value="Slovaquie">Slovaquie 🇸🇰 (+421)</option>
-                            <option value="Slovénie">Slovénie 🇸🇮 (+386)</option>
-                            <option value="Suède">Suède 🇸🇪 (+46)</option>
+                            <option value="Allemagne">Allemagne 🇩🇪</option>
+                            <option value="Andorre">Andorre 🇦🇩</option>
+                            <option value="Autriche">Autriche 🇦🇹</option>
+                            <option value="Bulgarie">Bulgarie 🇧🇬</option>
+                            <option value="Chypre">Chypre 🇨🇾</option>
+                            <option value="Croatie">Croatie 🇭🇷</option>
+                            <option value="Danemark">Danemark 🇩🇰</option>
+                            <option value="Espagne">Espagne 🇪🇸</option>
+                            <option value="Estonie">Estonie 🇪🇪</option>
+                            <option value="Finlande">Finlande 🇫🇮</option>
+                            <option value="Gibraltar">Gibraltar 🇬🇮</option>
+                            <option value="Grèce">Grèce 🇬🇷</option>
+                            <option value="Hongrie">Hongrie 🇭🇺</option>
+                            <option value="Irlande">Irlande 🇮🇪</option>
+                            <option value="Islande">Islande 🇮🇸</option>
+                            <option value="Italie">Italie 🇮🇹</option>
+                            <option value="Lettonie">Lettonie 🇱🇻</option>
+                            <option value="Liechtenstein">Liechtenstein 🇱🇮</option>
+                            <option value="Lituanie">Lituanie 🇱🇹</option>
+                            <option value="Malte">Malte 🇲🇹</option>
+                            <option value="Norvège">Norvège 🇳🇴</option>
+                            <option value="Pays-Bas">Pays-Bas 🇳🇱</option>
+                            <option value="Pologne">Pologne 🇵🇱</option>
+                            <option value="Portugal">Portugal 🇵🇹</option>
+                            <option value="République Tchèque">République Tchèque 🇨🇿</option>
+                            <option value="Roumanie">Roumanie 🇷🇴</option>
+                            <option value="Slovaquie">Slovaquie 🇸🇰</option>
+                            <option value="Slovénie">Slovénie 🇸🇮</option>
+                            <option value="Suède">Suède 🇸🇪</option>
                           </optgroup>
                           <optgroup label="Afrique">
-                            <option value="Algérie">Algérie 🇩🇿 (+213)</option>
-                            <option value="Bénin">Bénin 🇧🇯 (+229)</option>
-                            <option value="Burkina Faso">Burkina Faso 🇧🇫 (+226)</option>
-                            <option value="Cameroun">Cameroun 🇨🇲 (+237)</option>
-                            <option value="Congo (Brazzaville)">Congo (Brazzaville) 🇨🇬 (+242)</option>
-                            <option value="Congo (RDC)">Congo (RDC) 🇨🇩 (+243)</option>
-                            <option value="Côte d'Ivoire">Côte d'Ivoire 🇨🇮 (+225)</option>
-                            <option value="Djibouti">Djibouti 🇩🇯 (+253)</option>
-                            <option value="Égypte">Égypte 🇪🇬 (+20)</option>
-                            <option value="Gabon">Gabon 🇬🇦 (+241)</option>
-                            <option value="Ghana">Ghana 🇬🇭 (+233)</option>
-                            <option value="Guinée">Guinée 🇬🇳 (+224)</option>
-                            <option value="Île Maurice">Île Maurice 🇲🇺 (+230)</option>
-                            <option value="Madagascar">Madagascar 🇲🇬 (+261)</option>
-                            <option value="Mali">Mali 🇲🇱 (+223)</option>
-                            <option value="Maroc">Maroc 🇲🇦 (+212)</option>
-                            <option value="Mauritanie">Mauritanie 🇲🇷 (+222)</option>
-                            <option value="Niger">Niger 🇳🇪 (+227)</option>
-                            <option value="Nigéria">Nigéria 🇳🇬 (+234)</option>
-                            <option value="Rwanda">Rwanda 🇷🇼 (+250)</option>
-                            <option value="Sénégal">Sénégal 🇸🇳 (+221)</option>
-                            <option value="Seychelles">Seychelles 🇸🇨 (+248)</option>
-                            <option value="Tchad">Tchad 🇹🇩 (+235)</option>
-                            <option value="Togo">Togo 🇹🇬 (+228)</option>
-                            <option value="Tunisie">Tunisie 🇹🇳 (+216)</option>
-                            <option value="Afrique du Sud">Afrique du Sud 🇿🇦 (+27)</option>
+                            <option value="Algérie">Algérie 🇩🇿</option>
+                            <option value="Bénin">Bénin 🇧🇯</option>
+                            <option value="Burkina Faso">Burkina Faso 🇧🇫</option>
+                            <option value="Cameroun">Cameroun 🇨🇲</option>
+                            <option value="Congo (Brazzaville)">Congo (Brazzaville) 🇨🇬</option>
+                            <option value="Congo (RDC)">Congo (RDC) 🇨🇩</option>
+                            <option value="Côte d'Ivoire">Côte d'Ivoire 🇨🇮</option>
+                            <option value="Djibouti">Djibouti 🇩🇯</option>
+                            <option value="Égypte">Égypte 🇪🇬</option>
+                            <option value="Gabon">Gabon 🇬🇦</option>
+                            <option value="Ghana">Ghana 🇬🇭</option>
+                            <option value="Guinée">Guinée 🇬🇳</option>
+                            <option value="Île Maurice">Île Maurice 🇲🇺</option>
+                            <option value="Madagascar">Madagascar 🇲🇬</option>
+                            <option value="Mali">Mali 🇲🇱</option>
+                            <option value="Maroc">Maroc 🇲🇦</option>
+                            <option value="Mauritanie">Mauritanie 🇲🇷</option>
+                            <option value="Niger">Niger 🇳🇪</option>
+                            <option value="Nigéria">Nigéria 🇳🇬</option>
+                            <option value="Rwanda">Rwanda 🇷🇼</option>
+                            <option value="Sénégal">Sénégal 🇸🇳</option>
+                            <option value="Seychelles">Seychelles 🇸🇨</option>
+                            <option value="Tchad">Tchad 🇹🇩</option>
+                            <option value="Togo">Togo 🇹🇬</option>
+                            <option value="Tunisie">Tunisie 🇹🇳</option>
+                            <option value="Afrique du Sud">Afrique du Sud 🇿🇦</option>
                           </optgroup>
-                          <optgroup label="Amériques & Caraïbes">
-                            <option value="Argentine">Argentine 🇦🇷 (+54)</option>
-                            <option value="Bahamas">Bahamas 🇧🇸 (+1242)</option>
-                            <option value="Brésil">Brésil 🇧🇷 (+55)</option>
-                            <option value="Chili">Chili 🇨🇱 (+56)</option>
-                            <option value="Colombie">Colombie 🇨🇴 (+57)</option>
-                            <option value="Costa Rica">Costa Rica 🇨🇷 (+506)</option>
-                            <option value="Guadeloupe">Guadeloupe 🇬🇵 (+590)</option>
-                            <option value="Guyane Française">Guyane Française 🇬🇫 (+594)</option>
-                            <option value="Haïti">Haïti 🇭🇹 (+509)</option>
-                            <option value="Martinique">Martinique 🇲🇶 (+596)</option>
-                            <option value="Mexique">Mexique 🇲🇽 (+52)</option>
-                            <option value="Panama">Panama 🇵🇦 (+507)</option>
-                            <option value="Pérou">Pérou 🇵🇪 (+51)</option>
-                            <option value="La Réunion">La Réunion 🇷🇪 (+262)</option>
-                            <option value="Uruguay">Uruguay 🇺🇾 (+598)</option>
+                          <optgroup label="Amériques &amp; Caraïbes">
+                            <option value="Argentine">Argentine 🇦🇷</option>
+                            <option value="Bahamas">Bahamas 🇧🇸</option>
+                            <option value="Brésil">Brésil 🇧🇷</option>
+                            <option value="Chili">Chili 🇨🇱</option>
+                            <option value="Colombie">Colombie 🇨🇴</option>
+                            <option value="Costa Rica">Costa Rica 🇨🇷</option>
+                            <option value="Guadeloupe">Guadeloupe 🇬🇵</option>
+                            <option value="Guyane Française">Guyane Française 🇬🇫</option>
+                            <option value="Haïti">Haïti 🇭🇹</option>
+                            <option value="Martinique">Martinique 🇲🇶</option>
+                            <option value="Mexique">Mexique 🇲🇽</option>
+                            <option value="Panama">Panama 🇵🇦</option>
+                            <option value="Pérou">Pérou 🇵🇪</option>
+                            <option value="La Réunion">La Réunion 🇷🇪</option>
+                            <option value="Uruguay">Uruguay 🇺🇾</option>
                           </optgroup>
-                          <optgroup label="Moyen-Orient & Asie-Pacifique">
-                            <option value="Arabie Saoudite">Arabie Saoudite 🇸🇦 (+966)</option>
-                            <option value="Australie">Australie 🇦🇺 (+61)</option>
-                            <option value="Bahreïn">Bahreïn 🇧🇭 (+973)</option>
-                            <option value="Chine">Chine 🇨🇳 (+86)</option>
-                            <option value="Corée du Sud">Corée du Sud 🇰🇷 (+82)</option>
-                            <option value="Hong Kong">Hong Kong 🇭🇰 (+852)</option>
-                            <option value="Inde">Inde 🇮🇳 (+91)</option>
-                            <option value="Indonésie">Indonésie 🇮🇩 (+62)</option>
-                            <option value="Israël">Israël 🇮🇱 (+972)</option>
-                            <option value="Japon">Japon 🇯🇵 (+81)</option>
-                            <option value="Koweït">Koweït 🇰🇼 (+965)</option>
-                            <option value="Liban">Liban 🇱🇧 (+961)</option>
-                            <option value="Malaisie">Malaisie 🇲🇾 (+60)</option>
-                            <option value="Nouvelle-Calédonie">Nouvelle-Calédonie 🇳🇨 (+687)</option>
-                            <option value="Nouvelle-Zélande">Nouvelle-Zélande 🇳🇿 (+64)</option>
-                            <option value="Oman">Oman 🇴🇲 (+968)</option>
-                            <option value="Polynésie Française">Polynésie Française 🇵🇫 (+689)</option>
-                            <option value="Qatar">Qatar 🇶🇦 (+974)</option>
-                            <option value="Taïwan">Taïwan 🇹🇼 (+886)</option>
-                            <option value="Thaïlande">Thaïlande 🇹🇭 (+66)</option>
-                            <option value="Turquie">Turquie 🇹🇷 (+90)</option>
-                            <option value="Vietnam">Vietnam 🇻🇳 (+84)</option>
+                          <optgroup label="Moyen-Orient &amp; Asie-Pacifique">
+                            <option value="Arabie Saoudite">Arabie Saoudite 🇸🇦</option>
+                            <option value="Australie">Australie 🇦🇺</option>
+                            <option value="Bahreïn">Bahreïn 🇧🇭</option>
+                            <option value="Chine">Chine 🇨🇳</option>
+                            <option value="Corée du Sud">Corée du Sud 🇰🇷</option>
+                            <option value="Hong Kong">Hong Kong 🇭🇰</option>
+                            <option value="Inde">Inde 🇮🇳</option>
+                            <option value="Indonésie">Indonésie 🇮🇩</option>
+                            <option value="Israël">Israël 🇮🇱</option>
+                            <option value="Japon">Japon 🇯🇵</option>
+                            <option value="Koweït">Koweït 🇰🇼</option>
+                            <option value="Liban">Liban 🇱🇧</option>
+                            <option value="Malaisie">Malaisie 🇲🇾</option>
+                            <option value="Nouvelle-Calédonie">Nouvelle-Calédonie 🇳🇨</option>
+                            <option value="Nouvelle-Zélande">Nouvelle-Zélande 🇳🇿</option>
+                            <option value="Oman">Oman 🇴🇲</option>
+                            <option value="Polynésie Française">Polynésie Française 🇵🇫</option>
+                            <option value="Qatar">Qatar 🇶🇦</option>
+                            <option value="Taïwan">Taïwan 🇹🇼</option>
+                            <option value="Thaïlande">Thaïlande 🇹🇭</option>
+                            <option value="Turquie">Turquie 🇹🇷</option>
+                            <option value="Vietnam">Vietnam 🇻🇳</option>
                           </optgroup>
                         </select>
-                        <ChevronDown className="pointer-events-none absolute right-4 top-4 size-4 text-gray-600" />
+                        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 size-4 text-gray-600" />
                       </div>
                     </div>
 
@@ -546,30 +538,6 @@ function RegisterPage() {
                         placeholder="Ressaisissez le mot de passe"
                         className="rounded-xl border-gray-300 bg-white px-4 py-3.5 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00ff66]"
                       />
-                    </div>
-
-                    {/* Checkbox Introducing Broker */}
-                    <div className="pt-2">
-                      <label className="flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm font-bold text-gray-800">
-                        <input
-                          type="checkbox"
-                          checked={hasIb}
-                          onChange={(e) => setHasIb(e.target.checked)}
-                          className="size-4 rounded border-gray-300 text-black focus:ring-black accent-black"
-                        />
-                        <span>J'ai été parrainé(e) par un partenaire</span>
-                      </label>
-
-                      {hasIb && (
-                        <div className="mt-2">
-                          <Input
-                            value={ibCode}
-                            onChange={(e) => setIbCode(e.target.value)}
-                            placeholder="Code de parrainage"
-                            className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm font-mono text-gray-900 focus:border-[#00ff66]"
-                          />
-                        </div>
-                      )}
                     </div>
 
                     {/* Legal Policy Links */}
