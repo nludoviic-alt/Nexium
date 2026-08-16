@@ -3082,22 +3082,33 @@ function NexiumAdminDashboard({
               { key: "news-guard", label: "News Guard Macro", icon: Newspaper, isActive: activeSection === "news-guard" },
               { key: "perf-fees", label: "Performance Fees", icon: Receipt, isActive: activeSection === "perf-fees" },
               { key: "engines", label: "Moteurs & Auto-Trader", icon: Bot, isActive: activeSection === "engines" },
-              { key: "finances", label: "Finances & Dépôts", icon: Wallet, isActive: activeSection === "finances" },
+              ...(isSuperAdmin
+                ? [
+                    {
+                      key: "finances",
+                      label: "Finances & Dépôts",
+                      icon: Wallet,
+                      isActive: activeSection === "finances",
+                    } as const,
+                  ]
+                : []),
               { key: "logs", label: "Journal d'Audit", icon: Terminal, isActive: activeSection === "logs" },
             ]}
             onSelect={(key) => setActiveSection(key as typeof activeSection)}
           />
 
-          <AdminPanel padding="p-4" className="text-xs font-mono space-y-2.5 text-slate-300 shadow-md">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400 font-medium">Total Dépôts :</span>
-              <strong className="text-emerald-400 font-bold text-sm">${totalBalance.toLocaleString("fr-FR")} USD</strong>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400 font-medium">Bonus Accordés :</span>
-              <strong className="text-amber-300 font-bold text-sm">+${totalBonus.toLocaleString("fr-FR")} USD</strong>
-            </div>
-          </AdminPanel>
+          {isSuperAdmin && (
+            <AdminPanel padding="p-4" className="text-xs font-mono space-y-2.5 text-slate-300 shadow-md">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-medium">Total Dépôts :</span>
+                <strong className="text-emerald-400 font-bold text-sm">${totalBalance.toLocaleString("fr-FR")} USD</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 font-medium">Bonus Accordés :</span>
+                <strong className="text-amber-300 font-bold text-sm">+${totalBonus.toLocaleString("fr-FR")} USD</strong>
+              </div>
+            </AdminPanel>
+          )}
         </aside>
 
         {/* Espace Central */}
@@ -3160,11 +3171,13 @@ function NexiumAdminDashboard({
                     </div>
                   </div>
                   <p className="text-2xl font-bold text-emerald-400">
-                    ${totalBalance.toLocaleString("fr-FR")} USD
+                    {isSuperAdmin ? `$${totalBalance.toLocaleString("fr-FR")} USD` : "••••••"}
                   </p>
                   <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
                     <span>Bonus accordés :</span>
-                    <strong className="text-emerald-300">+${totalBonus.toLocaleString("fr-FR")}</strong>
+                    <strong className="text-emerald-300">
+                      {isSuperAdmin ? `+$${totalBonus.toLocaleString("fr-FR")}` : "••••••"}
+                    </strong>
                   </div>
                 </div>
 
@@ -3192,11 +3205,15 @@ function NexiumAdminDashboard({
                     </div>
                   </div>
                   <p className="text-2xl font-bold text-amber-300">
-                    +${clients.reduce((acc, c) => acc + c.totalNetPnl, 0).toLocaleString("fr-FR")} USD
+                    {isSuperAdmin
+                      ? `+$${clients.reduce((acc, c) => acc + c.totalNetPnl, 0).toLocaleString("fr-FR")} USD`
+                      : "••••••"}
                   </p>
                   <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
                     <span>Performance moyenne :</span>
-                    <strong className="text-amber-400">+14.8%</strong>
+                    <strong className="text-amber-400">
+                      {isSuperAdmin ? "+14.8%" : "••••••"}
+                    </strong>
                   </div>
                 </div>
 
@@ -3332,9 +3349,13 @@ function NexiumAdminDashboard({
                     header: "SOLDE & P&L JOUR",
                     render: (c: UserProfile) => (
                       <div>
-                        <strong className="text-sm font-bold text-white block font-mono">${c.balance.toLocaleString("fr-FR")} USD</strong>
+                        <strong className="text-sm font-bold text-white block font-mono">
+                          {isSuperAdmin ? `$${c.balance.toLocaleString("fr-FR")} USD` : "••••••"}
+                        </strong>
                         <span className={`text-xs font-semibold block font-mono ${c.todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                          {c.todayPnl >= 0 ? "+" : ""}${c.todayPnl.toLocaleString("fr-FR")} (Aujourd'hui)
+                          {isSuperAdmin
+                            ? `${c.todayPnl >= 0 ? "+" : ""}$${c.todayPnl.toLocaleString("fr-FR")} (Aujourd'hui)`
+                            : "••••••"}
                         </span>
                       </div>
                     ),
@@ -3344,8 +3365,12 @@ function NexiumAdminDashboard({
                     header: "GAIN NET GLOBAL",
                     render: (c: UserProfile) => (
                       <div>
-                        <strong className="text-sm font-bold text-emerald-400 block font-mono">+${c.totalNetPnl.toLocaleString("fr-FR")} USD</strong>
-                        <span className="text-xs text-slate-400 font-mono">Win Rate: {c.winRatePercent}%</span>
+                        <strong className="text-sm font-bold text-emerald-400 block font-mono">
+                          {isSuperAdmin ? `+${c.totalNetPnl.toLocaleString("fr-FR")} USD` : "••••••"}
+                        </strong>
+                        <span className="text-xs text-slate-400 font-mono">
+                          Win Rate: {isSuperAdmin ? `${c.winRatePercent}%` : "••••••"}
+                        </span>
                       </div>
                     ),
                   },
@@ -3620,7 +3645,7 @@ function NexiumAdminDashboard({
                       </div>
                     </div>
                     <p className="text-2xl font-bold text-emerald-400">
-                      +${activeClient.grossProfitTotal.toLocaleString("fr-FR")} USD
+                      {isSuperAdmin ? `+$${activeClient.grossProfitTotal.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
                     <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Trades Gagnants :</span>
@@ -3628,7 +3653,7 @@ function NexiumAdminDashboard({
                     </div>
                     <div className="flex justify-between text-xs text-slate-300">
                       <span>Meilleur Trade :</span>
-                      <strong className="text-emerald-400">+${activeClient.bestTradePnl.toLocaleString("fr-FR")} USD</strong>
+                      <strong className="text-emerald-400">{isSuperAdmin ? `+$${activeClient.bestTradePnl.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
                     </div>
                   </div>
 
@@ -3640,7 +3665,7 @@ function NexiumAdminDashboard({
                       </div>
                     </div>
                     <p className="text-2xl font-bold text-rose-400">
-                      -${activeClient.grossLossTotal.toLocaleString("fr-FR")} USD
+                      {isSuperAdmin ? `-$${activeClient.grossLossTotal.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
                     <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Trades Perdants :</span>
@@ -3648,7 +3673,7 @@ function NexiumAdminDashboard({
                     </div>
                     <div className="flex justify-between text-xs text-slate-300">
                       <span>Pire Trade :</span>
-                      <strong className="text-rose-400">${activeClient.worstTradePnl.toLocaleString("fr-FR")} USD</strong>
+                      <strong className="text-rose-400">{isSuperAdmin ? `$${activeClient.worstTradePnl.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
                     </div>
                   </div>
 
@@ -3660,15 +3685,15 @@ function NexiumAdminDashboard({
                       </div>
                     </div>
                     <p className={`text-2xl font-bold ${activeClient.todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {activeClient.todayPnl >= 0 ? "+" : ""}${activeClient.todayPnl.toLocaleString("fr-FR")} USD
+                      {isSuperAdmin ? `${activeClient.todayPnl >= 0 ? "+" : ""}$${activeClient.todayPnl.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
                     <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Gains Jour :</span>
-                      <strong className="text-emerald-400">+${activeClient.todayGrossGain.toLocaleString("fr-FR")}</strong>
+                      <strong className="text-emerald-400">{isSuperAdmin ? `+$${activeClient.todayGrossGain.toLocaleString("fr-FR")}` : "••••••"}</strong>
                     </div>
                     <div className="flex justify-between text-xs text-slate-300">
                       <span>Pertes Jour :</span>
-                      <strong className="text-rose-400">${activeClient.todayGrossLoss.toLocaleString("fr-FR")}</strong>
+                      <strong className="text-rose-400">{isSuperAdmin ? `$${activeClient.todayGrossLoss.toLocaleString("fr-FR")}` : "••••••"}</strong>
                     </div>
                   </div>
 
@@ -3680,15 +3705,15 @@ function NexiumAdminDashboard({
                       </div>
                     </div>
                     <p className="text-2xl font-bold text-amber-300">
-                      {activeClient.profitFactor} <span className="text-xs font-normal text-slate-400 font-mono">Factor</span>
+                      {isSuperAdmin ? activeClient.profitFactor : "••••"} <span className="text-xs font-normal text-slate-400 font-mono">Factor</span>
                     </p>
                     <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Taux de Réussite :</span>
-                      <strong className="text-white">{activeClient.winRatePercent}%</strong>
+                      <strong className="text-white">{isSuperAdmin ? `${activeClient.winRatePercent}%` : "••••••"}</strong>
                     </div>
                     <div className="flex justify-between text-xs text-slate-300">
                       <span>Max Drawdown :</span>
-                      <strong className="text-amber-400">{activeClient.maxDrawdownPercent}%</strong>
+                      <strong className="text-amber-400">{isSuperAdmin ? `${activeClient.maxDrawdownPercent}%` : "••••••"}</strong>
                     </div>
                   </div>
                 </div>
@@ -3721,7 +3746,7 @@ function NexiumAdminDashboard({
                       {activeClient.withdrawalRequests.map((w) => (
                         <tr key={w.id} className="hover:bg-slate-800/40 transition-colors">
                           <td className="px-4 py-3.5 font-semibold text-white">{w.date}</td>
-                          <td className="px-4 py-3.5 font-bold text-amber-300 font-mono">${w.amount.toLocaleString("fr-FR")} USD</td>
+                          <td className="px-4 py-3.5 font-bold text-amber-300 font-mono">{isSuperAdmin ? `$${w.amount.toLocaleString("fr-FR")} USD` : "••••••"}</td>
                           <td className="px-4 py-3.5">
                             <span className="font-semibold text-white block">{w.method}</span>
                             <span className="text-xs text-slate-400">{w.destination}</span>
@@ -3742,20 +3767,24 @@ function NexiumAdminDashboard({
                           </td>
                           <td className="px-4 py-3.5 text-right space-x-2">
                             {w.status === "PENDING" ? (
-                              <>
-                                <button
-                                  onClick={() => handleApproveWithdrawal(w)}
-                                  className="admin-btn-primary text-xs sm:text-sm py-1.5 px-3.5 font-bold"
-                                >
-                                  Valider ✓
-                                </button>
-                                <button
-                                  onClick={() => handleRejectWithdrawal(w)}
-                                  className="rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-rose-400 cursor-pointer transition"
-                                >
-                                  Rejeter ✕
-                                </button>
-                              </>
+                              isSuperAdmin ? (
+                                <>
+                                  <button
+                                    onClick={() => handleApproveWithdrawal(w)}
+                                    className="admin-btn-primary text-xs sm:text-sm py-1.5 px-3.5 font-bold"
+                                  >
+                                    Valider ✓
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectWithdrawal(w)}
+                                    className="rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-rose-400 cursor-pointer transition"
+                                  >
+                                    Rejeter ✕
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-xs text-slate-400 font-mono">Validation Direction</span>
+                              )
                             ) : (
                               <span className="text-xs sm:text-sm text-slate-400 font-mono">
                                 {w.processedBy ? `Traité par ${w.processedBy}` : "Traité"}
@@ -3782,7 +3811,7 @@ function NexiumAdminDashboard({
 
                   <div className="text-right font-mono">
                     <span className="text-xs sm:text-sm text-slate-300 uppercase block">Solde Actuel :</span>
-                    <strong className="text-xl sm:text-2xl font-bold text-emerald-400">${activeClient.balance.toLocaleString("fr-FR")} USD</strong>
+                    <strong className="text-xl sm:text-2xl font-bold text-emerald-400">{isSuperAdmin ? `$${activeClient.balance.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
                   </div>
                 </div>
 
@@ -3801,7 +3830,7 @@ function NexiumAdminDashboard({
                       {activeClient.depositRequests.map((d) => (
                         <tr key={d.id} className="hover:bg-slate-800/40 transition-colors">
                           <td className="px-4 py-3.5 font-semibold text-white">{d.date}</td>
-                          <td className="px-4 py-3.5 font-bold text-emerald-400 font-mono">+${d.amount.toLocaleString("fr-FR")} USD</td>
+                          <td className="px-4 py-3.5 font-bold text-emerald-400 font-mono">{isSuperAdmin ? `+$${d.amount.toLocaleString("fr-FR")} USD` : "••••••"}</td>
                           <td className="px-4 py-3.5">
                             <span className="font-semibold text-white block">{d.method}</span>
                             <span className="text-xs text-slate-400 font-mono">Réf: {d.reference}</span>
@@ -3813,12 +3842,16 @@ function NexiumAdminDashboard({
                           </td>
                           <td className="px-4 py-3.5 text-right">
                             {d.status === "PENDING" ? (
-                              <button
-                                onClick={() => handleApproveDeposit(d)}
-                                className="admin-btn-primary text-xs sm:text-sm py-1.5 px-3.5 font-bold"
-                              >
-                                Valider &amp; Créditer ✓
-                              </button>
+                              isSuperAdmin ? (
+                                <button
+                                  onClick={() => handleApproveDeposit(d)}
+                                  className="admin-btn-primary text-xs sm:text-sm py-1.5 px-3.5 font-bold"
+                                >
+                                  Valider &amp; Créditer ✓
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400 font-mono">Validation Direction</span>
+                              )
                             ) : (
                               <span className="text-xs sm:text-sm text-slate-400 font-mono">
                                 {d.creditedBy ? `Crédité par ${d.creditedBy}` : "Validé"}
@@ -4080,111 +4113,125 @@ function NexiumAdminDashboard({
               </section>
 
               {/* ── 8. CRÉDIT / DÉBIT FINANCIER & AJUSTEMENT DU P&L ── */}
-              <section className="admin-card-amber p-6 sm:p-7 space-y-6">
-                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5 border-b border-slate-700/50 pb-4">
-                  <Wallet className="size-5 text-amber-400" />
-                  Gestion Financière &amp; Ajustements P&amp;L du Desk
-                </h2>
+              {isSuperAdmin ? (
+                <section className="admin-card-amber p-6 sm:p-7 space-y-6">
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5 border-b border-slate-700/50 pb-4">
+                    <Wallet className="size-5 text-amber-400" />
+                    Gestion Financière &amp; Ajustements P&amp;L du Desk
+                  </h2>
 
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <form onSubmit={handleCreditOrDebit} className="p-5 sm:p-6 rounded-2xl border border-slate-700/50 bg-[#0c121e] space-y-4">
-                    <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-                      <DollarSign className="size-4.5 text-amber-400" />
-                      Opération Directe de Solde
-                    </h3>
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <form onSubmit={handleCreditOrDebit} className="p-5 sm:p-6 rounded-2xl border border-slate-700/50 bg-[#0c121e] space-y-4">
+                      <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                        <DollarSign className="size-4.5 text-amber-400" />
+                        Opération Directe de Solde
+                      </h3>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">TYPE D'OPÉRATION</label>
-                        <AdminDropdown
-                          value={creditType}
-                          onChange={setCreditType}
-                          options={[
-                            { value: "DEPOSIT", label: "Créditer Dépôt Réel (+)" },
-                            { value: "BONUS", label: "Attribuer Bonus (+)" },
-                            { value: "DEBIT", label: "Débit Forcé (-)" },
-                          ]}
-                        />
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">TYPE D'OPÉRATION</label>
+                          <AdminDropdown
+                            value={creditType}
+                            onChange={setCreditType}
+                            options={[
+                              { value: "DEPOSIT", label: "Créditer Dépôt Réel (+)" },
+                              { value: "BONUS", label: "Attribuer Bonus (+)" },
+                              { value: "DEBIT", label: "Débit Forcé (-)" },
+                            ]}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MONTANT ($ USD)</label>
+                          <input
+                            type="number"
+                            value={creditAmountInput}
+                            onChange={(e) => setCreditAmountInput(e.target.value)}
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white font-mono font-bold outline-none focus:border-amber-400"
+                          />
+                        </div>
                       </div>
 
                       <div>
-                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MONTANT ($ USD)</label>
+                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MOTIF DE L'OPÉRATION</label>
                         <input
-                          type="number"
-                          value={creditAmountInput}
-                          onChange={(e) => setCreditAmountInput(e.target.value)}
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white font-mono font-bold outline-none focus:border-amber-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MOTIF DE L'OPÉRATION</label>
-                      <input
-                        type="text"
-                        value={creditNote}
-                        onChange={(e) => setCreditNote(e.target.value)}
-                        className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-xs sm:text-sm text-white outline-none"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full admin-btn-primary py-3 text-sm font-bold"
-                    >
-                      Exécuter l'Écriture Financière ($)
-                    </button>
-                  </form>
-
-                  <form onSubmit={handleApplyPnlAdjustment} className="p-5 sm:p-6 rounded-2xl border border-amber-500/30 bg-[#0c121e] space-y-4">
-                    <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-                      <Scale className="size-4.5 text-amber-400" />
-                      Ajustement P&amp;L / Pertes ou Gains du Jour
-                    </h3>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">DIRECTION</label>
-                        <AdminDropdown
-                          value={pnlAdjustDirection}
-                          onChange={setPnlAdjustDirection}
-                          options={[
-                            { value: "PROFIT", label: "Ajouter Gain (+)" },
-                            { value: "LOSS", label: "Appliquer Perte (-)" },
-                          ]}
+                          type="text"
+                          value={creditNote}
+                          onChange={(e) => setCreditNote(e.target.value)}
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-xs sm:text-sm text-white outline-none"
                         />
                       </div>
 
+                      <button
+                        type="submit"
+                        className="w-full admin-btn-primary py-3 text-sm font-bold"
+                      >
+                        Exécuter l'Écriture Financière ($)
+                      </button>
+                    </form>
+
+                    <form onSubmit={handleApplyPnlAdjustment} className="p-5 sm:p-6 rounded-2xl border border-amber-500/30 bg-[#0c121e] space-y-4">
+                      <h3 className="text-sm sm:text-base font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+                        <Scale className="size-4.5 text-amber-400" />
+                        Ajustement P&amp;L / Pertes ou Gains du Jour
+                      </h3>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">DIRECTION</label>
+                          <AdminDropdown
+                            value={pnlAdjustDirection}
+                            onChange={setPnlAdjustDirection}
+                            options={[
+                              { value: "PROFIT", label: "Ajouter Gain (+)" },
+                              { value: "LOSS", label: "Appliquer Perte (-)" },
+                            ]}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MONTANT ($ USD)</label>
+                          <input
+                            type="number"
+                            value={pnlAdjustAmount}
+                            onChange={(e) => setPnlAdjustAmount(e.target.value)}
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white font-mono font-bold outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      </div>
+
                       <div>
-                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MONTANT ($ USD)</label>
+                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MOTIF DE L'AJUSTEMENT</label>
                         <input
-                          type="number"
-                          value={pnlAdjustAmount}
-                          onChange={(e) => setPnlAdjustAmount(e.target.value)}
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white font-mono font-bold outline-none focus:border-amber-400"
+                          type="text"
+                          value={pnlAdjustReason}
+                          onChange={(e) => setPnlAdjustReason(e.target.value)}
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-xs sm:text-sm text-white outline-none"
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MOTIF DE L'AJUSTEMENT</label>
-                      <input
-                        type="text"
-                        value={pnlAdjustReason}
-                        onChange={(e) => setPnlAdjustReason(e.target.value)}
-                        className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-xs sm:text-sm text-white outline-none"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full rounded-xl bg-amber-400 hover:bg-amber-500 py-3 text-sm font-bold text-slate-950 uppercase tracking-wider transition cursor-pointer shadow-md"
-                    >
-                      Appliquer l'Ajustement de P&amp;L
-                    </button>
-                  </form>
-                </div>
-              </section>
+                      <button
+                        type="submit"
+                        className="w-full rounded-xl bg-amber-400 hover:bg-amber-500 py-3 text-sm font-bold text-slate-950 uppercase tracking-wider transition cursor-pointer shadow-md"
+                      >
+                        Appliquer l'Ajustement de P&amp;L
+                      </button>
+                    </form>
+                  </div>
+                </section>
+              ) : (
+                <section className="p-6 rounded-2xl border border-slate-700/50 bg-[#0c121e] text-center space-y-2">
+                  <div className="size-10 rounded-xl bg-amber-500/10 text-amber-400 grid place-items-center mx-auto">
+                    <Lock className="size-5" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                    Opérations Financières Restreintes
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Les opérations de crédit/débit et les ajustements de P&amp;L sont réservés exclusivement à la Direction (SUPER_ADMIN et OWNER).
+                  </p>
+                </section>
+              )}
 
               {/* ── 9. JOURNAL DES TRADES EN TEMPS RÉEL ── */}
               <section className="admin-card-emerald p-6 sm:p-7 space-y-5">
@@ -4194,18 +4241,20 @@ function NexiumAdminDashboard({
                     Journal des Trades en Direct &amp; Fixation P&amp;L du Jour
                   </h2>
 
-                  <form onSubmit={handleSetExactTodayPnl} className="flex items-center gap-2.5 font-mono">
-                    <span className="text-xs sm:text-sm text-slate-400 uppercase font-bold">Fixer P&amp;L ($):</span>
-                    <input
-                      type="number"
-                      value={exactPnlInput}
-                      onChange={(e) => setExactPnlInput(e.target.value)}
-                      className="w-28 rounded-lg border border-slate-700/60 bg-[#0c121e] px-2.5 py-1.5 text-xs sm:text-sm text-emerald-400 font-bold outline-none"
-                    />
-                    <button type="submit" className="admin-btn-primary text-xs py-1.5 px-3.5 font-bold">
-                      Fixer
-                    </button>
-                  </form>
+                  {isSuperAdmin && (
+                    <form onSubmit={handleSetExactTodayPnl} className="flex items-center gap-2.5 font-mono">
+                      <span className="text-xs sm:text-sm text-slate-400 uppercase font-bold">Fixer P&amp;L ($):</span>
+                      <input
+                        type="number"
+                        value={exactPnlInput}
+                        onChange={(e) => setExactPnlInput(e.target.value)}
+                        className="w-28 rounded-lg border border-slate-700/60 bg-[#0c121e] px-2.5 py-1.5 text-xs sm:text-sm text-emerald-400 font-bold outline-none"
+                      />
+                      <button type="submit" className="admin-btn-primary text-xs py-1.5 px-3.5 font-bold">
+                        Fixer
+                      </button>
+                    </form>
+                  )}
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
@@ -6455,6 +6504,19 @@ function NexiumAdminDashboard({
           {/* 🌟 10. FINANCES & DÉPÔTS GLOBAUX (`finances`)                         */}
           {/* ===================================================================== */}
           {activeSection === "finances" && (
+            !isSuperAdmin ? (
+              <div className="p-8 rounded-2xl border border-slate-700/50 bg-[#0c121e] text-center space-y-3 animate-in fade-in">
+                <div className="size-12 rounded-2xl bg-amber-500/10 text-amber-400 grid place-items-center mx-auto">
+                  <Lock className="size-6" />
+                </div>
+                <h2 className="text-lg font-bold text-white uppercase tracking-wider font-mono">
+                  Accès Restreint — Trésorerie &amp; Finances
+                </h2>
+                <p className="text-sm text-slate-400 max-w-md mx-auto">
+                  Cette section contenant les actifs globaux sous gestion (AUM), les liquidités et les flux de trésorerie est réservée exclusivement au Super Administrateur et au Fondateur (OWNER).
+                </p>
+              </div>
+            ) : (
             <div className="space-y-6 animate-in fade-in">
               <div className="border-b border-slate-700/50 pb-5">
                 <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
@@ -6529,6 +6591,7 @@ function NexiumAdminDashboard({
                 </div>
               </div>
             </div>
+            )
           )}
 
           {/* ===================================================================== */}
