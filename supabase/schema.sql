@@ -40,6 +40,12 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_primary_owner BOOLEAN NO
 -- l'activation par moteur reste pilotée individuellement via engines_config.
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS requested_presets TEXT[] DEFAULT '{}';
 
+-- Nouveaux rôles Owner A+ / Owner B+ — le CHECK inline de CREATE TABLE ne
+-- s'applique jamais rétroactivement à une table déjà existante en prod.
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
+    CHECK (role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT', 'TRADER'));
+
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_single_primary_owner
     ON public.profiles (is_primary_owner)
     WHERE is_primary_owner;
@@ -290,6 +296,12 @@ CREATE TABLE IF NOT EXISTS public.role_permissions (
     can_view_treasury BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Idem : la table role_permissions existe déjà en prod depuis la migration
+-- précédente, avec l'ancien CHECK à 7 rôles.
+ALTER TABLE public.role_permissions DROP CONSTRAINT IF EXISTS role_permissions_role_check;
+ALTER TABLE public.role_permissions ADD CONSTRAINT role_permissions_role_check
+    CHECK (role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT'));
 
 INSERT INTO public.role_permissions (role, can_chat_with_clients, can_send_emails, can_take_phone_calls, can_approve_finances, can_manage_engines, can_adjust_pnl, can_use_kill_switch, can_manage_staff, can_view_treasury)
 VALUES
