@@ -654,10 +654,10 @@ const EMAIL_NAV_ITEMS: { key: EmailConversationFilter; label: string; icon: type
 ];
 function matchesClient(c: UserProfile, q: string) {
   return (
-    c.name.toLowerCase().includes(q) ||
-    c.email.toLowerCase().includes(q) ||
-    String(c.mt5.login).includes(q) ||
-    c.mt5.broker.toLowerCase().includes(q)
+    (c.name || "").toLowerCase().includes(q) ||
+    (c.email || "").toLowerCase().includes(q) ||
+    String(c.mt5?.login || "").includes(q) ||
+    (c.mt5?.broker || "").toLowerCase().includes(q)
   );
 }
 function matchesStaff(s: StaffAdministrator, q: string) {
@@ -752,6 +752,14 @@ const FALLBACK_CLIENT: any = {
     aiGold: { active: true, preset: "AI_GOLD", maxLot: 1.0, minScore: 75, riskCapPercent: 2 },
     fxTrend: { active: true, preset: "FX_TREND", maxLot: 1.5, minScore: 70, riskCapPercent: 2 },
     indexReversion: { active: false, preset: "INDEX_REVERSION", maxLot: 0.5, minScore: 80, riskCapPercent: 1.5 },
+  },
+  mt5: {
+    login: "#NX-000000",
+    broker: "Nexium Prime ECN",
+    server: "Nexium-NY4-Equinix",
+    investorPass: "",
+    pingMs: 16,
+    status: "ONLINE",
   },
   maxDailyLossPercent: 3.0,
   maxSimultaneousTrades: 3,
@@ -976,7 +984,10 @@ function NexiumAdminDashboard({
   // Contacts filtrés pour la messagerie
   const filteredContacts = useMemo(() => {
     return clients.filter((c) => {
-      const matchSearch = c.name.toLowerCase().includes(searchContactQuery.toLowerCase()) || c.email.toLowerCase().includes(searchContactQuery.toLowerCase()) || c.mt5.login.includes(searchContactQuery);
+      const matchSearch =
+        (c.name || "").toLowerCase().includes(searchContactQuery.toLowerCase()) ||
+        (c.email || "").toLowerCase().includes(searchContactQuery.toLowerCase()) ||
+        String(c.mt5?.login || "").includes(searchContactQuery);
       return matchSearch;
     });
   }, [clients, searchContactQuery]);
@@ -1037,23 +1048,23 @@ function NexiumAdminDashboard({
   const [newPasswordInput, setNewPasswordInput] = useState("");
 
   // Presets Client
-  const [goldActive, setGoldActive] = useState(activeClient?.engines.aiGold.active ?? true);
-  const [goldPreset, setGoldPreset] = useState(activeClient?.engines.aiGold.preset ?? GOLD_PRESETS[0].name);
-  const [goldMaxLot, setGoldMaxLot] = useState(activeClient?.engines.aiGold.maxLot ?? 0.5);
+  const [goldActive, setGoldActive] = useState(activeClient?.engines?.aiGold?.active ?? true);
+  const [goldPreset, setGoldPreset] = useState(activeClient?.engines?.aiGold?.preset ?? GOLD_PRESETS[0].name);
+  const [goldMaxLot, setGoldMaxLot] = useState(activeClient?.engines?.aiGold?.maxLot ?? 0.5);
 
-  const [fxActive, setFxActive] = useState(activeClient?.engines.fxTrend.active ?? true);
-  const [fxPreset, setFxPreset] = useState(activeClient?.engines.fxTrend.preset ?? FX_PRESETS[0].name);
-  const [fxMaxLot, setFxMaxLot] = useState(activeClient?.engines.fxTrend.maxLot ?? 0.5);
+  const [fxActive, setFxActive] = useState(activeClient?.engines?.fxTrend?.active ?? true);
+  const [fxPreset, setFxPreset] = useState(activeClient?.engines?.fxTrend?.preset ?? FX_PRESETS[0].name);
+  const [fxMaxLot, setFxMaxLot] = useState(activeClient?.engines?.fxTrend?.maxLot ?? 0.5);
 
-  const [indexActive, setIndexActive] = useState(activeClient?.engines.indexReversion.active ?? true);
-  const [indexPreset, setIndexPreset] = useState(activeClient?.engines.indexReversion.preset ?? INDEX_PRESETS[0].name);
-  const [indexMaxLot, setIndexMaxLot] = useState(activeClient?.engines.indexReversion.maxLot ?? 0.5);
+  const [indexActive, setIndexActive] = useState(activeClient?.engines?.indexReversion?.active ?? true);
+  const [indexPreset, setIndexPreset] = useState(activeClient?.engines?.indexReversion?.preset ?? INDEX_PRESETS[0].name);
+  const [indexMaxLot, setIndexMaxLot] = useState(activeClient?.engines?.indexReversion?.maxLot ?? 0.5);
 
   // MT5 Client
-  const [mt5Login, setMt5Login] = useState(activeClient?.mt5.login || "");
-  const [mt5Broker, setMt5Broker] = useState(activeClient?.mt5.broker || "");
-  const [mt5Server, setMt5Server] = useState(activeClient?.mt5.server || "");
-  const [mt5InvestorPass, setMt5InvestorPass] = useState(activeClient?.mt5.investorPass || "");
+  const [mt5Login, setMt5Login] = useState(activeClient?.mt5?.login || "");
+  const [mt5Broker, setMt5Broker] = useState(activeClient?.mt5?.broker || "");
+  const [mt5Server, setMt5Server] = useState(activeClient?.mt5?.server || "");
+  const [mt5InvestorPass, setMt5InvestorPass] = useState(activeClient?.mt5?.investorPass || "");
 
   // Finances Client
   const [creditAmountInput, setCreditAmountInput] = useState("");
@@ -1141,22 +1152,22 @@ function NexiumAdminDashboard({
     setNewCrmNoteText("");
     setExactPnlInput(client.todayPnl.toString());
 
-    setGoldActive(client.engines.aiGold.active);
-    setGoldPreset(client.engines.aiGold.preset);
-    setGoldMaxLot(client.engines.aiGold.maxLot);
+    setGoldActive(client.engines?.aiGold?.active ?? true);
+    setGoldPreset(client.engines?.aiGold?.preset ?? GOLD_PRESETS[0].name);
+    setGoldMaxLot(client.engines?.aiGold?.maxLot ?? 0.5);
 
-    setFxActive(client.engines.fxTrend.active);
-    setFxPreset(client.engines.fxTrend.preset);
-    setFxMaxLot(client.engines.fxTrend.maxLot);
+    setFxActive(client.engines?.fxTrend?.active ?? true);
+    setFxPreset(client.engines?.fxTrend?.preset ?? FX_PRESETS[0].name);
+    setFxMaxLot(client.engines?.fxTrend?.maxLot ?? 0.5);
 
-    setIndexActive(client.engines.indexReversion.active);
-    setIndexPreset(client.engines.indexReversion.preset);
-    setIndexMaxLot(client.engines.indexReversion.maxLot);
+    setIndexActive(client.engines?.indexReversion?.active ?? true);
+    setIndexPreset(client.engines?.indexReversion?.preset ?? INDEX_PRESETS[0].name);
+    setIndexMaxLot(client.engines?.indexReversion?.maxLot ?? 0.5);
 
-    setMt5Login(client.mt5.login);
-    setMt5Broker(client.mt5.broker);
-    setMt5Server(client.mt5.server);
-    setMt5InvestorPass(client.mt5.investorPass || "");
+    setMt5Login(client.mt5?.login || "");
+    setMt5Broker(client.mt5?.broker || "");
+    setMt5Server(client.mt5?.server || "");
+    setMt5InvestorPass(client.mt5?.investorPass || "");
 
     setActiveSection("user-detail");
 
@@ -1244,12 +1255,12 @@ function NexiumAdminDashboard({
             maxSimultaneousTrades: editMaxPositions,
             riskGuardAutoStop: editRiskGuardAuto,
             engines: {
-              aiGold: { ...c.engines.aiGold, active: goldActive, preset: goldPreset, maxLot: goldMaxLot },
-              fxTrend: { ...c.engines.fxTrend, active: fxActive, preset: fxPreset, maxLot: fxMaxLot },
-              indexReversion: { ...c.engines.indexReversion, active: indexActive, preset: indexPreset, maxLot: indexMaxLot },
+              aiGold: { ...(c.engines?.aiGold || {}), active: goldActive, preset: goldPreset, maxLot: goldMaxLot },
+              fxTrend: { ...(c.engines?.fxTrend || {}), active: fxActive, preset: fxPreset, maxLot: fxMaxLot },
+              indexReversion: { ...(c.engines?.indexReversion || {}), active: indexActive, preset: indexPreset, maxLot: indexMaxLot },
             },
             mt5: {
-              ...c.mt5,
+              ...(c.mt5 || {}),
               login: mt5Login,
               broker: mt5Broker,
               server: mt5Server,
@@ -1491,7 +1502,7 @@ function NexiumAdminDashboard({
 
   // Validation & Activation d'un compte client par l'Administrateur
   const handleApprovePendingClient = async (client: UserProfile) => {
-    const assignedMt5 = client.mt5.login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`;
+    const assignedMt5 = client.mt5?.login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`;
 
     // 1. Mise à jour Supabase
     if (isSupabaseConfigured) {
@@ -1507,7 +1518,7 @@ function NexiumAdminDashboard({
             status: "ACTIVE",
             kycStatus: "VERIFIED",
             mt5: {
-              ...c.mt5,
+              ...(c.mt5 || {}),
               login: assignedMt5,
             },
           };
@@ -1571,7 +1582,7 @@ function NexiumAdminDashboard({
     sendCustomDeskEmail(
       client.email,
       `Activation de votre Stratégie Algorithmique (${finalPreset})`,
-      `Bonjour ${client.name},\n\nVotre demande d'activation pour le Preset Algorithmique [${finalPreset}] a été validée par la Direction des Opérations.\n\nVotre Dashboard de Trading en direct (flux Equinix NY4 FIX 4.4) est désormais déverrouillé et opérationnel sur votre compte MT5 #${client.mt5.login}.\n\nConnectez-vous dès maintenant pour suivre vos exécutions et vos performances en temps réel : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+      `Bonjour ${client.name},\n\nVotre demande d'activation pour le Preset Algorithmique [${finalPreset}] a été validée par la Direction des Opérations.\n\nVotre Dashboard de Trading en direct (flux Equinix NY4 FIX 4.4) est désormais déverrouillé et opérationnel sur votre compte MT5 #${client.mt5?.login || "—"}.\n\nConnectez-vous dès maintenant pour suivre vos exécutions et vos performances en temps réel : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
     ).catch((err) => console.warn("Resend email error:", err));
 
     addAuditLog(
@@ -2076,7 +2087,7 @@ function NexiumAdminDashboard({
           activeClient.email,
           activeClient.name,
           `$${deposit.amount.toLocaleString("fr-FR")} USD`,
-          activeClient.mt5.login
+          activeClient.mt5?.login || "—"
         ).then((res) => {
           if (res.success) {
             toast.success(`E-mail de confirmation de dépôt expédié à ${activeClient.email} via Resend.`);
@@ -2419,9 +2430,9 @@ function NexiumAdminDashboard({
             ...c,
             status: "SUSPENDED",
             engines: {
-              aiGold: { ...c.engines.aiGold, active: false },
-              fxTrend: { ...c.engines.fxTrend, active: false },
-              indexReversion: { ...c.engines.indexReversion, active: false },
+              aiGold: { ...(c.engines?.aiGold || {}), active: false },
+              fxTrend: { ...(c.engines?.fxTrend || {}), active: false },
+              indexReversion: { ...(c.engines?.indexReversion || {}), active: false },
             },
           }))
         );
@@ -2947,7 +2958,7 @@ function NexiumAdminDashboard({
           <div className="flex items-center gap-2.5">
             <span className="size-2.5 rounded-full bg-amber-400 animate-ping" />
             <span className="font-bold uppercase tracking-wide">
-              SUPERVISION LIVE : {impersonatedClient.name} (MT5 #{impersonatedClient.mt5.login})
+              SUPERVISION LIVE : {impersonatedClient.name} (MT5 #{impersonatedClient.mt5?.login || "—"})
             </span>
           </div>
 
@@ -3284,7 +3295,7 @@ function NexiumAdminDashboard({
                       <div className="font-sans">
                         <strong className="text-sm font-semibold text-white block">{c.name}</strong>
                         <span className="text-xs text-slate-400 font-mono">{c.email}</span>
-                        <span className="text-xs text-emerald-400 font-mono block mt-0.5">MT5 #{c.mt5.login} · {c.mt5.broker}</span>
+                        <span className="text-xs text-emerald-400 font-mono block mt-0.5">MT5 #{c.mt5?.login || "—"} · {c.mt5?.broker || "—"}</span>
                       </div>
                     ),
                   },
@@ -3544,7 +3555,7 @@ function NexiumAdminDashboard({
                       </AdminBadge>
                     </div>
                     <p className="text-xs font-mono text-slate-400 mt-1">
-                      ID: {activeClient.id} · MT5 #{activeClient.mt5.login} ({activeClient.mt5.broker}) · Conseiller: <strong className="text-emerald-400">{activeClient.assignedAdvisor}</strong>
+                      ID: {activeClient.id} · MT5 #{activeClient.mt5?.login || "—"} ({activeClient.mt5?.broker || "—"}) · Conseiller: <strong className="text-emerald-400">{activeClient.assignedAdvisor}</strong>
                     </p>
                   </div>
                 </div>
@@ -5565,7 +5576,7 @@ function NexiumAdminDashboard({
                                   {lastMsg ? (lastMsg.subject ?? lastMsg.text) : "Aucun message récent."}
                                 </p>
                                 <div className="flex items-center gap-2 text-xs font-mono">
-                                  <span className="text-emerald-400 font-semibold">MT5 #{c.mt5.login}</span>
+                                  <span className="text-emerald-400 font-semibold">MT5 #{c.mt5?.login || "—"}</span>
                                   <span className="text-slate-600">·</span>
                                   <span className="text-slate-400">${c.balance.toLocaleString("fr-FR")}</span>
                                 </div>
