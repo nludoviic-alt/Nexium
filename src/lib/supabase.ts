@@ -46,7 +46,7 @@ export interface SupabaseUserProfile {
   email: string;
   name: string;
   phone?: string;
-  role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
+  role: "OWNER" | "OWNER_A_PLUS" | "OWNER_B_PLUS" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
   status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "BANNED" | "REVOKED";
   kyc_status: "VERIFIED" | "PENDING" | "REJECTED" | "NOT_SUBMITTED";
   /** Vrai uniquement pour le compte Super Owner protégé (au plus un seul profil, imposé côté DB). */
@@ -271,7 +271,7 @@ export async function getAllStaffProfiles(): Promise<SupabaseUserProfile[]> {
    individuellement par membre du staff, qui n'avaient aucun effet réel)
    ========================================================================== */
 
-export type StaffRole = "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
+export type StaffRole = "OWNER" | "OWNER_A_PLUS" | "OWNER_B_PLUS" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
 
 export interface RolePermissions {
   role: StaffRole;
@@ -529,7 +529,7 @@ export async function inviteUser(params: {
   name: string;
   email: string;
   phone?: string;
-  role: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
+  role: "OWNER" | "OWNER_A_PLUS" | "OWNER_B_PLUS" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
 }): Promise<{ success: boolean; error?: string }> {
   return callAdminApi("/api/admin/invite-user", params);
 }

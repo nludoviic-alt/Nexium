@@ -180,7 +180,7 @@ export const Route = createFileRoute("/composition")({
   component: CompositionAccessGate,
 });
 
-const ADMIN_CONSOLE_ROLES: ReadonlyArray<string> = ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
+const ADMIN_CONSOLE_ROLES: ReadonlyArray<string> = ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
 
 /**
  * Garde d'accès de /composition / /desk/$slug. Le build étant statique,
@@ -333,7 +333,7 @@ export function CompositionAccessGate({ customAdminSlug }: { customAdminSlug?: s
 /* TYPES & MODÈLES DE DONNÉES                                                */
 /* ========================================================================= */
 
-type AdminSystemRole = "OWNER" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
+type AdminSystemRole = "OWNER" | "OWNER_A_PLUS" | "OWNER_B_PLUS" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
 type AccountStatus = "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "REVOKED" | "BANNED";
 type KycStatus = "VERIFIED" | "PENDING_REVIEW" | "REJECTED" | "NOT_SUBMITTED";
 
@@ -697,8 +697,17 @@ interface DropdownOption<T> {
   badge?: string;
 }
 
+/** Libellé lisible d'un rôle (OWNER_A_PLUS -> "Owner A+", etc.) */
+function roleLabel(role: string): string {
+  if (role === "OWNER_A_PLUS") return "Owner A+";
+  if (role === "OWNER_B_PLUS") return "Owner B+";
+  return role.replace(/_/g, " ");
+}
+
 const STAFF_ROLE_OPTIONS: DropdownOption<AdminSystemRole>[] = [
   { value: "OWNER", label: "Owner", badge: "Fondateur" },
+  { value: "OWNER_A_PLUS", label: "Owner A+", badge: "Co-Fondateur" },
+  { value: "OWNER_B_PLUS", label: "Owner B+", badge: "Co-Fondateur" },
   { value: "SUPER_ADMIN", label: "Super Admin", badge: "Direction" },
   { value: "ADMIN", label: "Admin", badge: "Général" },
   { value: "CONSEILLER", label: "Conseiller", badge: "Compte Privé" },
@@ -907,7 +916,11 @@ function NexiumAdminDashboard({
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
 
   // Détection des privilèges Super Admin et Conseiller
-  const isSuperAdmin = currentSessionRole === "SUPER_ADMIN" || currentSessionRole === "OWNER";
+  const isSuperAdmin =
+    currentSessionRole === "SUPER_ADMIN" ||
+    currentSessionRole === "OWNER" ||
+    currentSessionRole === "OWNER_A_PLUS" ||
+    currentSessionRole === "OWNER_B_PLUS";
   const currentStaffMember = useMemo(() => staffList.find((s) => s.role === currentSessionRole), [staffList, currentSessionRole]);
   const [advisorFilter, setAdvisorFilter] = useState<string>("ALL");
 
@@ -936,7 +949,7 @@ function NexiumAdminDashboard({
   );
 
   // Page "Niveaux d'Accès" — édition du jeu de permissions d'un rôle
-  const ALL_STAFF_ROLES: StaffRole[] = ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
+  const ALL_STAFF_ROLES: StaffRole[] = ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
   const [accessLevelsSelectedRole, setAccessLevelsSelectedRole] = useState<StaffRole>("ADMIN");
   const [draftRolePerms, setDraftRolePerms] = useState<Omit<RolePermissions, "role"> | null>(null);
   const [savingRolePerms, setSavingRolePerms] = useState(false);
@@ -1490,7 +1503,7 @@ function NexiumAdminDashboard({
 
   // Synchronisation du staff réel depuis Supabase (tout profil hors rôle TRADER)
   const staffDepartmentForRole = (role: AdminSystemRole): StaffAdministrator["department"] => {
-    if (role === "OWNER" || role === "SUPER_ADMIN") return "Direction Générale";
+    if (role === "OWNER" || role === "OWNER_A_PLUS" || role === "OWNER_B_PLUS" || role === "SUPER_ADMIN") return "Direction Générale";
     if (role === "FINANCE") return "Gestion Financière";
     if (role === "QUANT") return "Recherche Quantitative";
     if (role === "CONSEILLER" || role === "SUPPORT") return "Desk Support & Conseillers";
@@ -1823,8 +1836,8 @@ function NexiumAdminDashboard({
       return;
     }
 
-    if (newStaffRole === "OWNER" && !isPrimaryOwner) {
-      toast.error("Seul le Super Owner peut désigner ou créer un rôle OWNER.");
+    if (["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(newStaffRole) && !isPrimaryOwner) {
+      toast.error("Seul le Super Owner peut désigner ou créer ce rôle.");
       return;
     }
 
@@ -1894,14 +1907,20 @@ function NexiumAdminDashboard({
       return;
     }
 
-    // Protection Souveraineté : Seul le OWNER peut modifier un compte OWNER
-    if (editingStaffMember.role === "OWNER" && currentSessionRole !== "OWNER") {
-      toast.error("Action refusée : Seul le Propriétaire (OWNER) peut modifier le compte Fondateur.");
+    // Protection Souveraineté : un Owner simple ne peut être modifié que par
+    // lui-même, un Owner A+/B+, ou le Super Owner.
+    if (
+      editingStaffMember.role === "OWNER" &&
+      currentSessionRole !== "OWNER" &&
+      currentSessionRole !== "OWNER_A_PLUS" &&
+      currentSessionRole !== "OWNER_B_PLUS"
+    ) {
+      toast.error("Action refusée : seul un Owner, un Owner A+/B+ ou le Super Owner peut modifier le compte Fondateur.");
       return;
     }
 
-    if (editStaffRole === "OWNER" && editStaffRole !== editingStaffMember.role && !isPrimaryOwner) {
-      toast.error("Seul le Super Owner peut promouvoir un membre du staff au rôle OWNER.");
+    if (["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(editStaffRole) && editStaffRole !== editingStaffMember.role && !isPrimaryOwner) {
+      toast.error("Seul le Super Owner peut promouvoir un membre du staff à ce rôle.");
       return;
     }
 
@@ -1988,12 +2007,24 @@ function NexiumAdminDashboard({
       toast.error("Compte Super Owner protégé : suppression impossible, y compris pour vous-même.");
       return;
     }
-    // Seul le Super Owner peut supprimer un compte OWNER — un OWNER ne peut
-    // pas en supprimer un autre (protection de souveraineté, appliquée aussi
-    // côté base via la policy profiles_delete).
-    if (st.role === "OWNER" && !isPrimaryOwner) {
-      toast.error("Action impossible : seul le Super Owner peut supprimer un compte Propriétaire (OWNER).");
-      return;
+    // Hiérarchie à 3 paliers (appliquée aussi côté base via la policy
+    // profiles_delete) :
+    //  - Super Owner : peut supprimer tout le monde.
+    //  - Owner A+ / Owner B+ : peuvent supprimer un Owner simple et tous les
+    //    rôles en dessous, mais pas se supprimer l'un l'autre.
+    //  - Owner / Super Admin : ne peuvent supprimer ni un Owner A+/B+, ni un
+    //    autre Owner (comportement historique, inchangé).
+    if (!isPrimaryOwner) {
+      const callerIsAPlusOrBPlus = currentSessionRole === "OWNER_A_PLUS" || currentSessionRole === "OWNER_B_PLUS";
+      const targetIsAPlusOrBPlus = st.role === "OWNER_A_PLUS" || st.role === "OWNER_B_PLUS";
+      if (targetIsAPlusOrBPlus) {
+        toast.error("Action impossible : seul le Super Owner peut supprimer un compte Owner A+/B+.");
+        return;
+      }
+      if (st.role === "OWNER" && !callerIsAPlusOrBPlus) {
+        toast.error("Action impossible : seul le Super Owner ou un Owner A+/B+ peut supprimer un compte Propriétaire (OWNER).");
+        return;
+      }
     }
     requestConfirmation(
       `Supprimer le membre du staff ${st.name} ?`,
@@ -3168,7 +3199,7 @@ function NexiumAdminDashboard({
                 <span className="size-1.5 rounded-full bg-emerald-400"></span>
               </div>
               <span className="text-[10px] font-mono text-slate-400 block">
-                {isPrimaryOwner ? "Super Owner" : currentSessionRole.replace("_", " ")}
+                {isPrimaryOwner ? "Super Owner" : roleLabel(currentSessionRole)}
               </span>
             </div>
             <ShieldCheck className="size-4 text-slate-400 group-hover:text-emerald-400 transition-colors ml-1" />
@@ -3251,7 +3282,7 @@ function NexiumAdminDashboard({
                     } as const,
                   ]
                 : []),
-              ...(isSuperAdmin
+              ...(isPrimaryOwner
                 ? [
                     {
                       key: "access-levels",
@@ -4653,7 +4684,7 @@ function NexiumAdminDashboard({
           {/* ===================================================================== */}
           {/* 🌟 NIVEAUX D'ACCÈS PAR RÔLE (`access-levels`)                         */}
           {/* ===================================================================== */}
-          {activeSection === "access-levels" && isSuperAdmin && (
+          {activeSection === "access-levels" && isPrimaryOwner && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="border-b border-slate-700/50 pb-5">
                 <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
@@ -4683,7 +4714,7 @@ function NexiumAdminDashboard({
                         }`}
                       >
                         <span className={`text-sm font-bold ${accessLevelsSelectedRole === role ? "text-emerald-300" : "text-white"}`}>
-                          {role.replace("_", " ")}
+                          {roleLabel(role)}
                         </span>
                         <span className="text-[11px] font-mono text-slate-400">
                           {count} {count > 1 ? "personnes" : "personne"}
@@ -4698,7 +4729,7 @@ function NexiumAdminDashboard({
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-700/50 pb-4">
                     <div>
                       <h2 className="text-base sm:text-lg font-bold text-white uppercase font-mono tracking-wider">
-                        Permissions : {accessLevelsSelectedRole.replace("_", " ")}
+                        Permissions : {roleLabel(accessLevelsSelectedRole)}
                       </h2>
                       <p className="text-xs text-slate-300 mt-1">
                         S'applique instantanément à {staffList.filter((s) => s.role === accessLevelsSelectedRole).length} collaborateur(s) de ce rôle.
@@ -4782,7 +4813,7 @@ function NexiumAdminDashboard({
                         variant={currentSessionRole === "OWNER" ? "amber" : currentSessionRole === "SUPER_ADMIN" ? "purple" : "emerald"}
                         dot={true}
                       >
-                        {currentSessionRole === "OWNER" ? "👑 OWNER (Maître)" : currentSessionRole.replace("_", " ")}
+                        {currentSessionRole === "OWNER" ? "👑 OWNER (Maître)" : roleLabel(currentSessionRole)}
                       </AdminBadge>
                     </div>
                   </div>
@@ -4961,7 +4992,7 @@ function NexiumAdminDashboard({
                                 }
                                 dot={false}
                               >
-                                {st.role === "OWNER" ? "👑 OWNER" : st.role.replace("_", " ")}
+                                {st.role === "OWNER" ? "👑 OWNER" : roleLabel(st.role)}
                               </AdminBadge>
                               <span className="text-xs sm:text-sm text-slate-300 font-sans block mt-1">{st.department}</span>
                             </div>
@@ -5120,7 +5151,7 @@ function NexiumAdminDashboard({
                             }
                             dot={true}
                           >
-                            {editingStaffMember.role === "OWNER" ? "👑 OWNER (Propriétaire)" : editingStaffMember.role.replace("_", " ")}
+                            {editingStaffMember.role === "OWNER" ? "👑 OWNER (Propriétaire)" : roleLabel(editingStaffMember.role)}
                           </AdminBadge>
                           <AdminBadge variant={editStaffStatus === "ACTIVE" ? "emerald" : "amber"}>
                             {editStaffStatus}
@@ -5285,7 +5316,7 @@ function NexiumAdminDashboard({
                             Les permissions sont désormais définies par rôle, pas par individu — tout collaborateur {editStaffRole} a exactement les mêmes.
                           </p>
                         </div>
-                        {isSuperAdmin && (
+                        {isPrimaryOwner && (
                           <button
                             type="button"
                             onClick={() => setActiveSection("access-levels")}
@@ -6440,7 +6471,7 @@ function NexiumAdminDashboard({
                                 : "emerald"
                             }
                           >
-                            {v.role.replace("_", " ")}
+                            {roleLabel(v.role)}
                           </AdminBadge>
                         </div>
                         <span className="text-xs text-slate-400 block mt-0.5">{v.device}</span>

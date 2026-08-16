@@ -65,7 +65,7 @@ function LoginPage() {
           const profile = await getUserProfile(data.user.id);
 
           // Vérification du rôle Administrateur
-          if (profile?.role && ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role)) {
+          if (profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role)) {
             const adminSlug = getAdminSlug({ name: profile.name, email: data.user.email, id: data.user.id });
             toast.success(`Connexion Desk confirmée. Bienvenue, ${profile.name || data.user.email} !`);
             navigate({ to: "/desk/$slug", params: { slug: adminSlug } });

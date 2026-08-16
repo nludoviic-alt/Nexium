@@ -5185,7 +5185,7 @@ export function NexiumDashboard({
       setClientEmail(user.email || "investisseur@nexiummarkets.com");
       const profile = await getUserProfile(user.id);
 
-      const isAdmin = profile?.role && ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
+      const isAdmin = profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
 
       // Verrouillage formel : si le compte n'est pas actif et n'est pas admin, bloquer l'accès
       if (!isAdmin) {

@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     phone TEXT,
-    role TEXT NOT NULL DEFAULT 'TRADER' CHECK (role IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT', 'TRADER')),
+    role TEXT NOT NULL DEFAULT 'TRADER' CHECK (role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT', 'TRADER')),
     status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
     kyc_status TEXT NOT NULL DEFAULT 'NOT_SUBMITTED' CHECK (kyc_status IN ('VERIFIED', 'PENDING', 'REJECTED', 'NOT_SUBMITTED')),
     mt5_login TEXT,
@@ -278,7 +278,7 @@ $$;
 -- anciennes permissions cochées individuellement par membre du staff, qui
 -- n'étaient qu'un affichage sans aucun effet réel).
 CREATE TABLE IF NOT EXISTS public.role_permissions (
-    role TEXT PRIMARY KEY CHECK (role IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT')),
+    role TEXT PRIMARY KEY CHECK (role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT')),
     can_chat_with_clients BOOLEAN NOT NULL DEFAULT FALSE,
     can_send_emails BOOLEAN NOT NULL DEFAULT FALSE,
     can_take_phone_calls BOOLEAN NOT NULL DEFAULT FALSE,
@@ -293,8 +293,10 @@ CREATE TABLE IF NOT EXISTS public.role_permissions (
 
 INSERT INTO public.role_permissions (role, can_chat_with_clients, can_send_emails, can_take_phone_calls, can_approve_finances, can_manage_engines, can_adjust_pnl, can_use_kill_switch, can_manage_staff, can_view_treasury)
 VALUES
-    ('OWNER',       TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
-    ('SUPER_ADMIN', TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+    ('OWNER',        TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+    ('OWNER_A_PLUS', TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+    ('OWNER_B_PLUS', TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
+    ('SUPER_ADMIN',  TRUE, TRUE, TRUE, TRUE,  TRUE,  TRUE,  TRUE,  TRUE,  TRUE),
     ('ADMIN',       TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
     ('CONSEILLER',  TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
     ('SUPPORT',     TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
@@ -307,8 +309,11 @@ DROP POLICY IF EXISTS "role_permissions_select" ON public.role_permissions;
 DROP POLICY IF EXISTS "role_permissions_write" ON public.role_permissions;
 CREATE POLICY "role_permissions_select" ON public.role_permissions
     FOR SELECT USING (public.get_my_role() IS NOT NULL);
+-- Réservé strictement au Super Owner (is_primary_owner), pas aux autres OWNER
+-- ni SUPER_ADMIN — la page "Niveaux d'Accès" ne doit être ni visible ni
+-- modifiable par qui que ce soit d'autre.
 CREATE POLICY "role_permissions_write" ON public.role_permissions
-    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN')) WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN'));
+    FOR ALL USING (public.am_i_primary_owner()) WITH CHECK (public.am_i_primary_owner());
 
 -- 10. PROTECTION DES COLONNES SENSIBLES DE PROFILES ET DU SUPER OWNER
 CREATE OR REPLACE FUNCTION public.protect_privileged_profile_fields()
@@ -329,8 +334,8 @@ BEGIN
   caller_is_primary_owner := COALESCE(caller_is_primary_owner, FALSE);
 
   IF TG_OP = 'INSERT' THEN
-    IF NEW.role = 'OWNER' AND NOT caller_is_primary_owner THEN
-      RAISE EXCEPTION 'Seul le Super Owner peut attribuer le rôle OWNER.';
+    IF NEW.role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS') AND NOT caller_is_primary_owner THEN
+      RAISE EXCEPTION 'Seul le Super Owner peut attribuer ce rôle.';
     END IF;
     IF NEW.is_primary_owner AND NOT caller_is_primary_owner THEN
       RAISE EXCEPTION 'Le statut de Super Owner ne peut être attribué que manuellement en base.';
@@ -338,8 +343,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF NEW.role = 'OWNER' AND NEW.role IS DISTINCT FROM OLD.role AND NOT caller_is_primary_owner THEN
-    RAISE EXCEPTION 'Seul le Super Owner peut attribuer le rôle OWNER.';
+  IF NEW.role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS') AND NEW.role IS DISTINCT FROM OLD.role AND NOT caller_is_primary_owner THEN
+    RAISE EXCEPTION 'Seul le Super Owner peut attribuer ce rôle.';
   END IF;
 
   IF NEW.is_primary_owner AND NOT OLD.is_primary_owner AND NOT caller_is_primary_owner THEN
@@ -371,7 +376,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF public.get_my_role() NOT IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER') THEN
+  IF public.get_my_role() NOT IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER') THEN
     NEW.role := OLD.role;
     NEW.status := OLD.status;
     NEW.kyc_status := OLD.kyc_status;
@@ -459,11 +464,11 @@ DROP POLICY IF EXISTS "profiles_update" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_delete" ON public.profiles;
 
 CREATE POLICY "profiles_select" ON public.profiles
-    FOR SELECT USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
+    FOR SELECT USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
 
 CREATE POLICY "profiles_insert" ON public.profiles
     FOR INSERT WITH CHECK (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN')
         OR (
             auth.uid() = id
             AND role = 'TRADER'
@@ -474,18 +479,24 @@ CREATE POLICY "profiles_insert" ON public.profiles
     );
 
 CREATE POLICY "profiles_update" ON public.profiles
-    FOR UPDATE USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'))
-    WITH CHECK (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
+    FOR UPDATE USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'))
+    WITH CHECK (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
 
--- Suppression : jamais le Super Owner. Un OWNER/SUPER_ADMIN peut supprimer
--- n'importe quel profil SAUF un autre OWNER — seul le Super Owner peut
--- supprimer un compte OWNER (protection de souveraineté).
+-- Suppression : hiérarchie à 3 paliers, jamais le Super Owner.
+--   Palier 0 (Super Owner)            : peut supprimer tout le monde.
+--   Palier 1 (OWNER_A_PLUS/B_PLUS)    : peut supprimer tout le monde SAUF
+--                                        le Super Owner et l'autre A+/B+.
+--   Palier 2 (OWNER, SUPER_ADMIN)     : peut supprimer tout le monde SAUF
+--                                        le Super Owner, A+/B+, et un autre
+--                                        OWNER/SUPER_ADMIN (comportement
+--                                        historique, inchangé).
 CREATE POLICY "profiles_delete" ON public.profiles
     FOR DELETE USING (
         NOT is_primary_owner
         AND (
-            (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN') AND role <> 'OWNER')
-            OR public.am_i_primary_owner()
+            public.am_i_primary_owner()
+            OR (public.get_my_role() IN ('OWNER_A_PLUS', 'OWNER_B_PLUS') AND role NOT IN ('OWNER_A_PLUS', 'OWNER_B_PLUS'))
+            OR (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN') AND role NOT IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS'))
         )
     );
 
@@ -495,7 +506,7 @@ DROP POLICY IF EXISTS "transactions_insert_client" ON public.transactions;
 DROP POLICY IF EXISTS "transactions_staff_write" ON public.transactions;
 
 CREATE POLICY "transactions_select" ON public.transactions
-    FOR SELECT USING (auth.uid() = user_id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
+    FOR SELECT USING (auth.uid() = user_id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
 
 -- Les clients peuvent créer leurs propres demandes de dépôt et de retrait (statut PENDING imposé)
 CREATE POLICY "transactions_insert_client" ON public.transactions
@@ -506,8 +517,8 @@ CREATE POLICY "transactions_insert_client" ON public.transactions
     );
 
 CREATE POLICY "transactions_staff_write" ON public.transactions
-    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'))
-    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
 
 -- Politiques LIVE_CHAT_THREADS (Accessible aux visiteurs et au staff)
 DROP POLICY IF EXISTS "live_chat_threads_select" ON public.live_chat_threads;
@@ -537,7 +548,7 @@ DROP POLICY IF EXISTS "email_conversations_delete" ON public.email_conversations
 
 CREATE POLICY "email_conversations_select" ON public.email_conversations
     FOR SELECT USING (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
         OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
     );
 
@@ -546,13 +557,13 @@ CREATE POLICY "email_conversations_insert" ON public.email_conversations
 
 CREATE POLICY "email_conversations_update" ON public.email_conversations
     FOR UPDATE USING (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
         OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
     );
 
 CREATE POLICY "email_conversations_delete" ON public.email_conversations
     FOR DELETE USING (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
     );
 
 DROP POLICY IF EXISTS "email_messages_all" ON public.email_messages;
@@ -563,7 +574,7 @@ DROP POLICY IF EXISTS "email_messages_delete" ON public.email_messages;
 
 CREATE POLICY "email_messages_select" ON public.email_messages
     FOR SELECT USING (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
         OR EXISTS (
             SELECT 1 FROM public.email_conversations
             WHERE id = conversation_id AND customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
@@ -575,18 +586,18 @@ CREATE POLICY "email_messages_insert" ON public.email_messages
 
 CREATE POLICY "email_messages_update" ON public.email_messages
     FOR UPDATE USING (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
     );
 
 CREATE POLICY "email_messages_delete" ON public.email_messages
     FOR DELETE USING (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
     );
 
 DROP POLICY IF EXISTS "email_notes_all" ON public.email_notes;
 CREATE POLICY "email_notes_all" ON public.email_notes
-    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
-    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
 
 DROP POLICY IF EXISTS "email_templates_all" ON public.email_templates;
 CREATE POLICY "email_templates_all" ON public.email_templates
@@ -597,19 +608,19 @@ DROP POLICY IF EXISTS "audit_logs_select" ON public.audit_logs;
 DROP POLICY IF EXISTS "audit_logs_insert" ON public.audit_logs;
 
 CREATE POLICY "audit_logs_select" ON public.audit_logs
-    FOR SELECT USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN'));
+    FOR SELECT USING (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN'));
 
 CREATE POLICY "audit_logs_insert" ON public.audit_logs
     FOR INSERT WITH CHECK (
-        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT')
+        public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT')
         OR (action = 'CLIENT_REGISTERED' AND admin_id = auth.uid()::text AND target_user_id = auth.uid()::text)
     );
 
 -- Politiques CRM_NOTES
 DROP POLICY IF EXISTS "crm_notes_staff_all" ON public.crm_notes;
 CREATE POLICY "crm_notes_staff_all" ON public.crm_notes
-    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
-    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+    FOR ALL USING (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
+    WITH CHECK (public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
 
 -- 12. DÉCLENCHEUR AUTOMATIQUE INFAILLIBLE : CRÉATION DU PROFIL LORS DE L'INSCRIPTION AUTH.USERS
 CREATE OR REPLACE FUNCTION public.handle_new_user()
