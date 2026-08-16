@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { CookieBanner } from "../components/site/CookieBanner";
+import { ScrollToTop } from "../components/site/ScrollToTop";
 import { LanguageProvider } from "../context/LanguageContext";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { NotFoundPage } from "./404";
@@ -121,6 +122,7 @@ function RootComponent() {
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <CookieBanner />
+        <ScrollToTop />
         <Toaster position="top-right" richColors theme="dark" />
       </LanguageProvider>
     </QueryClientProvider>
