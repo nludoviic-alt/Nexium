@@ -87,6 +87,7 @@ export async function getCurrentSession() {
 
 /**
  * Récupère le profil enrichi de l'utilisateur depuis la table `profiles`.
+ * En cas d'absence (ex: retard trigger), tente une insertion de secours sécurisée.
  */
 export async function getUserProfile(userId: string): Promise<SupabaseUserProfile | null> {
   if (!isSupabaseConfigured) return null;
@@ -94,13 +95,44 @@ export async function getUserProfile(userId: string): Promise<SupabaseUserProfil
     .from("profiles")
     .select("*")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("Erreur lors du chargement du profil Supabase:", error);
     return null;
   }
-  return data as SupabaseUserProfile;
+
+  if (data) return data as SupabaseUserProfile;
+
+  // Fallback si la ligne n'existait pas encore
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && user.id === userId) {
+      const fallbackName = user.user_metadata?.name || user.email?.split("@")[0] || "Trader";
+      const fallbackCountry = user.user_metadata?.country || "France";
+      const { data: createdProfile } = await supabase
+        .from("profiles")
+        .upsert({
+          id: userId,
+          email: user.email || "",
+          name: fallbackName,
+          country: fallbackCountry,
+          role: "TRADER",
+          status: "PENDING_APPROVAL",
+          kyc_status: "PENDING",
+          balance: 0.0,
+          assigned_advisor: "Desk de Conformité & Risque",
+        })
+        .select()
+        .maybeSingle();
+
+      if (createdProfile) return createdProfile as SupabaseUserProfile;
+    }
+  } catch (err) {
+    console.warn("Fallback profil:", err);
+  }
+
+  return null;
 }
 
 /**
@@ -580,6 +612,127 @@ export async function getAllDirectClientMessages(): Promise<SupabaseChatMessage[
 }
 
 /**
+ * Récupère les transactions spécifiques à un utilisateur.
+ */
+export async function getUserTransactions(userId: string): Promise<SupabaseTransaction[]> {
+  if (!isSupabaseConfigured) return [];
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Erreur chargement transactions utilisateur Supabase:", error);
+    return [];
+  }
+  return data as SupabaseTransaction[];
+}
+
+/**
+ * Crée une demande de dépôt pour un client (statut PENDING en attente de validation).
+ */
+export async function createDepositRequest(userId: string, amount: number, method = "Virement SEPA") {
+  return recordTransaction({
+    user_id: userId,
+    type: "DEPOSIT",
+    amount,
+    currency: "USD",
+    status: "PENDING",
+    method,
+  });
+}
+
+/**
+ * Crée une demande de retrait pour un client (statut PENDING en attente de validation).
+ */
+export async function createWithdrawalRequest(userId: string, amount: number, destination = "SEPA / SWIFT", method = "SEPA_IBAN") {
+  return recordTransaction({
+    user_id: userId,
+    type: "WITHDRAWAL",
+    amount,
+    currency: "USD",
+    status: "PENDING",
+    method,
+    reference_tx: destination,
+  });
+}
+
+/**
+ * Abonnement temps réel aux profils clients (création, mise à jour de statut, KYC...)
+ * Utilisé notamment par la console d'administration pour les alertes de nouveaux inscrits.
+ */
+export function subscribeToProfiles(callback: (payload: any) => void): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel("public:profiles:all")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        (payload) => callback(payload)
+      )
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime profiles Supabase:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Abonnement temps réel au profil d'un client précis (écoute d'approbation ou changement de preset).
+ */
+export function subscribeToUserProfile(userId: string, callback: (profile: SupabaseUserProfile) => void): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel(`public:profiles:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` },
+        (payload) => {
+          if (payload.new) callback(payload.new as SupabaseUserProfile);
+        }
+      )
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime user profile Supabase:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * Abonnement temps réel aux transactions (créations de dépôts/retraits, validations).
+ */
+export function subscribeToTransactions(callback: (payload: any) => void, userId?: string): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel(userId ? `public:transactions:user:${userId}` : "public:transactions:all")
+      .on(
+        "postgres_changes",
+        userId
+          ? { event: "*", schema: "public", table: "transactions", filter: `user_id=eq.${userId}` }
+          : { event: "*", schema: "public", table: "transactions" },
+        (payload) => callback(payload)
+      )
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime transactions Supabase:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
+/**
  * Abonnement temps réel aux messages directs d'un client précis (ou de tous
  * les clients si clientId est omis, pour la vue admin globale).
  */
@@ -604,4 +757,139 @@ export function subscribeToDirectMessages(callback: () => void, clientId?: strin
     if (channel) supabase.removeChannel(channel);
   };
 }
+
+/* ==========================================================================
+   HELPERS E-MAILS / SUPPORT TICKETS DU CLIENT
+   ========================================================================== */
+
+export interface ClientEmailThread {
+  id: string;
+  subject: string;
+  customer_email: string;
+  customer_name?: string;
+  preview?: string;
+  unread: boolean;
+  status: string;
+  created_at: string;
+  messages: Array<{
+    id: string;
+    from_address: string;
+    to_address: string;
+    subject: string;
+    body_text: string;
+    direction: "INBOUND" | "OUTBOUND";
+    created_at: string;
+  }>;
+}
+
+/**
+ * Récupère toutes les conversations e-mails d'un client depuis Supabase.
+ */
+export async function getClientEmailConversations(userEmail: string): Promise<ClientEmailThread[]> {
+  if (!isSupabaseConfigured || !userEmail) return [];
+  const { data: convs, error } = await supabase
+    .from("email_conversations")
+    .select("*")
+    .eq("customer_email", userEmail.trim().toLowerCase())
+    .order("created_at", { ascending: false });
+
+  if (error || !convs) return [];
+
+  const convIds = convs.map((c) => c.id);
+  if (convIds.length === 0) return [];
+
+  const { data: msgs } = await supabase
+    .from("email_messages")
+    .select("*")
+    .in("conversation_id", convIds)
+    .order("created_at", { ascending: true });
+
+  return convs.map((c) => ({
+    id: c.id,
+    subject: c.subject,
+    customer_email: c.customer_email,
+    customer_name: c.customer_name,
+    preview: c.preview,
+    unread: c.unread,
+    status: c.status,
+    created_at: c.created_at,
+    messages: (msgs || []).filter((m) => m.conversation_id === c.id),
+  }));
+}
+
+/**
+ * Envoie un e-mail / ticket depuis le dashboard client vers le Desk Admin.
+ */
+export async function sendClientEmailMessage(params: {
+  customerEmail: string;
+  customerName: string;
+  subject: string;
+  message: string;
+  toAddress?: string;
+}) {
+  if (!isSupabaseConfigured) return { success: true, simulated: true };
+  const convId = `thread-${Date.now().toString().slice(-6)}`;
+  const preview = params.message.slice(0, 100);
+
+  const { error: convErr } = await supabase.from("email_conversations").insert([
+    {
+      id: convId,
+      subject: params.subject,
+      status: "INBOX",
+      customer_email: params.customerEmail.trim().toLowerCase(),
+      customer_name: params.customerName,
+      preview,
+      unread: true,
+    },
+  ]);
+
+  if (convErr) {
+    console.error("Erreur création email_conversation:", convErr);
+    return { success: false, error: convErr };
+  }
+
+  const { error: msgErr } = await supabase.from("email_messages").insert([
+    {
+      conversation_id: convId,
+      from_address: params.customerEmail.trim().toLowerCase(),
+      to_address: params.toAddress || "support@nexiummarkets.com",
+      subject: params.subject,
+      body_text: params.message,
+      direction: "INBOUND",
+    },
+  ]);
+
+  if (msgErr) {
+    console.error("Erreur création email_message:", msgErr);
+    return { success: false, error: msgErr };
+  }
+
+  return { success: true, conversationId: convId };
+}
+
+/**
+ * Abonnement temps réel aux e-mails et réponses du Desk pour un client.
+ */
+export function subscribeToClientEmails(callback: () => void): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel("public:email_messages:client")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "email_messages" },
+        callback
+      )
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime email messages Supabase:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
+
+
 

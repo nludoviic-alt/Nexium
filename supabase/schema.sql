@@ -357,10 +357,19 @@ CREATE POLICY "profiles_delete" ON public.profiles
 
 -- Politiques TRANSACTIONS
 DROP POLICY IF EXISTS "transactions_select" ON public.transactions;
+DROP POLICY IF EXISTS "transactions_insert_client" ON public.transactions;
 DROP POLICY IF EXISTS "transactions_staff_write" ON public.transactions;
 
 CREATE POLICY "transactions_select" ON public.transactions
     FOR SELECT USING (auth.uid() = user_id OR public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'));
+
+-- Les clients peuvent créer leurs propres demandes de dépôt et de retrait (statut PENDING imposé)
+CREATE POLICY "transactions_insert_client" ON public.transactions
+    FOR INSERT WITH CHECK (
+        auth.uid() = user_id 
+        AND status = 'PENDING'
+        AND type IN ('DEPOSIT', 'WITHDRAWAL')
+    );
 
 CREATE POLICY "transactions_staff_write" ON public.transactions
     FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'FINANCE'))
@@ -385,16 +394,34 @@ DROP POLICY IF EXISTS "chat_messages_all" ON public.chat_messages;
 CREATE POLICY "chat_messages_all" ON public.chat_messages
     FOR ALL USING (true) WITH CHECK (true);
 
--- Politiques MODULE E-MAILS (Réservé au Staff)
+-- Politiques MODULE E-MAILS
 DROP POLICY IF EXISTS "email_conversations_all" ON public.email_conversations;
 CREATE POLICY "email_conversations_all" ON public.email_conversations
-    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
-    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+    FOR ALL USING (
+        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
+    )
+    WITH CHECK (
+        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        OR customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
+    );
 
 DROP POLICY IF EXISTS "email_messages_all" ON public.email_messages;
 CREATE POLICY "email_messages_all" ON public.email_messages
-    FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
-    WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
+    FOR ALL USING (
+        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        OR EXISTS (
+            SELECT 1 FROM public.email_conversations
+            WHERE id = conversation_id AND customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
+        )
+    )
+    WITH CHECK (
+        public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT')
+        OR EXISTS (
+            SELECT 1 FROM public.email_conversations
+            WHERE id = conversation_id AND customer_email = (SELECT email FROM public.profiles WHERE id = auth.uid())
+        )
+    );
 
 DROP POLICY IF EXISTS "email_notes_all" ON public.email_notes;
 CREATE POLICY "email_notes_all" ON public.email_notes
@@ -424,8 +451,78 @@ CREATE POLICY "crm_notes_staff_all" ON public.crm_notes
     FOR ALL USING (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'))
     WITH CHECK (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT'));
 
--- 12. ACTIVATION SUPABASE REALTIME
--- Publication pour streaming WebSockets instantané des messages et des fils
+-- 12. DÉCLENCHEUR AUTOMATIQUE INFAILLIBLE : CRÉATION DU PROFIL LORS DE L'INSCRIPTION AUTH.USERS
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_name TEXT;
+  v_country TEXT;
+BEGIN
+  v_name := COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1));
+  v_country := COALESCE(NEW.raw_user_meta_data->>'country', 'France');
+
+  INSERT INTO public.profiles (
+    id,
+    email,
+    name,
+    country,
+    role,
+    status,
+    kyc_status,
+    balance,
+    assigned_advisor
+  ) VALUES (
+    NEW.id,
+    NEW.email,
+    v_name,
+    v_country,
+    'TRADER',
+    'PENDING_APPROVAL',
+    'PENDING',
+    0.00,
+    'Desk de Conformité & Risque'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    name = CASE WHEN profiles.name = '' OR profiles.name IS NULL THEN EXCLUDED.name ELSE profiles.name END,
+    country = CASE WHEN profiles.country IS NULL THEN EXCLUDED.country ELSE profiles.country END;
+
+  -- Enregistrement automatique dans le journal d'audit
+  INSERT INTO public.audit_logs (
+    admin_id,
+    admin_name,
+    action,
+    target_user_id,
+    target_user_email,
+    details
+  ) VALUES (
+    NEW.id::text,
+    'Système Inscription',
+    'CLIENT_REGISTERED',
+    NEW.id::text,
+    NEW.email,
+    jsonb_build_object(
+      'message', 'Nouvelle inscription enregistrée automatiquement par le trigger PostgreSQL',
+      'name', v_name,
+      'country', v_country
+    )
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 13. ACTIVATION SUPABASE REALTIME
+-- Publication pour streaming WebSockets instantané des profils, transactions, messages et emails
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
@@ -433,7 +530,10 @@ BEGIN
   END IF;
 END $$;
 
+ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.transactions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.live_chat_threads;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.email_conversations;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.email_messages;
+

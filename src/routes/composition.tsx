@@ -157,6 +157,8 @@ import {
   getAllDirectClientMessages,
   sendChatMessage,
   subscribeToDirectMessages,
+  subscribeToProfiles,
+  subscribeToTransactions,
 } from "@/lib/supabase";
 
 export const Route = createFileRoute("/composition")({
@@ -1227,6 +1229,39 @@ function NexiumAdminDashboard({
 
   useEffect(() => {
     refreshClients();
+  }, [refreshClients]);
+
+  // Abonnement Realtime pour alertes instantanées sur nouvelles inscriptions
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const unsub = subscribeToProfiles((payload) => {
+      if (payload.eventType === "INSERT") {
+        const newClient = payload.new;
+        toast.info(
+          `🚨 Nouvelle demande d'ouverture de compte reçue : ${newClient?.name || "Client"} (${newClient?.email || ""})`,
+          { duration: 9000 }
+        );
+      }
+      refreshClients();
+    });
+    return unsub;
+  }, [refreshClients]);
+
+  // Abonnement Realtime pour alertes instantanées sur dépôts et retraits
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const unsub = subscribeToTransactions((payload) => {
+      if (payload.eventType === "INSERT") {
+        const tx = payload.new;
+        const isDep = tx?.type === "DEPOSIT";
+        toast.info(
+          `💳 Demande ${isDep ? "de dépôt" : "de retrait"} reçue : $${tx?.amount || 0} (${tx?.method || "Virement"})`,
+          { duration: 8000 }
+        );
+      }
+      refreshClients();
+    });
+    return unsub;
   }, [refreshClients]);
 
   // Synchronisation du staff réel depuis Supabase (tout profil hors rôle TRADER)

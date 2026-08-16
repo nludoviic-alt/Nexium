@@ -72,25 +72,32 @@ function LoginPage() {
             return;
           }
 
-          // Vérification du statut d'approbation pour les investisseurs / traders
-          if (profile?.status === "PENDING_APPROVAL") {
+          // Vérification stricte du statut pour les investisseurs / traders
+          if (!profile || profile.status === "PENDING_APPROVAL") {
             toast.warning(
-              "Votre compte est actuellement en cours de validation par un administrateur. Vous recevrez un e-mail dès son activation."
+              "Votre compte est actuellement en cours de validation par la Direction. Vous recevrez un e-mail officiel dès son activation."
             );
             await supabase.auth.signOut();
             setLoading(false);
             return;
           }
 
-          if (profile?.status === "REVOKED" || profile?.status === "BANNED" || profile?.status === "SUSPENDED") {
+          if (profile.status === "REVOKED" || profile.status === "BANNED" || profile.status === "SUSPENDED") {
             toast.error("Votre compte est restreint ou suspendu. Contactez support@nexiummarkets.com");
             await supabase.auth.signOut();
             setLoading(false);
             return;
           }
 
-          const userSlug = getUserSlug({ name: profile?.name, email: data.user.email, id: data.user.id });
-          toast.success(`Connexion réussie. Bienvenue, ${profile?.name || data.user.email} !`);
+          if (profile.status !== "ACTIVE") {
+            toast.warning("Votre compte n'est pas encore actif. Veuillez patienter pendant sa validation.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+
+          const userSlug = getUserSlug({ name: profile.name, email: data.user.email, id: data.user.id });
+          toast.success(`Connexion réussie. Bienvenue, ${profile.name || data.user.email} !`);
           navigate({ to: "/portal/$slug", params: { slug: userSlug } });
           return;
         }

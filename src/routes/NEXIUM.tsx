@@ -106,6 +106,14 @@ import {
   getClientChatMessages,
   sendChatMessage,
   subscribeToDirectMessages,
+  getUserTransactions,
+  createDepositRequest,
+  createWithdrawalRequest,
+  subscribeToUserProfile,
+  subscribeToTransactions,
+  getClientEmailConversations,
+  sendClientEmailMessage,
+  subscribeToClientEmails,
 } from "@/lib/supabase";
 
 export const Route = createFileRoute("/NEXIUM")({
@@ -4014,17 +4022,32 @@ function MessagingTab({
   const [composePriority, setComposePriority] = useState<"NORMAL" | "URGENT" | "CRITIQUE">("NORMAL");
   const [composeBody, setComposeBody] = useState("");
 
-  const handleSendEmail = (e: React.FormEvent) => {
+  const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeSubject.trim() || !composeBody.trim()) {
       toast.error("Veuillez renseigner l'objet et le message.");
       return;
     }
 
+    if (isSupabaseConfigured && clientEmail) {
+      const res = await sendClientEmailMessage({
+        customerEmail: clientEmail,
+        customerName: clientName,
+        subject: composeSubject.trim(),
+        message: composeBody.trim(),
+        toAddress: composeTo,
+      });
+
+      if (!res.success) {
+        toast.error("Erreur lors de l'enregistrement de l'e-mail.");
+        return;
+      }
+    }
+
     const newEmail: EmailItem = {
       id: `mail-${Date.now()}`,
-      from: "ludovic.m@investisseur-nexium.com",
-      fromName: "Ludovic M. (Compte #802194)",
+      from: clientEmail || "investisseur@nexiummarkets.com",
+      fromName: `${clientName} (Compte #${mt5AccountNumber})`,
       to: composeTo,
       subject: composeSubject,
       date: `Aujourd'hui · ${new Date().toLocaleTimeString().slice(0, 5)}`,
@@ -4040,35 +4063,7 @@ function MessagingTab({
     setEmailFolder("sent");
     setComposeSubject("");
     setComposeBody("");
-    toast.success("E-mail officiel transmis au Desk.");
-
-    setTimeout(() => {
-      const autoReply: EmailItem = {
-        id: `mail-reply-${Date.now()}`,
-        from: composeTo,
-        fromName: composeTo.includes("quant")
-          ? "Dr. Antoine R. (Nexium Quant)"
-          : composeTo.includes("support")
-          ? "Elena V. (Support VIP)"
-          : "Nexium Risk Governance",
-        to: "ludovic.m@investisseur-nexium.com",
-        subject: `Re: ${newEmail.subject}`,
-        date: `Aujourd'hui · ${new Date().toLocaleTimeString().slice(0, 5)}`,
-        preview: "Accusé de réception officiel de votre demande...",
-        body: [
-          "Bonjour Ludovic,",
-          `Nous accusons bonne réception de votre message : "${newEmail.subject}".`,
-          "Votre gestionnaire de compte et l'équipe technique MT5 traitent votre demande prioritaire.",
-          "Temps de traitement moyen estimé : 10 minutes.",
-          "Cordialement,\nLe Desk Nexium Markets Institutional",
-        ],
-        unread: true,
-        priority: newEmail.priority,
-        folder: "inbox",
-      };
-      setEmails((prev) => [autoReply, ...prev]);
-      toast.info("Nouvel e-mail reçu : Accusé de réception officiel.");
-    }, 3000);
+    toast.success("E-mail officiel transmis au Desk Nexium.");
   };
 
   return (
@@ -5264,22 +5259,33 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
       setClientEmail(user.email || "investisseur@nexiummarkets.com");
       const profile = await getUserProfile(user.id);
 
+      const isAdmin = profile?.role && ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
+
+      // Verrouillage formel : si le compte n'est pas actif et n'est pas admin, bloquer l'accès
+      if (!isAdmin) {
+        if (!profile || profile.status === "PENDING_APPROVAL") {
+          toast.warning("Votre compte est actuellement en cours de validation par la Direction.");
+          await supabase.auth.signOut();
+          navigate({ to: "/login" });
+          return;
+        }
+
+        if (profile.status === "REVOKED" || profile.status === "BANNED" || profile.status === "SUSPENDED") {
+          toast.error("Accès restreint ou suspendu. Contactez support@nexiummarkets.com");
+          await supabase.auth.signOut();
+          navigate({ to: "/login" });
+          return;
+        }
+
+        if (profile.status !== "ACTIVE") {
+          toast.warning("Votre compte n'est pas encore validé.");
+          await supabase.auth.signOut();
+          navigate({ to: "/login" });
+          return;
+        }
+      }
+
       if (profile) {
-        // Si le profil est en attente d'approbation globale, bloquer et renvoyer sur login
-        if (profile.status === "PENDING_APPROVAL") {
-          toast.warning("Votre compte est en cours d'approbation par la Direction.");
-          await supabase.auth.signOut();
-          navigate({ to: "/login" });
-          return;
-        }
-
-        if (profile.status === "REVOKED" || profile.status === "BANNED") {
-          toast.error("Accès restreint. Contactez support@nexiummarkets.com");
-          await supabase.auth.signOut();
-          navigate({ to: "/login" });
-          return;
-        }
-
         if (profile.name) setClientName(profile.name);
         if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
         if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
@@ -5296,7 +5302,6 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
 
         // Vérification du slug personnalisé dans l'URL
         const ownSlug = getUserSlug({ name: profile.name, email: user.email, id: user.id });
-        const isAdmin = profile.role && ["OWNER", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
 
         // Si l'utilisateur est sur /NEXIUM sans slug, rediriger vers son URL personnalisée
         if (!customSlug && !isAdmin) {
@@ -5305,6 +5310,153 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
       }
     });
   }, [customSlug]);
+
+  // Écouteur Realtime sur le profil de l'utilisateur (mise à jour en direct lors d'une validation Admin)
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+    const unsubProfile = subscribeToUserProfile(currentUserId, (updatedProfile) => {
+      if (updatedProfile.balance !== undefined && updatedProfile.balance !== null) {
+        setBalance(Number(updatedProfile.balance));
+      }
+      if (updatedProfile.status === "REVOKED" || updatedProfile.status === "BANNED" || updatedProfile.status === "SUSPENDED") {
+        toast.error("Votre compte a été restreint par l'administration.");
+        supabase.auth.signOut();
+        navigate({ to: "/login" });
+        return;
+      }
+      if (updatedProfile.license_status) setLicenseStatus(updatedProfile.license_status as any);
+      if (updatedProfile.active_preset) {
+        setActivePreset(updatedProfile.active_preset);
+        toast.success(`Votre stratégie [${updatedProfile.active_preset}] a été validée par la Direction !`);
+      }
+      if (updatedProfile.assigned_advisor) setAssignedAdvisor(updatedProfile.assigned_advisor);
+      if (updatedProfile.mt5_login) setMt5AccountNumber(updatedProfile.mt5_login.replace("#", ""));
+
+      // Synchronisation en direct des paramètres de moteurs IA
+      if (updatedProfile.engines_config) {
+        const cfg = updatedProfile.engines_config as any;
+        setBots((prev) =>
+          prev.map((bot) => {
+            if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
+              return {
+                ...bot,
+                statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
+                mainState: cfg.aiGold.active ? "POSITION OPEN" : "PAUSED",
+                risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
+              };
+            }
+            if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
+              return {
+                ...bot,
+                statusBadge: cfg.fxTrend.active ? "ACTIF" : "EN PAUSE",
+                mainState: cfg.fxTrend.active ? "POSITION OPEN" : "PAUSED",
+                risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
+              };
+            }
+            if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
+              return {
+                ...bot,
+                statusBadge: cfg.indexReversion.active ? "ACTIF" : "EN PAUSE",
+                mainState: cfg.indexReversion.active ? "POSITION OPEN" : "PAUSED",
+                risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
+              };
+            }
+            return bot;
+          })
+        );
+      }
+    });
+    return unsubProfile;
+  }, [currentUserId]);
+
+  // Synchronisation temps réel des e-mails du client avec Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured || !clientEmail) return;
+
+    const loadEmails = async () => {
+      const dbThreads = await getClientEmailConversations(clientEmail);
+      if (dbThreads && dbThreads.length > 0) {
+        const mappedEmails: EmailItem[] = [];
+        dbThreads.forEach((th) => {
+          th.messages.forEach((msg) => {
+            mappedEmails.push({
+              id: msg.id || `mail-${msg.created_at}`,
+              from: msg.from_address,
+              fromName: msg.direction === "OUTBOUND" ? "Desk Nexium Markets" : `${clientName} (Compte #${mt5AccountNumber})`,
+              to: msg.to_address,
+              subject: msg.subject || th.subject,
+              date: msg.created_at
+                ? new Date(msg.created_at).toLocaleDateString("fr-FR", {
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Récemment",
+              preview: msg.body_text ? msg.body_text.slice(0, 80) + "..." : "",
+              body: msg.body_text ? msg.body_text.split("\n") : [],
+              unread: msg.direction === "OUTBOUND" && th.unread,
+              priority: "NORMAL",
+              folder: msg.direction === "OUTBOUND" ? "inbox" : "sent",
+            });
+          });
+        });
+
+        if (mappedEmails.length > 0) {
+          setEmails(mappedEmails);
+          if (!selectedEmail) setSelectedEmail(mappedEmails[0]);
+        }
+      }
+    };
+
+    loadEmails();
+    const unsubEmails = subscribeToClientEmails(() => loadEmails());
+    return unsubEmails;
+  }, [clientEmail, clientName, mt5AccountNumber]);
+
+  // Synchronisation temps réel des transactions du client depuis Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId) return;
+
+    const loadTransactions = async () => {
+      const dbTxs = await getUserTransactions(currentUserId);
+      if (dbTxs && dbTxs.length > 0) {
+        setTransactions(
+          dbTxs.map((t): TransactionItem => {
+            const isPositive = t.type === "DEPOSIT" || t.type === "TRADE_PROFIT" || t.type === "BONUS" || t.type === "PROFIT_SHARE";
+            const dateStr = t.created_at
+              ? new Date(t.created_at).toLocaleDateString("fr-FR", {
+                  day: "2-digit",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Récemment";
+
+            let label = t.type as string;
+            if (t.type === "DEPOSIT") label = t.status === "COMPLETED" ? "Dépôt validé" : "Dépôt en attente";
+            if (t.type === "WITHDRAWAL") label = t.status === "COMPLETED" ? "Retrait validé" : "Demande de retrait";
+
+            return {
+              id: t.id || `tx-${Date.now()}`,
+              date: dateStr,
+              type: label,
+              amount: `${isPositive ? "+" : "-"}$${Number(t.amount).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
+              amountNum: isPositive ? Number(t.amount) : -Number(t.amount),
+              currency: t.currency || "USD",
+              status: t.status === "COMPLETED" ? "Confirmé" : t.status === "PENDING" ? "En attente" : "Rejeté",
+              method: t.method || (t.type === "DEPOSIT" ? "Virement SEPA" : "Virement Bancaire"),
+              color: t.status === "COMPLETED" ? (isPositive ? "#00D084" : "#f43f5e") : "#f59e0b",
+            };
+          })
+        );
+      }
+    };
+
+    loadTransactions();
+    const unsubTxs = subscribeToTransactions(() => loadTransactions(), currentUserId);
+    return unsubTxs;
+  }, [currentUserId]);
 
   // Synchronisation temps réel de la messagerie directe avec le Desk Nexium
   useEffect(() => {
@@ -5488,32 +5640,40 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
     toast.error("Coupe-circuit activé ! Toutes les positions sont fermées et les moteurs sont en pause.");
   };
 
-  const handleDepositSubmit = (e: React.FormEvent) => {
+  const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseFloat(depositAmount);
     if (isNaN(val) || val <= 0) {
       toast.error("Veuillez saisir un montant valide.");
       return;
     }
-    setBalance((prev) => prev + val);
+
+    if (isSupabaseConfigured && currentUserId) {
+      const res = await createDepositRequest(currentUserId, val, depositMethod);
+      if (!res.success) {
+        toast.error("Erreur lors de la transmission de la demande de dépôt.");
+        return;
+      }
+    }
+
     const now = new Date().toLocaleTimeString();
     const newTx: TransactionItem = {
       id: `tx-${Date.now()}`,
       date: `Aujourd'hui · ${now.slice(0, 5)}`,
-      type: "Dépôt validé",
+      type: "Dépôt en attente",
       amount: `+$${val.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
       amountNum: val,
       currency: "USD",
-      status: "Confirmé",
+      status: "En attente",
       method: depositMethod,
-      color: "#00D084",
+      color: "#f59e0b",
     };
     setTransactions((prev) => [newTx, ...prev]);
     setDepositOpen(false);
-    toast.success(`Dépôt de $${val.toFixed(2)} crédité avec succès.`);
+    toast.success(`Demande de dépôt de $${val.toFixed(2)} (${depositMethod}) transmise à l'Administration pour crédit.`);
   };
 
-  const handleWithdrawSubmit = (e: React.FormEvent) => {
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseFloat(withdrawAmount);
     if (isNaN(val) || val <= 0) {
@@ -5524,22 +5684,30 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
       toast.error("Fonds insuffisants.");
       return;
     }
-    setBalance((prev) => prev - val);
+
+    if (isSupabaseConfigured && currentUserId) {
+      const res = await createWithdrawalRequest(currentUserId, val, "Compte bancaire titulaire", "SEPA_IBAN");
+      if (!res.success) {
+        toast.error("Erreur lors de la transmission de la demande de retrait.");
+        return;
+      }
+    }
+
     const now = new Date().toLocaleTimeString();
     const newTx: TransactionItem = {
       id: `tx-${Date.now()}`,
       date: `Aujourd'hui · ${now.slice(0, 5)}`,
-      type: "Retrait traité",
+      type: "Demande de retrait",
       amount: `-$${val.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
       amountNum: -val,
       currency: "USD",
-      status: "Confirmé",
+      status: "En attente",
       method: "Virement SEPA / SWIFT",
-      color: "#f43f5e",
+      color: "#f59e0b",
     };
     setTransactions((prev) => [newTx, ...prev]);
     setWithdrawOpen(false);
-    toast.success(`Retrait de $${val.toFixed(2)} ordonné.`);
+    toast.success(`Demande de retrait de $${val.toFixed(2)} transmise au Desk Finance pour traitement.`);
   };
 
   const handleSendMessage = async (text: string) => {
@@ -5632,91 +5800,219 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   if (licenseStatus !== "ACTIVE") {
     return (
       <div className="min-h-screen bg-[#080a0e] text-white flex flex-col font-sans selection:bg-[#00D084]/30">
-        {/* Header Institutionnel Haut de Page */}
-        <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#0c1017]/90 backdrop-blur-xl px-4 sm:px-8 py-4">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* Top Header Harmonisé */}
+        <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-white/[0.08] bg-[#0b0d10]/95 px-4 sm:px-8 backdrop-blur-2xl">
+          <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-3">
-              <span className="font-mono text-2xl font-black tracking-[0.25em] text-white">NEXIUM</span>
+              <span className="font-mono text-xl sm:text-2xl font-black tracking-[0.25em] text-white">NEXIUM</span>
               <span className="h-4 w-px bg-[#00D084]" />
-              <span className="text-xs font-black tracking-[0.3em] text-[#00D084]">MARKETS</span>
+              <span className="text-[10px] sm:text-xs font-black tracking-[0.3em] text-[#00D084]">MARKETS</span>
             </Link>
 
-            <div className="flex flex-wrap items-center gap-3 text-xs">
-              <div className="px-3 py-1.5 rounded-xl border border-white/[0.08] bg-[#141a23] flex items-center gap-2">
-                <span className="text-slate-400">Client :</span>
-                <strong className="text-white font-semibold">{clientName}</strong>
-              </div>
+            <div className="hidden lg:block h-6 w-px bg-white/[0.08]" />
 
-              <div className="px-3 py-1.5 rounded-xl border border-[#00D084]/30 bg-[#00D084]/10 text-[#00D084] font-mono font-bold flex items-center gap-2">
-                <span>MT5 : #{mt5AccountNumber}</span>
-              </div>
+            <div className="hidden lg:block">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono">
+                PORTAIL INSTITUTIONNEL · INITIALISATION DU COMPTE
+              </p>
+              <h1 className="text-sm font-black text-white">
+                Sélection &amp; Activation de Stratégie Algorithmique
+              </h1>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-3">
+            {/* Statut ECN Live */}
+            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-mono font-bold text-emerald-400">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>MT5 RAW ECN : #{mt5AccountNumber}</span>
+            </div>
+
+            {/* Solde Ségrégué */}
+            <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] px-3.5 py-1.5 text-xs sm:text-sm font-mono font-black text-[#00D084]">
+              ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD
+            </div>
+
+            {/* Profile Dropdown */}
+            <div className="relative">
               <button
-                onClick={async () => {
-                  if (isSupabaseConfigured) await supabase.auth.signOut();
-                  toast.info("Déconnexion réussie.");
-                  navigate({ to: "/login" });
-                }}
-                className="px-3 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 font-bold transition flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setUserMenuOpen((prev) => !prev)}
+                className="flex items-center gap-2.5 rounded-xl border border-white/[0.1] bg-[#141a23] px-2.5 py-1.5 hover:border-white/20 transition cursor-pointer"
+                title="Menu profil"
               >
-                <LogOut className="size-3.5" />
-                <span>Déconnexion</span>
+                <div className="grid size-7 sm:size-8 place-items-center rounded-lg bg-[#00D084]/15 border border-[#00D084]/30 text-xs font-black text-[#00D084]">
+                  {clientName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </div>
+                <div className="hidden md:flex flex-col text-left leading-none">
+                  <span className="text-xs font-black text-white">{clientName}</span>
+                  <span className="text-[10px] font-mono text-slate-400">Titulaire</span>
+                </div>
+                <ChevronDown className="size-3 text-slate-400" />
               </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-60 rounded-2xl border border-white/[0.1] bg-[#10141b] p-2 shadow-2xl z-50 backdrop-blur-xl">
+                  <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
+                    <p className="text-xs font-bold text-white">{clientName}</p>
+                    <p className="text-[10px] font-mono text-[#00D084]">Compte MT5 #{mt5AccountNumber}</p>
+                    <div className="mt-1.5 flex items-center justify-between rounded-lg bg-black/40 px-2 py-1 border border-white/5">
+                      <span className="text-[9px] font-mono text-slate-400 truncate max-w-[140px]">
+                        /portal/{customSlug || getUserSlug({ name: clientName, email: clientEmail, id: currentUserId })}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const slug = customSlug || getUserSlug({ name: clientName, email: clientEmail, id: currentUserId });
+                          navigator.clipboard.writeText(`https://nexiummarkets.com/portal/${slug}`);
+                          toast.success("Lien de votre portail copié !");
+                        }}
+                        className="text-[9px] font-bold text-[#00D084] hover:underline cursor-pointer ml-1"
+                      >
+                        Copier
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (isSupabaseConfigured) await supabase.auth.signOut();
+                      toast.info("Déconnexion réussie.");
+                      navigate({ to: "/login" });
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
+                  >
+                    <LogOut className="size-3.5" />
+                    Déconnexion Sécurisée
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        {/* Corps Central */}
-        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-8 py-10 w-full space-y-8">
-          {/* Bannière de Statut si Demande en Cours */}
+        {/* Corps Principal */}
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-8 py-8 w-full space-y-8">
+          {/* Bandeau Institutionnel des 4 Indicateurs Compte */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
+              <div className="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center shrink-0">
+                <ShieldCheck className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Compte Titulaire</span>
+                <strong className="text-xs text-white truncate block">MT5 #{mt5AccountNumber}</strong>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
+              <div className="size-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 grid place-items-center shrink-0">
+                <Wifi className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Passerelle FIX</span>
+                <strong className="text-xs text-cyan-300 truncate block">Equinix NY4 Cross-Connect</strong>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
+              <div className="size-10 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 grid place-items-center shrink-0">
+                <Activity className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Conseiller Référent</span>
+                <strong className="text-xs text-white truncate block">{assignedAdvisor}</strong>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-white/[0.08] bg-[#0c1017] flex items-center gap-3.5">
+              <div className="size-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 grid place-items-center shrink-0">
+                <Lock className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Statut Stratégie</span>
+                <strong className="text-xs text-amber-400 truncate block">
+                  {licenseStatus === "PENDING_PRESET_APPROVAL" ? "En cours de validation Desk" : "En attente d'activation"}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Stepper Pipeline si Demande en cours */}
           {licenseStatus === "PENDING_PRESET_APPROVAL" ? (
-            <div className="p-6 rounded-3xl bg-amber-500/10 border border-amber-500/30 backdrop-blur-xl shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in fade-in">
-              <div className="flex items-start gap-4">
-                <div className="size-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 grid place-items-center shrink-0">
-                  <Clock className="size-6 animate-spin" style={{ animationDuration: "8s" }} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                      En cours de validation Desk
-                    </span>
-                    <span className="text-xs text-slate-400 font-mono">Protocole FIX 4.4</span>
+            <div className="p-6 sm:p-8 rounded-3xl bg-[#0c1017] border border-amber-500/40 backdrop-blur-xl shadow-2xl space-y-6 animate-in fade-in">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="size-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 grid place-items-center shrink-0">
+                    <Clock className="size-6 animate-spin" style={{ animationDuration: "8s" }} />
                   </div>
-                  <h2 className="text-lg font-bold text-white mt-1">
-                    Demande de Preset transmise à l'Administration
-                  </h2>
-                  <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                    Votre demande pour le <strong>{OFFICIAL_PRESETS.find(p => p.id === requestedPreset)?.name || requestedPreset}</strong> est
-                    actuellement examinée par votre gestionnaire <strong>{assignedAdvisor}</strong>. Dès que l'administrateur confirme votre
-                    abonnement, l'intégralité de votre Dashboard de trading sera instantanément déverrouillée.
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
+                        ÉTAPE 2/3 EN COURS
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">Protocole FIX 4.4</span>
+                    </div>
+                    <h2 className="text-xl font-bold text-white mt-1">
+                      Demande transmise au Desk d'Administration
+                    </h2>
+                    <p className="text-sm text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                      Votre demande pour le <strong>{OFFICIAL_PRESETS.find(p => p.id === requestedPreset)?.name || requestedPreset}</strong> a été enregistrée. Votre gestionnaire <strong>{assignedAdvisor}</strong> procède à la vérification de conformité et à l'affectation du flux de liquidité.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="px-4 py-2 rounded-xl bg-black/50 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold flex items-center gap-2 shrink-0">
+                  <span className="size-2 rounded-full bg-amber-400 animate-ping" />
+                  <span>Validation Desk en attente</span>
                 </div>
               </div>
 
-              <div className="shrink-0">
-                <div className="px-4 py-2 rounded-xl bg-black/40 border border-amber-500/30 text-amber-400 text-xs font-mono font-bold flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-amber-400 animate-ping" />
-                  <span>En attente validation Admin</span>
+              {/* Barre de Progression Visuelle */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
+                  <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
+                  <div>
+                    <strong className="text-xs text-emerald-300 block">1. Choix du Preset</strong>
+                    <span className="text-[10px] text-slate-400">Soumission confirmée</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center gap-3 shadow-lg shadow-amber-500/10">
+                  <Clock className="size-5 text-amber-400 animate-spin shrink-0" />
+                  <div>
+                    <strong className="text-xs text-amber-300 block">2. Examen Conformité Desk</strong>
+                    <span className="text-[10px] text-amber-200/80">Revue du Super Admin en cours</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex items-center gap-3 opacity-60">
+                  <Lock className="size-5 text-slate-400 shrink-0" />
+                  <div>
+                    <strong className="text-xs text-slate-300 block">3. Déploiement Live NY4</strong>
+                    <span className="text-[10px] text-slate-500">Déverrouillage Dashboard</span>
+                  </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="text-center max-w-3xl mx-auto space-y-3">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-                <ShieldCheck className="size-3.5" />
-                <span>Compte Titulaire Vérifié</span>
+            <div className="text-center max-w-3xl mx-auto space-y-3 pt-2">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider font-mono">
+                <Sparkles className="size-3.5" />
+                <span>Sélection de la Stratégie Initiale</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                 Activez votre Abonnement Algorithmique
-              </h1>
+              </h2>
               <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-                Votre compte de trading MT5 <strong>#{mt5AccountNumber}</strong> est opérationnel. Veuillez sélectionner ci-dessous le
-                Preset initial à déployer. Votre choix sera validé par l'Administration pour déverrouiller votre Dashboard de trading en direct.
+                Votre compte de trading MT5 <strong>#{mt5AccountNumber}</strong> est opérationnel et prêt pour l'exécution institutionnelle. Veuillez choisir la stratégie algorithmique à déployer. Dès validation par l'Administration, l'intégralité de votre Dashboard de trading en direct sera déverrouillée.
               </p>
             </div>
           )}
 
-          {/* Grille des 3 Presets */}
+          {/* Grille des 3 Presets Officiels */}
           <div className="grid md:grid-cols-3 gap-6 pt-2">
             {OFFICIAL_PRESETS.map((preset) => {
               const isSelected = requestedPreset === preset.id;
@@ -5725,7 +6021,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               return (
                 <div
                   key={preset.id}
-                  className={`rounded-3xl border bg-[#0d121a]/90 backdrop-blur-xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 shadow-xl ${preset.borderClass} ${
+                  className={`rounded-3xl border bg-[#0d121a] backdrop-blur-xl p-6 sm:p-7 flex flex-col justify-between transition-all duration-300 shadow-2xl ${preset.borderClass} ${
                     isSelected ? "ring-2 ring-emerald-400/50" : ""
                   }`}
                 >
@@ -5767,7 +6063,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                       </div>
                     </div>
 
-                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                    <div className="text-[11px] text-slate-400 flex items-center gap-2 font-mono">
                       <Wifi className="size-3.5 text-emerald-400 shrink-0" />
                       <span className="truncate">{preset.gateway}</span>
                     </div>
@@ -5795,19 +6091,44 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
             })}
           </div>
 
-          {/* Section d'Information Conseiller */}
+          {/* Section Frosted Preview des Fonctionnalités Verrouillées */}
+          <div className="relative rounded-3xl border border-white/[0.08] bg-[#0c1017] p-6 sm:p-8 overflow-hidden">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-6 space-y-3">
+              <div className="size-14 rounded-2xl bg-white/[0.08] border border-white/[0.15] text-white grid place-items-center shadow-2xl">
+                <Lock className="size-7 text-[#00D084]" />
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                Centre de Pilotage &amp; Graphiques de Trading en Direct
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
+                Le passage d'ordres MT5, les flux de liquidité FIX 4.4, le carnet d'ordres L2 et la télémétrie de haute fréquence s'activeront instantanément dès que l'Administration aura validé votre Preset.
+              </p>
+            </div>
+
+            <div className="opacity-20 pointer-events-none space-y-4 filter blur-[2px]">
+              <div className="h-10 bg-white/[0.06] rounded-xl w-full" />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="h-36 bg-white/[0.04] rounded-2xl" />
+                <div className="h-36 bg-white/[0.04] rounded-2xl" />
+                <div className="h-36 bg-white/[0.04] rounded-2xl" />
+              </div>
+              <div className="h-64 bg-white/[0.04] rounded-2xl" />
+            </div>
+          </div>
+
+          {/* Section d'Assistance Conseiller & Support Direct */}
           <div className="p-6 rounded-3xl border border-white/[0.08] bg-[#0c1017] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
             <div className="flex items-center gap-3">
-              <div className="size-10 rounded-2xl bg-white/[0.06] grid place-items-center text-white">
+              <div className="size-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 grid place-items-center text-emerald-400">
                 <ShieldCheck className="size-5" />
               </div>
               <div>
-                <strong className="text-white block font-semibold">Conseiller Référent Dédié</strong>
-                <span>{assignedAdvisor} · Supervision des risques et allocations 24/7</span>
+                <strong className="text-white block font-semibold">Conseiller Référent Dédié : {assignedAdvisor}</strong>
+                <span>Supervision institutionnelle, gestion des allocations et support 24/7</span>
               </div>
             </div>
             <div className="text-right">
-              <span className="text-slate-400">Support Technique : </span>
+              <span className="text-slate-400">Support Desk : </span>
               <strong className="text-emerald-400 font-mono">support@nexiummarkets.com</strong>
             </div>
           </div>
@@ -5829,7 +6150,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                 </div>
                 <button
                   onClick={() => setSelectedPresetModal(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06]"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
                 >
                   <X className="size-5" />
                 </button>
@@ -5852,7 +6173,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   onClick={() => setSelectedPresetModal(null)}
-                  className="px-4 py-2.5 rounded-xl border border-white/[0.1] text-xs font-bold text-slate-300 hover:bg-white/[0.06] transition"
+                  className="px-4 py-2.5 rounded-xl border border-white/[0.1] text-xs font-bold text-slate-300 hover:bg-white/[0.06] transition cursor-pointer"
                 >
                   Annuler
                 </button>

@@ -14,7 +14,11 @@ export const Route = createFileRoute("/dashboard")({
     }
 
     const profile = await getUserProfile(session.user.id);
-    const userSlug = getUserSlug({ name: profile?.name, email: session.user.email, id: session.user.id });
+    if (!profile || profile.status !== "ACTIVE") {
+      throw redirect({ to: "/login" });
+    }
+
+    const userSlug = getUserSlug({ name: profile.name, email: session.user.email, id: session.user.id });
 
     throw redirect({
       to: "/portal/$slug",
