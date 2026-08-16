@@ -103,6 +103,7 @@ import {
   supabase,
   isSupabaseConfigured,
   getUserProfile,
+  updateUserProfile,
   requestPresetsActivation,
   getClientChatMessages,
   sendChatMessage,
@@ -5512,21 +5513,42 @@ export function NexiumDashboard({
     });
   };
 
-  const handleToggleBotPause = (botId: EngineBot["id"]) => {
+  const ENGINE_ID_TO_KEY: Record<string, "aiGold" | "fxTrend" | "indexReversion"> = {
+    "nexium-ai-gold": "aiGold",
+    "nexium-fx-trend": "fxTrend",
+    "nexium-index-reversion": "indexReversion",
+  };
+
+  const handleToggleBotPause = async (botId: EngineBot["id"]) => {
+    const bot = bots.find((b) => b.id === botId);
+    if (!bot) return;
+    const nextActive = bot.statusBadge !== "ACTIF";
+    const nextState = nextActive ? "ACTIF" : "EN PAUSE";
+
     setBots((prev) =>
-      prev.map((b) => {
-        if (b.id === botId) {
-          const nextState = b.statusBadge === "ACTIF" ? "EN PAUSE" : "ACTIF";
-          toast.info(`Auto-Trader ${b.name} : ${nextState}.`);
-          return {
-            ...b,
-            statusBadge: nextState as any,
-            mainState: nextState === "ACTIF" ? "RUNNING" : ("RISK BLOCKED" as any),
-          };
-        }
-        return b;
-      })
+      prev.map((b) =>
+        b.id === botId
+          ? { ...b, statusBadge: nextState as any, mainState: (nextActive ? "RUNNING" : "RISK BLOCKED") as any }
+          : b
+      )
     );
+    toast.info(`Auto-Trader ${bot.name} : ${nextState}.`);
+
+    if (isSupabaseConfigured && currentUserId) {
+      const engineKey = ENGINE_ID_TO_KEY[botId];
+      if (engineKey) {
+        const profile = await getUserProfile(currentUserId);
+        const currentConfig = (profile?.engines_config as any) || {};
+        const nextConfig = {
+          ...currentConfig,
+          [engineKey]: { ...(currentConfig[engineKey] || {}), active: nextActive },
+        };
+        const result = await updateUserProfile(currentUserId, { engines_config: nextConfig });
+        if (!result.success) {
+          toast.error("Échec de l'enregistrement côté base de données.");
+        }
+      }
+    }
   };
 
   const handleClosePosition = (pos: PositionItem) => {
