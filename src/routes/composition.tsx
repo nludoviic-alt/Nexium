@@ -1588,6 +1588,13 @@ function NexiumAdminDashboard({
 
   // Édition d'un Membre du Staff
   const handleOpenEditStaff = (st: StaffAdministrator) => {
+    // Le statut de Super Owner ne doit jamais être révélé à quelqu'un d'autre
+    // que lui-même — pas même aux autres OWNER. Seul le Super Owner peut
+    // ouvrir sa propre fiche ; pour tout autre visiteur, la fiche reste fermée.
+    if (st.isPrimaryOwner && !isPrimaryOwner) {
+      toast.error("Accès refusé à ce profil.");
+      return;
+    }
     setEditingStaffMember(st);
     setEditStaffName(st.name);
     setEditStaffEmail(st.email);
@@ -1617,10 +1624,12 @@ function NexiumAdminDashboard({
     e.preventDefault();
     if (!editingStaffMember) return;
 
-    // Verrou Super Owner : ce compte est protégé pour tout le monde depuis
-    // l'app, y compris pour lui-même — seul un accès base de données direct
-    // peut le modifier (miroir du trigger Postgres protect_privileged_profile_fields).
-    if (editingStaffMember.isPrimaryOwner) {
+    // Verrou Super Owner : personne d'autre que lui-même ne peut modifier ce
+    // compte (déjà bloqué à l'ouverture de la fiche par handleOpenEditStaff).
+    // Le Super Owner peut corriger ses propres nom/téléphone — rôle, statut
+    // et champs sensibles restent verrouillés côté base par le trigger
+    // Postgres protect_privileged_profile_fields, quoi que ce formulaire envoie.
+    if (editingStaffMember.isPrimaryOwner && !isPrimaryOwner) {
       toast.error("Compte Super Owner protégé : non modifiable depuis cette interface.");
       return;
     }
@@ -4816,6 +4825,24 @@ function NexiumAdminDashboard({
                             <span>Révoquer Tous les Droits</span>
                           </button>
 
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingStaffMember(null);
+                              handleDeleteStaffMember(editingStaffMember);
+                            }}
+                            className="rounded-xl border border-rose-600 bg-rose-600/20 hover:bg-rose-600/30 px-5 py-2.5 text-xs sm:text-sm font-bold text-rose-400 transition cursor-pointer flex items-center gap-2 ml-auto"
+                          >
+                            <Trash2 className="size-4" />
+                            <span>Supprimer Définitivement</span>
+                          </button>
+                        </div>
+                      ) : isPrimaryOwner ? (
+                        <div className="flex flex-wrap items-center gap-3 pt-2">
+                          <p className="text-xs text-amber-300/80 flex items-center gap-2">
+                            <ShieldCheck className="size-4 shrink-0" />
+                            Compte OWNER : seule la suppression définitive est autorisée, réservée au Super Owner.
+                          </p>
                           <button
                             type="button"
                             onClick={() => {
