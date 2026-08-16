@@ -623,13 +623,13 @@ function matchesAuditEntry(l: AuditEntry, q: string) {
   );
 }
 const STAFF_ROLE_OPTIONS: DropdownOption<AdminSystemRole>[] = [
-  { value: "OWNER", label: "Owner (Propriétaire / Fondateur)" },
-  { value: "SUPER_ADMIN", label: "Super Administrateur (Gouvernance & Direction)" },
-  { value: "ADMIN", label: "Administrateur Général" },
-  { value: "CONSEILLER", label: "Conseiller Privé & Chargé de Compte" },
-  { value: "SUPPORT", label: "Conseiller Support & Relation Client" },
-  { value: "FINANCE", label: "Gestionnaire Financier & Trésorerie" },
-  { value: "QUANT", label: "Analyste Quantitatif & Stratégies MT5" },
+  { value: "OWNER", label: "Owner", badge: "Fondateur" },
+  { value: "SUPER_ADMIN", label: "Super Admin", badge: "Direction" },
+  { value: "ADMIN", label: "Admin", badge: "Général" },
+  { value: "CONSEILLER", label: "Conseiller", badge: "Compte Privé" },
+  { value: "SUPPORT", label: "Support", badge: "Relation Client" },
+  { value: "FINANCE", label: "Finance", badge: "Trésorerie" },
+  { value: "QUANT", label: "Quant", badge: "Stratégies MT5" },
 ];
 const STAFF_DEPT_OPTIONS: DropdownOption<any>[] = [
   { value: "Direction Générale", label: "Direction Générale" },
