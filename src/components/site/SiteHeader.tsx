@@ -62,13 +62,13 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
             : "max-h-14 overflow-visible border-b opacity-100"
         }`}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6">
           <div className="flex items-center gap-4 font-semibold tracking-wide">
             <Link
-              to="/portal"
+              to="/how-it-works"
               className="cursor-pointer text-xs font-extrabold tracking-wider text-[#00D084] uppercase hover:underline"
             >
-              {t.nav.clientArea}
+              {t.nav.automation}
             </Link>
             <span className="text-gray-700">|</span>
             <Link to="/about" className="text-xs transition-colors hover:text-[#00D084]">
@@ -81,10 +81,6 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
           </div>
 
           <div className="hidden items-center gap-4 text-xs font-medium lg:flex">
-            <Link to="/how-it-works" className="cursor-pointer transition-colors hover:text-white">
-              {t.nav.automation}
-            </Link>
-            <span className="text-gray-700">|</span>
             <Link to="/about" className="cursor-pointer transition-colors hover:text-white">
               {t.nav.technology}
             </Link>
@@ -98,8 +94,8 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
             </Link>
             <span className="text-gray-700">|</span>
 
-            {/* Premium Language Dropdown */}
-            <LanguageSelector variant="dropdown" />
+            {/* Premium Segmented Language Switch */}
+            <LanguageSelector variant="segmented" />
           </div>
         </div>
       </div>
@@ -140,7 +136,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
           {/* Quick switcher in sticky bar when scrolled */}
           {isTopBarHidden && (
             <div className="mr-1 animate-in fade-in zoom-in-95 duration-200">
-              <LanguageSelector variant="compact" />
+              <LanguageSelector variant="segmented" />
             </div>
           )}
 

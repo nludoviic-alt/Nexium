@@ -124,7 +124,7 @@ export function LanguageSelector({
   if (variant === "segmented") {
     return (
       <div
-        className={`relative inline-flex items-center rounded-full bg-slate-900/90 p-0.5 border border-slate-800 shadow-inner ${className}`}
+        className={`relative inline-flex items-center rounded-full bg-[#0c121d] p-0.5 border border-slate-700/70 shadow-[0_2px_10px_rgba(0,0,0,0.4)] backdrop-blur-md ${className}`}
       >
         {LANGUAGES.map((lang) => {
           const isSelected = language === lang.code;
@@ -137,13 +137,13 @@ export function LanguageSelector({
                 e.stopPropagation();
                 setLanguage(lang.code);
               }}
-              className={`relative flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-full transition-all duration-200 cursor-pointer ${
+              className={`relative flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold tracking-wider rounded-full transition-all duration-200 cursor-pointer ${
                 isSelected
-                  ? "bg-gradient-to-r from-[#00D084] to-[#00b070] text-black shadow-[0_0_12px_rgba(0,208,132,0.35)]"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                  ? "bg-[#00D084] text-slate-950 shadow-[0_0_12px_rgba(0,208,132,0.5)]"
+                  : "text-slate-400 hover:text-white hover:bg-white/5"
               }`}
             >
-              <FlagComponent className="w-3.5 h-2.5" />
+              <FlagComponent className="w-3.5 h-2.5 rounded-[1px]" />
               <span>{lang.label}</span>
             </button>
           );
