@@ -1139,6 +1139,7 @@ function EngineTab({
   mt5AccountNumber,
   onOpenBotDetail,
   onToggleBotPause,
+  onSetAllBotsActive,
   onClosePosition,
 }: {
   bots: EngineBot[];
@@ -1147,11 +1148,15 @@ function EngineTab({
   mt5AccountNumber: string;
   onOpenBotDetail: (bot: EngineBot) => void;
   onToggleBotPause: (botId: EngineBot["id"]) => void;
+  onSetAllBotsActive: (active: boolean) => void;
   onClosePosition: (pos: PositionItem) => void;
 }) {
   const [selectedBotId, setSelectedBotId] = useState<EngineBot["id"]>("nexium-ai-gold");
   const [tradingMode, setTradingMode] = useState<"simulation" | "demo" | "live">("demo");
-  const [isEngineRunning, setIsEngineRunning] = useState(true);
+  // Reflète l'état réel persisté des moteurs (engines_config) — jamais une
+  // valeur locale par défaut, pour ne pas ré-afficher "ACTIF" après un
+  // rafraîchissement alors que le trading est en pause côté base.
+  const isEngineRunning = useMemo(() => bots.some((b) => b.statusBadge === "ACTIF"), [bots]);
   const [forcingTrade, setForcingTrade] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<"decision" | "metrics" | "journal">("decision");
   const [logFilter, setLogFilter] = useState<"all" | "won" | "lost" | "open">("all");
@@ -1332,7 +1337,7 @@ function EngineTab({
     if (!confirmModal) return;
     if (confirmModal.type === "master_engine") {
       const next = !isEngineRunning;
-      setIsEngineRunning(next);
+      onSetAllBotsActive(next);
       if (next) {
         playOpenSound();
         toast.success("Trading Automatique global activé avec succès sur flux FIX NY4 !");
@@ -5106,7 +5111,6 @@ export function NexiumDashboard({
   onExitImpersonation?: () => void;
 } = {}) {
   const navigate = useNavigate();
-  const [running, setRunning] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("Vue d’ensemble");
@@ -5473,6 +5477,10 @@ export function NexiumDashboard({
   // Positions/journal : aucune table de trades réels n'existe encore (MT5 pas encore
   // connecté) — on démarre donc à vide plutôt que d'afficher une activité fictive.
   const [bots, setBots] = useState<EngineBot[]>(INITIAL_BOTS);
+  // Reflète l'état réel persisté des moteurs — jamais une valeur locale par
+  // défaut, pour ne pas ré-afficher "Activer le Trading" comme actif après un
+  // rafraîchissement alors que le trading est en pause côté base.
+  const running = useMemo(() => bots.some((b) => b.statusBadge === "ACTIF"), [bots]);
   const [positions, setPositions] = useState<PositionItem[]>([]);
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
@@ -5544,22 +5552,44 @@ export function NexiumDashboard({
     navigate({ to: "/login" });
   };
 
-  const handleToggleEngine = () => {
-    setRunning((prev) => {
-      const next = !prev;
-      if (next) {
-        toast.success("Auto-Trader activé en direct (Flux FIX Equinix NY4).");
-      } else {
-        toast.warning("Auto-Trader mis en pause de sécurité.");
-      }
-      return next;
-    });
-  };
-
   const ENGINE_ID_TO_KEY: Record<string, "aiGold" | "fxTrend" | "indexReversion"> = {
     "nexium-ai-gold": "aiGold",
     "nexium-fx-trend": "fxTrend",
     "nexium-index-reversion": "indexReversion",
+  };
+
+  // Bascule les 3 moteurs à la fois (interrupteur général) et persiste
+  // immédiatement en base — sans ça, le bouton "Activer le Trading" repartait
+  // toujours sur ACTIF après un rafraîchissement puisque rien n'était
+  // réellement enregistré côté engines_config.
+  const handleSetAllBotsActive = async (active: boolean) => {
+    const nextState = active ? "ACTIF" : "EN PAUSE";
+    setBots((prev) =>
+      prev.map((b) => ({ ...b, statusBadge: nextState as any, mainState: (active ? "RUNNING" : "RISK BLOCKED") as any }))
+    );
+
+    if (isSupabaseConfigured && currentUserId) {
+      const profile = await getUserProfile(currentUserId);
+      const currentConfig = (profile?.engines_config as any) || {};
+      const nextConfig = { ...currentConfig };
+      for (const key of Object.values(ENGINE_ID_TO_KEY)) {
+        nextConfig[key] = { ...(currentConfig[key] || {}), active };
+      }
+      const result = await updateUserProfile(currentUserId, { engines_config: nextConfig });
+      if (!result.success) {
+        toast.error("Échec de l'enregistrement côté base de données.");
+      }
+    }
+  };
+
+  const handleToggleEngine = () => {
+    const next = !running;
+    handleSetAllBotsActive(next);
+    if (next) {
+      toast.success("Auto-Trader activé en direct (Flux FIX Equinix NY4).");
+    } else {
+      toast.warning("Auto-Trader mis en pause de sécurité.");
+    }
   };
 
   const handleToggleBotPause = async (botId: EngineBot["id"]) => {
@@ -5630,7 +5660,7 @@ export function NexiumDashboard({
     const totalPnl = positions.reduce((acc, p) => acc + p.pnlNum, 0);
     setBalance((prev) => prev + totalPnl);
     setPositions([]);
-    setRunning(false);
+    handleSetAllBotsActive(false);
 
     const now = new Date().toLocaleTimeString();
     const newJ: JournalEntry = {
@@ -6589,6 +6619,7 @@ export function NexiumDashboard({
               mt5AccountNumber={mt5AccountNumber}
               onOpenBotDetail={(bot) => setSelectedDetailBot(bot)}
               onToggleBotPause={handleToggleBotPause}
+              onSetAllBotsActive={handleSetAllBotsActive}
               onClosePosition={handleClosePosition}
             />
           )}
