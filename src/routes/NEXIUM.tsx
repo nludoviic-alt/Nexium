@@ -5063,7 +5063,16 @@ function MessagingTab({
 // ----------------------------------------------------
 import { getUserSlug } from "@/lib/user-slug";
 
-export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
+export function NexiumDashboard({
+  customSlug,
+  adminImpersonateUserId,
+  onExitImpersonation,
+}: {
+  customSlug?: string;
+  /** Quand fourni, le dashboard charge/pilote CE client précis au lieu du compte connecté — utilisé par la Supervision Live admin. */
+  adminImpersonateUserId?: string;
+  onExitImpersonation?: () => void;
+} = {}) {
   const navigate = useNavigate();
   const [running, setRunning] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -5085,9 +5094,85 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   const [showPresetConfirmModal, setShowPresetConfirmModal] = useState(false);
   const [submittingPreset, setSubmittingPreset] = useState(false);
 
+  // Applique un profil (le sien, ou celui d'un client supervisé) à l'état local du dashboard.
+  const applyProfileToState = (profile: NonNullable<Awaited<ReturnType<typeof getUserProfile>>>) => {
+    if (profile.name) setClientName(profile.name);
+    if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
+    if (profile.bonus_credit !== undefined && profile.bonus_credit !== null) setBonus(Number(profile.bonus_credit));
+    if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
+    if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
+    if (profile.license_status) {
+      setLicenseStatus(profile.license_status as any);
+    } else if (profile.status === "ACTIVE" && profile.active_preset) {
+      setLicenseStatus("ACTIVE");
+    } else {
+      setLicenseStatus("NOT_REQUESTED");
+    }
+    if (profile.requested_presets && profile.requested_presets.length > 0) {
+      setRequestedPresets(profile.requested_presets);
+    } else if (profile.requested_preset) {
+      setRequestedPresets([profile.requested_preset]);
+    }
+    if (profile.active_preset) setActivePreset(profile.active_preset);
+
+    // Synchronisation initiale des moteurs (AI Gold / FX Trend / Index Reversion)
+    // avec l'état réel enregistré côté admin — sinon chaque carte reste figée sur
+    // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
+    if (profile.engines_config) {
+      const cfg = profile.engines_config as any;
+      setBots((prev) =>
+        prev.map((bot) => {
+          if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
+            return {
+              ...bot,
+              statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
+              mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+              risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
+            };
+          }
+          if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
+            return {
+              ...bot,
+              statusBadge: cfg.fxTrend.active ? "ACTIF" : "EN PAUSE",
+              mainState: cfg.fxTrend.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+              risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
+            };
+          }
+          if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
+            return {
+              ...bot,
+              statusBadge: cfg.indexReversion.active ? "ACTIF" : "EN PAUSE",
+              mainState: cfg.indexReversion.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+              risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
+            };
+          }
+          return { ...bot, statusBadge: "EN PAUSE", mainState: "WAITING FOR SETUP" };
+        })
+      );
+    } else {
+      setBots((prev) => prev.map((bot) => ({ ...bot, statusBadge: "EN PAUSE", mainState: "WAITING FOR SETUP" })));
+    }
+  };
+
   // Chargement dynamique & Protection stricte de l'espace client
   useEffect(() => {
     if (!isSupabaseConfigured) return;
+
+    // Supervision Live : l'admin est déjà authentifié dans sa propre session ;
+    // on charge simplement les données du client ciblé, sans revérifier son
+    // statut de compte ni le rediriger — l'admin doit pouvoir superviser un
+    // compte même en attente, suspendu, etc.
+    if (adminImpersonateUserId) {
+      setCurrentUserId(adminImpersonateUserId);
+      getUserProfile(adminImpersonateUserId).then((profile) => {
+        if (profile) {
+          setClientEmail(profile.email || "");
+          applyProfileToState(profile);
+        }
+      });
+      return;
+    }
+
     supabase.auth.getUser().then(async ({ data: { user }, error }) => {
       if (error || !user) {
         toast.info("Veuillez vous connecter pour accéder à votre espace institutionnel.");
@@ -5126,62 +5211,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
       }
 
       if (profile) {
-        if (profile.name) setClientName(profile.name);
-        if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
-        if (profile.bonus_credit !== undefined && profile.bonus_credit !== null) setBonus(Number(profile.bonus_credit));
-        if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
-        if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
-        if (profile.license_status) {
-          setLicenseStatus(profile.license_status as any);
-        } else if (profile.status === "ACTIVE" && profile.active_preset) {
-          setLicenseStatus("ACTIVE");
-        } else {
-          setLicenseStatus("NOT_REQUESTED");
-        }
-        if (profile.requested_presets && profile.requested_presets.length > 0) {
-          setRequestedPresets(profile.requested_presets);
-        } else if (profile.requested_preset) {
-          setRequestedPresets([profile.requested_preset]);
-        }
-        if (profile.active_preset) setActivePreset(profile.active_preset);
-
-        // Synchronisation initiale des moteurs (AI Gold / FX Trend / Index Reversion)
-        // avec l'état réel enregistré côté admin — sinon chaque carte reste figée sur
-        // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
-        if (profile.engines_config) {
-          const cfg = profile.engines_config as any;
-          setBots((prev) =>
-            prev.map((bot) => {
-              if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
-                return {
-                  ...bot,
-                  statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
-                  mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
-                  risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
-                };
-              }
-              if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
-                return {
-                  ...bot,
-                  statusBadge: cfg.fxTrend.active ? "ACTIF" : "EN PAUSE",
-                  mainState: cfg.fxTrend.active ? "POSITION OPEN" : "WAITING FOR SETUP",
-                  risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
-                };
-              }
-              if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
-                return {
-                  ...bot,
-                  statusBadge: cfg.indexReversion.active ? "ACTIF" : "EN PAUSE",
-                  mainState: cfg.indexReversion.active ? "POSITION OPEN" : "WAITING FOR SETUP",
-                  risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
-                };
-              }
-              return { ...bot, statusBadge: "EN PAUSE", mainState: "WAITING FOR SETUP" };
-            })
-          );
-        } else {
-          setBots((prev) => prev.map((bot) => ({ ...bot, statusBadge: "EN PAUSE", mainState: "WAITING FOR SETUP" })));
-        }
+        applyProfileToState(profile);
 
         // Vérification du slug personnalisé dans l'URL
         const ownSlug = getUserSlug({ name: profile.name, email: user.email, id: user.id });
@@ -5192,7 +5222,7 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
         }
       }
     });
-  }, [customSlug]);
+  }, [customSlug, adminImpersonateUserId]);
 
   // Écouteur Realtime sur le profil de l'utilisateur (mise à jour en direct lors d'une validation Admin)
   useEffect(() => {
@@ -5205,9 +5235,15 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
         setBonus(Number(updatedProfile.bonus_credit));
       }
       if (updatedProfile.status === "REVOKED" || updatedProfile.status === "BANNED" || updatedProfile.status === "SUSPENDED") {
-        toast.error("Votre compte a été restreint par l'administration.");
-        supabase.auth.signOut();
-        navigate({ to: "/login" });
+        if (adminImpersonateUserId) {
+          // Ne jamais déconnecter la vraie session admin qui supervise —
+          // ce statut restreint concerne le compte du client supervisé, pas le sien.
+          toast.warning("Ce client vient d'être restreint (suspendu/banni/révoqué) par l'administration.");
+        } else {
+          toast.error("Votre compte a été restreint par l'administration.");
+          supabase.auth.signOut();
+          navigate({ to: "/login" });
+        }
         return;
       }
       if (updatedProfile.license_status) setLicenseStatus(updatedProfile.license_status as any);
@@ -5451,8 +5487,15 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
   ];
 
   // Actions
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setUserMenuOpen(false);
+    // En supervision, "Déconnexion" ne doit jamais couper la vraie session
+    // admin — ça quitte simplement la supervision de ce client.
+    if (adminImpersonateUserId) {
+      onExitImpersonation?.();
+      return;
+    }
+    if (isSupabaseConfigured) await supabase.auth.signOut();
     toast.info("Déconnexion réussie. À bientôt !");
     navigate({ to: "/login" });
   };
@@ -5780,15 +5823,11 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                     </div>
                   </div>
                   <button
-                    onClick={async () => {
-                      if (isSupabaseConfigured) await supabase.auth.signOut();
-                      toast.info("Déconnexion réussie.");
-                      navigate({ to: "/login" });
-                    }}
+                    onClick={handleLogout}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
                   >
                     <LogOut className="size-3.5" />
-                    Déconnexion Sécurisée
+                    {adminImpersonateUserId ? "Quitter la Supervision" : "Déconnexion Sécurisée"}
                   </button>
                 </div>
               )}
@@ -6421,18 +6460,11 @@ export function NexiumDashboard({ customSlug }: { customSlug?: string } = {}) {
                   </Link>
                   <div className="my-1 border-t border-white/[0.06]" />
                   <button
-                    onClick={async () => {
-                      setUserMenuOpen(false);
-                      if (isSupabaseConfigured) {
-                        await supabase.auth.signOut();
-                      }
-                      toast.info("Déconnexion réussie.");
-                      navigate({ to: "/login" });
-                    }}
+                    onClick={handleLogout}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
                   >
                     <LogOut className="size-3.5" />
-                    Se déconnecter
+                    {adminImpersonateUserId ? "Quitter la Supervision" : "Se déconnecter"}
                   </button>
                 </div>
               )}

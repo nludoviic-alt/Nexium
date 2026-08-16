@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AdminPanel, AdminBadge, AdminToggle, AdminDataTable, AdminStatTile, AdminSidebarNav, AdminDropdown, useTableQuery, downloadCsv } from "@/components/admin";
+import { NexiumDashboard } from "./NEXIUM";
 import {
   emailApi,
   isEmailApiConfigured,
@@ -2992,6 +2993,44 @@ function NexiumAdminDashboard({
   const totalBalance = useMemo(() => clients.reduce((acc, c) => acc + c.balance, 0), [clients]);
   const totalBonus = useMemo(() => clients.reduce((acc, c) => acc + c.bonusCredit, 0), [clients]);
 
+  // Supervision Live : remplace intégralement l'interface admin par le vrai
+  // dashboard du client ciblé (mêmes composants, mêmes actions), pour que
+  // l'admin puisse voir et agir exactement comme lui depuis son propre espace.
+  if (impersonatedClient && activeSection === "impersonation") {
+    return (
+      <>
+        <div className="sticky top-0 z-50 border-b border-amber-500/40 bg-[#1a1206]/95 backdrop-blur-xl text-amber-300 px-6 py-2.5 flex flex-wrap items-center justify-between shadow-[0_0_24px_rgba(245,158,11,0.15)] font-semibold text-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="size-2.5 rounded-full bg-amber-400 animate-ping" />
+            <span className="font-bold uppercase tracking-wide">
+              SUPERVISION LIVE : {impersonatedClient.name} (MT5 #{impersonatedClient.mt5?.login || "—"})
+            </span>
+          </div>
+
+          <button
+            onClick={() => {
+              setImpersonatedClientId(null);
+              setActiveSection("users");
+              toast.info("Supervision terminée. Retour à l'administration.");
+            }}
+            className="rounded-lg border border-amber-500/40 bg-[#0c121e] hover:bg-amber-500/20 text-amber-300 px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+          >
+            Quitter la Supervision &amp; Retour Admin
+          </button>
+        </div>
+
+        <NexiumDashboard
+          adminImpersonateUserId={impersonatedClient.id}
+          onExitImpersonation={() => {
+            setImpersonatedClientId(null);
+            setActiveSection("users");
+            toast.info("Supervision terminée. Retour à l'administration.");
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-[#0a0e17] text-slate-100 font-sans selection:bg-emerald-500/30 flex flex-col antialiased palette-${adminPalette}`}>
       {/* Modale de Confirmation */}
@@ -3038,28 +3077,6 @@ function NexiumAdminDashboard({
         </div>
       )}
 
-      {/* BANDEAU IMPERSONATION */}
-      {impersonatedClient && activeSection === "impersonation" && (
-        <div className="sticky top-0 z-50 border-b border-amber-500/40 bg-[#1a1206]/95 backdrop-blur-xl text-amber-300 px-6 py-2.5 flex flex-wrap items-center justify-between shadow-[0_0_24px_rgba(245,158,11,0.15)] font-semibold text-sm">
-          <div className="flex items-center gap-2.5">
-            <span className="size-2.5 rounded-full bg-amber-400 animate-ping" />
-            <span className="font-bold uppercase tracking-wide">
-              SUPERVISION LIVE : {impersonatedClient.name} (MT5 #{impersonatedClient.mt5?.login || "—"})
-            </span>
-          </div>
-
-          <button
-            onClick={() => {
-              setImpersonatedClientId(null);
-              setActiveSection("users");
-              toast.info("Supervision terminée. Retour à l'administration.");
-            }}
-            className="rounded-lg border border-amber-500/40 bg-[#0c121e] hover:bg-amber-500/20 text-amber-300 px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition cursor-pointer"
-          >
-            Quitter la Supervision &amp; Retour Admin
-          </button>
-        </div>
-      )}
 
       {/* TOPBAR */}
       <header className="sticky top-0 z-40 flex h-20 shrink-0 items-center justify-between border-b border-slate-700/50 bg-[#0d1322]/95 px-6 lg:px-8 backdrop-blur-xl shadow-lg">
