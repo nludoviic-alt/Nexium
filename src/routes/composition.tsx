@@ -234,10 +234,75 @@ export function CompositionAccessGate({ customAdminSlug }: { customAdminSlug?: s
 
   if (state !== "authorized" || !sessionRole || !sessionUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0b0d10]">
-        <div className="flex items-center gap-3 text-sm font-semibold text-emerald-400">
-          <Loader2 className="size-5 animate-spin" />
-          Vérification des accès…
+      <div className="min-h-screen bg-[#080a0e] text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans select-none">
+        {/* Lueur d'ambiance d'arrière-plan */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-[500px] bg-[#00D084]/5 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 size-[300px] bg-cyan-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#0c1017]/90 backdrop-blur-2xl p-8 sm:p-10 shadow-2xl shadow-black/80 text-center space-y-7 animate-in fade-in zoom-in-95 duration-300">
+          {/* Logo & Emblème */}
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-3">
+              <span className="font-mono text-2xl font-black tracking-[0.25em] text-white">NEXIUM</span>
+              <span className="h-5 w-px bg-[#00D084]" />
+              <span className="text-xs font-black tracking-[0.3em] text-[#00D084]">MARKETS</span>
+            </div>
+            <div>
+              <span className="inline-block px-3 py-1 rounded-full text-[10px] font-mono font-black uppercase tracking-widest bg-[#00D084]/10 text-[#00D084] border border-[#00D084]/30">
+                Desk d'Administration · Supervision Quant
+              </span>
+            </div>
+          </div>
+
+          {/* Radar Central Animé */}
+          <div className="relative size-24 mx-auto flex items-center justify-center">
+            {/* Anneau rotatif 1 */}
+            <div className="absolute inset-0 rounded-full border-2 border-dashed border-[#00D084]/40 animate-spin" style={{ animationDuration: "12s" }} />
+            {/* Anneau rotatif 2 inverse */}
+            <div className="absolute inset-2 rounded-full border border-cyan-500/30 animate-spin" style={{ animationDuration: "8s", animationDirection: "reverse" }} />
+            {/* Halo central */}
+            <div className="size-14 rounded-2xl bg-gradient-to-br from-[#00D084]/20 to-cyan-500/10 border border-[#00D084]/40 grid place-items-center shadow-lg shadow-[#00D084]/20">
+              <ShieldCheck className="size-7 text-[#00D084] animate-pulse" />
+            </div>
+          </div>
+
+          {/* Statut & Barre de Progression */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+              <span className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-[#00D084] animate-ping" />
+                <span>Initialisation du Desk...</span>
+              </span>
+              <span className="text-[#00D084] font-bold">Protocole FIX 4.4</span>
+            </div>
+
+            {/* Barre de Progression Fluide */}
+            <div className="h-1.5 w-full bg-white/[0.06] rounded-full overflow-hidden relative">
+              <div className="h-full bg-gradient-to-r from-[#00D084] via-cyan-400 to-[#00D084] rounded-full w-2/3 animate-pulse" />
+            </div>
+
+            {/* Logs de Télémétrie en Direct */}
+            <div className="pt-2 text-[11px] font-mono text-slate-400/90 space-y-1 bg-black/40 p-3 rounded-xl border border-white/[0.04] text-left">
+              <div className="flex items-center gap-2 truncate text-slate-300">
+                <span className="text-[#00D084]">✓</span>
+                <span>Liaison chiffrée TLS 1.3 établie</span>
+              </div>
+              <div className="flex items-center gap-2 truncate text-slate-300">
+                <span className="text-[#00D084]">✓</span>
+                <span>Authentification du jeton de session</span>
+              </div>
+              <div className="flex items-center gap-2 truncate text-cyan-300">
+                <span className="text-cyan-400 animate-spin">⟳</span>
+                <span>Synchronisation de l'infrastructure NY4...</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer de Sécurité */}
+          <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-slate-500">
+            <span>Passerelle : Equinix NY4</span>
+            <span className="text-emerald-500 font-bold">Latence : 16ms</span>
+          </div>
         </div>
       </div>
     );
