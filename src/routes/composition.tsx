@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AdminPanel, AdminBadge, AdminToggle, AdminDataTable, AdminStatTile, AdminSidebarNav, AdminDropdown, useTableQuery, downloadCsv } from "@/components/admin";
-import { NexiumDashboard } from "./NEXIUM";
 import {
   emailApi,
   isEmailApiConfigured,
@@ -175,6 +174,10 @@ import {
 } from "@/lib/supabase";
 
 import { getAdminSlug } from "@/lib/user-slug";
+
+const NexiumDashboard = lazy(() =>
+  import("./-nexium-dashboard").then((m) => ({ default: m.NexiumDashboard }))
+);
 
 export const Route = createFileRoute("/composition")({
   component: CompositionAccessGate,
@@ -3095,14 +3098,16 @@ function NexiumAdminDashboard({
           </button>
         </div>
 
-        <NexiumDashboard
-          adminImpersonateUserId={impersonatedClient.id}
-          onExitImpersonation={() => {
-            setImpersonatedClientId(null);
-            setActiveSection("users");
-            toast.info("Supervision terminée. Retour à l'administration.");
-          }}
-        />
+        <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center"><div className="size-10 animate-spin rounded-full border-2 border-white/10 border-t-[#00D084]" /></div>}>
+          <NexiumDashboard
+            adminImpersonateUserId={impersonatedClient.id}
+            onExitImpersonation={() => {
+              setImpersonatedClientId(null);
+              setActiveSection("users");
+              toast.info("Supervision terminée. Retour à l'administration.");
+            }}
+          />
+        </Suspense>
       </>
     );
   }

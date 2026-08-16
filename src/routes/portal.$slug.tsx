@@ -1,5 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { NexiumDashboard } from "./NEXIUM";
+import { lazy, Suspense } from "react";
+
+const NexiumDashboardLazy = lazy(() =>
+  import("./-nexium-dashboard").then((m) => ({ default: m.NexiumDashboard }))
+);
+
+function DashboardLoadingFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#0a0d12]">
+      <div className="size-10 animate-spin rounded-full border-2 border-white/10 border-t-[#00D084]" />
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/portal/$slug")({
   head: ({ params }) => ({
@@ -17,5 +29,9 @@ export const Route = createFileRoute("/portal/$slug")({
 
 function UserPortalPage() {
   const { slug } = Route.useParams();
-  return <NexiumDashboard customSlug={slug} />;
+  return (
+    <Suspense fallback={<DashboardLoadingFallback />}>
+      <NexiumDashboardLazy customSlug={slug} />
+    </Suspense>
+  );
 }
