@@ -1742,7 +1742,7 @@ function NexiumAdminDashboard({
       toast.error("Action impossible : seul le Super Owner peut supprimer un compte Propriétaire (OWNER).");
       return;
     }
-    openConfirmModal(
+    requestConfirmation(
       `Supprimer le membre du staff ${st.name} ?`,
       `Cette action révoquera définitivement tous les accès de ${st.name} (${st.role}) à la plateforme d'administration Nexium.`,
       "Supprimer Définitivement",
