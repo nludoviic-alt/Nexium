@@ -2486,6 +2486,163 @@ function EngineTab({
   );
 }
 
+// ── Graphique en Chandeliers de l'Équity (Live, Ancré sur le Solde Réel) ──
+interface EquityCandle {
+  id: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  up: boolean;
+}
+
+const EQUITY_CANDLE_COUNT: Record<"24H" | "7J" | "30J" | "1A", number> = {
+  "24H": 24,
+  "7J": 14,
+  "30J": 30,
+  "1A": 12,
+};
+
+function generateEquityCandles(finalValue: number, count: number): EquityCandle[] {
+  const safeValue = Math.max(finalValue, 0);
+  // Pas encore de dépôt : pas d'historique à simuler, juste une ligne plate à zéro.
+  if (safeValue === 0) {
+    return Array.from({ length: count }, (_, i) => ({ id: i, open: 0, high: 0, low: 0, close: 0, volume: 0, up: true }));
+  }
+  const startValue = safeValue * (0.8 + Math.random() * 0.08);
+  const candles: EquityCandle[] = [];
+  let prevClose = startValue;
+
+  for (let i = 0; i < count; i++) {
+    const isLast = i === count - 1;
+    const remaining = count - i;
+    const drift = (safeValue - prevClose) / remaining;
+    const noise = prevClose * 0.022 * (Math.random() - 0.5);
+    const open = prevClose;
+    const close = isLast ? safeValue : Math.max(open + drift + noise, safeValue * 0.5);
+    const wick = Math.abs(close - open) * 0.5 + prevClose * 0.006;
+    const high = Math.max(open, close) + wick * Math.random();
+    const low = Math.max(Math.min(open, close) - wick * Math.random(), 0);
+
+    candles.push({
+      id: i,
+      open,
+      high,
+      low,
+      close,
+      volume: Math.round(400 + Math.random() * 2200),
+      up: close >= open,
+    });
+    prevClose = close;
+  }
+  return candles;
+}
+
+function EquityCandlestickChart({ balance, timeframe }: { balance: number; timeframe: "24H" | "7J" | "30J" | "1A" }) {
+  const count = EQUITY_CANDLE_COUNT[timeframe];
+  const [candles, setCandles] = useState<EquityCandle[]>(() => generateEquityCandles(balance, count));
+
+  // Régénère tout l'historique quand on change de période, ou que le solde
+  // réel évolue nettement (dépôt, retrait, ajustement admin...).
+  useEffect(() => {
+    setCandles(generateEquityCandles(balance, count));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeframe, count]);
+
+  useEffect(() => {
+    setCandles((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      if (!last || Math.abs(last.close - balance) / (balance || 1) < 0.0005) return prev;
+      const updated = { ...last, close: balance, high: Math.max(last.high, balance), low: Math.min(last.low, balance), up: balance >= last.open };
+      return [...prev.slice(0, -1), updated];
+    });
+  }, [balance]);
+
+  // Effet "vivant" : micro-agitation du dernier chandelier entre deux
+  // vraies mises à jour de solde, pour un rendu qui respire sans jamais
+  // s'éloigner de la vraie valeur du compte.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCandles((prev) => {
+        const last = prev[prev.length - 1];
+        if (!last) return prev;
+        const jitter = last.close * 0.0015 * (Math.random() - 0.5);
+        const high = Math.max(last.high, last.close + Math.abs(jitter));
+        const low = Math.min(last.low, Math.max(last.close - Math.abs(jitter), 0));
+        return [...prev.slice(0, -1), { ...last, high, low, volume: Math.round(400 + Math.random() * 2200) }];
+      });
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+
+  const { minVal, maxVal } = useMemo(() => {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const c of candles) {
+      min = Math.min(min, c.low);
+      max = Math.max(max, c.high);
+    }
+    if (!isFinite(min) || !isFinite(max)) return { minVal: 0, maxVal: 1 };
+    const pad = (max - min) * 0.08 || max * 0.02 || 1;
+    return { minVal: Math.max(min - pad, 0), maxVal: max + pad };
+  }, [candles]);
+
+  const priceRange = maxVal - minVal || 1;
+  const maxVolume = Math.max(...candles.map((c) => c.volume), 1);
+
+  const width = 500;
+  const height = 150;
+  const priceAreaHeight = 112;
+  const volumeAreaHeight = 30;
+  const step = width / candles.length;
+  const candleWidth = Math.max(step * 0.55, 2);
+
+  const yForPrice = (val: number) => 4 + priceAreaHeight - ((val - minVal) / priceRange) * priceAreaHeight;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" preserveAspectRatio="none">
+      {candles.map((c, i) => {
+        const x = i * step + step / 2;
+        const color = c.up ? "#10b981" : "#f43f5e";
+        const bodyTop = yForPrice(Math.max(c.open, c.close));
+        const bodyBottom = yForPrice(Math.min(c.open, c.close));
+        const bodyHeight = Math.max(bodyBottom - bodyTop, 1);
+        const volHeight = (c.volume / maxVolume) * volumeAreaHeight;
+
+        return (
+          <g key={c.id}>
+            <line
+              x1={x} x2={x}
+              y1={yForPrice(c.high)} y2={yForPrice(c.low)}
+              stroke={color}
+              strokeWidth="1"
+            />
+            <rect
+              x={x - candleWidth / 2}
+              y={bodyTop}
+              width={candleWidth}
+              height={bodyHeight}
+              fill={color}
+              rx="0.6"
+            />
+            <rect
+              x={x - candleWidth / 2}
+              y={height - volHeight}
+              width={candleWidth}
+              height={volHeight}
+              fill="#f59e0b"
+              opacity="0.4"
+              rx="0.5"
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // ----------------------------------------------------
 // 2. OVERVIEW VIEW
 // ----------------------------------------------------
@@ -2527,53 +2684,6 @@ function OverviewTab({
   }, []);
 
   const totalOpenPnl = positions.reduce((acc, p) => acc + p.pnlNum, 0);
-
-  const chartPoints = useMemo(() => {
-    switch (chartTimeframe) {
-      case "24H":
-        return [
-          { label: "00h", val: 24720 },
-          { label: "04h", val: 24750 },
-          { label: "08h", val: 24730 },
-          { label: "12h", val: 24810 },
-          { label: "14h", val: 24860 },
-        ];
-      case "7J":
-        return [
-          { label: "Lun", val: 24100 },
-          { label: "Mar", val: 24280 },
-          { label: "Mer", val: 24450 },
-          { label: "Jeu", val: 24620 },
-          { label: "Ven", val: 24860 },
-        ];
-      case "30J":
-        return [
-          { label: "Sem 1", val: 22400 },
-          { label: "Sem 2", val: 23150 },
-          { label: "Sem 3", val: 23900 },
-          { label: "Sem 4", val: 24860 },
-        ];
-      case "1A":
-        return [
-          { label: "T1", val: 15000 },
-          { label: "T2", val: 18400 },
-          { label: "T3", val: 21800 },
-          { label: "T4", val: 24860 },
-        ];
-    }
-  }, [chartTimeframe]);
-
-  const minVal = Math.min(...chartPoints.map((p) => p.val));
-  const maxVal = Math.max(...chartPoints.map((p) => p.val));
-  const range = maxVal - minVal || 1;
-
-  const svgPath = chartPoints
-    .map((p, i) => {
-      const x = (i / (chartPoints.length - 1)) * 500;
-      const y = 140 - ((p.val - minVal) / range) * 110;
-      return `${i === 0 ? "M" : "L"} ${x},${y}`;
-    })
-    .join(" ");
 
   const marketTickers = [
     { pair: "EUR/USD", price: (1.0858 + (tickerTick % 2 === 0 ? 0.0002 : -0.0001)).toFixed(5), change: "+0.28%", up: true },
@@ -2780,23 +2890,14 @@ function OverviewTab({
 
           <div className="mt-6">
             <div className="relative h-52 w-full">
-              <svg viewBox="0 0 500 150" className="h-full w-full overflow-visible" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                <path d={`${svgPath} L 500,150 L 0,150 Z`} fill="url(#chartGrad)" />
-                <path d={svgPath} fill="none" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" className="drop-shadow-[0_0_10px_rgba(16,185,129,0.6)]" />
-              </svg>
+              <EquityCandlestickChart balance={balance} timeframe={chartTimeframe} />
             </div>
-            <div className="mt-5 flex justify-between border-t border-indigo-500/20 pt-3 text-xs sm:text-sm font-mono text-slate-300">
-              {chartPoints.map((pt) => (
-                <span key={pt.label}>
-                  {pt.label} : <strong className="text-white">${pt.val.toLocaleString()}</strong>
-                </span>
-              ))}
+            <div className="mt-5 flex items-center justify-between border-t border-indigo-500/20 pt-3 text-xs sm:text-sm font-mono text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                Solde en direct
+              </span>
+              <strong className="text-white text-base">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>
         </article>
