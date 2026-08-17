@@ -2560,22 +2560,54 @@ function EquityCandlestickChart({ balance, timeframe }: { balance: number; timef
     });
   }, [balance]);
 
-  // Effet "vivant" : micro-agitation du dernier chandelier entre deux
-  // vraies mises à jour de solde, pour un rendu qui respire sans jamais
-  // s'éloigner de la vraie valeur du compte.
+  // Tick live : fait bouger visiblement le prix et le volume du chandelier en
+  // cours toutes les 1.2s (mouvement à ressort vers le vrai solde, jamais de
+  // dérive) — représente le flottement réel de l'équity via le P&L latent
+  // des positions ouvertes, comme sur un compte live.
   useEffect(() => {
+    if (balance <= 0) return;
     const interval = setInterval(() => {
       setCandles((prev) => {
         const last = prev[prev.length - 1];
         if (!last) return prev;
-        const jitter = last.close * 0.0015 * (Math.random() - 0.5);
-        const high = Math.max(last.high, last.close + Math.abs(jitter));
-        const low = Math.min(last.low, Math.max(last.close - Math.abs(jitter), 0));
-        return [...prev.slice(0, -1), { ...last, high, low, volume: Math.round(400 + Math.random() * 2200) }];
+        const pullToTruth = (balance - last.close) * 0.35;
+        const noise = balance * 0.0022 * (Math.random() - 0.5) * 2;
+        const nextClose = Math.max(last.close + pullToTruth + noise, 0);
+        const high = Math.max(last.high, last.open, nextClose);
+        const low = Math.max(Math.min(last.low, last.open, nextClose), 0);
+        return [
+          ...prev.slice(0, -1),
+          { ...last, close: nextClose, high, low, up: nextClose >= last.open, volume: Math.round(400 + Math.random() * 2200) },
+        ];
       });
-    }, 2200);
+    }, 1200);
     return () => clearInterval(interval);
-  }, []);
+  }, [balance]);
+
+  // Formation d'un nouveau chandelier toutes les 7s : fait défiler le
+  // graphique vers la gauche, exactement comme un vrai terminal en direct.
+  useEffect(() => {
+    if (balance <= 0) return;
+    const interval = setInterval(() => {
+      setCandles((prev) => {
+        if (prev.length === 0) return prev;
+        const last = prev[prev.length - 1];
+        if (!last) return prev;
+        const nextId = last.id + 1;
+        const newCandle: EquityCandle = {
+          id: nextId,
+          open: last.close,
+          high: last.close,
+          low: last.close,
+          close: last.close,
+          volume: Math.round(400 + Math.random() * 2200),
+          up: true,
+        };
+        return [...prev.slice(1), newCandle];
+      });
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [balance]);
 
   const { minVal, maxVal } = useMemo(() => {
     let min = Infinity;
