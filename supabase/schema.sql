@@ -347,11 +347,12 @@ DROP POLICY IF EXISTS "role_permissions_select" ON public.role_permissions;
 DROP POLICY IF EXISTS "role_permissions_write" ON public.role_permissions;
 CREATE POLICY "role_permissions_select" ON public.role_permissions
     FOR SELECT USING (public.get_my_role() IS NOT NULL);
--- Réservé strictement au Super Owner (is_primary_owner), pas aux autres OWNER
--- ni SUPER_ADMIN — la page "Niveaux d'Accès" ne doit être ni visible ni
--- modifiable par qui que ce soit d'autre.
+-- Réservé au Super Owner (is_primary_owner) et au rôle OWNER — pas aux autres
+-- rôles (OWNER_A_PLUS/B_PLUS, SUPER_ADMIN, etc.) : la page "Niveaux d'Accès"
+-- ne doit être ni visible ni modifiable par qui que ce soit d'autre.
 CREATE POLICY "role_permissions_write" ON public.role_permissions
-    FOR ALL USING (public.am_i_primary_owner()) WITH CHECK (public.am_i_primary_owner());
+    FOR ALL USING (public.am_i_primary_owner() OR public.get_my_role() = 'OWNER')
+    WITH CHECK (public.am_i_primary_owner() OR public.get_my_role() = 'OWNER');
 
 -- 9ter. TABLE : PAYMENT_SETTINGS (Coordonnées de paiement affichées au client
 -- lors d'un dépôt — IBAN et adresses de portefeuilles crypto). Ligne unique
