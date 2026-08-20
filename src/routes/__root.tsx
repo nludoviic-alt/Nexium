@@ -125,7 +125,7 @@ function RootComponent() {
         <PageViewTracker />
         <CookieBanner />
         <ScrollToTop />
-        <Toaster position="top-right" richColors theme="dark" closeButton />
+        <Toaster position="bottom-right" richColors theme="dark" closeButton offset={{ bottom: "96px" }} />
       </LanguageProvider>
     </QueryClientProvider>
   );
