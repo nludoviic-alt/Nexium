@@ -5881,8 +5881,9 @@ export function NexiumDashboard({
       toast.error("Veuillez saisir un montant valide.");
       return;
     }
-    if (val > balance) {
-      toast.error("Fonds insuffisants.");
+    const withdrawableTotal = balance + bonus;
+    if (val > withdrawableTotal) {
+      toast.error(`Fonds insuffisants : $${withdrawableTotal.toFixed(2)} disponible (solde + bonus).`);
       return;
     }
 
@@ -7221,8 +7222,8 @@ export function NexiumDashboard({
 
             <form onSubmit={handleWithdrawSubmit} className="space-y-5">
               <div className="flex items-center justify-between rounded-2xl border border-[#00D084]/20 bg-[#00D084]/10 px-5 py-4 text-xs sm:text-sm text-gray-300">
-                <span className="font-medium text-gray-300">Solde disponible :</span>
-                <strong className="font-mono text-base sm:text-lg text-[#00D084] font-black">${balance.toFixed(2)} USD</strong>
+                <span className="font-medium text-gray-300">Solde disponible (cash + bonus) :</span>
+                <strong className="font-mono text-base sm:text-lg text-[#00D084] font-black">${(balance + bonus).toFixed(2)} USD</strong>
               </div>
 
               <div>
@@ -7230,10 +7231,10 @@ export function NexiumDashboard({
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">MONTANT DU RETRAIT (USD)</label>
                   <button
                     type="button"
-                    onClick={() => setWithdrawAmount(balance.toFixed(2))}
+                    onClick={() => setWithdrawAmount((balance + bonus).toFixed(2))}
                     className="text-xs font-bold text-[#00D084] hover:underline cursor-pointer"
                   >
-                    MAX (${balance.toFixed(2)})
+                    MAX (${(balance + bonus).toFixed(2)})
                   </button>
                 </div>
                 <div className="relative">

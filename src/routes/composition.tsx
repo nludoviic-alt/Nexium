@@ -2291,18 +2291,34 @@ function NexiumAdminDashboard({
       toast.error("Privilège insuffisant : votre rôle ne peut pas valider de retraits.");
       return;
     }
+
+    // Fonds disponibles = solde cash + bonus crédité (le bonus est retirable).
+    // Sans ce contrôle, l'approbation débitait silencieusement jusqu'à $0 sans
+    // jamais prévenir l'admin que le client n'avait pas les fonds nécessaires.
+    const totalAvailable = activeClient.balance + activeClient.bonusCredit;
+    if (withdrawal.amount > totalAvailable) {
+      toast.error(
+        `Fonds insuffisants : ${activeClient.name} dispose de $${totalAvailable.toLocaleString("fr-FR")} USD (solde + bonus) pour un retrait demandé de $${withdrawal.amount.toLocaleString("fr-FR")} USD.`
+      );
+      return;
+    }
+
     requestConfirmation(
       `Valider le Retrait de $${withdrawal.amount.toLocaleString("fr-FR")} USD`,
-      `Êtes-vous certain de vouloir approuver ce retrait pour ${activeClient.name} ? Le solde MT5 sera débité de $${withdrawal.amount.toLocaleString("fr-FR")} USD.`,
+      `Êtes-vous certain de vouloir approuver ce retrait pour ${activeClient.name} ? Le solde MT5 (et le bonus si nécessaire) sera débité de $${withdrawal.amount.toLocaleString("fr-FR")} USD.`,
       "Valider & Débiter les Fonds",
       "WARNING",
       async () => {
-        const newBalance = Math.max(0, activeClient.balance - withdrawal.amount);
+        // Débite d'abord le cash, puis le bonus si le cash seul ne suffit pas.
+        const balanceDeduction = Math.min(activeClient.balance, withdrawal.amount);
+        const bonusDeduction = withdrawal.amount - balanceDeduction;
+        const newBalance = activeClient.balance - balanceDeduction;
+        const newBonus = activeClient.bonusCredit - bonusDeduction;
 
         if (isSupabaseConfigured) {
           const [txResult, balResult] = await Promise.all([
             updateTransactionStatus(withdrawal.id, "COMPLETED"),
-            updateClientBalance(activeClient.id, newBalance),
+            updateClientBalance(activeClient.id, newBalance, newBonus),
           ]);
           if (!txResult.success || !balResult.success) {
             toast.error("Échec de la validation du retrait côté base de données.");
@@ -2319,7 +2335,8 @@ function NexiumAdminDashboard({
               return {
                 ...c,
                 balance: newBalance,
-                equity: newBalance + c.bonusCredit,
+                bonusCredit: newBonus,
+                equity: newBalance + newBonus,
                 withdrawalRequests: updatedWithdrawals,
               };
             }

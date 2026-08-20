@@ -593,8 +593,10 @@ export async function updateTransactionStatus(txId: string, status: SupabaseTran
 /**
  * Met à jour le solde d'un client (crédit/débit manuel, validation dépôt/retrait).
  */
-export async function updateClientBalance(userId: string, newBalance: number) {
-  return updateUserProfile(userId, { balance: newBalance });
+export async function updateClientBalance(userId: string, newBalance: number, newBonus?: number) {
+  const updates: Partial<SupabaseUserProfile> = { balance: newBalance };
+  if (newBonus !== undefined) updates.bonus_credit = newBonus;
+  return updateUserProfile(userId, updates);
 }
 
 /* ==========================================================================
