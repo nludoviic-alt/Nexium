@@ -4,8 +4,9 @@ export interface AdminNavItem {
   key: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  badge?: string | number;
-  badgeTone?: "default" | "brand";
+  badge?: string | number | undefined;
+  /** "alert" = demande en attente d'action (ambre, pulse) — disparaît dès que le badge sous-jacent retombe à 0. */
+  badgeTone?: "default" | "brand" | "alert";
   isActive: boolean;
 }
 
@@ -37,7 +38,9 @@ export function AdminSidebarNav({ items, onSelect }: { items: AdminNavItem[]; on
             {item.badge !== undefined && (
               <span
                 className={`text-xs sm:text-[13px] font-mono px-2.5 py-0.5 rounded-lg font-bold ${
-                  item.badgeTone === "brand"
+                  item.badgeTone === "alert"
+                    ? "bg-amber-500 text-black border border-amber-400 animate-pulse"
+                    : item.badgeTone === "brand"
                     ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                     : "bg-slate-800/90 text-slate-300 border border-slate-700/60"
                 }`}

@@ -1189,6 +1189,15 @@ function NexiumAdminDashboard({
     return webThreads.filter((t) => t.status === "QUEUE").length;
   }, [webThreads]);
 
+  // Compteurs persistants du menu admin — dérivés en direct des données Supabase
+  // (déjà synchronisées en temps réel), donc ils apparaissent à la création
+  // d'une demande et disparaissent d'eux-mêmes dès qu'elle est traitée, sans
+  // logique de "vu/non vu" séparée à maintenir.
+  const pendingClientsCount = useMemo(
+    () => clients.filter((c) => c.status === "PENDING_APPROVAL" || c.licenseStatus === "PENDING_PRESET_APPROVAL").length,
+    [clients]
+  );
+
   // États d'édition Client
   const [editName, setEditName] = useState(activeClient?.name || "");
   const [editEmail, setEditEmail] = useState(activeClient?.email || "");
@@ -1638,6 +1647,7 @@ function NexiumAdminDashboard({
   // Synchronisation des transactions réelles depuis Supabase, fusionnées dans
   // chaque client (retraits/dépôts en attente + historique).
   const [allTransactions, setAllTransactions] = useState<SupabaseTransaction[]>([]);
+  const pendingFinanceCount = useMemo(() => allTransactions.filter((t) => t.status === "PENDING").length, [allTransactions]);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
   const [paymentSettingsDraft, setPaymentSettingsDraft] = useState<Partial<PaymentSettings>>({});
   const [savingPaymentSettings, setSavingPaymentSettings] = useState(false);
@@ -3595,6 +3605,8 @@ function NexiumAdminDashboard({
                 label: "Comptes Clients",
                 icon: Users,
                 isActive: activeSection === "users" || activeSection === "user-detail" || activeSection === "create-user",
+                badge: pendingClientsCount > 0 ? pendingClientsCount : undefined,
+                badgeTone: "alert" as const,
               },
               {
                 key: "administrators",
@@ -3607,6 +3619,8 @@ function NexiumAdminDashboard({
                 label: "Chat",
                 icon: MessageSquare,
                 isActive: activeSection === "messaging",
+                badge: queueCount > 0 ? queueCount : undefined,
+                badgeTone: "alert" as const,
               },
               {
                 key: "emails",
@@ -3631,6 +3645,8 @@ function NexiumAdminDashboard({
                       label: "Finances & Dépôts",
                       icon: Wallet,
                       isActive: activeSection === "finances",
+                      badge: pendingFinanceCount > 0 ? pendingFinanceCount : undefined,
+                      badgeTone: "alert" as const,
                     } as const,
                   ]
                 : []),
