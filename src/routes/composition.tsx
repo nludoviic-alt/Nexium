@@ -1865,7 +1865,7 @@ function NexiumAdminDashboard({
     e.preventDefault();
     if (!chatReplyInput.trim() || !activeClient) return;
 
-    const authorName = `${sessionUser.name} (${currentSessionRole})`;
+    const authorName = currentDeskSignature;
     const text = chatReplyInput.trim();
 
     if (isSupabaseConfigured) {
@@ -1902,7 +1902,7 @@ function NexiumAdminDashboard({
 
   // Handlers pour la file d'attente Web (Live Chat Router)
   const handleClaimWebThread = async (threadId: string) => {
-    const updated = await claimLiveChatThread(threadId, `Conseiller Desk (${currentSessionRole})`, currentSessionRole);
+    const updated = await claimLiveChatThread(threadId, currentDeskSignature, currentSessionRole);
     if (updated) {
       addAuditLog("LIVE_CHAT_CLAIMED", `Fil prospect #${threadId} pris en charge par ${currentSessionRole}.`);
       toast.success(`Vous avez pris en charge le fil #${threadId} !`);
@@ -1917,7 +1917,7 @@ function NexiumAdminDashboard({
     await sendLiveChatMessage({
       threadId: activeWebThread.id,
       sender: "ADVISOR",
-      authorName: `Conseiller Desk (${currentSessionRole})`,
+      authorName: currentDeskSignature,
       text: webThreadReplyInput.trim(),
     });
 
