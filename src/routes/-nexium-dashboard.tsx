@@ -2715,6 +2715,102 @@ function EquityCandlestickChart({ balance, timeframe }: { balance: number; timef
   );
 }
 
+// ── Panneaux d'oscillateurs animés (décoratifs) sous l'équity ──
+// Simple habillage visuel façon terminal live — même esprit que les tickers
+// de marché déjà simulés ailleurs sur le dashboard. Ce ne sont PAS de vrais
+// calculs de Money Flow Index / Aroon (l'équity du compte n'a ni volume ni
+// prix de marché sur lesquels les calculer) : juste une marche aléatoire qui
+// avance en douceur pour donner un rendu "terminal vivant".
+function useLiveOscillator(pointCount: number, min: number, max: number, seed: number) {
+  const [values, setValues] = useState<number[]>(() => Array.from({ length: pointCount }, () => seed));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setValues((prev) => {
+        const last = prev[prev.length - 1] ?? seed;
+        const step = (max - min) * 0.06;
+        const next = Math.min(max, Math.max(min, last + (Math.random() - 0.5) * step));
+        return [...prev.slice(1), next];
+      });
+    }, 1400);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return values;
+}
+
+function OscillatorPane({
+  label,
+  lines,
+}: {
+  label: string;
+  lines: { color: string; values: number[]; readout?: string }[];
+}) {
+  const width = 500;
+  const height = 46;
+  const allVals = lines.flatMap((l) => l.values);
+  const min = Math.min(...allVals, 0);
+  const max = Math.max(...allVals, 100);
+  const range = max - min || 1;
+  const yFor = (v: number) => height - ((v - min) / range) * height;
+
+  return (
+    <div className="mt-3 border-t border-indigo-500/10 pt-2.5">
+      <div className="mb-1 flex items-center gap-2 text-[10px] font-mono">
+        <span className="text-slate-500 uppercase tracking-wider">{label}</span>
+        {lines.map(
+          (l, i) =>
+            l.readout && (
+              <span key={i} style={{ color: l.color }} className="font-bold">
+                {l.readout}
+              </span>
+            )
+        )}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-11 w-full overflow-visible" preserveAspectRatio="none">
+        {lines.map((l, li) => {
+          const step = width / l.values.length;
+          const points = l.values.map((v, i) => `${i * step + step / 2},${yFor(v)}`).join(" ");
+          return (
+            <polyline
+              key={li}
+              points={points}
+              fill="none"
+              stroke={l.color}
+              strokeWidth="1.25"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function EquityIndicatorPanels() {
+  const mfi = useLiveOscillator(30, 22, 88, 52);
+  const aroonUp = useLiveOscillator(30, 5, 95, 60);
+  const aroonDown = useLiveOscillator(30, 5, 95, 35);
+
+  return (
+    <>
+      <OscillatorPane
+        label="MFI 14"
+        lines={[{ color: "#3b82f6", values: mfi, readout: (mfi[mfi.length - 1] ?? 0).toFixed(2) }]}
+      />
+      <OscillatorPane
+        label="Aroon 14"
+        lines={[
+          { color: "#3b82f6", values: aroonUp, readout: `${(aroonUp[aroonUp.length - 1] ?? 0).toFixed(2)}%` },
+          { color: "#f59e0b", values: aroonDown, readout: `${(aroonDown[aroonDown.length - 1] ?? 0).toFixed(2)}%` },
+        ]}
+      />
+    </>
+  );
+}
+
 // ----------------------------------------------------
 // 2. OVERVIEW VIEW
 // ----------------------------------------------------
@@ -2969,6 +3065,7 @@ function OverviewTab({
               </div>
               <EquityCandlestickChart balance={balance} timeframe={chartTimeframe} />
             </div>
+            <EquityIndicatorPanels />
             <div className="mt-5 flex items-center justify-between border-t border-indigo-500/20 pt-3 text-xs sm:text-sm font-mono text-slate-300">
               <span className="flex items-center gap-1.5">
                 <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />

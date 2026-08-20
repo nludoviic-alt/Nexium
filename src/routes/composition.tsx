@@ -1114,6 +1114,46 @@ function NexiumAdminDashboard({
     }
   };
 
+  // Anti-veille Supabase — le plan gratuit met le projet en pause après 7
+  // jours sans activité. Ce bouton exécute une requête minimale (lecture
+  // d'une seule ligne) pour compter comme de l'activité : cliqué une fois
+  // par semaine, il suffit à empêcher la mise en veille.
+  const LAST_SUPABASE_PING_KEY = "nexium_last_supabase_ping";
+  const [lastSupabasePing, setLastSupabasePing] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return localStorage.getItem(LAST_SUPABASE_PING_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [pingingSupabase, setPingingSupabase] = useState(false);
+
+  const handleRefreshSupabase = async () => {
+    if (!isSupabaseConfigured) {
+      toast.error("Supabase n'est pas configuré.");
+      return;
+    }
+    setPingingSupabase(true);
+    try {
+      const { error } = await supabase.from("profiles").select("id").limit(1);
+      if (error) {
+        toast.error("Échec du ping Supabase — le projet est peut-être en veille, réessayez.");
+        return;
+      }
+      const nowIso = new Date().toISOString();
+      setLastSupabasePing(nowIso);
+      try {
+        localStorage.setItem(LAST_SUPABASE_PING_KEY, nowIso);
+      } catch {
+        // Stockage indisponible (navigation privée...) : sans conséquence, le ping a quand même eu lieu.
+      }
+      toast.success("Supabase rafraîchi — la mise en veille pour inactivité est repoussée de 7 jours.");
+    } finally {
+      setPingingSupabase(false);
+    }
+  };
+
   // Identifiant email-service du collaborateur connecté — l'id Supabase réel
   // de la session, identique à l'id agent seedé côté email-service (voir
   // email-service/seed_real_agents.mjs). Auparavant cherchait le premier
@@ -3629,6 +3669,27 @@ function NexiumAdminDashboard({
               </button>
             )}
           </div>
+
+          {/* Anti-veille Supabase (plan gratuit : pause après 7 jours sans
+              activité) — un clic par semaine suffit à repousser l'échéance. */}
+          <button
+            type="button"
+            onClick={handleRefreshSupabase}
+            disabled={pingingSupabase}
+            title={
+              lastSupabasePing
+                ? `Dernier rafraîchissement : ${new Date(lastSupabasePing).toLocaleString("fr-FR")}\nÉvite la mise en veille Supabase pour inactivité (7 jours).`
+                : "Rafraîchir Supabase — évite la mise en veille pour inactivité (7 jours). Cliquez une fois par semaine."
+            }
+            className="hidden md:flex items-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800/90 px-3 py-2 text-slate-400 hover:text-emerald-300 transition cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3.5 ${pingingSupabase ? "animate-spin" : ""}`} />
+            <span className="text-[10px] font-mono">
+              {lastSupabasePing
+                ? new Date(lastSupabasePing).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })
+                : "Supabase"}
+            </span>
+          </button>
 
           {/* Badge Session Administrateur Authentifié */}
           <button
