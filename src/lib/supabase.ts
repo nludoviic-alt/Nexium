@@ -531,6 +531,30 @@ export async function getAuditLogs(limit = 200): Promise<SupabaseAuditLog[]> {
   return data as SupabaseAuditLog[];
 }
 
+/**
+ * Abonnement temps réel au journal d'audit — permet à une session admin de
+ * voir en direct les actions faites par un collègue (réservé OWNER / SUPER_ADMIN côté RLS).
+ */
+export function subscribeToAuditLogs(callback: (entry: SupabaseAuditLog) => void): () => void {
+  if (!isSupabaseConfigured) return () => {};
+  let channel: any = null;
+  try {
+    channel = supabase
+      .channel("public:audit_logs:all")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "audit_logs" },
+        (payload) => callback(payload.new as SupabaseAuditLog)
+      )
+      .subscribe();
+  } catch (err) {
+    console.warn("Notice Realtime audit logs Supabase:", err);
+  }
+  return () => {
+    if (channel) supabase.removeChannel(channel);
+  };
+}
+
 /* ==========================================================================
    HELPERS TRANSACTIONS (Dépôts, Retraits, Ajustements)
    ========================================================================== */
@@ -942,7 +966,7 @@ export function subscribeToTransactions(callback: (payload: any) => void, userId
  * Abonnement temps réel aux messages directs d'un client précis (ou de tous
  * les clients si clientId est omis, pour la vue admin globale).
  */
-export function subscribeToDirectMessages(callback: () => void, clientId?: string): () => void {
+export function subscribeToDirectMessages(callback: (payload?: any) => void, clientId?: string): () => void {
   if (!isSupabaseConfigured) return () => {};
   let channel: any = null;
   try {
@@ -953,7 +977,7 @@ export function subscribeToDirectMessages(callback: () => void, clientId?: strin
         clientId
           ? { event: "INSERT", schema: "public", table: "chat_messages", filter: `client_id=eq.${clientId}` }
           : { event: "INSERT", schema: "public", table: "chat_messages" },
-        callback
+        (payload) => callback(payload)
       )
       .subscribe();
   } catch (err) {
@@ -1278,7 +1302,7 @@ export async function adminAddEmailNote(params: {
 /**
  * Abonnement temps réel pour le Desk Admin à toutes les réceptions et réponses e-mails.
  */
-export function subscribeToAdminEmails(callback: () => void): () => void {
+export function subscribeToAdminEmails(callback: (change?: { table: "email_conversations" | "email_messages"; payload: any }) => void): () => void {
   if (!isSupabaseConfigured) return () => {};
   let channel: any = null;
   try {
@@ -1287,12 +1311,12 @@ export function subscribeToAdminEmails(callback: () => void): () => void {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "email_conversations" },
-        callback
+        (payload) => callback({ table: "email_conversations", payload })
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "email_messages" },
-        callback
+        (payload) => callback({ table: "email_messages", payload })
       )
       .subscribe();
   } catch (err) {

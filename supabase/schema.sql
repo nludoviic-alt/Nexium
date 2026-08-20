@@ -799,6 +799,19 @@ BEGIN
   END IF;
 END $$;
 
+-- Temps réel sur le journal d'audit : permet à chaque session admin ouverte
+-- de voir en direct les actions faites par un collègue (approbation de
+-- retrait, modification de compte client, etc.) sans recharger la page.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'audit_logs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_logs;
+  END IF;
+END $$;
+
 -- 14. TABLE : PAGE_VIEWS (Suivi des visiteurs du site & de l'application)
 -- Aucune IP stockée (respect de la vie privée) ; l'écriture n'est déclenchée
 -- côté client que si le visiteur a accepté les cookies de mesure d'audience

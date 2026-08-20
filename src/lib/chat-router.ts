@@ -296,20 +296,23 @@ export async function unarchiveLiveChatThread(threadId: string): Promise<LiveCha
  * modifié par l'un est immédiatement visible chez l'autre.
  */
 export function subscribeToLiveChatUpdates(
-  callback: (threads: LiveChatThread[]) => void
+  // `changedMessage` n'est renseigné que lors d'un changement sur chat_messages
+  // (pas sur live_chat_threads) — permet au caller de détecter un nouveau
+  // message visiteur dans un fil déjà actif, pas seulement un nouveau fil.
+  callback: (threads: LiveChatThread[], changedMessage?: any) => void
 ): () => void {
   if (!isSupabaseConfigured) return () => {};
 
-  const refresh = () => {
-    getLiveChatThreads().then(callback);
+  const refresh = (changedMessage?: any) => {
+    getLiveChatThreads().then((threads) => callback(threads, changedMessage));
   };
 
   let channel: any = null;
   try {
     channel = supabase
       .channel("public:live_chat")
-      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, refresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "live_chat_threads" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages" }, (payload) => refresh(payload))
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_chat_threads" }, () => refresh())
       .subscribe();
   } catch (realtimeErr) {
     console.warn("Notice Realtime Supabase:", realtimeErr);

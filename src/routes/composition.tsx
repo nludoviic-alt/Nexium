@@ -146,6 +146,7 @@ import {
   updateUserProfile,
   recordAuditLog,
   getAuditLogs,
+  subscribeToAuditLogs,
   getAllStaffProfiles,
   findProfileByEmail,
   deleteProfile,
@@ -1138,7 +1139,7 @@ function NexiumAdminDashboard({
       seenChatThreadIdsRef.current = new Set(threads.map((t) => t.id));
       setWebThreads(threads);
     });
-    const unsub = subscribeToLiveChatUpdates((threads) => {
+    const unsub = subscribeToLiveChatUpdates((threads, changedMessage) => {
       if (seenChatThreadIdsRef.current) {
         const newThreads = threads.filter(
           (t) => t.status === "QUEUE" && !seenChatThreadIdsRef.current!.has(t.id)
@@ -1149,6 +1150,16 @@ function NexiumAdminDashboard({
             { duration: 9000 }
           );
         });
+
+        // Nouveau message d'un visiteur dans un fil DÉJÀ pris en charge (pas
+        // un nouveau fil) — sans ça, un follow-up du prospect ne notifiait
+        // jamais l'admin en dehors de cet onglet précis.
+        if (changedMessage?.eventType === "INSERT" && changedMessage.new?.sender === "VISITOR") {
+          const thread = threads.find((t) => t.id === changedMessage.new.thread_id);
+          if (thread && thread.status === "ACTIVE") {
+            toast.info(`💬 ${thread.visitorName} : ${String(changedMessage.new.text || "").slice(0, 90)}`, { duration: 8000 });
+          }
+        }
       }
       seenChatThreadIdsRef.current = new Set(threads.map((t) => t.id));
       setWebThreads(threads);
@@ -1176,7 +1187,12 @@ function NexiumAdminDashboard({
 
   useEffect(() => {
     refreshDirectMessages();
-    const unsub = subscribeToDirectMessages(refreshDirectMessages);
+    const unsub = subscribeToDirectMessages((payload) => {
+      if (payload?.eventType === "INSERT" && payload.new?.sender === "CLIENT") {
+        toast.info(`💬 Message de ${payload.new.author_name} : ${String(payload.new.text || "").slice(0, 90)}`, { duration: 8000 });
+      }
+      refreshDirectMessages();
+    });
     return unsub;
   }, [refreshDirectMessages]);
 
@@ -1280,6 +1296,31 @@ function NexiumAdminDashboard({
       ]);
     });
   }, [currentSessionRole]);
+
+  // Temps réel : quand un collègue effectue une action (validation de retrait,
+  // modification d'un compte client, etc.), elle apparaît immédiatement ici,
+  // sous forme de toast + entrée ajoutée au journal — sans recharger la page.
+  // On ignore les entrées créées par la session en cours (déjà affichées via
+  // addAuditLog) et CLIENT_REGISTERED (déjà notifié par l'abonnement profils).
+  useEffect(() => {
+    if (!isSupabaseConfigured || (currentSessionRole !== "OWNER" && currentSessionRole !== "SUPER_ADMIN")) return;
+    const unsub = subscribeToAuditLogs((entry) => {
+      if (entry.admin_id === sessionUser.id || entry.action === "CLIENT_REGISTERED") return;
+      toast.info(`🔔 ${entry.admin_name} : ${entry.details}`, { duration: 8000 });
+      setAuditLogs((prev) => [
+        {
+          id: entry.id || `audit-${entry.created_at}`,
+          timestamp: entry.created_at ? new Date(entry.created_at).toLocaleTimeString("fr-FR") : "",
+          admin: entry.admin_name,
+          action: entry.action,
+          ...(entry.target_user_email ? { targetUser: entry.target_user_email } : {}),
+          details: typeof entry.details === "string" ? entry.details : JSON.stringify(entry.details ?? ""),
+        },
+        ...prev,
+      ]);
+    });
+    return unsub;
+  }, [currentSessionRole, sessionUser.id]);
 
   const requestConfirmation = (
     title: string,
@@ -2989,7 +3030,15 @@ function NexiumAdminDashboard({
 
   useEffect(() => {
     refreshEmailCounts();
-    const unsub = subscribeToAdminEmails(() => {
+    const unsub = subscribeToAdminEmails((change) => {
+      if (change?.table === "email_conversations" && change.payload.eventType === "INSERT") {
+        const conv = change.payload.new;
+        toast.info(`📧 Nouveau message de ${conv?.customer_name || conv?.customer_email} : ${conv?.subject || ""}`, { duration: 9000 });
+      }
+      if (change?.table === "email_messages" && change.payload.eventType === "INSERT" && change.payload.new?.direction === "INBOUND") {
+        const msg = change.payload.new;
+        toast.info(`📧 Réponse reçue de ${msg?.from_address} : ${msg?.subject || ""}`, { duration: 9000 });
+      }
       refreshEmailCounts();
       refreshEmailList();
       if (selectedEmailConversationId) refreshEmailDetail(selectedEmailConversationId);
