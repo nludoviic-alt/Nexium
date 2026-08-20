@@ -36,6 +36,7 @@ function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -47,7 +48,7 @@ function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password || !firstName) {
+    if (!email || !password || !firstName || !lastName || !phone) {
       toast.error(language === "fr" ? "Veuillez remplir tous les champs obligatoires." : "Please fill in all required fields.");
       return;
     }
@@ -107,6 +108,7 @@ function RegisterPage() {
             id: createdUserId,
             email,
             name: fullName,
+            phone: phone.trim(),
             role: "TRADER",
             status: "PENDING_APPROVAL", // En attente de validation par l'administrateur
             license_status: "NOT_REQUESTED", // En attente de sélection de preset
@@ -457,16 +459,36 @@ function RegisterPage() {
                           htmlFor="lastName"
                           className="text-xs sm:text-sm font-extrabold text-gray-800"
                         >
-                          {language === "fr" ? "Nom" : "Last Name"}
+                          {language === "fr" ? "Nom *" : "Last Name *"}
                         </label>
                         <Input
                           id="lastName"
+                          required
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           placeholder="Dupont"
                           className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00c853] focus:ring-2 focus:ring-[#00c853]/20 transition-all"
                         />
                       </div>
+                    </div>
+
+                    {/* Phone Number */}
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="phone"
+                        className="text-xs sm:text-sm font-extrabold text-gray-800"
+                      >
+                        {language === "fr" ? "Numéro de Téléphone *" : "Phone Number *"}
+                      </label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="+33 6 12 34 56 78"
+                        className="rounded-xl border-gray-300 bg-white px-4 py-3 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:border-[#00c853] focus:ring-2 focus:ring-[#00c853]/20 transition-all"
+                      />
                     </div>
 
                     {/* Email Address */}
