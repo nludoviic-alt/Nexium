@@ -1067,11 +1067,51 @@ function NexiumAdminDashboard({
     return messagesList.filter((m) => m.clientId === activeClient?.id && m.channel === "CHAT");
   }, [messagesList, activeClient]);
 
-  // Signature desk automatique du collaborateur actuellement connecté
-  const currentDeskSignature = useMemo(() => {
-    const staffMember = staffList.find((s) => s.role === currentSessionRole);
-    return staffMember?.deskSignature ?? `Conseiller Desk (${currentSessionRole}) — Nexium Markets`;
-  }, [staffList, currentSessionRole]);
+  // Fiche staff du collaborateur actuellement connecté — identifiée par son
+  // propre id (jamais par rôle seul : deux collaborateurs peuvent partager le
+  // même rôle, ex. deux CONSEILLER).
+  const myStaffRecord = useMemo(() => staffList.find((s) => s.id === sessionUser.id), [staffList, sessionUser.id]);
+  // Signature desk (pseudo) du collaborateur connecté — c'est ce nom qui est
+  // montré au client/visiteur dans le chat et les e-mails, jamais son rôle réel.
+  const currentDeskSignature = useMemo(
+    () => myStaffRecord?.deskSignature || `${sessionUser.name} — @ Nexium Markets`,
+    [myStaffRecord, sessionUser.name]
+  );
+
+  // Édition du pseudo par son propriétaire, depuis son propre profil — toujours
+  // permise (RLS Supabase : auth.uid() = id), contrairement à l'édition de la
+  // fiche d'un autre collaborateur qui exige can_manage_staff.
+  const [editingMyPseudo, setEditingMyPseudo] = useState(false);
+  const [myPseudoDraft, setMyPseudoDraft] = useState("");
+  const [savingMyPseudo, setSavingMyPseudo] = useState(false);
+
+  const handleOpenMyPseudoEditor = () => {
+    setMyPseudoDraft(currentDeskSignature);
+    setEditingMyPseudo(true);
+  };
+
+  const handleSaveMyPseudo = async () => {
+    const nextSignature = myPseudoDraft.trim();
+    if (!nextSignature) {
+      toast.error("Le pseudo ne peut pas être vide.");
+      return;
+    }
+    setSavingMyPseudo(true);
+    try {
+      if (isSupabaseConfigured) {
+        const result = await updateUserProfile(sessionUser.id, { desk_signature: nextSignature });
+        if (!result.success) {
+          toast.error("Échec de l'enregistrement du pseudo côté base de données.");
+          return;
+        }
+      }
+      setStaffList((prev) => prev.map((s) => (s.id === sessionUser.id ? { ...s, deskSignature: nextSignature } : s)));
+      toast.success("Pseudo mis à jour — c'est ce nom qui apparaît désormais au client dans le chat.");
+      setEditingMyPseudo(false);
+    } finally {
+      setSavingMyPseudo(false);
+    }
+  };
 
   // Identifiant email-service du collaborateur connecté — l'id Supabase réel
   // de la session, identique à l'id agent seedé côté email-service (voir
@@ -1580,7 +1620,7 @@ function NexiumAdminDashboard({
         lastIp: "-",
         ipWhitelist: "Toutes les adresses IP",
         allowedHours: "24/7",
-        deskSignature: `${p.name} — @ Nexium Markets`,
+        deskSignature: p.desk_signature || `${p.name} — @ Nexium Markets`,
         assignedAccountsCount: 0,
         assignedTraders: [],
       }))
@@ -2082,6 +2122,7 @@ function NexiumAdminDashboard({
         role: editStaffRole,
         status: editStaffStatus,
         assigned_advisor: editStaffDept,
+        desk_signature: editStaffSignature || null,
       });
       if (!result.success) {
         toast.error("Échec de l'enregistrement — droits insuffisants ou compte protégé côté base de données.");
@@ -3441,6 +3482,55 @@ function NexiumAdminDashboard({
         </div>
 
         <div className="flex items-center gap-3.5">
+          {/* Pseudo Desk (Signature) — éditable par son propriétaire, toujours,
+              quel que soit son rôle. C'est ce nom qui apparaît au client/visiteur
+              dans le chat et les e-mails, jamais le rôle réel du collaborateur. */}
+          <div className="hidden md:flex items-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#121a2d] px-3 py-2">
+            {editingMyPseudo ? (
+              <>
+                <input
+                  type="text"
+                  value={myPseudoDraft}
+                  onChange={(e) => setMyPseudoDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveMyPseudo();
+                    if (e.key === "Escape") setEditingMyPseudo(false);
+                  }}
+                  placeholder="Pseudo affiché au client"
+                  className="w-40 bg-transparent text-xs text-white outline-none placeholder:text-slate-500"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveMyPseudo}
+                  disabled={savingMyPseudo}
+                  title="Enregistrer le pseudo"
+                  className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50 cursor-pointer"
+                >
+                  <Check className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingMyPseudo(false)}
+                  title="Annuler"
+                  className="text-slate-500 hover:text-slate-300 cursor-pointer"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenMyPseudoEditor}
+                className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 hover:text-emerald-300 transition cursor-pointer"
+                title="Modifier votre pseudo — c'est ce nom qui est montré au client/visiteur dans le chat, jamais votre rôle réel"
+              >
+                <PenLine className="size-3" />
+                <span className="max-w-[150px] truncate">{currentDeskSignature}</span>
+              </button>
+            )}
+          </div>
+
           {/* Badge Session Administrateur Authentifié */}
           <button
             type="button"

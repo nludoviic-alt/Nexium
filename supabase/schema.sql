@@ -75,6 +75,10 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS risk_guard_auto_stop BOOLEA
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS engines_config JSONB;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS license_key TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS license_expires DATE;
+-- Pseudo affiché au client/visiteur (chat, e-mails) à la place du nom réel du
+-- collaborateur staff. Auto-éditable par son propriétaire (RLS auth.uid() = id) ;
+-- NULL -> le frontend retombe sur "{name} — @ Nexium Markets".
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS desk_signature TEXT;
 
 -- Notes confidentielles du staff sur un client (CRM) — policy RLS définie
 -- plus bas, section 11, une fois get_my_role() disponible.

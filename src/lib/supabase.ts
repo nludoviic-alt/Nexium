@@ -71,6 +71,8 @@ export interface SupabaseUserProfile {
   engines_config?: Record<string, unknown>;
   license_key?: string;
   license_expires?: string;
+  /** Pseudo affiché aux clients/visiteurs dans le chat et les e-mails, à la place du nom réel. */
+  desk_signature?: string | null;
   created_at?: string;
 }
 
