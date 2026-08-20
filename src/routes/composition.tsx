@@ -938,6 +938,8 @@ function NexiumAdminDashboard({
     currentSessionRole === "OWNER_A_PLUS" ||
     currentSessionRole === "OWNER_B_PLUS";
   const currentStaffMember = useMemo(() => staffList.find((s) => s.role === currentSessionRole), [staffList, currentSessionRole]);
+  // Le Super Owner et le rôle Owner (Fondateur) ont accès à "Niveaux d'Accès".
+  const canManageAccessLevels = isPrimaryOwner || currentSessionRole === "OWNER";
   const [advisorFilter, setAdvisorFilter] = useState<string>("ALL");
 
   // Niveaux d'accès par rôle — source de vérité unique pour ce que chaque
@@ -982,7 +984,7 @@ function NexiumAdminDashboard({
   // Page "Niveaux d'Accès" — édition du jeu de permissions d'un rôle
   const ALL_STAFF_ROLES: StaffRole[] = ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"];
   // Pages du menu admin qu'on peut masquer par rôle (hors "access-levels", qui
-  // reste de toute façon réservée au Super Owner quoi qu'il arrive).
+  // reste de toute façon réservée au Super Owner et au rôle Owner, quoi qu'il arrive).
   const MANAGEABLE_PAGES: { key: string; label: string }[] = [
     { key: "users", label: "Comptes Clients" },
     { key: "administrators", label: "Administration" },
@@ -3538,7 +3540,7 @@ function NexiumAdminDashboard({
                     } as const,
                   ]
                 : []),
-              ...(isPrimaryOwner
+              ...(canManageAccessLevels
                 ? [
                     {
                       key: "access-levels",
@@ -4941,7 +4943,7 @@ function NexiumAdminDashboard({
           {/* ===================================================================== */}
           {/* 🌟 NIVEAUX D'ACCÈS PAR RÔLE (`access-levels`)                         */}
           {/* ===================================================================== */}
-          {activeSection === "access-levels" && isPrimaryOwner && (
+          {activeSection === "access-levels" && canManageAccessLevels && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="border-b border-slate-700/50 pb-5">
                 <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
@@ -5621,7 +5623,7 @@ function NexiumAdminDashboard({
                             Les permissions sont désormais définies par rôle, pas par individu — tout collaborateur {editStaffRole} a exactement les mêmes.
                           </p>
                         </div>
-                        {isPrimaryOwner && (
+                        {canManageAccessLevels && (
                           <button
                             type="button"
                             onClick={() => setActiveSection("access-levels")}
