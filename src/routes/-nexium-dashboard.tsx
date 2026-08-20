@@ -5918,7 +5918,9 @@ export function NexiumDashboard({
     };
     setTransactions((prev) => [newTx, ...prev]);
     setWithdrawOpen(false);
-    toast.success(`Demande de retrait de $${val.toFixed(2)} transmise au Desk Finance pour traitement.`);
+    // Persistante (pas d'auto-fermeture) : le client doit voir clairement que
+    // sa demande a bien été transmise, avec un bouton pour fermer lui-même.
+    toast.success(`Demande de retrait de $${val.toFixed(2)} transmise au Desk Finance pour traitement.`, { duration: Infinity });
   };
 
   const handleSendMessage = async (text: string, id?: string) => {

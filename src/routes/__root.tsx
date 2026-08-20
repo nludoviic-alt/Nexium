@@ -125,7 +125,7 @@ function RootComponent() {
         <PageViewTracker />
         <CookieBanner />
         <ScrollToTop />
-        <Toaster position="top-right" richColors theme="dark" />
+        <Toaster position="top-right" richColors theme="dark" closeButton />
       </LanguageProvider>
     </QueryClientProvider>
   );

@@ -1248,7 +1248,7 @@ function NexiumAdminDashboard({
 
   // Finances Client
   const [creditAmountInput, setCreditAmountInput] = useState("");
-  const [creditType, setCreditType] = useState<"DEPOSIT" | "BONUS" | "DEBIT">("DEPOSIT");
+  const [creditType, setCreditType] = useState<"DEPOSIT" | "BONUS" | "DEBIT" | "BONUS_DEBIT">("DEPOSIT");
   const [creditNote, setCreditNote] = useState("");
 
   // Ajustement P&L
@@ -2502,7 +2502,14 @@ function NexiumAdminDashboard({
       return;
     }
 
-    const actionText = creditType === "DEPOSIT" ? "un Dépôt de" : creditType === "BONUS" ? "un Bonus de" : "un Débit forcé de";
+    const actionText =
+      creditType === "DEPOSIT"
+        ? "un Dépôt de"
+        : creditType === "BONUS"
+        ? "un Bonus de"
+        : creditType === "BONUS_DEBIT"
+        ? "un Retrait de Bonus de"
+        : "un Débit forcé de";
 
     requestConfirmation(
       `Confirmer ${actionText} $${amount.toLocaleString("fr-FR")} USD`,
@@ -2516,21 +2523,33 @@ function NexiumAdminDashboard({
         if (creditType === "DEPOSIT") newBalance += amount;
         if (creditType === "BONUS") newBonus += amount;
         if (creditType === "DEBIT") newBalance = Math.max(0, newBalance - amount);
+        if (creditType === "BONUS_DEBIT") newBonus = Math.max(0, newBonus - amount);
 
-        const method = creditType === "DEPOSIT" ? "Dépôt Réel Desk" : creditType === "BONUS" ? "Bonus Commercial" : "Débit Administratif";
+        const method =
+          creditType === "DEPOSIT"
+            ? "Dépôt Réel Desk"
+            : creditType === "BONUS"
+            ? "Bonus Commercial"
+            : creditType === "BONUS_DEBIT"
+            ? "Retrait Bonus Administratif"
+            : "Débit Administratif";
+        // La table transactions n'autorise pas "BONUS_DEBIT" en base — c'est
+        // fondamentalement un débit, tracé comme tel (le motif/method ci-dessus
+        // précise qu'il s'agit du bonus, pas du solde cash).
+        const dbTxType = creditType === "BONUS_DEBIT" ? "DEBIT" : creditType;
         let newTxId = `tx-${Date.now()}`;
 
         if (isSupabaseConfigured) {
           const [txResult, balResult] = await Promise.all([
             recordTransaction({
               user_id: activeClient.id,
-              type: creditType,
+              type: dbTxType,
               amount,
               status: "COMPLETED",
               method,
               ...(creditNote ? { reference_tx: creditNote } : {}),
             }),
-            creditType === "BONUS"
+            creditType === "BONUS" || creditType === "BONUS_DEBIT"
               ? updateUserProfile(activeClient.id, { bonus_credit: newBonus })
               : updateClientBalance(activeClient.id, newBalance),
           ]);
@@ -2544,7 +2563,7 @@ function NexiumAdminDashboard({
         const newTx: UserTransaction = {
           id: newTxId,
           date: new Date().toISOString().split("T")[0],
-          type: creditType,
+          type: dbTxType,
           amount,
           status: "COMPLETED",
           method,
@@ -4805,6 +4824,7 @@ function NexiumAdminDashboard({
                               { value: "DEPOSIT", label: "Créditer Dépôt Réel (+)" },
                               { value: "BONUS", label: "Attribuer Bonus (+)" },
                               { value: "DEBIT", label: "Débit Forcé (-)" },
+                              { value: "BONUS_DEBIT", label: "Retirer Bonus (-)" },
                             ]}
                           />
                         </div>
