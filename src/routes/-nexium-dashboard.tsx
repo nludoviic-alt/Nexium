@@ -2609,6 +2609,24 @@ function EquityCandlestickChart({ balance, timeframe }: { balance: number; timef
     return () => clearInterval(interval);
   }, [balance]);
 
+  // Moyenne Mobile Pondérée (WMA 9), comme sur TradingView : les bougies
+  // récentes pèsent davantage que les anciennes dans le calcul.
+  const wmaPeriod = 9;
+  const wmaValues = useMemo(() => {
+    const closes = candles.map((c) => c.close);
+    return closes.map((_, i) => {
+      if (i < wmaPeriod - 1) return closes[i];
+      let weightedSum = 0;
+      let weightTotal = 0;
+      for (let j = 0; j < wmaPeriod; j++) {
+        const weight = wmaPeriod - j;
+        weightedSum += (closes[i - j] ?? 0) * weight;
+        weightTotal += weight;
+      }
+      return weightedSum / weightTotal;
+    });
+  }, [candles]);
+
   const { minVal, maxVal } = useMemo(() => {
     let min = Infinity;
     let max = -Infinity;
@@ -2632,6 +2650,7 @@ function EquityCandlestickChart({ balance, timeframe }: { balance: number; timef
   const candleWidth = Math.max(step * 0.55, 2);
 
   const yForPrice = (val: number) => 4 + priceAreaHeight - ((val - minVal) / priceRange) * priceAreaHeight;
+  const wmaPoints = wmaValues.map((v, i) => `${i * step + step / 2},${yForPrice(v ?? 0)}`).join(" ");
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" preserveAspectRatio="none">
@@ -2671,6 +2690,27 @@ function EquityCandlestickChart({ balance, timeframe }: { balance: number; timef
           </g>
         );
       })}
+
+      {/* Ligne WMA 9 lumineuse par-dessus les bougies, style TradingView :
+          un halo flou (large, semi-transparent) sous un trait net. */}
+      <polyline
+        points={wmaPoints}
+        fill="none"
+        stroke="#3b82f6"
+        strokeWidth="5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        opacity="0.35"
+        style={{ filter: "blur(3px)" }}
+      />
+      <polyline
+        points={wmaPoints}
+        fill="none"
+        stroke="#60a5fa"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -2922,6 +2962,11 @@ function OverviewTab({
 
           <div className="mt-6">
             <div className="relative h-52 w-full">
+              <div className="absolute left-1 top-0 z-10 flex items-center gap-1.5 text-[10px] font-mono pointer-events-none">
+                <span className="text-slate-500">WMA</span>
+                <span className="text-[#60a5fa] font-bold">9</span>
+                <span className="text-slate-600">close</span>
+              </div>
               <EquityCandlestickChart balance={balance} timeframe={chartTimeframe} />
             </div>
             <div className="mt-5 flex items-center justify-between border-t border-indigo-500/20 pt-3 text-xs sm:text-sm font-mono text-slate-300">
