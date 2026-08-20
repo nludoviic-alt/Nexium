@@ -180,8 +180,8 @@ export function ChatWidget() {
 
   const greetingText =
     language === "fr"
-      ? "Bonjour ! Je suis l'assistant IA Nexium. Comment puis-je vous aider avec vos robots MT5, licences ou transfert vers un opérateur ?"
-      : "Hello! I am the Nexium AI Assistant. How can I help you today with MT5 bots, licenses, or connecting to a live operator?";
+      ? "Bonjour ! Je suis l'assistant IA Nexium. Comment puis-je vous aider aujourd'hui ?"
+      : "Hello! I am the Nexium AI Assistant. How can I help you today?";
 
   const quickReplies =
     language === "fr"
