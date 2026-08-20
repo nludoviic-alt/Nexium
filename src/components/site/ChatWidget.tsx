@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Send,
   Sparkles,
+  Trash2,
   UserCheck,
   X,
   ShieldCheck,
@@ -21,6 +22,7 @@ import {
   createLiveChatThread,
   getLiveChatThreads,
   LiveChatThread,
+  resolveLiveChatThread,
   sendLiveChatMessage,
   subscribeToLiveChatUpdates,
 } from "@/lib/chat-router";
@@ -329,6 +331,22 @@ export function ChatWidget() {
     }
   };
 
+  // Termine la conversation : clôture le fil côté Desk s'il y en a un
+  // (fil en file d'attente ou pris en charge), puis efface tout le dialogue
+  // affiché côté visiteur pour repartir sur un écran vierge.
+  const handleEndChat = () => {
+    if (liveThread) {
+      resolveLiveChatThread(liveThread.id).catch((err) => console.warn("Notice clôture fil chat:", err));
+    }
+    setActiveThreadId(null);
+    setLiveThread(null);
+    setOperatorContact("");
+    setDraft("");
+    setIsTyping(false);
+    setMessages([{ id: 0, role: "bot", text: greetingText }]);
+    toast.success(language === "fr" ? "Conversation terminée." : "Chat ended.");
+  };
+
   const isLiveWithAdvisor = liveThread && liveThread.status === "ACTIVE";
 
   return (
@@ -377,13 +395,23 @@ export function ChatWidget() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              aria-label="Close chat"
-              className="flex size-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
-            >
-              <X className="size-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleEndChat}
+                aria-label={language === "fr" ? "Terminer le chat" : "End chat"}
+                title={language === "fr" ? "Terminer le chat" : "End chat"}
+                className="flex size-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-rose-400 transition-colors cursor-pointer"
+              >
+                <Trash2 className="size-4" />
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                aria-label="Close chat"
+                className="flex size-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
 
           {/* Banner if in Queue */}
