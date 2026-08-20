@@ -5630,8 +5630,17 @@ export function NexiumDashboard({
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
 
   const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState("500");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawIban, setWithdrawIban] = useState("FR76 3000 4000 5000 6000 7000 123");
+
+  // Pré-remplit le montant avec la totalité des fonds disponibles (solde +
+  // bonus) à CHAQUE ouverture de la modale — auparavant "500" était figé en
+  // dur par défaut, sans rapport avec le solde réel du client : un client
+  // qui ne changeait pas le champ finissait par ne retirer que $500 au lieu
+  // de la totalité de son compte, sans jamais s'en rendre compte.
+  useEffect(() => {
+    if (withdrawOpen) setWithdrawAmount((balance + bonus).toFixed(2));
+  }, [withdrawOpen, balance, bonus]);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
