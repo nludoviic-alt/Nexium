@@ -178,7 +178,8 @@ export async function claimLiveChatThread(
       sender: "SYSTEM",
       author_name: "Desk Router",
       channel: "CHAT",
-      text: `${advisorName} (${advisorRole || "Conseiller Desk"}) a pris en charge la conversation.`,
+      // Jamais le rôle réel ici : ce message est visible du visiteur.
+      text: `${advisorName} a pris en charge la conversation.`,
       is_read: true,
     },
   ]);

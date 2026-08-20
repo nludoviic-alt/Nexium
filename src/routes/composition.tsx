@@ -1544,53 +1544,6 @@ function NexiumAdminDashboard({
     refreshClients();
   }, [refreshClients]);
 
-  // Abonnement Realtime pour alertes instantanées sur nouvelles inscriptions et demandes de Preset
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    const unsub = subscribeToProfiles((payload) => {
-      if (payload.eventType === "INSERT") {
-        const newClient = payload.new;
-        toast.info(
-          `🚨 Nouvelle demande d'ouverture de compte reçue : ${newClient?.name || "Client"} (${newClient?.email || ""})`,
-          { duration: 9000 }
-        );
-      } else if (
-        payload.eventType === "UPDATE" &&
-        payload.new?.license_status === "PENDING_PRESET_APPROVAL" &&
-        payload.old?.license_status !== "PENDING_PRESET_APPROVAL"
-      ) {
-        const client = payload.new;
-        const presetsLabel = (client?.requested_presets && client.requested_presets.length > 0
-          ? client.requested_presets.join(", ")
-          : client?.requested_preset) || "Preset";
-        toast.info(
-          `⚡ Nouvelle demande d'activation de Preset : ${client?.name || "Client"} (${client?.email || ""}) — ${presetsLabel}`,
-          { duration: 9000 }
-        );
-      }
-      refreshClients();
-    });
-    return unsub;
-  }, [refreshClients]);
-
-  // Abonnement Realtime pour alertes instantanées sur dépôts et retraits
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    const unsub = subscribeToTransactions((payload) => {
-      if (payload.eventType === "INSERT") {
-        const tx = payload.new;
-        const isDep = tx?.type === "DEPOSIT";
-        toast.info(
-          `💳 Demande ${isDep ? "de dépôt" : "de retrait"} reçue : $${tx?.amount || 0} (${tx?.method || "Virement"})`,
-          { duration: 8000 }
-        );
-      }
-      refreshClients();
-      getAllTransactions().then((txs) => txs && setAllTransactions(txs));
-    });
-    return unsub;
-  }, [refreshClients]);
-
   // Synchronisation du staff réel depuis Supabase (tout profil hors rôle TRADER)
   const staffDepartmentForRole = (role: AdminSystemRole): StaffAdministrator["department"] => {
     if (role === "OWNER" || role === "OWNER_A_PLUS" || role === "OWNER_B_PLUS" || role === "SUPER_ADMIN") return "Direction Générale";
@@ -1630,6 +1583,57 @@ function NexiumAdminDashboard({
   useEffect(() => {
     refreshStaffList();
   }, [refreshStaffList]);
+
+  // Abonnement Realtime pour alertes instantanées sur nouvelles inscriptions et demandes de Preset
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const unsub = subscribeToProfiles((payload) => {
+      if (payload.eventType === "INSERT") {
+        const newClient = payload.new;
+        toast.info(
+          `🚨 Nouvelle demande d'ouverture de compte reçue : ${newClient?.name || "Client"} (${newClient?.email || ""})`,
+          { duration: 9000 }
+        );
+      } else if (
+        payload.eventType === "UPDATE" &&
+        payload.new?.license_status === "PENDING_PRESET_APPROVAL" &&
+        payload.old?.license_status !== "PENDING_PRESET_APPROVAL"
+      ) {
+        const client = payload.new;
+        const presetsLabel = (client?.requested_presets && client.requested_presets.length > 0
+          ? client.requested_presets.join(", ")
+          : client?.requested_preset) || "Preset";
+        toast.info(
+          `⚡ Nouvelle demande d'activation de Preset : ${client?.name || "Client"} (${client?.email || ""}) — ${presetsLabel}`,
+          { duration: 9000 }
+        );
+      }
+      refreshClients();
+      // Le staff (collègues) vit dans la même table "profiles" — un changement
+      // fait par un collègue (pseudo, rôle...) doit apparaître immédiatement
+      // dans les autres sessions admin ouvertes, sans attendre un rechargement.
+      refreshStaffList();
+    });
+    return unsub;
+  }, [refreshClients, refreshStaffList]);
+
+  // Abonnement Realtime pour alertes instantanées sur dépôts et retraits
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const unsub = subscribeToTransactions((payload) => {
+      if (payload.eventType === "INSERT") {
+        const tx = payload.new;
+        const isDep = tx?.type === "DEPOSIT";
+        toast.info(
+          `💳 Demande ${isDep ? "de dépôt" : "de retrait"} reçue : $${tx?.amount || 0} (${tx?.method || "Virement"})`,
+          { duration: 8000 }
+        );
+      }
+      refreshClients();
+      getAllTransactions().then((txs) => txs && setAllTransactions(txs));
+    });
+    return unsub;
+  }, [refreshClients]);
 
   // Synchronisation des transactions réelles depuis Supabase, fusionnées dans
   // chaque client (retraits/dépôts en attente + historique).
