@@ -1184,7 +1184,7 @@ function EngineTab({
 
   // 3 moteurs institutionnels (Gold, FX, Index)
   const activeBots = useMemo(() => bots, [bots]);
-  const selectedBot: EngineBot = (activeBots.find((b) => b.id === selectedBotId) ?? activeBots[0] ?? bots[0])!;
+  const selectedBot: EngineBot = (activeBots.find((b) => b.id === selectedBotId) ?? activeBots[0] ?? INITIAL_BOTS[0])!;
   const matchingPos = positions.find((p) => p.botId === selectedBot.id);
 
   // Live Calculations
@@ -1397,6 +1397,15 @@ function EngineTab({
     if (logFilter === "open") return l.level === "OPEN";
     return true;
   });
+
+  if (bots.length === 0) {
+    return (
+      <section className="rounded-3xl border border-slate-700/60 bg-[#0c121e] px-6 py-14 text-center shadow-xl">
+        <h2 className="text-lg font-bold text-white">Aucun moteur disponible</h2>
+        <p className="mt-2 text-sm text-slate-400">Votre Desk a masqué les stratégies de ce profil. Contactez votre conseiller pour plus d’informations.</p>
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -5431,6 +5440,13 @@ export function NexiumDashboard({
     // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
     if (profile.engines_config) {
       const cfg = profile.engines_config as any;
+      setVisibleBotIds(
+        [
+          cfg.aiGold?.visible !== false && "nexium-ai-gold",
+          cfg.fxTrend?.visible !== false && "nexium-fx-trend",
+          cfg.indexReversion?.visible !== false && "nexium-index-reversion",
+        ].filter(Boolean) as EngineBot["id"][]
+      );
       setBots((prev) =>
         prev.map((bot) => {
           if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
@@ -5438,6 +5454,7 @@ export function NexiumDashboard({
               ...bot,
               statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
               mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+              version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
               risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
             };
           }
@@ -5461,6 +5478,7 @@ export function NexiumDashboard({
         })
       );
     } else {
+      setVisibleBotIds(INITIAL_BOTS.map((bot) => bot.id));
       setBots((prev) => prev.map((bot) => ({ ...bot, statusBadge: "EN PAUSE", mainState: "WAITING FOR SETUP" })));
     }
   };
@@ -5568,6 +5586,13 @@ export function NexiumDashboard({
       // Synchronisation en direct des paramètres de moteurs IA
       if (updatedProfile.engines_config) {
         const cfg = updatedProfile.engines_config as any;
+        setVisibleBotIds(
+          [
+            cfg.aiGold?.visible !== false && "nexium-ai-gold",
+            cfg.fxTrend?.visible !== false && "nexium-fx-trend",
+            cfg.indexReversion?.visible !== false && "nexium-index-reversion",
+          ].filter(Boolean) as EngineBot["id"][]
+        );
         setBots((prev) =>
           prev.map((bot) => {
             if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
@@ -5575,6 +5600,7 @@ export function NexiumDashboard({
                 ...bot,
                 statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
                 mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+                version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
                 risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
               };
             }
@@ -5752,10 +5778,12 @@ export function NexiumDashboard({
   // Positions/journal : aucune table de trades réels n'existe encore (MT5 pas encore
   // connecté) — on démarre donc à vide plutôt que d'afficher une activité fictive.
   const [bots, setBots] = useState<EngineBot[]>(INITIAL_BOTS);
+  const [visibleBotIds, setVisibleBotIds] = useState<EngineBot["id"][]>(() => INITIAL_BOTS.map((bot) => bot.id));
   // Reflète l'état réel persisté des moteurs — jamais une valeur locale par
   // défaut, pour ne pas ré-afficher "Activer le Trading" comme actif après un
   // rafraîchissement alors que le trading est en pause côté base.
-  const running = useMemo(() => bots.some((b) => b.statusBadge === "ACTIF"), [bots]);
+  const visibleBots = useMemo(() => bots.filter((bot) => visibleBotIds.includes(bot.id)), [bots, visibleBotIds]);
+  const running = useMemo(() => visibleBots.some((b) => b.statusBadge === "ACTIF"), [visibleBots]);
   const [positions, setPositions] = useState<PositionItem[]>([]);
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
@@ -5857,7 +5885,8 @@ export function NexiumDashboard({
       const currentConfig = (profile?.engines_config as any) || {};
       const nextConfig = { ...currentConfig };
       for (const key of Object.values(ENGINE_ID_TO_KEY)) {
-        nextConfig[key] = { ...(currentConfig[key] || {}), active };
+        const engine = currentConfig[key] || {};
+        nextConfig[key] = { ...engine, active: engine.visible === false ? false : active };
       }
       const result = await updateUserProfile(currentUserId, { engines_config: nextConfig });
       if (!result.success) {
@@ -6900,7 +6929,7 @@ export function NexiumDashboard({
         <main className={`flex-1 ${activeNav === "Messagerie" ? "p-4 sm:p-5 lg:p-6" : "p-6 sm:p-8 lg:p-10"} max-w-[1650px] w-full mx-auto`}>
           {activeNav === "Auto-Trader" && (
             <EngineTab
-              bots={bots}
+              bots={visibleBots}
               positions={positions}
               balance={balance}
               mt5AccountNumber={mt5AccountNumber}
@@ -6918,7 +6947,7 @@ export function NexiumDashboard({
               bonus={bonus}
               running={running}
               onToggleRunning={handleToggleEngine}
-              bots={bots}
+              bots={visibleBots}
               positions={positions}
               onClosePosition={handleClosePosition}
               onOpenDeposit={openDepositModal}
@@ -6930,7 +6959,7 @@ export function NexiumDashboard({
 
           {activeNav === "Stratégies" && (
             <StrategiesTab
-              bots={bots}
+              bots={visibleBots}
               onOpenBotDetail={(bot) => setSelectedDetailBot(bot)}
             />
           )}

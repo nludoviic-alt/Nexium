@@ -354,6 +354,10 @@ type KycStatus = "VERIFIED" | "PENDING_REVIEW" | "REJECTED" | "NOT_SUBMITTED";
 
 interface EngineAssignment {
   active: boolean;
+  /** Contrôle l'affichage du moteur dans le portail client. */
+  visible?: boolean;
+  /** AI Gold peut être attribué en simulation sans exécution réelle. */
+  mode?: "DEMO" | "LIVE";
   preset: string;
   maxLot: number;
   minScore: number;
@@ -626,6 +630,7 @@ interface AuditEntry {
 /* ========================================================================= */
 
 const GOLD_PRESETS = [
+  { id: "gold-demo", name: "Démo — AI Gold (simulation sans exécution réelle)", maxLot: 0.01, minScore: 82 },
   { id: "gold-conservative", name: "Conservateur (0.25% risque / SL 1.2 ATR)", maxLot: 0.2, minScore: 82 },
   { id: "gold-balanced", name: "Équilibré (0.50% risque / SL 1.5 ATR)", maxLot: 0.5, minScore: 78 },
   { id: "gold-aggressive", name: "Agressif (1.00% risque / SL 2.0 ATR)", maxLot: 1.0, minScore: 74 },
@@ -1268,17 +1273,21 @@ function NexiumAdminDashboard({
   const [newPasswordInput, setNewPasswordInput] = useState("");
 
   // Presets Client
-  const [goldActive, setGoldActive] = useState(activeClient?.engines?.aiGold?.active ?? true);
+  const [goldActive, setGoldActive] = useState(activeClient?.engines?.aiGold?.active ?? false);
+  const [goldVisible, setGoldVisible] = useState((activeClient?.engines?.aiGold as any)?.visible ?? true);
   const [goldPreset, setGoldPreset] = useState(activeClient?.engines?.aiGold?.preset ?? GOLD_PRESETS[0].name);
   const [goldMaxLot, setGoldMaxLot] = useState(activeClient?.engines?.aiGold?.maxLot ?? 0.5);
 
-  const [fxActive, setFxActive] = useState(activeClient?.engines?.fxTrend?.active ?? true);
+  const [fxActive, setFxActive] = useState(activeClient?.engines?.fxTrend?.active ?? false);
+  const [fxVisible, setFxVisible] = useState((activeClient?.engines?.fxTrend as any)?.visible ?? true);
   const [fxPreset, setFxPreset] = useState(activeClient?.engines?.fxTrend?.preset ?? FX_PRESETS[0].name);
   const [fxMaxLot, setFxMaxLot] = useState(activeClient?.engines?.fxTrend?.maxLot ?? 0.5);
 
-  const [indexActive, setIndexActive] = useState(activeClient?.engines?.indexReversion?.active ?? true);
+  const [indexActive, setIndexActive] = useState(activeClient?.engines?.indexReversion?.active ?? false);
+  const [indexVisible, setIndexVisible] = useState((activeClient?.engines?.indexReversion as any)?.visible ?? true);
   const [indexPreset, setIndexPreset] = useState(activeClient?.engines?.indexReversion?.preset ?? INDEX_PRESETS[0].name);
   const [indexMaxLot, setIndexMaxLot] = useState(activeClient?.engines?.indexReversion?.maxLot ?? 0.5);
+  const [demoAssigneeId, setDemoAssigneeId] = useState("");
 
   // MT5 Client
   const [mt5Login, setMt5Login] = useState(activeClient?.mt5?.login || "");
@@ -1382,6 +1391,57 @@ function NexiumAdminDashboard({
     });
   };
 
+  const handleAssignDemoPreset = async () => {
+    const client = clients.find((candidate) => candidate.id === demoAssigneeId);
+    if (!client) {
+      toast.error("Sélectionnez un client avant d’attribuer la démo.");
+      return;
+    }
+
+    const demoPreset = GOLD_PRESETS[0];
+    const nextEngines = {
+      ...client.engines,
+      aiGold: {
+        ...(client.engines?.aiGold || {}),
+        active: true,
+        visible: true,
+        mode: "DEMO" as const,
+        preset: demoPreset.name,
+        maxLot: demoPreset.maxLot,
+      },
+    };
+    const activePresets = new Set((client.activePreset || "").split(",").filter(Boolean));
+    activePresets.add("AI_GOLD");
+
+    if (isSupabaseConfigured) {
+      const result = await updateUserProfile(client.id, {
+        license_status: "ACTIVE",
+        active_preset: Array.from(activePresets).join(","),
+        engines_config: nextEngines,
+      });
+      if (!result.success) {
+        toast.error("L’attribution de la démo n’a pas pu être enregistrée.");
+        return;
+      }
+    }
+
+    setClients((prev) =>
+      prev.map((candidate) =>
+        candidate.id === client.id
+          ? {
+              ...candidate,
+              licenseStatus: "ACTIVE",
+              activePreset: Array.from(activePresets).join(","),
+              engines: nextEngines,
+            }
+          : candidate
+      )
+    );
+    setDemoAssigneeId("");
+    addAuditLog("PRESET_DEMO_ASSIGNED", `Version Démo AI Gold attribuée à ${client.name}.`, client.email);
+    toast.success(`Démo AI Gold attribuée à ${client.name}.`);
+  };
+
   const handleOpenClientProfile = (client: UserProfile) => {
     setSelectedUserId(client.id);
     setEditName(client.name);
@@ -1397,15 +1457,18 @@ function NexiumAdminDashboard({
     setNewCrmNoteText("");
     setExactPnlInput(client.todayPnl.toString());
 
-    setGoldActive(client.engines?.aiGold?.active ?? true);
+    setGoldActive(client.engines?.aiGold?.active ?? false);
+    setGoldVisible((client.engines?.aiGold as any)?.visible ?? true);
     setGoldPreset(client.engines?.aiGold?.preset ?? GOLD_PRESETS[0].name);
     setGoldMaxLot(client.engines?.aiGold?.maxLot ?? 0.5);
 
-    setFxActive(client.engines?.fxTrend?.active ?? true);
+    setFxActive(client.engines?.fxTrend?.active ?? false);
+    setFxVisible((client.engines?.fxTrend as any)?.visible ?? true);
     setFxPreset(client.engines?.fxTrend?.preset ?? FX_PRESETS[0].name);
     setFxMaxLot(client.engines?.fxTrend?.maxLot ?? 0.5);
 
-    setIndexActive(client.engines?.indexReversion?.active ?? true);
+    setIndexActive(client.engines?.indexReversion?.active ?? false);
+    setIndexVisible((client.engines?.indexReversion as any)?.visible ?? true);
     setIndexPreset(client.engines?.indexReversion?.preset ?? INDEX_PRESETS[0].name);
     setIndexMaxLot(client.engines?.indexReversion?.maxLot ?? 0.5);
 
@@ -1441,10 +1504,15 @@ function NexiumAdminDashboard({
   const handleSaveClientProfile = async () => {
     if (!activeClient) return;
 
+    const activePresetKeys = [
+      goldActive && "AI_GOLD",
+      fxActive && "FX_TREND",
+      indexActive && "INDEX_REVERSION",
+    ].filter(Boolean) as string[];
     const engines_config = {
-      aiGold: { active: goldActive, preset: goldPreset, maxLot: goldMaxLot },
-      fxTrend: { active: fxActive, preset: fxPreset, maxLot: fxMaxLot },
-      indexReversion: { active: indexActive, preset: indexPreset, maxLot: indexMaxLot },
+      aiGold: { active: goldActive, visible: goldVisible, mode: goldPreset.startsWith("Démo") ? "DEMO" : "LIVE", preset: goldPreset, maxLot: goldMaxLot },
+      fxTrend: { active: fxActive, visible: fxVisible, preset: fxPreset, maxLot: fxMaxLot },
+      indexReversion: { active: indexActive, visible: indexVisible, preset: indexPreset, maxLot: indexMaxLot },
     };
 
     if (isSupabaseConfigured) {
@@ -1452,6 +1520,8 @@ function NexiumAdminDashboard({
         name: editName,
         phone: editPhone,
         status: editStatus,
+        license_status: activePresetKeys.length > 0 ? "ACTIVE" : "NOT_REQUESTED",
+        active_preset: activePresetKeys.join(","),
         kyc_status: editKycStatus === "PENDING_REVIEW" ? "PENDING" : editKycStatus,
         country: editCountry,
         mt5_login: mt5Login,
@@ -1495,14 +1565,16 @@ function NexiumAdminDashboard({
             phone: editPhone,
             country: editCountry,
             status: editStatus,
+            licenseStatus: activePresetKeys.length > 0 ? "ACTIVE" : "NOT_REQUESTED",
+            activePreset: activePresetKeys.join(","),
             kycStatus: editKycStatus,
             maxDailyLossPercent: editMaxDailyLoss,
             maxSimultaneousTrades: editMaxPositions,
             riskGuardAutoStop: editRiskGuardAuto,
             engines: {
-              aiGold: { ...(c.engines?.aiGold || {}), active: goldActive, preset: goldPreset, maxLot: goldMaxLot },
-              fxTrend: { ...(c.engines?.fxTrend || {}), active: fxActive, preset: fxPreset, maxLot: fxMaxLot },
-              indexReversion: { ...(c.engines?.indexReversion || {}), active: indexActive, preset: indexPreset, maxLot: indexMaxLot },
+              aiGold: { ...(c.engines?.aiGold || {}), active: goldActive, visible: goldVisible, mode: goldPreset.startsWith("Démo") ? "DEMO" : "LIVE", preset: goldPreset, maxLot: goldMaxLot },
+              fxTrend: { ...(c.engines?.fxTrend || {}), active: fxActive, visible: fxVisible, preset: fxPreset, maxLot: fxMaxLot },
+              indexReversion: { ...(c.engines?.indexReversion || {}), active: indexActive, visible: indexVisible, preset: indexPreset, maxLot: indexMaxLot },
             },
             mt5: {
               ...(c.mt5 || {}),
@@ -1609,9 +1681,9 @@ function NexiumAdminDashboard({
             performanceFeeRate: 20,
             pendingPerfFee: 0,
             engines: (p.engines_config as any) || {
-              aiGold: { active: true, preset: "EQUINIX_NY4_DIRECT", maxLot: 1.0, minScore: 82, riskCapPercent: 2.0 },
-              fxTrend: { active: true, preset: "INSTITUTIONAL_ALPHA", maxLot: 1.0, minScore: 78, riskCapPercent: 2.0 },
-              indexReversion: { active: false, preset: "CONSERVATIVE_CORE", maxLot: 0.5, minScore: 85, riskCapPercent: 1.5 },
+              aiGold: { active: false, visible: true, preset: "EQUINIX_NY4_DIRECT", maxLot: 1.0, minScore: 82, riskCapPercent: 2.0 },
+              fxTrend: { active: false, visible: true, preset: "INSTITUTIONAL_ALPHA", maxLot: 1.0, minScore: 78, riskCapPercent: 2.0 },
+              indexReversion: { active: false, visible: true, preset: "CONSERVATIVE_CORE", maxLot: 0.5, minScore: 85, riskCapPercent: 1.5 },
             },
             mt5: {
               login: p.mt5_login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -3462,7 +3534,12 @@ function NexiumAdminDashboard({
     return allTransactions
       .map((t) => {
         const client = clients.find((c) => c.id === t.user_id);
-        return { tx: t, clientName: client?.name || "Client inconnu", clientEmail: client?.email || "-" };
+        return {
+          tx: t,
+          client,
+          clientName: client?.name || "Client inconnu",
+          clientEmail: client?.email || "-",
+        };
       })
       .filter(({ tx, clientName, clientEmail }) => {
         if (financeTxTypeFilter !== "ALL" && tx.type !== financeTxTypeFilter) return false;
@@ -4035,6 +4112,11 @@ function NexiumAdminDashboard({
                         <span className="text-[11px] text-indigo-300 font-mono block">
                           KYC : {c.kycStatus} {c.activePreset ? `· ${c.activePreset}` : ""}
                         </span>
+                        {c.engines?.aiGold?.mode === "DEMO" && (
+                          <span className="mt-1 inline-flex rounded-md border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">
+                            AI GOLD · DÉMO
+                          </span>
+                        )}
                       </div>
                     ),
                   },
@@ -4711,17 +4793,21 @@ function NexiumAdminDashboard({
 
                 <div className="grid gap-5 lg:grid-cols-3">
                   <div className="admin-subcard p-5 space-y-3.5 border-amber-500/25">
-                    <div className="flex justify-between items-center border-b border-slate-700/40 pb-2.5">
-                      <h4 className="font-bold text-base text-white">Nexium AI Gold</h4>
-                      <button
-                        type="button"
-                        onClick={() => setGoldActive(!goldActive)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                          goldActive ? "bg-amber-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"
-                        }`}
-                      >
-                        {goldActive ? "ACTIF" : "DÉSACTIVÉ"}
-                      </button>
+                    <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-base text-white">Nexium AI Gold</h4>
+                        {goldPreset.startsWith("Démo") && (
+                          <span className="rounded-md border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">DÉMO</span>
+                        )}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button type="button" onClick={() => { setGoldVisible(!goldVisible); if (goldVisible) setGoldActive(false); }} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer ${goldVisible ? "bg-slate-700 text-white" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"}`}>
+                          {goldVisible ? "VISIBLE" : "MASQUÉ"}
+                        </button>
+                        <button type="button" onClick={() => setGoldActive(!goldActive)} disabled={!goldVisible} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer disabled:opacity-40 ${goldActive ? "bg-amber-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"}`}>
+                          {goldActive ? "ACTIF" : "INACTIF"}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-3 text-xs sm:text-sm font-mono">
@@ -4748,17 +4834,16 @@ function NexiumAdminDashboard({
                   </div>
 
                   <div className="admin-subcard p-5 space-y-3.5 border-indigo-500/25">
-                    <div className="flex justify-between items-center border-b border-slate-700/40 pb-2.5">
+                    <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-2.5">
                       <h4 className="font-bold text-base text-white">Nexium FX Trend</h4>
-                      <button
-                        type="button"
-                        onClick={() => setFxActive(!fxActive)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                          fxActive ? "bg-indigo-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"
-                        }`}
-                      >
-                        {fxActive ? "ACTIF" : "DÉSACTIVÉ"}
-                      </button>
+                      <div className="flex gap-1.5">
+                        <button type="button" onClick={() => { setFxVisible(!fxVisible); if (fxVisible) setFxActive(false); }} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer ${fxVisible ? "bg-slate-700 text-white" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"}`}>
+                          {fxVisible ? "VISIBLE" : "MASQUÉ"}
+                        </button>
+                        <button type="button" onClick={() => setFxActive(!fxActive)} disabled={!fxVisible} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer disabled:opacity-40 ${fxActive ? "bg-indigo-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"}`}>
+                          {fxActive ? "ACTIF" : "INACTIF"}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-3 text-xs sm:text-sm font-mono">
@@ -4785,17 +4870,16 @@ function NexiumAdminDashboard({
                   </div>
 
                   <div className="admin-subcard p-5 space-y-3.5 border-purple-500/25">
-                    <div className="flex justify-between items-center border-b border-slate-700/40 pb-2.5">
+                    <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-2.5">
                       <h4 className="font-bold text-base text-white">Index Reversion</h4>
-                      <button
-                        type="button"
-                        onClick={() => setIndexActive(!indexActive)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                          indexActive ? "bg-purple-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"
-                        }`}
-                      >
-                        {indexActive ? "ACTIF" : "DÉSACTIVÉ"}
-                      </button>
+                      <div className="flex gap-1.5">
+                        <button type="button" onClick={() => { setIndexVisible(!indexVisible); if (indexVisible) setIndexActive(false); }} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer ${indexVisible ? "bg-slate-700 text-white" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"}`}>
+                          {indexVisible ? "VISIBLE" : "MASQUÉ"}
+                        </button>
+                        <button type="button" onClick={() => setIndexActive(!indexActive)} disabled={!indexVisible} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer disabled:opacity-40 ${indexActive ? "bg-purple-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"}`}>
+                          {indexActive ? "ACTIF" : "INACTIF"}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-3 text-xs sm:text-sm font-mono">
@@ -7363,7 +7447,7 @@ function NexiumAdminDashboard({
                 )}
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-3 font-mono">
+              <div className="grid gap-5 lg:grid-cols-4 font-mono">
                 <div className="admin-card-amber p-6 space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
@@ -7409,6 +7493,53 @@ function NexiumAdminDashboard({
                     <div className="flex justify-between"><span className="text-slate-400 font-sans">Comptes Actifs :</span><strong className="text-white">1 / 2</strong></div>
                     <div className="flex justify-between"><span className="text-slate-400 font-sans">Win Rate Global :</span><strong className="text-emerald-400 font-bold">82.1%</strong></div>
                     <div className="flex justify-between"><span className="text-slate-400 font-sans">P&amp;L Cumulé :</span><strong className="text-purple-300 font-bold">+$9,210.00</strong></div>
+                  </div>
+                </div>
+
+                <div className="admin-card-amber p-6 space-y-4 border-dashed border-amber-400/50">
+                  <div className="flex justify-between items-start gap-3">
+                    <div>
+                      <span className="text-[11px] uppercase font-bold text-amber-300 font-mono tracking-wider">Environnement de simulation</span>
+                      <h3 className="text-lg font-bold text-white mt-0.5">Nexium AI Gold — Démo</h3>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-200 border border-amber-500/30">DÉMO</span>
+                  </div>
+                  <p className="text-xs text-slate-300 font-sans leading-relaxed">Version de simulation du preset AI Gold : mêmes signaux et réglages de risque, sans exécution réelle ni impact sur le compte MT5.</p>
+                  <div className="pt-3 space-y-2 text-xs border-t border-slate-700/40">
+                    <div className="flex justify-between"><span className="text-slate-400 font-sans">Exécution :</span><strong className="text-amber-300">Simulation uniquement</strong></div>
+                    <div className="flex justify-between"><span className="text-slate-400 font-sans">Risque :</span><strong className="text-white">Aucun capital engagé</strong></div>
+                  </div>
+                  <div className="space-y-2 pt-1">
+                    <label htmlFor="demo-assignee" className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Client bénéficiaire
+                    </label>
+                    <select
+                      id="demo-assignee"
+                      value={demoAssigneeId}
+                      onChange={(event) => setDemoAssigneeId(event.target.value)}
+                      className="w-full rounded-lg border border-slate-700/70 bg-[#0c121e] px-2.5 py-2 text-xs text-white outline-none focus:border-amber-400"
+                    >
+                      <option value="">Sélectionner un client…</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>{client.name} — {client.email}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!demoAssigneeId}
+                      onClick={() =>
+                        requestConfirmation(
+                          "Attribuer la démo AI Gold",
+                          "Le preset Démo AI Gold sera activé et visible dans le profil du client sélectionné, sans exécution réelle.",
+                          "Approuver & attribuer",
+                          "INFO",
+                          () => { void handleAssignDemoPreset(); }
+                        )
+                      }
+                      className="w-full rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40 transition cursor-pointer"
+                    >
+                      Approuver &amp; attribuer →
+                    </button>
                   </div>
                 </div>
               </div>
@@ -7591,16 +7722,29 @@ function NexiumAdminDashboard({
                           </td>
                         </tr>
                       ) : (
-                        financeTransactionRows.map(({ tx, clientName, clientEmail }) => {
+                        financeTransactionRows.map(({ tx, client, clientName, clientEmail }) => {
                           const isPositive = tx.type === "DEPOSIT" || tx.type === "TRADE_PROFIT" || tx.type === "BONUS" || tx.type === "PROFIT_SHARE";
                           return (
-                            <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
+                            <tr
+                              key={tx.id}
+                              onClick={() => client && handleOpenClientProfile(client)}
+                              onKeyDown={(event) => {
+                                if (client && (event.key === "Enter" || event.key === " ")) {
+                                  event.preventDefault();
+                                  handleOpenClientProfile(client);
+                                }
+                              }}
+                              tabIndex={client ? 0 : undefined}
+                              role={client ? "link" : undefined}
+                              aria-label={client ? `Ouvrir la fiche de ${clientName}` : undefined}
+                              className={`transition-colors ${client ? "group cursor-pointer hover:bg-emerald-500/10 focus:outline-none focus-visible:bg-emerald-500/15" : "hover:bg-slate-800/40"}`}
+                            >
                               <td className="px-4 py-3 text-slate-300 text-xs">
                                 {tx.created_at ? new Date(tx.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-"}
                               </td>
                               <td className="px-4 py-3">
-                                <span className="font-semibold text-white block">{clientName}</span>
-                                <span className="text-[11px] text-slate-500">{clientEmail}</span>
+                                <span className={`font-semibold block transition-colors ${client ? "text-white group-hover:text-emerald-300" : "text-white"}`}>{clientName}</span>
+                                <span className={`text-[11px] transition-colors ${client ? "text-slate-500 group-hover:text-emerald-400/80" : "text-slate-500"}`}>{clientEmail}</span>
                               </td>
                               <td className="px-4 py-3 text-slate-200 text-xs">{TX_TYPE_LABELS[tx.type] || tx.type}</td>
                               <td className={`px-4 py-3 font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>

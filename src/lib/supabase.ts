@@ -231,6 +231,7 @@ export async function approvePresetSelection(userId: string, activePresetKeys: s
     nextConfig[engineKey] = {
       ...(currentConfig[engineKey] || {}),
       active: activePresetKeys.includes(presetId),
+      visible: activePresetKeys.includes(presetId) ? true : (currentConfig[engineKey]?.visible ?? true),
     };
   }
 
@@ -1326,7 +1327,5 @@ export function subscribeToAdminEmails(callback: (change?: { table: "email_conve
     if (channel) supabase.removeChannel(channel);
   };
 }
-
-
 
 
