@@ -8,13 +8,13 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/register")({
   head: () => ({
     meta: [
-      { title: "s'inscrire — Nexium-markets" },
+      { title: "S’inscrire — Nexium Markets" },
       {
         name: "description",
         content:
           "Inscrivez-vous sur Nexium-markets pour accéder au catalogue de robots MetaTrader 5 et à votre dashboard.",
       },
-      { property: "og:title", content: "s'inscrire — Nexium-markets" },
+      { property: "og:title", content: "S’inscrire — Nexium Markets" },
       { property: "og:description", content: "Ouvrez votre espace client Nexium-markets." },
       { name: "robots", content: "noindex" },
     ],
@@ -78,6 +78,7 @@ function RegisterPage() {
             data: {
               name: fullName,
               country,
+              phone: phone.trim(),
             },
             emailRedirectTo: "https://nexiummarkets.com/login",
           },
@@ -104,11 +105,12 @@ function RegisterPage() {
 
         // 2. Enregistrement systématique de la fiche profil dans la table `profiles`
         try {
-          await supabase.from("profiles").upsert({
+          const { error: profileError } = await supabase.from("profiles").upsert({
             id: createdUserId,
             email,
             name: fullName,
             phone: phone.trim(),
+            country,
             role: "TRADER",
             status: "PENDING_APPROVAL", // En attente de validation par l'administrateur
             license_status: "NOT_REQUESTED", // En attente de sélection de preset
@@ -116,6 +118,10 @@ function RegisterPage() {
             balance: 0.0,
             assigned_advisor: "Expert Trading",
           });
+          if (profileError) {
+            console.error("Erreur enregistrement profil Supabase:", profileError);
+            toast.error("Votre compte a été créé, mais vos coordonnées n’ont pas pu être enregistrées. Contactez le support.");
+          }
         } catch (profileErr) {
           console.warn("Notice enregistrement profil Supabase:", profileErr);
         }
@@ -297,7 +303,7 @@ function RegisterPage() {
               ) : (
                 <>
                   <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                    {language === "fr" ? "s'inscrire" : "Create Your Account"}
+                    {language === "fr" ? "S’inscrire" : "Create Your Account"}
                   </h1>
 
                   <form
@@ -599,7 +605,7 @@ function RegisterPage() {
                             ? "Création en cours..."
                             : "Creating account..."
                           : language === "fr"
-                          ? "s'inscrire"
+                          ? "S’inscrire"
                           : "Create Account"}
                       </span>
                     </Button>

@@ -1540,6 +1540,10 @@ function NexiumAdminDashboard({
           if (!p) return c;
           return {
             ...c,
+            name: p.name || c.name,
+            email: p.email || c.email,
+            phone: p.phone || c.phone,
+            country: p.country || c.country,
             status: (p.status as AccountStatus) ?? c.status,
             kycStatus: (p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW") as UserProfile["kycStatus"],
             licenseStatus: ((p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED")) as UserProfile["licenseStatus"],
@@ -4032,6 +4036,15 @@ function NexiumAdminDashboard({
                           KYC : {c.kycStatus} {c.activePreset ? `· ${c.activePreset}` : ""}
                         </span>
                       </div>
+                    ),
+                  },
+                  {
+                    key: "phone",
+                    header: "TÉLÉPHONE",
+                    render: (c: UserProfile) => (
+                      <span className="text-xs text-slate-300 font-mono whitespace-nowrap">
+                        {c.phone || "—"}
+                      </span>
                     ),
                   },
                   {

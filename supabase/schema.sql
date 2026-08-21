@@ -713,15 +713,18 @@ AS $$
 DECLARE
   v_name TEXT;
   v_country TEXT;
+  v_phone TEXT;
 BEGIN
   v_name := COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1));
   v_country := COALESCE(NEW.raw_user_meta_data->>'country', 'France');
+  v_phone := NULLIF(trim(COALESCE(NEW.raw_user_meta_data->>'phone', '')), '');
 
   INSERT INTO public.profiles (
     id,
     email,
     name,
     country,
+    phone,
     role,
     status,
     kyc_status,
@@ -732,6 +735,7 @@ BEGIN
     NEW.email,
     v_name,
     v_country,
+    v_phone,
     'TRADER',
     'PENDING_APPROVAL',
     'PENDING',
@@ -741,7 +745,8 @@ BEGIN
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     name = CASE WHEN profiles.name = '' OR profiles.name IS NULL THEN EXCLUDED.name ELSE profiles.name END,
-    country = CASE WHEN profiles.country IS NULL THEN EXCLUDED.country ELSE profiles.country END;
+    country = CASE WHEN profiles.country IS NULL THEN EXCLUDED.country ELSE profiles.country END,
+    phone = CASE WHEN profiles.phone = '' OR profiles.phone IS NULL THEN EXCLUDED.phone ELSE profiles.phone END;
 
   -- Enregistrement automatique dans le journal d'audit
   INSERT INTO public.audit_logs (
@@ -840,4 +845,3 @@ CREATE POLICY "page_views_insert" ON public.page_views FOR INSERT WITH CHECK (tr
 -- Lecture réservée au personnel connecté (staff/admin), jamais aux visiteurs.
 CREATE POLICY "page_views_select" ON public.page_views
     FOR SELECT USING (public.get_my_role() IS NOT NULL);
-
