@@ -4,7 +4,7 @@ export const translations = {
   fr: {
     // Header & Navigation
     nav: {
-      clientArea: "ESPACE CLIENT",
+      clientArea: "connexion",
       partners: "PARTENAIRES",
       blog: "BLOG",
       automation: "Automatisation",
@@ -18,8 +18,8 @@ export const translations = {
       faq: "FAQ",
       pricing: "Tarifs",
       contact: "Contact",
-      openAccount: "Ouvrir un Compte",
-      login: "Espace Client",
+      openAccount: "inscription",
+      login: "connexion",
       brandSub: "AUTOMATISATION & CONTRÔLE",
       langSwitch: "Langue",
     },
@@ -69,7 +69,7 @@ export const translations = {
       titlePart2: "Gardez le contrôle.",
       description: "Robots de trading certifiés pour MetaTrader 5. Exécution institutionnelle à faible latence (Equinix NY4), règles strictes de gestion du risque et tableau de bord de pilotage centralisé.",
       ctaPrimary: "DÉCOUVRIR LES ROBOTS",
-      ctaSecondary: "Voir la Démo Live",
+      ctaSecondary: "Trader",
       statExecution: "Latence d'Exécution",
       statExecutionVal: "18 ms",
       statExecutionNote: "Equinix NY4 Cross-Connect",
@@ -134,7 +134,7 @@ export const translations = {
       badge: "GUIDE DÉMARRAGE RAPIDE",
       title: "Comment fonctionne Nexium Markets",
       subtitle: "De la création de votre compte jusqu'au suivi télémétrique en temps réel : 5 étapes simples pour activer vos robots de trading.",
-      step1Title: "Créer votre compte",
+      step1Title: "s'inscrire",
       step1Desc: "Inscription gratuite en 2 minutes par e-mail, validation de sécurité et accès immédiat à votre console de gestion.",
       step2Title: "Choisir votre robot EA",
       step2Desc: "Comparez les stratégies, actifs (Forex, Or, Indices), horizons de temps et niveaux de risque depuis le catalogue certifié.",
@@ -282,9 +282,9 @@ export const translations = {
 
     // Auth Pages (Login, Register, Forgot Password)
     auth: {
-      loginTitle: "Connexion à votre Espace Client",
+      loginTitle: "Connexion à votre connexion",
       loginSubtitle: "Accédez à votre dashboard de trading et à vos licences de robots MT5.",
-      registerTitle: "Créer votre Compte Nexium Markets",
+      registerTitle: "s'inscrire Nexium Markets",
       registerSubtitle: "Rejoignez la plateforme d'automatisation algorithmique MetaTrader 5.",
       forgotPasswordTitle: "Réinitialisation du Mot de Passe",
       forgotPasswordSubtitle: "Saisissez votre e-mail pour recevoir un lien de récupération sécurisé.",
@@ -297,10 +297,10 @@ export const translations = {
       phoneLabel: "Numéro de téléphone",
       phonePlaceholder: "+33 6 12 34 56 78",
       loginBtn: "Se Connecter ➔",
-      registerBtn: "Créer mon Compte ➔",
+      registerBtn: "s'inscrire ➔",
       sendResetLinkBtn: "Envoyer le lien de réinitialisation ➔",
-      noAccountPrompt: "Vous n'avez pas encore de compte ?",
-      hasAccountPrompt: "Vous avez déjà un compte ?",
+      noAccountPrompt: "Vous n'avez pas encore d'inscription ?",
+      hasAccountPrompt: "Vous avez déjà une inscription ?",
       forgotPasswordLink: "Mot de passe oublié ?",
       acceptTermsPrompt: "En vous inscrivant, vous acceptez nos",
     },

@@ -164,12 +164,35 @@ export function TradingViewSuperchart({
     ]);
   }, [symbolMeta]);
 
-  // LIVE REAL-TIME CONTINUOUS CANDLESTICK STREAMING & SCROLLING ENGINE
-  useEffect(() => {
-    if (!isTradingActive) return;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
 
-    // 1. Tick generator (every 500ms updates current rightmost bar)
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      setIsInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0.05, rootMargin: "50px" }
+    );
+    const el = containerRef.current;
+    if (el) observer.observe(el);
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, []);
+
+  // LIVE REAL-TIME CONTINUOUS CANDLESTICK STREAMING & SCROLLING ENGINE (Only when in view)
+  useEffect(() => {
+    if (!isTradingActive || !isInView) return;
+
+    // 1. Tick generator (every 1000ms updates current rightmost bar)
     const tickInterval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+
       setCandles((prev) => {
         if (prev.length === 0) return prev;
         const lastIdx = prev.length - 1;
@@ -194,10 +217,12 @@ export function TradingViewSuperchart({
         };
         return updated;
       });
-    }, 500);
+    }, 1000);
 
-    // 2. New Candle Scroll Generator (Every 3.2 seconds, spawns a new bar and shifts chart left)
+    // 2. New Candle Scroll Generator (Every 4 seconds, spawns a new bar and shifts chart left)
     const newBarInterval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+
       setCandles((prev) => {
         if (prev.length === 0) return prev;
         const last = prev[prev.length - 1];
@@ -241,13 +266,13 @@ export function TradingViewSuperchart({
         // Keep last 34 candles for smooth scrolling window
         return [...prev.slice(1), newCandle];
       });
-    }, 3200);
+    }, 4000);
 
     return () => {
       clearInterval(tickInterval);
       clearInterval(newBarInterval);
     };
-  }, [isTradingActive, symbolMeta]);
+  }, [isTradingActive, symbolMeta, isInView]);
 
   // Dynamic Scale Range calculation
   const { minPrice, maxPrice, priceRange } = useMemo(() => {
@@ -274,7 +299,7 @@ export function TradingViewSuperchart({
   const ema20Path = useMemo(() => {
     if (candles.length === 0) return "";
     const points = candles.map((c, i) => {
-      const avg = (c.open + c.close + c.high + c.low) / 4;
+      const avg = (c.open + c.close) / 2;
       const x = 20 + i * 27;
       const y = getY(avg);
       return `${x},${y}`;
@@ -296,7 +321,7 @@ export function TradingViewSuperchart({
   const lastY = getY(parseFloat(currentLivePrice));
 
   return (
-    <div className="flex flex-col w-full rounded-2xl overflow-hidden admin-card border border-slate-700/60 bg-[#0c1220] shadow-2xl">
+    <div ref={containerRef} className="flex flex-col w-full rounded-2xl overflow-hidden admin-card border border-slate-700/60 bg-[#0c1220] shadow-2xl">
       {/* ── 1. HEADER DU GRAPHIQUE ÉPURÉ & PROFESSIONNEL ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/50 bg-[#0f172a]/95 px-4 py-3">
         {/* Symbole & Prix en Direct avec Pulse */}

@@ -145,7 +145,7 @@ function LoginPage() {
 
             <div className="relative z-10">
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                {language === "fr" ? "Espace Client" : "Portal Client"}
+                {language === "fr" ? "connexion" : "Portal Client"}
               </h2>
 
               <ul className="mt-6 space-y-3.5 text-sm sm:text-base font-semibold">
@@ -259,7 +259,7 @@ function LoginPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 hover:text-[#00D084] text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                 >
                   {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
                   <span>
@@ -278,7 +278,7 @@ function LoginPage() {
             {/* Bottom Switch Link */}
             <div className="mt-8 pt-4 text-center text-xs sm:text-sm font-semibold text-gray-600 border-t border-gray-100 flex justify-between items-center">
               <Link to="/register" className="font-extrabold text-gray-900 underline hover:text-[#00c853]">
-                {language === "fr" ? "Créer un compte" : "Create account"}
+                {language === "fr" ? "s'inscrire" : "Create account"}
               </Link>
               <Link to="/" className="text-gray-500 hover:text-gray-900">
                 {language === "fr" ? "← Retour à l'accueil" : "← Back to Home"}

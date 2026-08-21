@@ -60,8 +60,8 @@ function TradingHero({
 
   const slides = [
     {
-      badge: language === "fr" ? "Plateforme d'Automatisation MT5" : "MT5 Automation Platform",
-      titlePrefix: language === "fr" ? "Automatisez Votre Trading" : "Automate Your Trading",
+      badge: language === "fr" ? "Plateforme MT5 Pro" : "MT5 Pro Platform",
+      titlePrefix: language === "fr" ? "Votre Trading" : "Your Trading",
       titleHighlight: language === "fr" ? "MetaTrader 5" : "MetaTrader 5",
       description:
         language === "fr"
@@ -145,6 +145,26 @@ function TradingHero({
     },
   ];
 
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) {
+        onNext();
+      } else {
+        onPrevious();
+      }
+    }
+    setTouchStartX(null);
+  };
+
   return (
     <section
       onMouseEnter={onMouseEnter}
@@ -156,7 +176,13 @@ function TradingHero({
         className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden"
         aria-hidden="true"
       >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[550px] bg-[#00D084]/10 blur-[200px] rounded-full" />
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[550px] rounded-full pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(0,208,132,0.12) 0%, rgba(0,208,132,0.02) 60%, transparent 80%)",
+            transform: "translate3d(-50%, -50%, 0)",
+          }}
+        />
         <svg
           className="absolute inset-0 w-full h-full opacity-35"
           xmlns="http://www.w3.org/2000/svg"
@@ -179,8 +205,65 @@ function TradingHero({
         </svg>
       </div>
 
-      {/* Center Hero Content Container */}
-      <div className="relative z-20 flex flex-col items-center justify-center text-center px-4 pt-32 sm:pt-36 md:pt-40 pb-10 sm:pb-14 max-w-5xl mx-auto my-auto select-none w-full">
+      {/* ── MOBILE HERO SLIDER ONLY (md:hidden) ── */}
+      <div
+        className="relative z-20 flex flex-col justify-between items-center text-center md:hidden w-full px-4 pt-44 pb-10 min-h-[700px] select-none"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full my-auto max-w-md">
+          {/* Top Pill Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/35 bg-[#00D084]/10 px-4 py-1.5 text-xs font-black tracking-[0.16em] text-[#00D084] uppercase shadow-[0_0_15px_rgba(0,208,132,0.15)] backdrop-blur-md mb-4">
+            <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
+            <span>{currentSlide.badge}</span>
+          </div>
+
+          {/* Main Title OUTSIDE the card */}
+          <h1 className="text-[30px] sm:text-3xl font-black uppercase tracking-tight leading-[1.14] text-white">
+            <span className="block text-white mb-1">{currentSlide.titlePrefix}</span>
+            <span className="block text-[#00D084] drop-shadow-[0_0_25px_rgba(0,208,132,0.4)]">
+              {currentSlide.titleHighlight}
+            </span>
+          </h1>
+
+          {/* 💎 Luxury Accent Card with Description & Buttons */}
+          <div className="mt-5 p-6 rounded-3xl border border-[#00D084]/20 bg-gradient-to-b from-[#131922]/95 via-[#0e1319]/95 to-[#0a0d12]/95 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,208,132,0.08),0_25px_60px_rgba(0,0,0,0.8)] w-full flex flex-col items-center relative overflow-hidden">
+            {/* Top Micro Laser Glow */}
+            <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-[#00D084]/70 to-transparent" />
+
+            {/* Description text */}
+            <p className="text-[14.5px] font-normal text-gray-200/90 leading-relaxed text-center">
+              {currentSlide.description}
+            </p>
+
+            {/* CTA Buttons */}
+            <div className="mt-6 flex flex-col gap-3 w-full">
+              <Button
+                asChild
+                className="hero-watch-btn w-full h-12.5 rounded-xl text-[14.5px] font-black text-white tracking-wide cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_25px_rgba(0,208,132,0.35)]"
+              >
+                <Link to={currentSlide.primaryCta.to} className="flex items-center justify-center gap-2">
+                  <span>{currentSlide.primaryCta.label}</span>
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                variant="outline"
+                className="w-full h-12.5 rounded-xl border border-white/15 bg-white/[0.04] text-[14.5px] font-bold text-white hover:bg-white/[0.08] backdrop-blur-md cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                <Link to={currentSlide.secondaryCta.to} className="flex items-center justify-center">
+                  {currentSlide.secondaryCta.label}
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── DESKTOP HERO SLIDER ONLY (hidden md:flex) ── */}
+      <div className="relative z-20 hidden md:flex flex-col items-center justify-center text-center px-4 pt-32 sm:pt-36 md:pt-40 pb-10 sm:pb-14 max-w-5xl mx-auto my-auto select-none w-full">
         <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full">
           {/* Eyebrow badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/35 bg-[#00D084]/10 px-4 py-1.5 text-xs font-black tracking-[0.16em] text-[#00D084] uppercase shadow-[0_0_15px_rgba(0,208,132,0.15)] backdrop-blur-md">

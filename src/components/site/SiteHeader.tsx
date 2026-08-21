@@ -149,7 +149,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
           <Button
             asChild
             variant="outline"
-            className="rounded-full border-gray-600 bg-transparent px-6 py-2.5 text-xs font-extrabold tracking-wider text-white uppercase hover:border-[#00D084]/50 hover:bg-gray-800"
+            className="rounded-full border-gray-600 bg-transparent px-6 py-2.5 text-xs font-extrabold tracking-wider text-white uppercase hover:border-[#00D084]/50 hover:bg-gray-800 hover:text-[#00D084]"
           >
             <Link to="/login">{t.nav.login}</Link>
           </Button>
@@ -165,7 +165,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
                 variant="outline"
                 size="icon"
                 aria-label="Open menu"
-                className="size-10 border-gray-600 bg-transparent text-white hover:border-[#00D084]"
+                className="size-10 border-gray-600 bg-transparent text-white hover:border-[#00D084] hover:text-[#00D084]"
               >
                 <Menu className="size-6" />
               </Button>
@@ -203,7 +203,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
                   <Button
                     asChild
                     variant="outline"
-                    className="rounded-full border-gray-500 bg-transparent py-3 text-xs font-extrabold text-white"
+                    className="rounded-full border-gray-500 bg-transparent py-3 text-xs font-extrabold text-white hover:text-[#00D084]"
                   >
                     <Link to="/login" onClick={() => setOpen(false)}>
                       {t.nav.login}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ArrowRight, TrendingUp, Zap, ShieldCheck, Monitor, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
@@ -42,9 +42,31 @@ export function Mt5SimulatedTradingDesktop({
 
   const [livePnl, setLivePnl] = useState(1450.25);
   const [currentPrice, setCurrentPrice] = useState(194.75);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
 
-  // Smooth 3.2s tick interval for realistic desktop algo trading
   useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      setIsInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0.05, rootMargin: "50px" }
+    );
+    const el = containerRef.current;
+    if (el) observer.observe(el);
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, []);
+
+  // Smooth 3.2s tick interval for realistic desktop algo trading (only when in view)
+  useEffect(() => {
+    if (!isInView) return;
+
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
 
@@ -61,14 +83,14 @@ export function Mt5SimulatedTradingDesktop({
     }, 3200);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isInView]);
 
   return (
-    <div className="w-full py-0 px-4 sm:px-6 md:px-8 text-white">
+    <div ref={containerRef} className="w-full py-0 px-4 sm:px-6 md:px-8 text-white">
       <div className="mx-auto max-w-7xl">
         <div className="grid grid-cols-1 gap-12 items-center lg:grid-cols-12">
-          {/* Left Desktop Monitor Mockup Column (7 Cols, lg:order-1) */}
-          <div className="lg:col-span-7 lg:order-1 relative flex items-center justify-center">
+          {/* Left Desktop Monitor Mockup Column (7 Cols, order-2 on mobile, lg:order-1 on desktop) */}
+          <div className="lg:col-span-7 order-2 lg:order-1 relative flex items-center justify-center">
             {/* Desktop Monitor Outer Shell */}
             <div className="relative z-10 w-full">
               {/* Monitor Screen Frame (Ultra-sleek titanium alloy frame) */}
@@ -301,18 +323,18 @@ export function Mt5SimulatedTradingDesktop({
             </div>
           </div>
 
-          {/* Right Text Content Column (5 Cols, lg:order-2) */}
-          <div className="lg:col-span-5 lg:order-2 flex flex-col items-start lg:pl-6">
+          {/* Right Text Content Column (5 Cols, order-1 on mobile, lg:order-2 on desktop) */}
+          <div className="lg:col-span-5 order-1 lg:order-2 flex flex-col items-center text-center lg:items-start lg:text-left lg:pl-6">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-xs font-black uppercase tracking-widest text-[#00D084] shadow-sm mb-4">
               ROBOTS MT5 · ACTIONS & INDICES
             </span>
             <h2 className="text-4xl font-black tracking-tight text-white sm:text-5xl md:text-6xl leading-[1.1]">
               {title}
             </h2>
-            <p className="mt-6 text-base sm:text-lg leading-relaxed text-gray-300 font-medium max-w-xl">
+            <p className="mt-6 text-base sm:text-lg leading-relaxed text-gray-300 font-medium max-w-xl mx-auto lg:mx-0">
               {description}
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 w-full sm:w-auto">
               <Button
                 asChild
                 className="neon-btn rounded-full px-8 py-3.5 text-xs font-black uppercase tracking-wider text-[#021a11] hover:scale-105 transition-all shadow-lg cursor-pointer"
@@ -325,7 +347,7 @@ export function Mt5SimulatedTradingDesktop({
               <Button
                 asChild
                 variant="outline"
-                className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 px-8 py-3.5 text-xs font-black uppercase tracking-wider text-white hover:scale-105 transition-all cursor-pointer"
+                className="rounded-full border-white/20 bg-white/5 hover:bg-white/10 hover:text-[#00D084] px-8 py-3.5 text-xs font-black uppercase tracking-wider text-white hover:scale-105 transition-all cursor-pointer"
               >
                 <Link to="/how-it-works">MODE D'EMPLOI</Link>
               </Button>

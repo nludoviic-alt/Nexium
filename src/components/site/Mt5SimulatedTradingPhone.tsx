@@ -96,10 +96,32 @@ export function Mt5SimulatedTradingPhone({
     { id: 22, open: 28680, close: 28797.56, high: 28850, low: 28650 }, // Live forming candle
   ]);
 
-  // Real-Time Tick Engine (Runs smoothly every 1000ms when tab is active)
+  // Real-Time Tick Engine (Only runs when visible in viewport)
   const barTimerRef = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isInView, setIsInView] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      setIsInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0.05, rootMargin: "50px" }
+    );
+    const el = containerRef.current;
+    if (el) observer.observe(el);
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isInView) return;
+
     const tickInterval = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
 
@@ -140,7 +162,7 @@ export function Mt5SimulatedTradingPhone({
           low: updatedLow,
         };
 
-        // Every ~8 ticks (~8s), finalize bar and create a new live candle
+        // Every ~8 ticks (~16s), finalize bar and create a new live candle
         barTimerRef.current += 1;
         if (barTimerRef.current >= 8) {
           barTimerRef.current = 0;
@@ -157,10 +179,10 @@ export function Mt5SimulatedTradingPhone({
 
         return newCandles;
       });
-    }, 1000);
+    }, 1800);
 
     return () => clearInterval(tickInterval);
-  }, []);
+  }, [isInView]);
 
   const handleOrder = (type: "BUY" | "SELL") => {
     const priceStr = type === "BUY" ? (currentPrice + 25).toFixed(2) : currentPrice.toFixed(2);
@@ -202,16 +224,16 @@ export function Mt5SimulatedTradingPhone({
   const livePriceY = getY(currentPrice);
 
   return (
-    <div className="w-full py-0 px-4 sm:px-6 md:px-8">
+    <div ref={containerRef} className="w-full py-0 px-4 sm:px-6 md:px-8">
       <div className="mx-auto max-w-7xl">
         <div
           className={`grid grid-cols-1 gap-10 items-center lg:grid-cols-2 ${
             !connectorRight ? "lg:flex-row-reverse" : ""
           }`}
         >
-          {/* Left Text Content Column */}
+          {/* Left Text Content Column (Centered on mobile, left-aligned on desktop) */}
           <div
-            className={`flex flex-col items-start ${!connectorRight ? "lg:order-2" : "lg:order-1"}`}
+            className={`flex flex-col items-center text-center lg:items-start lg:text-left ${!connectorRight ? "lg:order-2" : "lg:order-1"}`}
           >
             {badge && (
               <span
@@ -232,13 +254,13 @@ export function Mt5SimulatedTradingPhone({
               {title}
             </h2>
             <p
-              className={`mt-6 text-base sm:text-lg leading-relaxed font-medium max-w-xl ${
+              className={`mt-6 text-base sm:text-lg leading-relaxed font-medium max-w-xl mx-auto lg:mx-0 ${
                 isDarkTheme ? "text-gray-300" : "text-gray-600"
               }`}
             >
               {description}
             </p>
-            <div className="mt-8 flex flex-wrap gap-4">
+            <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 w-full sm:w-auto">
               <Button
                 asChild
                 className={`rounded-full px-8 py-3.5 text-xs font-black uppercase tracking-wider shadow-lg cursor-pointer hover:scale-105 transition-all ${
@@ -248,7 +270,7 @@ export function Mt5SimulatedTradingPhone({
                 }`}
               >
                 <Link to="/robots">
-                  <span>{isDarkTheme ? "Ouvrir un Compte Démo" : "DÉCOUVRIR LES STRATÉGIES"}</span>
+                  <span>{isDarkTheme ? "inscription Démo" : "DÉCOUVRIR LES STRATÉGIES"}</span>
                   <ArrowRight className="size-4 ml-2" />
                 </Link>
               </Button>
@@ -257,7 +279,7 @@ export function Mt5SimulatedTradingPhone({
                 variant="outline"
                 className={`rounded-full px-8 py-3.5 text-xs font-black uppercase tracking-wider cursor-pointer hover:scale-105 transition-all ${
                   isDarkTheme
-                    ? "border-white/20 bg-white/5 text-white hover:bg-white/10"
+                    ? "border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-[#00D084]"
                     : "border-gray-300 bg-white hover:bg-gray-100 text-gray-900 shadow-sm"
                 }`}
               >

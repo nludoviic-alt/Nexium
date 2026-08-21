@@ -8,13 +8,13 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/register")({
   head: () => ({
     meta: [
-      { title: "Créer un compte — Nexium-markets" },
+      { title: "s'inscrire — Nexium-markets" },
       {
         name: "description",
         content:
-          "Créez votre compte Nexium-markets pour accéder au catalogue de robots MetaTrader 5 et à votre dashboard.",
+          "Inscrivez-vous sur Nexium-markets pour accéder au catalogue de robots MetaTrader 5 et à votre dashboard.",
       },
-      { property: "og:title", content: "Créer un compte — Nexium-markets" },
+      { property: "og:title", content: "s'inscrire — Nexium-markets" },
       { property: "og:description", content: "Ouvrez votre espace client Nexium-markets." },
       { name: "robots", content: "noindex" },
     ],
@@ -297,7 +297,7 @@ function RegisterPage() {
               ) : (
                 <>
                   <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                    {language === "fr" ? "Créer Votre Compte" : "Create Your Account"}
+                    {language === "fr" ? "s'inscrire" : "Create Your Account"}
                   </h1>
 
                   <form
@@ -590,7 +590,7 @@ function RegisterPage() {
                     <Button
                       type="submit"
                       disabled={loading}
-                      className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
+                      className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 hover:text-[#00D084] text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
                     >
                       {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
                       <span>
@@ -599,7 +599,7 @@ function RegisterPage() {
                             ? "Création en cours..."
                             : "Creating account..."
                           : language === "fr"
-                          ? "Créer Mon Compte"
+                          ? "s'inscrire"
                           : "Create Account"}
                       </span>
                     </Button>
@@ -611,7 +611,7 @@ function RegisterPage() {
             {/* Bottom Switch Link */}
             <div className="mt-8 pt-4 text-center text-xs sm:text-sm font-semibold text-gray-600 border-t border-gray-100 flex justify-between items-center">
               <Link to="/login" className="font-extrabold text-gray-900 underline hover:text-[#00c853]">
-                {language === "fr" ? "Déjà un compte ? Se connecter" : "Already have an account? Sign in"}
+                {language === "fr" ? "Déjà une inscription ? Se connecter" : "Already have an account? Sign in"}
               </Link>
               <Link to="/" className="text-gray-500 hover:text-gray-900">
                 {language === "fr" ? "← Accueil" : "← Home"}

@@ -205,7 +205,7 @@ function PricingPage() {
                 className={`mt-8 rounded-2xl py-4 text-sm font-black uppercase tracking-wider transition-all hover:scale-105 cursor-pointer ${
                   p.highlight
                     ? "neon-btn text-[#021a11]"
-                    : "border border-gray-700 bg-gray-900 text-white hover:bg-gray-800 hover:border-gray-600"
+                    : "border border-gray-700 bg-gray-900 text-white hover:bg-gray-800 hover:border-gray-600 hover:text-[#00D084]"
                 }`}
               >
                 <Link to="/register">
@@ -323,7 +323,7 @@ function PricingPage() {
               </h3>
               <p className="text-xs sm:text-sm text-gray-300 font-medium leading-relaxed">
                 {language === "fr"
-                  ? "Créez votre compte en moins de 2 minutes et connectez vos terminaux MetaTrader 5 à notre pont réseau."
+                  ? "Inscrivez-vous en moins de 2 minutes et connectez vos terminaux MetaTrader 5 à notre pont réseau."
                   : "Create your account in under 2 minutes and link your MetaTrader 5 terminals to our network bridge."}
               </p>
             </div>

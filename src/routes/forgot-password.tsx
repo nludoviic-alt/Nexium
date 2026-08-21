@@ -224,7 +224,7 @@ function ForgotPasswordPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full mt-2 rounded-xl bg-black hover:bg-neutral-900 hover:text-[#00D084] text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                   >
                     {loading && <Loader2 className="size-4 animate-spin text-emerald-400" />}
                     <span>
@@ -247,7 +247,7 @@ function ForgotPasswordPage() {
                 {language === "fr" ? "← Connexion" : "← Login"}
               </Link>
               <Link to="/register" className="font-extrabold text-gray-900 underline hover:text-[#00c853]">
-                {language === "fr" ? "Créer un compte" : "Create account"}
+                {language === "fr" ? "s'inscrire" : "Create account"}
               </Link>
             </div>
           </div>

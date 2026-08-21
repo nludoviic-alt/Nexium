@@ -81,9 +81,9 @@ const INTENTS: Intent[] = [
   },
   {
     keywords: ["compte", "account", "register", "inscription", "ouvrir", "open", "commencer", "start"],
-    textFr: "Vous pouvez ouvrir un compte de trading ou associer votre terminal MetaTrader 5 en moins de 2 minutes.",
+    textFr: "Vous pouvez vous inscrire ou associer votre terminal MetaTrader 5 en moins de 2 minutes.",
     textEn: "You can register your account or link your MetaTrader 5 terminal in under 2 minutes with instant verification.",
-    ctaLabelFr: "Ouvrir un compte",
+    ctaLabelFr: "inscription",
     ctaLabelEn: "Open Account",
     ctaTo: "/register",
   },

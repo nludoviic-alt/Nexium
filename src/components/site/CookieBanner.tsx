@@ -121,7 +121,7 @@ export function CookieBanner() {
 
             <button
               onClick={handleRefuseOptional}
-              className="rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 px-5 py-3 text-xs font-bold text-gray-200 transition cursor-pointer text-center"
+              className="rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 hover:text-[#00D084] px-5 py-3 text-xs font-bold text-gray-200 transition cursor-pointer text-center"
             >
               {t.cookieBanner.rejectOptional}
             </button>

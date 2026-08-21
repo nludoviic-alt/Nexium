@@ -155,7 +155,7 @@ function FaqPage() {
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     isActive
                       ? "bg-black text-white shadow-lg scale-105"
-                      : "bg-white text-gray-700 border border-gray-200/80 hover:bg-gray-100 hover:text-gray-900 shadow-sm"
+                      : "bg-white text-gray-700 border border-gray-200/80 hover:bg-gray-100 hover:text-[#00D084] shadow-sm"
                   }`}
                 >
                   <Icon className={`size-4 ${isActive ? "text-[#00ff66]" : "text-gray-500"}`} />

@@ -32,7 +32,7 @@ export function getEmailWrapper(
       ? "E-mail officiel sécurisé de gestion de compte · MetaTrader 5 High-Frequency Infrastructure"
       : "Official verified account management notification · MetaTrader 5 High-Frequency Infrastructure";
 
-  const clientAreaLabel = lang === "fr" ? "Espace Client" : "Client Portal";
+  const clientAreaLabel = lang === "fr" ? "connexion" : "Client Portal";
   const supportLabel = lang === "fr" ? "Support 24/7" : "24/7 Support";
   const termsLabel = lang === "fr" ? "Conditions" : "Terms";
   const rightsLabel = lang === "fr" ? "Tous droits réservés" : "All rights reserved";
