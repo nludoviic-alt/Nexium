@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CompositionAccessGate } from "./composition";
+import { lazy, Suspense } from "react";
+
+const LazyCompositionAccessGate = lazy(() =>
+  import("./composition").then((m) => ({ default: m.CompositionAccessGate }))
+);
 
 export const Route = createFileRoute("/desk/$slug")({
   head: ({ params }) => ({
@@ -17,5 +21,9 @@ export const Route = createFileRoute("/desk/$slug")({
 
 function AdminDeskPage() {
   const { slug } = Route.useParams();
-  return <CompositionAccessGate customAdminSlug={slug} />;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#070b12]" />}>
+      <LazyCompositionAccessGate customAdminSlug={slug} />
+    </Suspense>
+  );
 }

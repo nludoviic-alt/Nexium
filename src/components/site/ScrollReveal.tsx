@@ -51,7 +51,7 @@ export function ScrollReveal({
         style={{
           transitionDelay: `${delay}ms`,
         }}
-        className={`transition-all duration-500 ease-out will-change-transform ${
+        className={`transition-all duration-500 ease-out transform-gpu ${
           isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
         }`}
       >
