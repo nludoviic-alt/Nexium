@@ -9,10 +9,17 @@
   RewriteEngine On
   RewriteBase /
 
-  # Force HTTPS
+  # Force HTTPS, redirecting straight to the canonical apex host so an
+  # insecure www request only redirects once.
   RewriteCond %{HTTPS} !=on
   RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+  RewriteRule ^ https://nexiummarkets.com%{REQUEST_URI} [L,R=301]
+
+  # Canonical apex domain (no www) — nexiummarkets.com and
+  # www.nexiummarkets.com used to serve identical pages with no redirect,
+  # which search engines treat as duplicate content.
+  RewriteCond %{HTTP_HOST} ^www\.nexiummarkets\.com$ [NC]
+  RewriteRule ^ https://nexiummarkets.com%{REQUEST_URI} [L,R=301]
 
   # Serve pre-rendered HTML files if available (e.g. /contact -> /contact/index.html or /contact.html)
   RewriteCond %{REQUEST_FILENAME} -d

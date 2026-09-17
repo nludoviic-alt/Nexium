@@ -3,4 +3,4 @@ Allow: /
 Disallow: /dashboard
 Disallow: /admin
 
-Sitemap: /sitemap.xml
+Sitemap: https://nexiummarkets.com/sitemap.xml
