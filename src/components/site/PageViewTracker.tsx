@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { isSupabaseConfigured, recordPageView, supabase } from "@/lib/supabase";
 
 const SESSION_KEY = "nexium_visitor_session_id";
 const COOKIE_STORAGE_KEY = "nexium_cookie_consent_v1";
@@ -39,13 +38,15 @@ export function PageViewTracker() {
   const lastTracked = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     if (pathname.startsWith("/composition")) return;
     if (!hasAnalyticsConsent()) return;
     if (lastTracked.current === pathname) return;
     lastTracked.current = pathname;
 
     (async () => {
+      const { isSupabaseConfigured, recordPageView, supabase } = await import("@/lib/supabase");
+      if (!isSupabaseConfigured) return;
+
       const {
         data: { user },
       } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }) as any);

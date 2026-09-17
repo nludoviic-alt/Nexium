@@ -18,15 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useLanguage } from "@/context/LanguageContext";
-import {
-  createLiveChatThread,
-  getLiveChatThreads,
-  LiveChatThread,
-  resolveLiveChatThread,
-  sendLiveChatMessage,
-  subscribeToLiveChatUpdates,
-} from "@/lib/chat-router";
-import { sendCustomDeskEmail } from "@/lib/resend";
+import type { LiveChatThread } from "@/lib/chat-router";
 
 type ChatMessage = {
   id: number;
@@ -206,18 +198,31 @@ export function ChatWidget() {
     }
   }, [language]);
 
-  // Real-time synchronization with the chat router
+  // Real-time synchronization with the chat router — only once the visitor
+  // has actually opened the widget, so idle pageviews never pay for the
+  // Supabase Realtime bundle or connection.
   useEffect(() => {
-    const unsub = subscribeToLiveChatUpdates((threads) => {
-      if (activeThreadId) {
-        const found = threads.find((t) => t.id === activeThreadId);
-        if (found) {
-          setLiveThread(found);
+    if (!isOpen) return;
+    let cancelled = false;
+    let unsub: (() => void) | undefined;
+
+    import("@/lib/chat-router").then(({ subscribeToLiveChatUpdates }) => {
+      if (cancelled) return;
+      unsub = subscribeToLiveChatUpdates((threads) => {
+        if (activeThreadId) {
+          const found = threads.find((t) => t.id === activeThreadId);
+          if (found) {
+            setLiveThread(found);
+          }
         }
-      }
+      });
     });
-    return unsub;
-  }, [activeThreadId]);
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, [activeThreadId, isOpen]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -229,12 +234,14 @@ export function ChatWidget() {
 
     // If we have an active assigned live advisor thread, send message through the router
     if (liveThread && liveThread.status === "ACTIVE") {
-      sendLiveChatMessage({
-        threadId: liveThread.id,
-        sender: "VISITOR",
-        authorName: liveThread.visitorName || "Visiteur",
-        text,
-      }).catch((err) => console.warn("Notice envoi message chat:", err));
+      import("@/lib/chat-router").then(({ sendLiveChatMessage }) =>
+        sendLiveChatMessage({
+          threadId: liveThread.id,
+          sender: "VISITOR",
+          authorName: liveThread.visitorName || "Visiteur",
+          text,
+        }).catch((err) => console.warn("Notice envoi message chat:", err)),
+      );
       setDraft("");
       return;
     }
@@ -275,6 +282,7 @@ export function ChatWidget() {
 
     try {
       // 1. Create a live thread in the central Router (Claim Queue)
+      const { createLiveChatThread } = await import("@/lib/chat-router");
       const thread = await createLiveChatThread({
         contact: operatorContact,
         initialQuery: userQuery || "Demande d'opérateur en direct",
@@ -293,6 +301,7 @@ export function ChatWidget() {
       setLiveThread(thread);
 
       // 2. Send backup dispatch notification email to desk
+      const { sendCustomDeskEmail } = await import("@/lib/resend");
       await sendCustomDeskEmail(
         "support@nexiummarkets.com",
         `🚨 [CHATBOT DISPATCH] Demande d'opérateur en direct (${operatorContact})`,
@@ -336,7 +345,9 @@ export function ChatWidget() {
   // affiché côté visiteur pour repartir sur un écran vierge.
   const handleEndChat = () => {
     if (liveThread) {
-      resolveLiveChatThread(liveThread.id).catch((err) => console.warn("Notice clôture fil chat:", err));
+      import("@/lib/chat-router").then(({ resolveLiveChatThread }) =>
+        resolveLiveChatThread(liveThread.id).catch((err) => console.warn("Notice clôture fil chat:", err)),
+      );
     }
     setActiveThreadId(null);
     setLiveThread(null);
