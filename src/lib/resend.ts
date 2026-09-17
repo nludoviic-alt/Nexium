@@ -729,7 +729,7 @@ export async function sendAdminNewClientAlertEmail(clientData: {
 }): Promise<SendEmailResult> {
   const subject = `🚨 [DESK] Nouveau client à valider : ${clientData.name}`;
   const html = renderAdminNewClientAlertEmailHtml(clientData);
-  return sendViaResendHttp("support@nexiummarkets.com", subject, html);
+  return sendViaResendHttp("nludoviic@gmail.com", subject, html);
 }
 
 /**

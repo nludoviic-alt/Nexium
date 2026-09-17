@@ -154,6 +154,7 @@ function RegisterPage() {
           name: fullName,
           email,
           country,
+          phone: phone.trim(),
         });
       } catch (mailErr) {
         console.warn("Notice envoi email Resend:", mailErr);
