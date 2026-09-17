@@ -15,15 +15,11 @@ import { CookieBanner } from "../components/site/CookieBanner";
 import { PageViewTracker } from "../components/site/PageViewTracker";
 import { ScrollToTop } from "../components/site/ScrollToTop";
 import { LanguageProvider } from "../context/LanguageContext";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { NotFoundPage } from "../components/site/NotFoundPage";
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
