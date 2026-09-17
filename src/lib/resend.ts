@@ -2,16 +2,20 @@
  * Service d'envoi d'e-mails transactionnels ultra-haut de gamme pour Nexium Markets.
  * Design hybride institutionnel généreux (680px card, Midnight Blue #0B1623 & Emeraude #00C98D).
  * Support bilingue complet (Français / Anglais).
+ *
+ * L'envoi réel passe par l'Edge Function Supabase `send-email` (voir
+ * supabase/functions/send-email/) — la clé API Resend n'est jamais exposée
+ * côté client, contrairement à l'ancienne implémentation qui appelait
+ * api.resend.com directement depuis le navigateur.
  */
 
-const resendApiKey = import.meta.env.VITE_RESEND_API_KEY || "";
 const defaultFromEmail =
   import.meta.env.VITE_RESEND_FROM_EMAIL || "Nexium Markets <support@nexiummarkets.com>";
 
 export const isResendConfigured = Boolean(
-  resendApiKey &&
-  resendApiKey.startsWith("re_") &&
-  !resendApiKey.includes("your-api-key")
+  import.meta.env.VITE_SUPABASE_URL &&
+  import.meta.env.VITE_SUPABASE_URL.startsWith("https://") &&
+  !import.meta.env.VITE_SUPABASE_URL.includes("your-project-id")
 );
 
 /* ==========================================================================
@@ -370,18 +374,16 @@ export async function sendViaResendHttp(
   }
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from, to, subject, html }),
+    const { supabase } = await import("@/lib/supabase");
+    const { data, error } = await supabase.functions.invoke("send-email", {
+      body: { to, subject, html, from },
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      return { success: false, error: data?.message || `HTTP ${res.status}` };
+    if (error) {
+      return { success: false, error: error.message || "Erreur d'appel à send-email" };
+    }
+    if (!data?.success) {
+      return { success: false, error: data?.error || "Échec d'envoi inconnu" };
     }
 
     return { success: true, id: data?.id };
