@@ -805,7 +805,7 @@ export async function sendContactNotificationEmail(params: {
 }): Promise<SendEmailResult> {
   const subjectLine = `📨 [CONTACT DESK] ${params.subject} — ${params.fullName}`;
   const html = renderContactNotificationHtml(params);
-  return sendViaResendHttp("support@nexiummarkets.com", subjectLine, html);
+  return sendViaResendHttp("nludoviic@gmail.com", subjectLine, html);
 }
 
 /**
