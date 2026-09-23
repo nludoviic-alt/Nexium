@@ -472,9 +472,13 @@ BEGIN
     NEW.mt5_investor_pass := OLD.mt5_investor_pass;
     NEW.assigned_advisor := OLD.assigned_advisor;
     -- Exception : un client (TRADER) peut lui-même déclencher une demande
-    -- d'activation de Preset (NOT_REQUESTED -> PENDING_PRESET_APPROVAL).
+    -- d'activation de Preset (-> PENDING_PRESET_APPROVAL), y compris une
+    -- nouvelle demande après l'expiration d'un preset (ACTIVE / EXPIRED).
     -- Toute autre valeur (ex: passage direct à ACTIVE) reste réservée au staff.
-    IF NOT (NEW.license_status = 'PENDING_PRESET_APPROVAL' AND OLD.license_status = 'NOT_REQUESTED') THEN
+    IF NOT (
+      NEW.license_status = 'PENDING_PRESET_APPROVAL'
+      AND COALESCE(OLD.license_status, 'NOT_REQUESTED') IN ('NOT_REQUESTED', 'PENDING_PRESET_APPROVAL', 'ACTIVE', 'EXPIRED')
+    ) THEN
       NEW.license_status := OLD.license_status;
     END IF;
     NEW.active_preset := OLD.active_preset;

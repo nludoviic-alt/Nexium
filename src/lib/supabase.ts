@@ -232,23 +232,19 @@ export async function approvePresetSelection(userId: string, activePresetKeys: s
     .filter(Boolean);
   const combinedActive = Array.from(new Set([...existingActive, ...activePresetKeys]));
 
+  // Valider un preset ouvre un NOUVEAU CYCLE (identifiant `cycle`) mais ne
+  // démarre jamais le bot : c'est au client de le lancer lui-même. Les presets
+  // déjà actifs et non concernés par cette validation restent inchangés.
+  const cycleId = new Date().toISOString();
   const nextConfig = { ...currentConfig };
   for (const [presetId, engineKey] of Object.entries(PRESET_TO_ENGINE_KEY)) {
-    const isNowActive = combinedActive.includes(presetId);
-    nextConfig[engineKey] = {
-      ...(currentConfig[engineKey] || {}),
-      active: isNowActive,
-      visible: isNowActive ? true : (currentConfig[engineKey]?.visible ?? true),
-    };
+    const engine = currentConfig[engineKey] || {};
+    if (activePresetKeys.includes(presetId)) {
+      nextConfig[engineKey] = { ...engine, active: false, visible: true, cycle: cycleId };
+    } else if (!combinedActive.includes(presetId)) {
+      nextConfig[engineKey] = { ...engine, active: false, visible: engine.visible ?? true };
+    }
   }
-
-  const currentQuota = currentConfig.quota_stats || { goldWins: 0, fxWins: 0, indexWins: 0 };
-  const nextQuotaStats = {
-    ...currentQuota,
-    ...(activePresetKeys.includes("AI_GOLD") ? { goldWins: 0 } : {}),
-    ...(activePresetKeys.includes("FX_TREND") ? { fxWins: 0 } : {}),
-  };
-  nextConfig.quota_stats = nextQuotaStats;
 
   const remainingRequested = ((profile?.requested_presets as string[]) || []).filter(
     (p) => !combinedActive.includes(p)

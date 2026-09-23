@@ -1403,8 +1403,9 @@ function NexiumAdminDashboard({
       ...client.engines,
       aiGold: {
         ...(client.engines?.aiGold || {}),
-        active: true,
+        active: false,
         visible: true,
+        cycle: new Date().toISOString(),
         mode: "DEMO" as const,
         preset: demoPreset.name,
         maxLot: demoPreset.maxLot,
@@ -2020,10 +2021,11 @@ function NexiumAdminDashboard({
             licenseStatus: "ACTIVE",
             activePreset: presetsLabel,
             status: "ACTIVE",
+            // Preset validé = nouveau cycle, bot arrêté : le client le lance lui-même.
             engines: {
-              aiGold: { ...(c.engines?.aiGold || {}), active: activePresetKeys.includes("AI_GOLD") },
-              fxTrend: { ...(c.engines?.fxTrend || {}), active: activePresetKeys.includes("FX_TREND") },
-              indexReversion: { ...(c.engines?.indexReversion || {}), active: activePresetKeys.includes("INDEX_REVERSION") },
+              aiGold: { ...(c.engines?.aiGold || {}), active: activePresetKeys.includes("AI_GOLD") ? false : (c.engines?.aiGold?.active ?? false) },
+              fxTrend: { ...(c.engines?.fxTrend || {}), active: activePresetKeys.includes("FX_TREND") ? false : (c.engines?.fxTrend?.active ?? false) },
+              indexReversion: { ...(c.engines?.indexReversion || {}), active: activePresetKeys.includes("INDEX_REVERSION") ? false : (c.engines?.indexReversion?.active ?? false) },
             },
           };
         }
@@ -2035,7 +2037,7 @@ function NexiumAdminDashboard({
     sendCustomDeskEmail(
       client.email,
       `Activation de votre Stratégie Algorithmique (${presetsLabel})`,
-      `Bonjour ${client.name},\n\nVotre demande d'activation pour le${activePresetKeys.length > 1 ? "s" : ""} Preset${activePresetKeys.length > 1 ? "s" : ""} Algorithmique${activePresetKeys.length > 1 ? "s" : ""} [${presetsLabel}] a été validée par la Direction des Opérations.\n\nVotre Dashboard de Trading en direct (flux Equinix NY4 FIX 4.4) est désormais déverrouillé et opérationnel sur votre compte MT5 #${client.mt5?.login || "—"}.\n\nConnectez-vous dès maintenant pour suivre vos exécutions et vos performances en temps réel : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+      `Bonjour ${client.name},\n\nVotre demande d'activation pour le${activePresetKeys.length > 1 ? "s" : ""} Preset${activePresetKeys.length > 1 ? "s" : ""} Algorithmique${activePresetKeys.length > 1 ? "s" : ""} [${presetsLabel}] a été validée par la Direction des Opérations.\n\nLe preset est désormais actif sur votre compte de DÉMONSTRATION : les trades y sont simulés et n'engagent pas votre solde réel. Définissez votre mise initiale puis lancez le bot depuis l'onglet MT5 quand vous le souhaitez.\n\nAccédez à votre espace : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
     ).catch((err) => console.warn("Resend email error:", err));
 
     addAuditLog(
@@ -2061,12 +2063,21 @@ function NexiumAdminDashboard({
 
     const presetsLabel = activePresetsList.join(", ");
 
+    // Prolongation = nouveau cycle pour chaque preset concerné (compteur remis à
+    // zéro côté client via l'identifiant `cycle`) ; le bot reste arrêté jusqu'à
+    // ce que le client le relance.
+    const cycleId = new Date().toISOString();
     const nextEngines = {
       ...client.engines,
-      aiGold: { ...(client.engines?.aiGold || {}), active: activePresetsList.includes("AI_GOLD"), visible: true },
-      fxTrend: { ...(client.engines?.fxTrend || {}), active: activePresetsList.includes("FX_TREND"), visible: true },
-      indexReversion: { ...(client.engines?.indexReversion || {}), active: activePresetsList.includes("INDEX_REVERSION"), visible: true },
-      quota_stats: { goldWins: 0, fxWins: 0, indexWins: 0 },
+      aiGold: activePresetsList.includes("AI_GOLD")
+        ? { ...(client.engines?.aiGold || {}), active: false, visible: true, cycle: cycleId }
+        : { ...(client.engines?.aiGold || {}) },
+      fxTrend: activePresetsList.includes("FX_TREND")
+        ? { ...(client.engines?.fxTrend || {}), active: false, visible: true, cycle: cycleId }
+        : { ...(client.engines?.fxTrend || {}) },
+      indexReversion: activePresetsList.includes("INDEX_REVERSION")
+        ? { ...(client.engines?.indexReversion || {}), active: false, visible: true, cycle: cycleId }
+        : { ...(client.engines?.indexReversion || {}) },
     };
 
     if (isSupabaseConfigured) {
@@ -2096,7 +2107,7 @@ function NexiumAdminDashboard({
     sendCustomDeskEmail(
       client.email,
       "Prolongation de votre Abonnement & Quotas de Trading — Nexium Markets",
-      `Bonjour ${client.name},\n\nVotre abonnement aux algorithmes de trading Nexium Markets [${presetsLabel}] ainsi que vos quotas de trading ont été prolongés avec succès par la Direction.\n\nVos algorithmes de trading et votre Terminal MT5 sont immédiatement réactivés pour vos prochaines sessions.\n\nAccédez à votre espace sécurisé : https://nexiummarkets.com/login\n\nBien cordialement,\nLa Direction des Opérations Nexium Markets`
+      `Bonjour ${client.name},\n\nVotre abonnement aux algorithmes de trading Nexium Markets [${presetsLabel}] ainsi que vos quotas de trading ont été prolongés avec succès par la Direction.\n\nUn nouveau cycle démarre sur votre compte de DÉMONSTRATION (trades simulés, sans effet sur votre solde réel). Relancez le bot depuis l'onglet MT5 quand vous le souhaitez.\n\nAccédez à votre espace sécurisé : https://nexiummarkets.com/login\n\nBien cordialement,\nLa Direction des Opérations Nexium Markets`
     ).catch((err) => console.warn("Resend email error:", err));
 
     addAuditLog(

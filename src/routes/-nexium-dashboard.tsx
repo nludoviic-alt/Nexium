@@ -106,7 +106,16 @@ import {
 import { useEffect, useId, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { TradingViewSuperchart } from "@/components/site/TradingViewSuperchart";
-import { MetaTrader5Terminal, type Mt5Position, type PresetQuotaStats, type PresetStakes } from "@/components/dashboard/MetaTrader5Terminal";
+import { MetaTrader5Terminal, presetCycleStats, type Mt5Position, type PresetQuotaStats, type PresetStakes } from "@/components/dashboard/MetaTrader5Terminal";
+import {
+  isPresetExpired,
+  PRESET_ENGINE_KEY,
+  PRESET_IDS,
+  PRESET_LABEL,
+  PRESET_RULES,
+  PRESET_STAT_KEYS,
+  type PresetId,
+} from "@/lib/preset-rules";
 import {
   supabase,
   isSupabaseConfigured,
@@ -6482,6 +6491,37 @@ function MessagingTab({
 // ----------------------------------------------------
 // CONFIGURATION DES MISES & GESTION DU RISQUE (PAGE DÉDIÉE)
 // ----------------------------------------------------
+// ── Compte DÉMO ──
+const DEMO_START_BALANCE = 25000;
+const EMPTY_QUOTA_STATS: PresetQuotaStats = { goldWins: 0, fxWins: 0, indexWins: 0, goldPnl: 0, fxPnl: 0, indexPnl: 0 };
+
+function readDemoJson<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDemoJson(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+function cyclesFromEnginesConfig(cfg: unknown): Partial<Record<PresetId, string>> {
+  const config = (cfg || {}) as Record<string, { cycle?: string } | undefined>;
+  const cycles: Partial<Record<PresetId, string>> = {};
+  for (const id of PRESET_IDS) {
+    const cycle = config[PRESET_ENGINE_KEY[id]]?.cycle;
+    if (cycle) cycles[id] = String(cycle);
+  }
+  return cycles;
+}
+
 const GOLD_QUICK_STAKES = [
   { value: 50, label: "$50" },
   { value: 100, label: "$100" },
@@ -6525,7 +6565,7 @@ function StakeManagementTab({
   presetStakes?: PresetStakes;
   activePreset?: string | null;
   requestedPresets?: string[];
-  quotaStats?: { goldWins: number; fxWins: number; indexWins: number };
+  quotaStats?: PresetQuotaStats;
   onRequestPreset?: (presetId: string, botName: string) => void;
   onUpdatePresetStakes?: (newStakes: PresetStakes) => void;
   onOpenTerminal?: () => void;
@@ -6559,6 +6599,15 @@ function StakeManagementTab({
   const isIndexExpired = false;
   const isIndexActive = isIndexApproved;
   const isIndexPending = (requestedPresets || []).includes("INDEX_REVERSION") && !isIndexApproved;
+
+  // Mise initiale figée dès le lancement du bot : elle reste la base du gain
+  // cible pour tout le cycle, même si le client modifie ensuite sa mise.
+  const goldLockedStake = isGoldActive ? quotaStats?.goldInitialStake : undefined;
+  const fxLockedStake = isFxActive ? quotaStats?.fxInitialStake : undefined;
+  const indexLockedStake = isIndexActive ? quotaStats?.indexInitialStake : undefined;
+  const isGoldEditable = isGoldActive && goldLockedStake === undefined;
+  const isFxEditable = isFxActive && fxLockedStake === undefined;
+  const isIndexEditable = isIndexActive && indexLockedStake === undefined;
 
   const totalAllocated =
     (isGoldActive ? goldStakeInput : 0) +
@@ -6724,7 +6773,12 @@ function StakeManagementTab({
               </div>
 
               {/* Sizing Input */}
-              {isGoldActive ? (
+              {goldLockedStake !== undefined && (
+                <p className="text-[11px] font-mono text-slate-400">
+                  Mise initiale figée pour ce cycle : <strong className="text-white">${goldLockedStake}</strong> — modifiable au prochain cycle.
+                </p>
+              )}
+              {isGoldEditable ? (
                 <div className="relative flex items-center rounded-2xl bg-[#06090e] border border-amber-500/35 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 transition-all px-4 h-14">
                   <span className="text-2xl font-black font-mono text-amber-400 mr-2 select-none">$</span>
                   <input
@@ -6757,10 +6811,10 @@ function StakeManagementTab({
                   <button
                     key={chip.value}
                     type="button"
-                    disabled={!isGoldActive}
+                    disabled={!isGoldEditable}
                     onClick={() => setGoldStakeInput(chip.value)}
                     className={`py-2 rounded-xl text-xs font-bold font-mono transition-all ${
-                      !isGoldActive
+                      !isGoldEditable
                         ? "bg-[#10151f] text-slate-600 opacity-40 cursor-not-allowed pointer-events-none"
                         : goldStakeInput === chip.value
                         ? "bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30 scale-105 cursor-pointer"
@@ -6915,7 +6969,12 @@ function StakeManagementTab({
               </div>
 
               {/* Sizing Input */}
-              {isFxActive ? (
+              {fxLockedStake !== undefined && (
+                <p className="text-[11px] font-mono text-slate-400">
+                  Mise initiale figée pour ce cycle : <strong className="text-white">${fxLockedStake}</strong> — modifiable au prochain cycle.
+                </p>
+              )}
+              {isFxEditable ? (
                 <div className="relative flex items-center rounded-2xl bg-[#06090e] border border-cyan-500/35 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400/20 transition-all px-4 h-14">
                   <span className="text-2xl font-black font-mono text-cyan-400 mr-2 select-none">$</span>
                   <input
@@ -6948,10 +7007,10 @@ function StakeManagementTab({
                   <button
                     key={chip.value}
                     type="button"
-                    disabled={!isFxActive}
+                    disabled={!isFxEditable}
                     onClick={() => setFxStakeInput(chip.value)}
                     className={`py-2 rounded-xl text-xs font-bold font-mono transition-all ${
-                      !isFxActive
+                      !isFxEditable
                         ? "bg-[#10151f] text-slate-600 opacity-40 cursor-not-allowed pointer-events-none"
                         : fxStakeInput === chip.value
                         ? "bg-cyan-500 text-slate-950 font-black shadow-md shadow-cyan-500/30 scale-105 cursor-pointer"
@@ -7101,7 +7160,12 @@ function StakeManagementTab({
               </div>
 
               {/* Sizing Input */}
-              {isIndexActive ? (
+              {indexLockedStake !== undefined && (
+                <p className="text-[11px] font-mono text-slate-400">
+                  Mise initiale figée pour ce cycle : <strong className="text-white">${indexLockedStake}</strong> — modifiable au prochain cycle.
+                </p>
+              )}
+              {isIndexEditable ? (
                 <div className="relative flex items-center rounded-2xl bg-[#06090e] border border-purple-500/35 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 transition-all px-4 h-14">
                   <span className="text-2xl font-black font-mono text-purple-400 mr-2 select-none">$</span>
                   <input
@@ -7134,10 +7198,10 @@ function StakeManagementTab({
                   <button
                     key={chip.value}
                     type="button"
-                    disabled={!isIndexActive}
+                    disabled={!isIndexEditable}
                     onClick={() => setIndexStakeInput(chip.value)}
                     className={`py-2 rounded-xl text-xs font-bold font-mono transition-all ${
-                      !isIndexActive
+                      !isIndexEditable
                         ? "bg-[#10151f] text-slate-600 opacity-40 cursor-not-allowed pointer-events-none"
                         : indexStakeInput === chip.value
                         ? "bg-purple-500 text-white font-black shadow-md shadow-purple-500/30 scale-105 cursor-pointer"
@@ -7603,28 +7667,41 @@ export function NexiumDashboard({
   const [showPresetConfirmModal, setShowPresetConfirmModal] = useState(false);
   const [submittingPreset, setSubmittingPreset] = useState(false);
   const [terminalPositions, setTerminalPositions] = useState<Mt5Position[]>([]);
-  const [quotaStats, setQuotaStats] = useState<PresetQuotaStats>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("nexium_preset_quota_stats");
-        if (saved) return JSON.parse(saved);
-      } catch {}
+  // ── Compte DÉMO (étude de comportement) ──
+  // Solde démo et cycles des presets sont conservés par client dans ce
+  // navigateur, séparément du solde réel (profiles.balance) : aucun résultat
+  // simulé ne touche le portefeuille, les dépôts ou les retraits.
+  const demoStorageKey = (name: string) => `nexium_demo_${name}_${currentUserId || "local"}`;
+  const [demoBalance, setDemoBalance] = useState(DEMO_START_BALANCE);
+  const [quotaStats, setQuotaStats] = useState<PresetQuotaStats>(EMPTY_QUOTA_STATS);
+  // Cycle de chaque preset validé par l'admin (engines_config.<moteur>.cycle)
+  const [engineCycles, setEngineCycles] = useState<Partial<Record<PresetId, string>>>({});
+
+  useEffect(() => {
+    const stored = readDemoJson<PresetQuotaStats>(demoStorageKey("quota")) || { ...EMPTY_QUOTA_STATS };
+    let next = stored;
+    for (const id of PRESET_IDS) {
+      const cycle = engineCycles[id];
+      const keys = PRESET_STAT_KEYS[id];
+      if (cycle && next[keys.cycle] !== cycle) {
+        // Nouveau cycle validé par l'admin : compteur, P&L et mise initiale repartent de zéro
+        next = { ...next, [keys.trades]: 0, [keys.pnl]: 0, [keys.initialStake]: undefined, [keys.cycle]: cycle };
+      }
     }
-    return { goldWins: 0, fxWins: 0, indexWins: 0, goldPnl: 0, fxPnl: 0, indexPnl: 0 };
-  });
+    setQuotaStats(next);
+    writeDemoJson(demoStorageKey("quota"), next);
+    setDemoBalance(readDemoJson<number>(demoStorageKey("balance")) ?? DEMO_START_BALANCE);
+  }, [currentUserId, engineCycles]);
 
   const handleQuotaChange = (newStats: PresetQuotaStats) => {
     setQuotaStats(newStats);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(newStats));
-      } catch {}
-    }
-    if (isSupabaseConfigured && currentUserId) {
-      getUserProfile(currentUserId).then((profile) => updateUserProfile(currentUserId, {
-        engines_config: { ...((profile?.engines_config as any) || {}), quota_stats: newStats },
-      }));
-    }
+    writeDemoJson(demoStorageKey("quota"), newStats);
+  };
+
+  const handleDemoBalanceChange = (newBalance: number) => {
+    const rounded = +newBalance.toFixed(2);
+    setDemoBalance(rounded);
+    writeDemoJson(demoStorageKey("balance"), rounded);
   };
 
   // Montants de mise alloués par Trade pour chaque Preset ($ USD)
@@ -7717,25 +7794,13 @@ export function NexiumDashboard({
     setRequestedPresets(profile.requested_presets?.length ? profile.requested_presets : profile.requested_preset ? [profile.requested_preset] : []);
     setActivePreset(profile.active_preset || null);
 
-    const savedQuota = (profile.engines_config as any)?.quota_stats;
-    if (savedQuota) {
-      setQuotaStats(savedQuota);
-      try { localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(savedQuota)); } catch {}
-    } else {
-      setQuotaStats({ goldWins: 0, fxWins: 0, indexWins: 0, goldPnl: 0, fxPnl: 0, indexPnl: 0 });
-    }
+    setEngineCycles(cyclesFromEnginesConfig(profile.engines_config));
 
     // Synchronisation initiale des moteurs (AI Gold / FX Trend / Index Reversion)
     // avec l'état réel enregistré côté admin — sinon chaque carte reste figée sur
     // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
     if (profile.engines_config) {
       const cfg = profile.engines_config as any;
-      if (cfg.quota_stats) {
-        setQuotaStats(cfg.quota_stats);
-        try {
-          localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(cfg.quota_stats));
-        } catch {}
-      }
       setVisibleBotIds(
         [
           cfg.aiGold?.visible === true && "nexium-ai-gold",
@@ -7883,12 +7948,7 @@ export function NexiumDashboard({
       // Synchronisation en direct des paramètres de moteurs IA
       if (updatedProfile.engines_config) {
         const cfg = updatedProfile.engines_config as any;
-        if (cfg.quota_stats) {
-          setQuotaStats(cfg.quota_stats);
-          try {
-            localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(cfg.quota_stats));
-          } catch {}
-        }
+        setEngineCycles(cyclesFromEnginesConfig(cfg));
         setVisibleBotIds(
           [
             cfg.aiGold?.visible === true && "nexium-ai-gold",
@@ -8225,10 +8285,45 @@ export function NexiumDashboard({
   // immédiatement en base — sans ça, le bouton "Activer le Trading" repartait
   // toujours sur ACTIF après un rafraîchissement puisque rien n'était
   // réellement enregistré côté engines_config.
-  const handleSetAllBotsActive = async (active: boolean) => {
+  /**
+   * Préparation du lancement d'un ou plusieurs bots : refuse un preset expiré,
+   * contrôle la hiérarchie Preset 1 < Preset 2 < Preset 3 et fige la mise
+   * initiale du cycle (base fixe du gain cible, indépendante du solde).
+   */
+  const prepareBotLaunch = (ids: PresetId[]): boolean => {
+    for (const id of ids) {
+      const { trades } = presetCycleStats(quotaStats, presetStakes, id);
+      if (isPresetExpired(id, trades)) {
+        toast.warning(`${PRESET_LABEL[id]} est EXPIRÉ (${trades}/${PRESET_RULES[id].maxTrades}). Faites une nouvelle demande d'activation.`);
+        return false;
+      }
+    }
+    const [p1, p2, p3] = PRESET_IDS.map((id) => presetCycleStats(quotaStats, presetStakes, id).initialStake);
+    if (!(p1! < p2! && p2! < p3!)) {
+      toast.error(`Hiérarchie des mises non respectée : Preset 1 ($${p1}) < Preset 2 ($${p2}) < Preset 3 ($${p3}) est obligatoire.`);
+      return false;
+    }
+    let next = quotaStats;
+    for (const id of ids) {
+      const key = PRESET_STAT_KEYS[id].initialStake;
+      if (next[key] === undefined) next = { ...next, [key]: presetStakes[PRESET_RULES[id].stakeKey] };
+    }
+    if (next !== quotaStats) handleQuotaChange(next);
+    return true;
+  };
+
+  const handleSetAllBotsActive = async (active: boolean): Promise<boolean> => {
     if (active && !activePreset) {
       toast.warning("Aucun preset n’a été approuvé. Demandez son activation à l’administration avant de démarrer le bot.");
-      return;
+      return false;
+    }
+    if (active) {
+      const approved = PRESET_IDS.filter((id) => (activePreset || "").split(",").includes(id));
+      const launchable = approved.filter((id) => !isPresetExpired(id, presetCycleStats(quotaStats, presetStakes, id).trades));
+      if (launchable.length === 0 || !prepareBotLaunch(launchable)) {
+        if (launchable.length === 0) toast.warning("Tous vos presets validés sont expirés. Faites une nouvelle demande d'activation.");
+        return false;
+      }
     }
     const nextState = active ? "ACTIF" : "EN PAUSE";
     setBots((prev) =>
@@ -8248,15 +8343,16 @@ export function NexiumDashboard({
         toast.error("Échec de l'enregistrement côté base de données.");
       }
     }
+    return true;
   };
 
-  const handleToggleEngine = () => {
+  const handleToggleEngine = async () => {
     const next = !running;
-    handleSetAllBotsActive(next);
+    if (!(await handleSetAllBotsActive(next))) return;
     if (next) {
-      toast.success("Auto-Trader activé en direct (Flux FIX Equinix NY4).");
+      toast.success("Bots lancés (DÉMO) : les presets validés recherchent leurs setups.");
     } else {
-      toast.warning("Auto-Trader mis en pause de sécurité.");
+      toast.warning("Bots arrêtés. Les trades et le P&L des cycles sont conservés.");
     }
   };
 
@@ -8273,6 +8369,7 @@ export function NexiumDashboard({
       toast.warning("Ce preset n’a pas été approuvé par l’administration. Le bot reste arrêté.");
       return;
     }
+    if (nextActive && !prepareBotLaunch([presetForBot[botId] as PresetId])) return;
     const nextState = nextActive ? "ACTIF" : "EN PAUSE";
 
     setBots((prev) =>
@@ -8282,7 +8379,11 @@ export function NexiumDashboard({
           : b
       )
     );
-    toast.info(`Auto-Trader ${bot.name} : ${nextState}.`);
+    toast.info(
+      nextActive
+        ? `Bot ${bot.name} lancé (DÉMO) : recherche de setup en cours.`
+        : `Bot ${bot.name} arrêté. Trades, P&L et compteur du cycle sont conservés.`
+    );
 
     if (isSupabaseConfigured && currentUserId) {
       const engineKey = ENGINE_ID_TO_KEY[botId];
@@ -9378,7 +9479,7 @@ export function NexiumDashboard({
                             XAUUSD
                           </span>
                           <span className="px-2 py-0.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300 font-mono text-[10px] font-bold">
-                            +50% GAIN / TRADE (2 MAX)
+                            OBJECTIF +50% / TRADE · 2 MAX
                           </span>
                         </div>
                         {isPending ? (
@@ -9417,7 +9518,7 @@ export function NexiumDashboard({
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L CYCLE · DÉMO</span>
                             {isApproved && goldPositions.length > 0 && (
                               <span className="text-[10px] font-mono font-bold text-amber-400">({goldPositions.length} pos)</span>
                             )}
@@ -9428,7 +9529,7 @@ export function NexiumDashboard({
                         </div>
                         <div className="text-right">
                           <span className="text-[11px] font-mono font-bold text-slate-400">
-                            QUOTA : <strong className={isExpired ? "text-rose-400" : "text-amber-400"}>{Math.min(2, quotaStats.goldWins)} / 2 GAINS</strong>
+                            QUOTA : <strong className={isExpired ? "text-rose-400" : "text-amber-400"}>{Math.min(2, quotaStats.goldWins)} / 2 TRADES</strong>
                           </span>
                           <div className="mt-1 h-1.5 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
                             <div
@@ -9441,13 +9542,13 @@ export function NexiumDashboard({
 
                       {/* Configured Stake Info */}
                       <div className="flex items-center justify-between bg-[#121a2d]/60 rounded-xl px-2.5 py-1.5 border border-slate-800/80">
-                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise par trade :</span>
+                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise initiale :</span>
                         <button
                           onClick={() => setActiveNav("Configuration des Mises")}
                           className="flex items-center gap-1 text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 transition cursor-pointer"
                           title="Modifier la mise dans Configuration des Mises"
                         >
-                          <span>${presetStakes.goldStake} USD</span>
+                          <span>${quotaStats.goldInitialStake ?? presetStakes.goldStake} USD</span>
                           <SlidersHorizontal className="size-3 text-slate-400" />
                         </button>
                       </div>
@@ -9532,7 +9633,7 @@ export function NexiumDashboard({
                             EURUSD
                           </span>
                           <span className="px-2 py-0.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-mono text-[10px] font-bold">
-                            +75% GAIN / TRADE (5 MAX)
+                            OBJECTIF +75% / TRADE · 5 MAX
                           </span>
                         </div>
                         {isPending ? (
@@ -9571,7 +9672,7 @@ export function NexiumDashboard({
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L CYCLE · DÉMO</span>
                             {isApproved && fxPositions.length > 0 && (
                               <span className="text-[10px] font-mono font-bold text-cyan-400">({fxPositions.length} pos)</span>
                             )}
@@ -9582,7 +9683,7 @@ export function NexiumDashboard({
                         </div>
                         <div className="text-right">
                           <span className="text-[11px] font-mono font-bold text-slate-400">
-                            QUOTA : <strong className={isExpired ? "text-rose-400" : "text-cyan-400"}>{Math.min(5, quotaStats.fxWins)} / 5 GAINS</strong>
+                            QUOTA : <strong className={isExpired ? "text-rose-400" : "text-cyan-400"}>{Math.min(5, quotaStats.fxWins)} / 5 TRADES</strong>
                           </span>
                           <div className="mt-1 h-1.5 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
                             <div
@@ -9595,13 +9696,13 @@ export function NexiumDashboard({
 
                       {/* Configured Stake Info */}
                       <div className="flex items-center justify-between bg-[#121a2d]/60 rounded-xl px-2.5 py-1.5 border border-slate-800/80">
-                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise par trade :</span>
+                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise initiale :</span>
                         <button
                           onClick={() => setActiveNav("Configuration des Mises")}
                           className="flex items-center gap-1 text-[11px] font-mono font-bold text-cyan-400 hover:text-cyan-300 transition cursor-pointer"
                           title="Modifier la mise dans Configuration des Mises"
                         >
-                          <span>${presetStakes.fxStake} USD</span>
+                          <span>${quotaStats.fxInitialStake ?? presetStakes.fxStake} USD</span>
                           <SlidersHorizontal className="size-3 text-slate-400" />
                         </button>
                       </div>
@@ -9685,7 +9786,7 @@ export function NexiumDashboard({
                             NAS100
                           </span>
                           <span className="px-2 py-0.5 rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-300 font-mono text-[10px] font-bold">
-                            +98% GAIN / TRADE (ILLIMITÉ ∞)
+                            OBJECTIF +98% / TRADE · ILLIMITÉ
                           </span>
                         </div>
                         {isApproved ? (
@@ -9719,7 +9820,7 @@ export function NexiumDashboard({
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L CYCLE · DÉMO</span>
                             {isApproved && indexPositions.length > 0 && (
                               <span className="text-[10px] font-mono font-bold text-purple-400">({indexPositions.length} pos)</span>
                             )}
@@ -9740,13 +9841,13 @@ export function NexiumDashboard({
 
                       {/* Configured Stake Info */}
                       <div className="flex items-center justify-between bg-[#121a2d]/60 rounded-xl px-2.5 py-1.5 border border-slate-800/80">
-                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise par trade :</span>
+                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise initiale :</span>
                         <button
                           onClick={() => setActiveNav("Configuration des Mises")}
                           className="flex items-center gap-1 text-[11px] font-mono font-bold text-purple-400 hover:text-purple-300 transition cursor-pointer"
                           title="Modifier la mise dans Configuration des Mises"
                         >
-                          <span>${presetStakes.indexStake} USD</span>
+                          <span>${quotaStats.indexInitialStake ?? presetStakes.indexStake} USD</span>
                           <SlidersHorizontal className="size-3 text-slate-400" />
                         </button>
                       </div>
@@ -9797,15 +9898,17 @@ export function NexiumDashboard({
 
               {/* ── META TRADER 5 TERMINAL WORKSTATION EN DESSOUS ── */}
               <MetaTrader5Terminal
-                balance={balance}
-                bonus={bonus}
+                key={currentUserId || "local"}
+                storageKey={`nexium_demo_terminal_${currentUserId || "local"}`}
+                balance={demoBalance}
+                bonus={0}
                 mt5AccountNumber={mt5AccountNumber}
                 clientName={clientName}
                 activePreset={activePreset}
                 bots={bots}
                 onOpenDeposit={openDepositModal}
                 onOpenWithdraw={() => setWithdrawOpen(true)}
-                onBalanceChange={handleLiveBalanceChange}
+                onBalanceChange={handleDemoBalanceChange}
                 onPositionsChange={setTerminalPositions}
                 quotaStats={quotaStats}
                 onQuotaChange={handleQuotaChange}

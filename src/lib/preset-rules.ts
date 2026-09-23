@@ -16,3 +16,46 @@ export function getPresetId(comment = ""): PresetId | null {
 export function canRequestPresetCycle(id: PresetId, tradeCount: number) {
   return PRESET_RULES[id].maxTrades === Infinity || tradeCount >= PRESET_RULES[id].maxTrades;
 }
+
+export const PRESET_IDS: PresetId[] = ["AI_GOLD", "FX_TREND", "INDEX_REVERSION"];
+
+/** Clé du moteur dans `engines_config` et identifiant du bot côté dashboard. */
+export const PRESET_ENGINE_KEY: Record<PresetId, "aiGold" | "fxTrend" | "indexReversion"> = {
+  AI_GOLD: "aiGold",
+  FX_TREND: "fxTrend",
+  INDEX_REVERSION: "indexReversion",
+};
+
+export const PRESET_BOT_ID: Record<PresetId, "nexium-ai-gold" | "nexium-fx-trend" | "nexium-index-reversion"> = {
+  AI_GOLD: "nexium-ai-gold",
+  FX_TREND: "nexium-fx-trend",
+  INDEX_REVERSION: "nexium-index-reversion",
+};
+
+export const PRESET_LABEL: Record<PresetId, string> = {
+  AI_GOLD: "Nexium AI Gold",
+  FX_TREND: "Nexium FX Trend",
+  INDEX_REVERSION: "Nexium Index Reversion",
+};
+
+/** Symbole traité par chaque bot sur le terminal. */
+export const PRESET_SYMBOL: Record<PresetId, string> = {
+  AI_GOLD: "GOLD",
+  FX_TREND: "DXY",
+  INDEX_REVERSION: "NDQ",
+};
+
+/**
+ * Champs du cycle d'un preset dans les statistiques de quota.
+ * `*Wins` compte les trades CLÔTURÉS du cycle (gagnants ou perdants) — le nom
+ * est conservé pour rester compatible avec les données déjà enregistrées.
+ */
+export const PRESET_STAT_KEYS = {
+  AI_GOLD: { trades: "goldWins", pnl: "goldPnl", initialStake: "goldInitialStake", cycle: "goldCycle" },
+  FX_TREND: { trades: "fxWins", pnl: "fxPnl", initialStake: "fxInitialStake", cycle: "fxCycle" },
+  INDEX_REVERSION: { trades: "indexWins", pnl: "indexPnl", initialStake: "indexInitialStake", cycle: "indexCycle" },
+} as const;
+
+export function isPresetExpired(id: PresetId, tradeCount: number) {
+  return tradeCount >= PRESET_RULES[id].maxTrades;
+}

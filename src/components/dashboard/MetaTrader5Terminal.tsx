@@ -42,7 +42,16 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getPresetId, PRESET_RULES } from "@/lib/preset-rules";
+import {
+  isPresetExpired,
+  PRESET_BOT_ID,
+  PRESET_IDS,
+  PRESET_LABEL,
+  PRESET_RULES,
+  PRESET_STAT_KEYS,
+  PRESET_SYMBOL,
+  type PresetId,
+} from "@/lib/preset-rules";
 
 // ----------------------------------------------------
 // TYPES & DEFINITIONS
@@ -61,6 +70,13 @@ export interface Mt5Position {
   swap: number;
   profit: number;
   comment?: string | undefined;
+  /** Renseigné pour les trades ouverts par un bot de preset (DÉMO). */
+  presetId?: PresetId | undefined;
+  /** $ gagnés/perdus par unité de prix (TP atteint = gain cible exact). */
+  pointValue?: number | undefined;
+  /** Bougie d'entrée (séquence du moteur de prix) pour l'affichage sur le graphique. */
+  openSeq?: number | undefined;
+  openedAt?: number | undefined;
 }
 
 export interface ChartPoint {
@@ -309,6 +325,8 @@ const WATCHLIST_SYMBOLS: WatchlistSymbol[] = [
 ];
 
 interface CandleBar {
+  /** Numéro de bougie commun à tous les symboles : sert à placer les trades sur le graphique. */
+  seq?: number | undefined;
   dateLabel: string;
   monthLabel?: string | undefined;
   open: number;
@@ -320,100 +338,70 @@ interface CandleBar {
   event?: "D" | "E" | "lightning" | undefined;
 }
 
-function generateAaplRealisticCandles(): CandleBar[] {
-  const dataPoints: { o: number; h: number; l: number; c: number; v: number; m?: string | undefined; d: string; ev?: "D" | "E" | "lightning" | undefined }[] = [
-    // Dec
-    { o: 250, h: 255, l: 247, c: 253, v: 22, m: "Dec", d: "Dec 01" },
-    { o: 253, h: 258, l: 251, c: 257, v: 28, d: "Dec 05" },
-    { o: 257, h: 260, l: 252, c: 254, v: 31, d: "Dec 09" },
-    { o: 254, h: 256, l: 246, c: 248, v: 38, d: "Dec 12" },
-    { o: 248, h: 252, l: 244, c: 246, v: 25, d: "Dec 16" },
-    { o: 246, h: 250, l: 242, c: 244, v: 34, d: "Dec 20" },
-    { o: 244, h: 249, l: 241, c: 248, v: 19, d: "Dec 24" },
-    { o: 248, h: 255, l: 246, c: 253, v: 23, d: "Dec 29" },
-    // Jan
-    { o: 253, h: 262, l: 251, c: 260, v: 42, m: "Mon 05 Jan '26", d: "Jan 05", ev: "E" },
-    { o: 260, h: 268, l: 258, c: 266, v: 36, d: "Jan 10" },
-    { o: 266, h: 271, l: 263, c: 269, v: 29, d: "Jan 15" },
-    { o: 269, h: 272, l: 264, c: 267, v: 33, d: "Jan 20" },
-    { o: 267, h: 268, l: 259, c: 261, v: 30, d: "Jan 26" },
-    // Feb
-    { o: 261, h: 264, l: 255, c: 257, v: 27, m: "Feb", d: "Feb 02", ev: "D" },
-    { o: 257, h: 259, l: 248, c: 250, v: 39, d: "Feb 08" },
-    { o: 250, h: 253, l: 245, c: 246, v: 44, d: "Feb 14" },
-    { o: 246, h: 254, l: 243, c: 252, v: 31, d: "Feb 20" },
-    { o: 252, h: 258, l: 250, c: 256, v: 28, d: "Feb 26" },
-    // Mar
-    { o: 256, h: 265, l: 254, c: 263, v: 33, m: "Mar", d: "Mar 03" },
-    { o: 263, h: 270, l: 261, c: 268, v: 37, d: "Mar 09" },
-    { o: 268, h: 273, l: 265, c: 266, v: 30, d: "Mar 15" },
-    { o: 266, h: 268, l: 258, c: 260, v: 35, d: "Mar 21" },
-    { o: 260, h: 264, l: 255, c: 258, v: 29, d: "Mar 27" },
-    // Apr
-    { o: 258, h: 263, l: 252, c: 254, v: 32, m: "Apr", d: "Apr 02" },
-    { o: 254, h: 259, l: 249, c: 251, v: 26, d: "Apr 08" },
-    { o: 251, h: 260, l: 248, c: 258, v: 34, d: "Apr 14" },
-    { o: 258, h: 266, l: 256, c: 264, v: 40, d: "Apr 20" },
-    { o: 264, h: 272, l: 262, c: 270, v: 48, d: "Apr 26" },
-    // May
-    { o: 270, h: 278, l: 268, c: 275, v: 52, m: "May", d: "May 02", ev: "E" },
-    { o: 275, h: 285, l: 273, c: 283, v: 58, d: "May 08", ev: "D" },
-    { o: 283, h: 294, l: 281, c: 291, v: 62, d: "May 14" },
-    { o: 291, h: 301, l: 288, c: 298, v: 65, d: "May 20" },
-    { o: 298, h: 307, l: 295, c: 304, v: 59, d: "May 27" },
-    // Jun
-    { o: 304, h: 312, l: 301, c: 309, v: 68, m: "Jun", d: "Jun 02" },
-    { o: 309, h: 318, l: 306, c: 315, v: 74, d: "Jun 08" },
-    { o: 315, h: 317, l: 305, c: 308, v: 51, d: "Jun 14" },
-    { o: 308, h: 311, l: 299, c: 302, v: 47, d: "Jun 20" },
-    { o: 302, h: 305, l: 292, c: 295, v: 63, d: "Jun 26" },
-    // Jul
-    { o: 295, h: 300, l: 288, c: 291, v: 54, m: "Jul", d: "Jul 02" },
-    { o: 291, h: 296, l: 284, c: 286, v: 71, d: "Jul 08" },
-    { o: 286, h: 302, l: 285, c: 299, v: 92, d: "Jul 14" },
-    { o: 299, h: 315, l: 297, c: 312, v: 88, d: "Jul 20" },
-    { o: 312, h: 326, l: 310, c: 322, v: 79, d: "Jul 26" },
-    // Aug
-    { o: 322, h: 336, l: 319, c: 332, v: 84, m: "Aug", d: "Aug 02", ev: "E" },
-    { o: 332, h: 342, l: 328, c: 338, v: 96, d: "Aug 08", ev: "D" },
-    { o: 338, h: 341, l: 324, c: 327, v: 67, d: "Aug 14" },
-    { o: 327, h: 331, l: 318, c: 321, v: 58, d: "Aug 20" },
-    { o: 321, h: 325, l: 312, c: 316, v: 53, d: "Aug 26" },
-    // Sep
-    { o: 316, h: 324, l: 314, c: 322, v: 61, m: "Sep", d: "Sep 02" },
-    { o: 322, h: 331, l: 320, c: 329, v: 69, d: "Sep 08" },
-    { o: 329, h: 337, l: 326, c: 334, v: 75, d: "Sep 15" },
-    { o: 334, h: 341, l: 330, c: 337, v: 82, d: "Sep 22", ev: "lightning" },
-    { o: 337, h: 344, l: 333, c: 340, v: 89, d: "Sep 28" },
-    // Oct (Current live)
-    { o: 340, h: 343, l: 336, c: 338.44, v: 45.65, m: "Oct", d: "Oct 04" },
-  ];
+// ── Moteur de marché DÉMO ──
+// Chaque tick fait évoluer le prix de tous les symboles par une marche
+// aléatoire neutre (aucun biais haussier/baissier) ; une bougie se forme
+// toutes les CANDLE_TICKS ticks. L'historique initial est généré avec la
+// même volatilité que le direct, pour que les niveaux d'entrée / SL / TP des
+// trades restent lisibles sur le graphique.
+const TICK_MS = 380;
+const CANDLE_TICKS = 24;
+const HISTORY_CANDLES = 60;
+const TICK_VOLATILITY = 0.00035;
 
-  return dataPoints.map((dp) => ({
-    dateLabel: dp.d,
-    monthLabel: dp.m,
-    open: dp.o,
-    high: dp.h,
-    low: dp.l,
-    close: dp.c,
-    volume: dp.v * 1000000,
-    isUp: dp.c >= dp.o,
-    event: dp.ev,
-  }));
+const SYMBOL_DIGITS: Record<string, number> = Object.fromEntries(
+  WATCHLIST_SYMBOLS.map((s) => [s.symbol, s.digits])
+);
+
+function roundTo(value: number, digits: number) {
+  return +value.toFixed(digits);
 }
 
-function generateGenericCandles(basePrice: number, count = 52): CandleBar[] {
-  const scale = basePrice / 338.43;
-  return generateAaplRealisticCandles().map((c) => ({
-    ...c,
-    open: +(c.open * scale).toFixed(2),
-    high: +(c.high * scale).toFixed(2),
-    low: +(c.low * scale).toFixed(2),
-    close: +(c.close * scale).toFixed(2),
-  }));
+function stepPrice(price: number, digits: number) {
+  return roundTo(price + (Math.random() - 0.5) * price * TICK_VOLATILITY, digits);
+}
+
+function candleTimeLabel(ms: number) {
+  return new Date(ms).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+/** Génère un historique qui se termine exactement au prix courant. */
+function buildSeries(symbol: string, currentPrice: number, lastSeq: number): CandleBar[] {
+  const digits = SYMBOL_DIGITS[symbol] ?? 2;
+  // Marche aléatoire à rebours depuis le prix courant.
+  const candles: CandleBar[] = [];
+  let close = currentPrice;
+  const now = Date.now();
+  for (let i = 0; i < HISTORY_CANDLES; i++) {
+    let price = close;
+    let high = price;
+    let low = price;
+    for (let t = 0; t < CANDLE_TICKS; t++) {
+      price = stepPrice(price, digits);
+      high = Math.max(high, price);
+      low = Math.min(low, price);
+    }
+    const open = price;
+    const seq = lastSeq - i;
+    const startMs = now - i * CANDLE_TICKS * TICK_MS;
+    candles.unshift({
+      seq,
+      dateLabel: candleTimeLabel(startMs),
+      monthLabel: seq % 10 === 0 ? candleTimeLabel(startMs).slice(0, 5) : undefined,
+      open,
+      high,
+      low,
+      close,
+      volume: Math.round(300000 + Math.random() * 700000),
+      isUp: close >= open,
+    });
+    close = open;
+  }
+  return candles;
 }
 
 export interface PresetQuotaStats {
+  // Nombre de trades clôturés dans le cycle en cours (gagnants ou perdants).
   goldWins: number; // Max 2
   fxWins: number;   // Max 5
   indexWins: number; // Illimité
@@ -423,6 +411,10 @@ export interface PresetQuotaStats {
   goldInitialStake?: number;
   fxInitialStake?: number;
   indexInitialStake?: number;
+  /** Identifiant du cycle validé par l'admin (une nouvelle validation = nouveau cycle). */
+  goldCycle?: string;
+  fxCycle?: string;
+  indexCycle?: string;
 }
 
 export interface PresetStakes {
@@ -444,6 +436,20 @@ export interface Mt5HistoryItem {
   tp: number;
   profit: number;
   comment: string;
+  presetId?: PresetId | undefined;
+  openSeq?: number | undefined;
+  closeSeq?: number | undefined;
+  exitReason?: string | undefined;
+}
+
+/** Trades clôturés, P&L et mise initiale (figée au lancement du cycle) d'un preset. */
+export function presetCycleStats(stats: PresetQuotaStats, stakes: PresetStakes, id: PresetId) {
+  const keys = PRESET_STAT_KEYS[id];
+  return {
+    trades: stats[keys.trades] ?? 0,
+    pnl: stats[keys.pnl] ?? 0,
+    initialStake: stats[keys.initialStake] ?? stakes[PRESET_RULES[id].stakeKey],
+  };
 }
 
 // ----------------------------------------------------
@@ -464,6 +470,7 @@ export function MetaTrader5Terminal({
   onQuotaChange,
   presetStakes = { goldStake: 100, fxStake: 750, indexStake: 2500 },
   onOpenStakeConfig,
+  storageKey,
 }: {
   balance?: number;
   bonus?: number;
@@ -479,7 +486,23 @@ export function MetaTrader5Terminal({
   onQuotaChange?: (stats: PresetQuotaStats) => void;
   presetStakes?: PresetStakes;
   onOpenStakeConfig?: () => void;
+  /** Clé localStorage du compte DÉMO (positions, historique, cotations). */
+  storageKey?: string;
 }) {
+  // État DÉMO sauvegardé (positions ouvertes, historique, derniers prix)
+  const savedDemo = useMemo(() => {
+    if (!storageKey || typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      return raw
+        ? (JSON.parse(raw) as { positions?: Mt5Position[]; history?: Mt5HistoryItem[]; prices?: Record<string, number> })
+        : null;
+    } catch {
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Selected Symbol (Default AAPL)
   const defaultSymbol: WatchlistSymbol = WATCHLIST_SYMBOLS.find((s) => s.symbol === "AAPL") || WATCHLIST_SYMBOLS[0] || {
     symbol: "AAPL",
@@ -493,8 +516,25 @@ export function MetaTrader5Terminal({
     volume: "45.2M",
     avgVolume: "52.1M",
   };
-  const [selectedSymbol, setSelectedSymbol] = useState<WatchlistSymbol>(defaultSymbol);
-  const [watchlist, setWatchlist] = useState<WatchlistSymbol[]>(WATCHLIST_SYMBOLS);
+  // Prix unique par symbole : alimente la watchlist, le graphique et le P&L.
+  const pricesRef = useRef<Record<string, number>>({
+    ...Object.fromEntries(WATCHLIST_SYMBOLS.map((s) => [s.symbol, s.last])),
+    ...(savedDemo?.prices || {}),
+  });
+  const seriesRef = useRef<Record<string, CandleBar[]>>({});
+  const lastSeqRef = useRef<number>(HISTORY_CANDLES - 1);
+  const getSeries = (symbol: string) => {
+    let series = seriesRef.current[symbol];
+    if (!series) {
+      series = buildSeries(symbol, pricesRef.current[symbol] ?? 100, lastSeqRef.current);
+      seriesRef.current[symbol] = series;
+    }
+    return series;
+  };
+  const withLivePrice = (s: WatchlistSymbol): WatchlistSymbol => ({ ...s, last: pricesRef.current[s.symbol] ?? s.last });
+
+  const [selectedSymbol, setSelectedSymbol] = useState<WatchlistSymbol>(() => withLivePrice(defaultSymbol));
+  const [watchlist, setWatchlist] = useState<WatchlistSymbol[]>(() => WATCHLIST_SYMBOLS.map(withLivePrice));
   const [timeframe, setTimeframe] = useState<string>("1D");
   
   // Mise / Sizing Mode
@@ -502,9 +542,7 @@ export function MetaTrader5Terminal({
   const [stakeUsd, setStakeUsd] = useState<string>("100");
   const [lotSize, setLotSize] = useState<string>("0.10");
   
-  const [candles, setCandles] = useState<CandleBar[]>(() =>
-    generateAaplRealisticCandles()
-  );
+  const [candles, setCandles] = useState<CandleBar[]>(() => getSeries(defaultSymbol.symbol).slice());
 
   // Crosshair & Hover state
   const [hoveredCandle, setHoveredCandle] = useState<CandleBar | null>(null);
@@ -533,16 +571,34 @@ export function MetaTrader5Terminal({
   const [showToolsDrawer, setShowToolsDrawer] = useState<boolean>(false);
 
   // Account Manager / Positions state
-  const [positions, setPositions] = useState<Mt5Position[]>([]);
+  // Toute modification des positions passe par commitPositions pour que le
+  // moteur (setInterval) lise toujours la liste à jour via positionsRef.
+  const [positions, setPositions] = useState<Mt5Position[]>(() => savedDemo?.positions || []);
+  const positionsRef = useRef<Mt5Position[]>(positions);
+  const commitPositions = (next: Mt5Position[]) => {
+    positionsRef.current = next;
+    setPositions(next);
+  };
 
   // Closed Trades History
-  const [tradeHistory, setTradeHistory] = useState<Mt5HistoryItem[]>([]);
+  const [tradeHistory, setTradeHistory] = useState<Mt5HistoryItem[]>(() => savedDemo?.history || []);
   const tradeHistoryRef = useRef<Mt5HistoryItem[]>([]);
   useEffect(() => { tradeHistoryRef.current = tradeHistory; }, [tradeHistory]);
 
   useEffect(() => {
     onPositionsChange?.(positions);
   }, [positions]);
+
+  // Sauvegarde du compte DÉMO : rien n'est perdu à l'arrêt du bot ni au rechargement.
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ positions, history: tradeHistory.slice(0, 200), prices: pricesRef.current })
+      );
+    } catch {}
+  }, [storageKey, positions, tradeHistory]);
 
   const [bottomTab, setBottomTab] = useState<"positions" | "history" | "quotas">("positions");
   const [isBottomOpen, setIsBottomOpen] = useState(true);
@@ -561,344 +617,250 @@ export function MetaTrader5Terminal({
     return () => clearInterval(timer);
   }, []);
 
-  // Sync candles when symbol changes
+  // Affiche la série du symbole choisi (historique conservé par symbole)
   useEffect(() => {
-    if (selectedSymbol.symbol === "AAPL") {
-      setCandles(generateAaplRealisticCandles());
-    } else {
-      setCandles(generateGenericCandles(selectedSymbol.last));
-    }
+    setCandles(getSeries(selectedSymbol.symbol).slice());
   }, [selectedSymbol.symbol]);
 
-  // Bot active detection & Quotas verification
+  // ── Bots des presets (DÉMO) ──
+  // Un bot ne trade que si : preset validé par l'admin + bot lancé par le
+  // client + quota du cycle non atteint. Rien ne démarre tout seul.
   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
-  const isGoldActive =
-    activeList.includes("AI_GOLD") &&
-    bots.find((b) => b.id === "nexium-ai-gold")?.statusBadge === "ACTIF" &&
-    (quotaStats?.goldWins ?? 0) < 2;
+  const isPresetRunning = (id: PresetId) =>
+    activeList.includes(id) &&
+    bots.find((b) => b.id === PRESET_BOT_ID[id])?.statusBadge === "ACTIF" &&
+    !isPresetExpired(id, presetCycleStats(quotaStats, presetStakes, id).trades);
+  const runningPresets: Record<PresetId, boolean> = {
+    AI_GOLD: isPresetRunning("AI_GOLD"),
+    FX_TREND: isPresetRunning("FX_TREND"),
+    INDEX_REVERSION: isPresetRunning("INDEX_REVERSION"),
+  };
 
-  const isFxActive =
-    activeList.includes("FX_TREND") &&
-    bots.find((b) => b.id === "nexium-fx-trend")?.statusBadge === "ACTIF" &&
-    (quotaStats?.fxWins ?? 0) < 5;
+  // Valeurs courantes lues par le moteur (évite de recréer l'intervalle à chaque rendu)
+  const latestRef = useRef({ balance, quotaStats, presetStakes, runningPresets, onBalanceChange, onQuotaChange });
+  latestRef.current = { balance, quotaStats, presetStakes, runningPresets, onBalanceChange, onQuotaChange };
+  const selectedSymbolRef = useRef(selectedSymbol.symbol);
+  selectedSymbolRef.current = selectedSymbol.symbol;
+  const nextSetupAtRef = useRef<Partial<Record<PresetId, number>>>({});
 
-  const isIndexActive =
-    activeList.includes("INDEX_REVERSION") &&
-    bots.find((b) => b.id === "nexium-index-reversion")?.statusBadge === "ACTIF";
-
-  // Automated trading loop: continuously searches setups and executes trades while bot is active and quota not reached
+  // Au lancement d'un bot, le graphique bascule sur son symbole pour suivre ses trades
+  const prevRunningRef = useRef(runningPresets);
   useEffect(() => {
-    if (!isGoldActive && !isFxActive && !isIndexActive) return;
+    const started = PRESET_IDS.find((id) => runningPresets[id] && !prevRunningRef.current[id]);
+    prevRunningRef.current = runningPresets;
+    if (!started) return;
+    const target = watchlist.find((w) => w.symbol === PRESET_SYMBOL[started]);
+    if (target) setSelectedSymbol(target);
+  }, [runningPresets.AI_GOLD, runningPresets.FX_TREND, runningPresets.INDEX_REVERSION]);
 
-    const botInterval = setInterval(() => {
-      setPositions((prev) => {
-        const next = [...prev];
-        const timeNow = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  /** Applique le résultat d'un trade de preset au cycle (trades, P&L, mise initiale figée). */
+  const applyTradeToStats = (stats: PresetQuotaStats, id: PresetId, profit: number): PresetQuotaStats => {
+    const keys = PRESET_STAT_KEYS[id];
+    const current = presetCycleStats(stats, latestRef.current.presetStakes, id);
+    return {
+      ...stats,
+      [keys.trades]: current.trades + 1,
+      [keys.pnl]: +(current.pnl + profit).toFixed(2),
+      [keys.initialStake]: current.initialStake,
+    };
+  };
 
-        // 1. Preset 1 : Nexium AI Gold (XAUUSD · Gain +50% · Max 2 trades)
-        const hasOpenGold = next.some(
-          (p) => (p.symbol === "GOLD" || p.symbol === "XAUUSD") && (p.comment || "").includes("Preset")
-        );
-        if (isGoldActive && !hasOpenGold && (quotaStats?.goldWins ?? 0) < 2) {
-          const goldSym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "GOLD") || { last: 4390.25, digits: 3 };
-          const p = goldSym.last;
-          const stake = quotaStats.goldInitialStake || presetStakes.goldStake;
-          const goldLots = +(Math.max(0.02, (stake / 1000) * 0.15)).toFixed(2);
-          const startProfit = +(stake * 0.50 * 0.25).toFixed(2);
-          next.unshift({
-            ticket: Math.floor(8910000 + Math.random() * 9000),
-            time: timeNow,
-            type: "BUY",
-            lots: goldLots,
-            symbol: "GOLD",
-            openPrice: +(p - 1.25).toFixed(3),
-            currentPrice: p,
-            sl: +(p - 15.0).toFixed(3),
-            tp: +(p + 35.0).toFixed(3),
-            commission: -2.25,
-            swap: 0.00,
-            profit: startProfit,
-            comment: `Preset Nexium AI Gold (Mise: $${stake})`,
-          });
-          playTradeAudio();
-          const currentTradeNum = (quotaStats?.goldWins ?? 0) + 1;
-          toast.success(
-            `Nexium AI Gold : Trade #${currentTradeNum}/2 exécuté sur GOLD (Mise : $${presetStakes.goldStake} USD · Cible : +50% / +$${(presetStakes.goldStake * 0.50).toFixed(2)} USD) !`
-          );
-        }
+  /** Profit d'une position au prix donné. */
+  const profitAt = (pos: Mt5Position, price: number) => {
+    const dir = pos.type === "BUY" ? 1 : -1;
+    if (pos.pointValue) return +(dir * (price - pos.openPrice) * pos.pointValue).toFixed(2);
+    const pnlFactor = pos.symbol === "GOLD" ? 100 : pos.symbol === "EURUSD" ? 200 : 10;
+    return +(dir * (price - pos.openPrice) * pos.lots * pnlFactor).toFixed(2);
+  };
 
-        // 2. Preset 2 : Nexium FX Trend (EURUSD · Gain +75% · Max 5 trades)
-        const hasOpenFx = next.some(
-          (p) => (p.symbol === "DXY" || p.symbol === "EURUSD") && (p.comment || "").includes("Preset")
-        );
-        if (isFxActive && !hasOpenFx && (quotaStats?.fxWins ?? 0) < 5) {
-          const dxySym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "DXY") || { last: 101.034, digits: 3 };
-          const p = dxySym.last;
-          const stake = quotaStats.fxInitialStake || presetStakes.fxStake;
-          const fxLots = +(Math.max(0.02, (stake / 1000) * 0.20)).toFixed(2);
-          const startProfit = +(stake * 0.75 * 0.25).toFixed(2);
-          next.unshift({
-            ticket: Math.floor(8920000 + Math.random() * 9000),
-            time: timeNow,
-            type: "BUY",
-            lots: fxLots,
-            symbol: "DXY",
-            openPrice: +(p - 0.08).toFixed(3),
-            currentPrice: p,
-            sl: +(p - 0.40).toFixed(3),
-            tp: +(p + 0.90).toFixed(3),
-            commission: -1.80,
-            swap: 0.00,
-            profit: startProfit,
-            comment: `Preset Nexium FX Trend (Mise: $${stake})`,
-          });
-          playTradeAudio();
-          const currentTradeNum = (quotaStats?.fxWins ?? 0) + 1;
-          toast.success(
-            `Nexium FX Trend : Trade #${currentTradeNum}/5 exécuté sur DXY (Mise : $${presetStakes.fxStake} USD · Cible : +75% / +$${(presetStakes.fxStake * 0.75).toFixed(2)} USD) !`
-          );
-        }
+  const toHistoryItem = (pos: Mt5Position, exitPrice: number, profit: number, reason: string): Mt5HistoryItem => ({
+    ticket: pos.ticket,
+    openTime: pos.time,
+    closeTime: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    type: pos.type,
+    lots: pos.lots,
+    symbol: pos.symbol,
+    openPrice: pos.openPrice,
+    closePrice: exitPrice,
+    sl: pos.sl,
+    tp: pos.tp,
+    profit,
+    comment: `${pos.comment || "Trade"} — ${reason}`,
+    presetId: pos.presetId,
+    openSeq: pos.openSeq,
+    closeSeq: lastSeqRef.current,
+    exitReason: reason,
+  });
 
-        // 3. Preset 3 : Nexium Index Reversion (NAS100 / NDQ · Gain +98% · Illimité)
-        const hasOpenIndex = next.some(
-          (p) =>
-            (p.symbol === "NDQ" || p.symbol === "SPX" || p.symbol === "DJI" || p.symbol === "NAS100") &&
-            (p.comment || "").includes("Preset")
-        );
-        if (isIndexActive && !hasOpenIndex) {
-          const ndqSym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "NDQ") || { last: 30508.52, digits: 2 };
-          const p = ndqSym.last;
-          const stake = quotaStats.indexInitialStake || presetStakes.indexStake;
-          const indexLots = +(Math.max(0.01, (stake / 1000) * 0.10)).toFixed(2);
-          const startProfit = +(stake * 0.98 * 0.25).toFixed(2);
-          next.unshift({
-            ticket: Math.floor(8930000 + Math.random() * 9000),
-            time: timeNow,
-            type: "BUY",
-            lots: indexLots,
-            symbol: "NDQ",
-            openPrice: +(p - 12.0).toFixed(2),
-            currentPrice: p,
-            sl: +(p - 60.0).toFixed(2),
-            tp: +(p + 140.0).toFixed(2),
-            commission: -2.00,
-            swap: 0.00,
-            profit: startProfit,
-            comment: `Preset Nexium Index Reversion (Mise: $${stake})`,
-          });
-          playTradeAudio();
-          toast.success(
-            `Nexium Index Reversion : Ordre BUY exécuté sur NDQ (Mise : $${presetStakes.indexStake} USD · Cible : +98% / +$${(presetStakes.indexStake * 0.98).toFixed(2)} USD) !`
-          );
-        }
+  /** Ouvre un trade de bot : TP = gain cible exact du preset, SL = moitié du gain cible (R:R 1:2). */
+  const buildBotPosition = (id: PresetId, stake: number, tradeNumber: number): Mt5Position => {
+    const symbol = PRESET_SYMBOL[id];
+    const digits = SYMBOL_DIGITS[symbol] ?? 2;
+    const price = pricesRef.current[symbol] ?? 100;
+    const type: "BUY" | "SELL" = Math.random() < 0.5 ? "BUY" : "SELL";
+    const dir = type === "BUY" ? 1 : -1;
+    const targetProfit = +(stake * PRESET_RULES[id].targetRate).toFixed(2);
+    const tpDist = price * 0.0012;
+    const slDist = tpDist / 2;
+    return {
+      ticket: Math.floor(8900000 + Math.random() * 90000),
+      time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      type,
+      lots: +Math.max(0.01, stake / 1000).toFixed(2),
+      symbol,
+      openPrice: price,
+      currentPrice: price,
+      sl: roundTo(price - dir * slDist, digits),
+      tp: roundTo(price + dir * tpDist, digits),
+      commission: 0,
+      swap: 0,
+      profit: 0,
+      comment: `Preset ${PRESET_LABEL[id]} · Trade #${tradeNumber} (Mise initiale: $${stake})`,
+      presetId: id,
+      pointValue: targetProfit / tpDist,
+      openSeq: lastSeqRef.current,
+      openedAt: Date.now(),
+    };
+  };
 
-        return next;
-      });
-    }, 2500);
-
-    return () => clearInterval(botInterval);
-  }, [isGoldActive, isFxActive, isIndexActive, presetStakes, quotaStats]);
-
-  // Real-time tick engine & Live PnL fluctuation
+  // Moteur temps réel : cotations, bougies, P&L des positions et bots des presets
   useEffect(() => {
     const interval = setInterval(() => {
-      tickCounterRef.current += 1;
+      const L = latestRef.current;
+      const now = Date.now();
 
-      // 1. Update Watchlist quotes
+      // 1. Cotations (marche aléatoire neutre)
+      tickCounterRef.current += 1;
+      const roll = tickCounterRef.current >= CANDLE_TICKS;
+      if (roll) {
+        tickCounterRef.current = 0;
+        lastSeqRef.current += 1;
+      }
+      const deltas: Record<string, number> = {};
+      for (const [sym, prev] of Object.entries(pricesRef.current)) {
+        const next = stepPrice(prev, SYMBOL_DIGITS[sym] ?? 2);
+        pricesRef.current[sym] = next;
+        deltas[sym] = next - prev;
+      }
+
+      // 2. Bougies de tous les symboles déjà affichés
+      for (const [sym, series] of Object.entries(seriesRef.current)) {
+        const price = pricesRef.current[sym] ?? 0;
+        const last = series[series.length - 1];
+        if (!last) continue;
+        series[series.length - 1] = {
+          ...last,
+          close: price,
+          high: Math.max(last.high, price),
+          low: Math.min(last.low, price),
+          isUp: price >= last.open,
+          volume: last.volume + Math.round(Math.random() * 20000),
+        };
+        if (roll) {
+          series.shift();
+          const label = candleTimeLabel(now);
+          series.push({
+            seq: lastSeqRef.current,
+            dateLabel: label,
+            monthLabel: lastSeqRef.current % 10 === 0 ? label.slice(0, 5) : undefined,
+            open: price,
+            close: price,
+            high: price,
+            low: price,
+            volume: Math.round(300000 + Math.random() * 200000),
+            isUp: true,
+          });
+        }
+      }
       setWatchlist((prev) =>
         prev.map((item) => {
-          const delta = (Math.random() - 0.49) * (item.last * 0.00035);
-          const nextLast = +(item.last + delta).toFixed(item.digits);
-          const nextChg = +(item.chg + delta).toFixed(item.digits);
-          const nextChgPct = +((nextChg / (item.last - nextChg || 1)) * 100).toFixed(2);
-          return {
-            ...item,
-            last: nextLast,
-            chg: nextChg,
-            chgPct: nextChgPct,
-          };
+          const last = pricesRef.current[item.symbol];
+          if (last === undefined) return item;
+          const chg = roundTo(item.chg + (deltas[item.symbol] ?? 0), item.digits);
+          return { ...item, last, chg, chgPct: +((chg / (last - chg || 1)) * 100).toFixed(2) };
         })
       );
+      setCandles(getSeries(selectedSymbolRef.current).slice());
+      setSelectedSymbol((s) => {
+        const last = pricesRef.current[s.symbol] ?? s.last;
+        const chg = roundTo(s.chg + (deltas[s.symbol] ?? 0), s.digits || 2);
+        return { ...s, last, chg, chgPct: +((chg / (last || 1)) * 100).toFixed(2) };
+      });
 
-      // 2. Update Live Positions PnL & Current Price
-      setPositions((prev) => {
-        const next = prev.map((pos) => {
-          const isGold = pos.symbol === "GOLD" || pos.symbol === "XAUUSD" || (pos.comment || "").includes("AI Gold");
-          const isFx = pos.symbol === "DXY" || pos.symbol === "EURUSD" || (pos.comment || "").includes("FX Trend");
-          const isIndex =
-            pos.symbol === "NDQ" ||
-            pos.symbol === "SPX" ||
-            pos.symbol === "DJI" ||
-            pos.symbol === "NAS100" ||
-            pos.symbol === "US30" ||
-            (pos.comment || "").includes("Index");
+      // 3. Positions : P&L au prix du marché, clôture des trades de bot sur TP / SL / arrêt
+      let stats = L.quotaStats;
+      let balanceDelta = 0;
+      const closed: Mt5HistoryItem[] = [];
+      const notices: Array<() => void> = [];
+      const nextPositions: Mt5Position[] = [];
+      for (const pos of positionsRef.current) {
+        const price = pricesRef.current[pos.symbol] ?? pos.currentPrice;
+        if (pos.presetId) {
+          const dir = pos.type === "BUY" ? 1 : -1;
+          const hitTp = dir * (price - pos.tp) >= 0;
+          const hitSl = dir * (price - pos.sl) <= 0;
+          const stopped = !L.runningPresets[pos.presetId];
+          if (hitTp || hitSl || stopped) {
+            const exitPrice = hitTp ? pos.tp : hitSl ? pos.sl : price;
+            const profit = profitAt(pos, exitPrice);
+            const reason = hitTp ? "Take Profit atteint" : hitSl ? "Stop Loss touché" : "Bot arrêté (clôture au marché)";
+            closed.push(toHistoryItem(pos, exitPrice, profit, reason));
+            balanceDelta += profit;
+            stats = applyTradeToStats(stats, pos.presetId, profit);
+            const id = pos.presetId;
+            const { trades } = presetCycleStats(stats, L.presetStakes, id);
+            const max = PRESET_RULES[id].maxTrades;
+            notices.push(() => {
+              const quota = max === Infinity ? `${trades} trade(s)` : `${trades}/${max}`;
+              const msg = `${PRESET_LABEL[id]} (DÉMO) : ${reason} sur ${pos.symbol} — ${profit >= 0 ? "+" : "-"}$${Math.abs(profit).toFixed(2)} · ${quota}`;
+              if (profit >= 0) toast.success(msg);
+              else toast.error(msg);
+              if (isPresetExpired(id, trades)) {
+                toast.info(`${PRESET_LABEL[id]} : quota atteint (${trades}/${max}) — preset EXPIRÉ. Vous pouvez faire une nouvelle demande d'activation.`);
+              }
+            });
+            continue;
+          }
+        }
+        nextPositions.push({ ...pos, currentPrice: price, profit: profitAt(pos, price) });
+      }
 
-          // Target profit based strictly on configured stake percentage
-          const id = getPresetId(pos.comment || "");
-          const initialStake = id === "AI_GOLD" ? quotaStats.goldInitialStake ?? presetStakes.goldStake
-            : id === "FX_TREND" ? quotaStats.fxInitialStake ?? presetStakes.fxStake
-            : id === "INDEX_REVERSION" ? quotaStats.indexInitialStake ?? presetStakes.indexStake : 0;
-          const targetProfit = id ? +(initialStake * PRESET_RULES[id].targetRate).toFixed(2) : 25;
-
-          const tickDelta = (Math.random() - 0.44) * (pos.openPrice * 0.00025);
-          const nextCurrent = +(pos.currentPrice + tickDelta).toFixed(
-            pos.symbol === "DXY" || pos.symbol === "EURUSD" || pos.symbol === "GOLD" ? 3 : 2
+      // 4. Bots lancés : recherche de setup puis ouverture d'un trade (un à la fois par preset)
+      for (const id of PRESET_IDS) {
+        if (!L.runningPresets[id]) {
+          delete nextSetupAtRef.current[id];
+          continue;
+        }
+        const { trades, initialStake } = presetCycleStats(stats, L.presetStakes, id);
+        if (isPresetExpired(id, trades) || nextPositions.some((p) => p.presetId === id)) continue;
+        const due = nextSetupAtRef.current[id];
+        if (due === undefined) {
+          nextSetupAtRef.current[id] = now + 5000 + Math.random() * 7000;
+          continue;
+        }
+        if (now < due) continue;
+        delete nextSetupAtRef.current[id];
+        const pos = buildBotPosition(id, initialStake, trades + 1);
+        nextPositions.unshift(pos);
+        notices.push(() => {
+          playTradeAudio();
+          toast.info(
+            `${PRESET_LABEL[id]} (DÉMO) : ${pos.type} ${pos.symbol} @ ${pos.openPrice} · TP ${pos.tp} · SL ${pos.sl}`
           );
-
-          // Smooth convergence towards target profit for bot trades
-          const isBotPosition = isGold || isFx || isIndex || (pos.comment || "").includes("Preset");
-          let nextProfit = pos.profit;
-          if (isBotPosition) {
-            const stepIncrement = Math.max(0.50, +(targetProfit * (0.04 + Math.random() * 0.05)).toFixed(2));
-            nextProfit = +(Math.min(targetProfit, pos.profit + stepIncrement)).toFixed(2);
-            if (isIndex) {
-              nextProfit = Math.max(1.50, nextProfit);
-            }
-          } else {
-            const priceDiff = pos.type === "BUY" ? nextCurrent - pos.openPrice : pos.openPrice - nextCurrent;
-            const pnlFactor = pos.symbol === "GOLD" ? 100 : pos.symbol === "EURUSD" ? 200 : 10;
-            nextProfit = +(priceDiff * pos.lots * pnlFactor).toFixed(2);
-          }
-
-          return {
-            ...pos,
-            currentPrice: nextCurrent,
-            profit: nextProfit,
-          };
         });
+      }
 
-        // Check if any bot position reached full take-profit to automatically close and credit wallet
-        const winningPos = next.find((p) => {
-          const isGold = p.symbol === "GOLD" || p.symbol === "XAUUSD" || (p.comment || "").includes("AI Gold");
-          const isFx = p.symbol === "DXY" || p.symbol === "EURUSD" || (p.comment || "").includes("FX Trend");
-          const isIndex =
-            p.symbol === "NDQ" ||
-            p.symbol === "SPX" ||
-            p.symbol === "DJI" ||
-            p.symbol === "NAS100" ||
-            p.symbol === "US30" ||
-            (p.comment || "").includes("Index");
-
-          const id = getPresetId(p.comment || "");
-          const initialStake = id === "AI_GOLD" ? quotaStats.goldInitialStake ?? presetStakes.goldStake
-            : id === "FX_TREND" ? quotaStats.fxInitialStake ?? presetStakes.fxStake
-            : id === "INDEX_REVERSION" ? quotaStats.indexInitialStake ?? presetStakes.indexStake : 0;
-          const targetProfit = id ? +(initialStake * PRESET_RULES[id].targetRate).toFixed(2) : 22;
-
-          return ((p.comment || "").includes("Preset") || (p.comment || "").includes("Algorithme")) && p.profit >= targetProfit;
-        });
-
-        if (winningPos) {
-          const isGold = winningPos.symbol === "GOLD" || winningPos.symbol === "XAUUSD" || (winningPos.comment || "").includes("AI Gold");
-          const isFx = winningPos.symbol === "DXY" || winningPos.symbol === "EURUSD" || (winningPos.comment || "").includes("FX Trend");
-          const presetId = getPresetId(winningPos.comment || "");
-          const initialStake = presetId === "AI_GOLD" ? quotaStats.goldInitialStake ?? presetStakes.goldStake
-            : presetId === "FX_TREND" ? quotaStats.fxInitialStake ?? presetStakes.fxStake
-            : quotaStats.indexInitialStake ?? presetStakes.indexStake;
-          const exactProfit = winningPos.profit;
-
-          const timeNow = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-          setTradeHistory((hist) => [
-            {
-              ticket: winningPos.ticket,
-              openTime: winningPos.time,
-              closeTime: timeNow,
-              type: winningPos.type,
-              lots: winningPos.lots,
-              symbol: winningPos.symbol,
-              openPrice: winningPos.openPrice,
-              closePrice: winningPos.currentPrice,
-              sl: winningPos.sl,
-              tp: winningPos.tp,
-              profit: exactProfit,
-              comment: `${winningPos.comment || "Preset Trade"} — TP Clôturé (+${isGold ? "50%" : isFx ? "75%" : "98%"})`,
-            },
-            ...hist,
-          ]);
-
-          // Crédit immédiat dans le portefeuille / balance
-          if (onBalanceChange) {
-            onBalanceChange(balance + exactProfit);
-          }
-
-          if (isGold) {
-            const nextWins = quotaStats.goldWins + 1;
-            onQuotaChange?.({ ...quotaStats, goldWins: nextWins, goldPnl: (quotaStats.goldPnl || 0) + exactProfit, goldInitialStake: initialStake });
-            if (nextWins >= 2) {
-              toast.success(`🏆 Nexium AI Gold : Gain de +50% (+$${exactProfit} USD) sur mise de $${presetStakes.goldStake} USD ! Quota maximum atteint (2/2) — Abonnement terminé.`);
-            } else {
-              toast.success(`🎯 Nexium AI Gold : Gain de +50% (+$${exactProfit} USD) sur mise de $${presetStakes.goldStake} USD clôturé ! Quota : ${nextWins}/2 trades.`);
-            }
-          } else if (isFx) {
-            const nextWins = quotaStats.fxWins + 1;
-            onQuotaChange?.({ ...quotaStats, fxWins: nextWins, fxPnl: (quotaStats.fxPnl || 0) + exactProfit, fxInitialStake: initialStake });
-            if (nextWins >= 5) {
-              toast.success(`🏆 Nexium FX Trend : Gain de +75% (+$${exactProfit} USD) sur mise de $${presetStakes.fxStake} USD ! Quota maximum atteint (5/5) — Abonnement terminé.`);
-            } else {
-              toast.success(`🎯 Nexium FX Trend : Gain de +75% (+$${exactProfit} USD) sur mise de $${presetStakes.fxStake} USD clôturé ! Quota : ${nextWins}/5 trades.`);
-            }
-          } else {
-            const nextWins = quotaStats.indexWins + 1;
-            onQuotaChange?.({ ...quotaStats, indexWins: nextWins, indexPnl: (quotaStats.indexPnl || 0) + exactProfit, indexInitialStake: initialStake });
-            toast.success(`🎯 Nexium Index Reversion : Gain de +98% (+$${exactProfit} USD) sur mise de $${presetStakes.indexStake} USD clôturé (Trading Illimité ∞).`);
-          }
-
-          return next.filter((p) => p.ticket !== winningPos.ticket);
-        }
-
-        return next;
-      });
-
-      // 3. Update current chart candle and live symbol price
-      setCandles((prev) => {
-        if (prev.length === 0) return prev;
-        const lastCandle = prev[prev.length - 1];
-        if (!lastCandle) return prev;
-        // Dynamic micro tick variation
-        const delta = (Math.random() - 0.48) * (selectedSymbol.last * 0.0006);
-        const nextClose = +(lastCandle.close + delta).toFixed(selectedSymbol.digits || 2);
-        const nextHigh = Math.max(lastCandle.high, nextClose);
-        const nextLow = Math.min(lastCandle.low, nextClose);
-
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          ...lastCandle,
-          close: nextClose,
-          high: nextHigh,
-          low: nextLow,
-          isUp: nextClose >= lastCandle.open,
-        };
-
-        // Sync selectedSymbol live price
-        setSelectedSymbol((s) => ({
-          ...s,
-          last: nextClose,
-          chg: +(s.chg + delta).toFixed(s.digits || 2),
-          chgPct: +((((s.chg + delta) / (nextClose || 1)) * 100)).toFixed(2),
-        }));
-
-        // Every 24 ticks (~9 seconds), spawn a new live candle and push to chart!
-        if (tickCounterRef.current >= 24) {
-          tickCounterRef.current = 0;
-          const timeLabel = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-          const newCandle: CandleBar = {
-            dateLabel: timeLabel,
-            open: nextClose,
-            close: nextClose,
-            high: nextClose,
-            low: nextClose,
-            volume: 500000,
-            isUp: true,
-          };
-          return [...updated.slice(1), newCandle];
-        }
-
-        return updated;
-      });
-    }, 380);
+      commitPositions(nextPositions);
+      if (closed.length > 0) {
+        setTradeHistory((hist) => [...closed.reverse(), ...hist]);
+        L.onQuotaChange?.(stats);
+      }
+      if (balanceDelta !== 0) L.onBalanceChange?.(+(L.balance + balanceDelta).toFixed(2));
+      notices.forEach((notify) => notify());
+    }, TICK_MS);
 
     return () => clearInterval(interval);
-  }, [selectedSymbol.symbol, quotaStats, balance, presetStakes]);
+  }, []);
 
   // Audio effect for order execution
   const playTradeAudio = () => {
@@ -952,7 +914,7 @@ export function MetaTrader5Terminal({
       comment: commentText,
     };
 
-    setPositions((prev) => [newPos, ...prev]);
+    commitPositions([newPos, ...positionsRef.current]);
     playTradeAudio();
     if (stakeMode === "USD") {
       toast.success(
@@ -1255,56 +1217,26 @@ export function MetaTrader5Terminal({
   };
 
   const handleClosePosition = (ticket: number) => {
-    const pos = positions.find((p) => p.ticket === ticket);
+    const pos = positionsRef.current.find((p) => p.ticket === ticket);
     if (!pos) return;
-    setPositions((prev) => prev.filter((p) => p.ticket !== ticket));
-    const timeNow = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const exitPrice = pricesRef.current[pos.symbol] ?? pos.currentPrice;
+    const profit = profitAt(pos, exitPrice);
+    commitPositions(positionsRef.current.filter((p) => p.ticket !== ticket));
+    setTradeHistory((hist) => [toHistoryItem(pos, exitPrice, profit, "Clôturé manuellement"), ...hist]);
+    onBalanceChange?.(+(balance + profit).toFixed(2));
 
-    // Enregistrer dans l'historique
-    setTradeHistory((hist) => [
-      {
-        ticket: pos.ticket,
-        openTime: pos.time,
-        closeTime: timeNow,
-        type: pos.type,
-        lots: pos.lots,
-        symbol: pos.symbol,
-        openPrice: pos.openPrice,
-        closePrice: pos.currentPrice,
-        sl: pos.sl,
-        tp: pos.tp,
-        profit: pos.profit,
-        comment: `${pos.comment || "Trade"} — Clôturé Manuellement`,
-      },
-      ...hist,
-    ]);
-
-    if (onBalanceChange) {
-      onBalanceChange(balance + pos.profit);
-    }
-
-    // Incrémenter le quota en cas de gain sur un trade Preset
-    const posComment = pos.comment || "";
-    if (pos.profit > 0 && (posComment.includes("Preset") || posComment.includes("Algorithme"))) {
-      if (pos.symbol === "GOLD" || pos.symbol === "XAUUSD" || posComment.includes("AI Gold")) {
-        const nextWins = (quotaStats?.goldWins ?? 0) + 1;
-        onQuotaChange?.({ ...quotaStats, goldWins: nextWins });
-        if (nextWins >= 2) {
-          toast.success("🏆 Nexium AI Gold : Quota de 2 trades gagnants atteint (2/2) ! Abonnement pour ce preset terminé.");
-        }
-      } else if (pos.symbol === "DXY" || pos.symbol === "EURUSD" || posComment.includes("FX Trend")) {
-        const nextWins = (quotaStats?.fxWins ?? 0) + 1;
-        onQuotaChange?.({ ...quotaStats, fxWins: nextWins });
-        if (nextWins >= 5) {
-          toast.success("🏆 Nexium FX Trend : Quota de 5 trades gagnants atteint (5/5) ! Abonnement pour ce preset terminé.");
-        }
-      } else {
-        const nextWins = (quotaStats?.indexWins ?? 0) + 1;
-        onQuotaChange?.({ ...quotaStats, indexWins: nextWins });
+    // Un trade de preset clôturé à la main compte dans le quota du cycle
+    if (pos.presetId) {
+      const id = pos.presetId;
+      const nextStats = applyTradeToStats(quotaStats, id, profit);
+      onQuotaChange?.(nextStats);
+      const { trades } = presetCycleStats(nextStats, presetStakes, id);
+      if (isPresetExpired(id, trades)) {
+        toast.info(`${PRESET_LABEL[id]} : quota atteint (${trades}/${PRESET_RULES[id].maxTrades}) — preset EXPIRÉ.`);
       }
     }
 
-    toast.info(`Position #${ticket} clôturée avec un P&L de ${pos.profit >= 0 ? "+" : ""}$${pos.profit.toFixed(2)} USD.`);
+    toast.info(`Position #${ticket} clôturée avec un P&L de ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)} USD (DÉMO).`);
   };
 
   // Dynamic Chart Dimensions & Scale based on active candles
@@ -1426,6 +1358,11 @@ export function MetaTrader5Terminal({
 
   return (
     <div className="flex flex-col bg-[#131722] border border-[#2a2e39] rounded-2xl shadow-2xl overflow-hidden font-sans select-none text-[#d1d4dc] antialiased">
+      {/* Bandeau DÉMO : tout ce terminal est une simulation */}
+      <div className="flex items-center gap-2 border-b border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-[11px] font-mono text-amber-200">
+        <span className="rounded border border-amber-400/60 bg-amber-400/20 px-1.5 py-0.5 font-black tracking-wider text-amber-300">DÉMO</span>
+        <span>Compte de démonstration : cotations et trades simulés, aucun ordre réel n'est transmis. Le solde démo est séparé de votre portefeuille.</span>
+      </div>
       {/* ── 1. TOP TRADINGVIEW TOOLBAR HEADER (DARK THEME) ── */}
       <div className="flex items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-2.5 py-1 text-xs font-semibold overflow-x-auto no-scrollbar gap-1.5 h-10">
         {/* Left Side Controls */}
@@ -2067,19 +2004,6 @@ export function MetaTrader5Terminal({
                 );
               })}
 
-              {positions.filter((p) => (p.comment || "").includes("Preset")).map((trade) => {
-                const entryY = getY(trade.openPrice);
-                const currentY = getY(trade.currentPrice);
-                const color = trade.type === "BUY" ? "#00d084" : "#f43f5e";
-                return <g key={`open-trade-${trade.ticket}`}>
-                  <line x1={chartWidth - 180} y1={getY(trade.sl)} x2={chartWidth - paddingRight} y2={getY(trade.sl)} stroke="#f43f5e" strokeDasharray="5 3" />
-                  <line x1={chartWidth - 180} y1={getY(trade.tp)} x2={chartWidth - paddingRight} y2={getY(trade.tp)} stroke="#00d084" strokeDasharray="5 3" />
-                  <path d={`M ${chartWidth - 190} ${entryY} l 10 -6 v 12 z`} fill={color} />
-                  <text x={chartWidth - 176} y={entryY - 8} fill={color} fontSize="10" fontWeight="bold">{trade.type} entrée {trade.openPrice.toFixed(2)}</text>
-                  <circle cx={chartWidth - 165} cy={currentY} r="4" fill={color} />
-                </g>;
-              })}
-
               {/* Dynamic Exponential Moving Averages (EMA 9 & EMA 21) */}
               {ema9Points && (
                 <polyline
@@ -2113,6 +2037,87 @@ export function MetaTrader5Terminal({
                     <circle cx={lastX} cy={lastY} r="8" fill={color} opacity="0.4" className="animate-ping" />
                     <circle cx={lastX} cy={lastY} r="4" fill={color} />
                     <circle cx={lastX} cy={lastY} r="2" fill="#ffffff" />
+                  </g>
+                );
+              })()}
+
+              {/* Trades sur les bougies : entrée, sens, SL/TP, sortie et résultat */}
+              {(() => {
+                const firstSeq = candles[0]?.seq;
+                if (firstSeq === undefined) return null;
+                const plotRight = chartWidth - paddingRight;
+                const xForSeq = (seq: number | undefined) =>
+                  seq === undefined ? null : 25 + (seq - firstSeq) * candleSpacing;
+                const visible = (x: number | null): x is number => x !== null && x >= 10 && x <= plotRight;
+                const digits = selectedSymbol.digits || 2;
+
+                const closedTrades = tradeHistory
+                  .filter((t) => t.symbol === selectedSymbol.symbol && t.openSeq !== undefined)
+                  .slice(0, 25);
+                const openTrades = positions.filter((p) => p.symbol === selectedSymbol.symbol && p.openSeq !== undefined);
+
+                const entryMarker = (key: string, x: number, price: number, type: "BUY" | "SELL", label: string) => {
+                  const y = getY(price);
+                  const color = type === "BUY" ? "#089981" : "#f23645";
+                  // Flèche sous le prix pour un BUY (pointe vers le haut), au-dessus pour un SELL
+                  const path = type === "BUY" ? `M ${x} ${y + 4} l -6 10 h 12 z` : `M ${x} ${y - 4} l -6 -10 h 12 z`;
+                  return (
+                    <g key={key}>
+                      <path d={path} fill={color} stroke="#131722" strokeWidth="1" />
+                      <text x={x + 8} y={type === "BUY" ? y + 16 : y - 10} fill={color} fontSize="9.5" fontWeight="bold" fontFamily="monospace">
+                        {label}
+                      </text>
+                    </g>
+                  );
+                };
+
+                return (
+                  <g pointerEvents="none">
+                    {closedTrades.map((t) => {
+                      const xIn = xForSeq(t.openSeq);
+                      const xOut = xForSeq(t.closeSeq);
+                      if (!visible(xIn) && !visible(xOut)) return null;
+                      const x1 = Math.max(10, xIn ?? 10);
+                      const x2 = Math.min(plotRight, xOut ?? plotRight);
+                      const yIn = getY(t.openPrice);
+                      const yOut = getY(t.closePrice);
+                      const win = t.profit >= 0;
+                      const resultColor = win ? "#089981" : "#f23645";
+                      return (
+                        <g key={`hist-mark-${t.ticket}`}>
+                          <line x1={x1} y1={getY(t.tp)} x2={x2} y2={getY(t.tp)} stroke="#089981" strokeWidth="1" strokeDasharray="3 3" opacity="0.7" />
+                          <line x1={x1} y1={getY(t.sl)} x2={x2} y2={getY(t.sl)} stroke="#f23645" strokeWidth="1" strokeDasharray="3 3" opacity="0.7" />
+                          <line x1={x1} y1={yIn} x2={x2} y2={yOut} stroke={resultColor} strokeWidth="1.2" strokeDasharray="5 3" />
+                          {visible(xIn) && entryMarker(`hist-in-${t.ticket}`, xIn, t.openPrice, t.type, `${t.type} ${t.openPrice.toFixed(digits)}`)}
+                          {visible(xOut) && (
+                            <g>
+                              <circle cx={xOut} cy={yOut} r="4.5" fill="#131722" stroke={resultColor} strokeWidth="2" />
+                              <rect x={xOut - 34} y={yOut - 26} width="68" height="15" rx="3" fill={resultColor} />
+                              <text x={xOut} y={yOut - 15} fill="#ffffff" fontSize="9.5" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+                                {win ? "+" : "-"}${Math.abs(t.profit).toFixed(2)}
+                              </text>
+                            </g>
+                          )}
+                        </g>
+                      );
+                    })}
+                    {openTrades.map((p) => {
+                      const xIn = xForSeq(p.openSeq);
+                      const lastX = 25 + (candles.length - 1) * candleSpacing;
+                      const yIn = getY(p.openPrice);
+                      const yNow = getY(p.currentPrice);
+                      const color = p.profit >= 0 ? "#089981" : "#f23645";
+                      return (
+                        <g key={`open-mark-${p.ticket}`}>
+                          {visible(xIn) && (
+                            <>
+                              <line x1={xIn} y1={yIn} x2={lastX} y2={yNow} stroke={color} strokeWidth="1.2" strokeDasharray="5 3" />
+                              {entryMarker(`open-in-${p.ticket}`, xIn, p.openPrice, p.type, `${p.type} ${p.openPrice.toFixed(digits)}`)}
+                            </>
+                          )}
+                        </g>
+                      );
+                    })}
                   </g>
                 );
               })()}
@@ -3215,7 +3220,7 @@ export function MetaTrader5Terminal({
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 text-xs font-mono">
-              <span className="text-[#787b86]">Solde: <strong className="text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong></span>
+              <span className="text-[#787b86]">Solde démo: <strong className="text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong></span>
               <span className="text-[#787b86]">P&amp;L Flottant: <strong className={totalOpenProfit >= 0 ? "text-[#089981]" : "text-[#f23645]"}>
                 {totalOpenProfit >= 0 ? "+" : ""}${totalOpenProfit.toFixed(2)} USD
               </strong></span>
@@ -3349,96 +3354,67 @@ export function MetaTrader5Terminal({
         {isBottomOpen && bottomTab === "quotas" && (
           <div className="p-3 bg-[#0d1017]">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* Preset 1: AI Gold Quota Card */}
-              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-300">Preset 1 : Nexium AI Gold</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                      quotaStats.goldWins >= 2
-                        ? "border-rose-500/40 bg-rose-500/20 text-rose-300"
-                        : "border-amber-500/40 bg-amber-500/20 text-amber-300"
-                    }`}>
-                      {quotaStats.goldWins >= 2 ? "EXPIRÉ (2/2)" : `${Math.min(2, quotaStats.goldWins)} / 2 GAINS`}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Limite contractuelle : 2 trades gagnants (+50% de la mise).</p>
-                </div>
-                <div className="mt-3">
-                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${quotaStats.goldWins >= 2 ? "bg-rose-500" : "bg-amber-400"}`}
-                      style={{ width: `${Math.min(100, (Math.min(2, quotaStats.goldWins) / 2) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between mt-1.5">
+              {PRESET_IDS.map((id, index) => {
+                const rules = PRESET_RULES[id];
+                const { trades, pnl, initialStake } = presetCycleStats(quotaStats, presetStakes, id);
+                const limited = rules.maxTrades !== Infinity;
+                const expired = isPresetExpired(id, trades);
+                const approved = activeList.includes(id);
+                const running = runningPresets[id];
+                const status = !approved ? "INACTIF" : expired ? "EXPIRÉ" : running ? "BOT LANCÉ" : "BOT ARRÊTÉ";
+                const statusClass = !approved
+                  ? "border-slate-600/50 bg-slate-800/40 text-slate-400"
+                  : expired
+                  ? "border-rose-500/40 bg-rose-500/20 text-rose-300"
+                  : running
+                  ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300"
+                  : "border-amber-500/40 bg-amber-500/15 text-amber-300";
+                const accent = ["text-amber-300", "text-cyan-300", "text-purple-300"][index];
+                const bar = ["bg-amber-400", "bg-cyan-400", "bg-purple-400"][index];
+                return (
+                  <div key={id} className="p-3 rounded-xl border border-[#2a2e39] bg-[#131722] flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-xs font-bold ${accent}`}>{rules.name} : {PRESET_LABEL[id]}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${statusClass}`}>{status}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Gain cible : +{Math.round(rules.targetRate * 100)}% de la mise initiale · {limited ? `${rules.maxTrades} trades max` : "trades illimités"} · {PRESET_SYMBOL[id]}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 text-[11px] font-mono">
+                      <div>
+                        <span className="block text-[9px] uppercase text-slate-500">Mise initiale</span>
+                        <strong className="text-white">${initialStake}</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] uppercase text-slate-500">Trades</span>
+                        <strong className="text-white">{limited ? `${Math.min(trades, rules.maxTrades)}/${rules.maxTrades}` : trades}</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[9px] uppercase text-slate-500">{expired ? "P&L final" : "P&L cycle"}</span>
+                        <strong className={pnl >= 0 ? "text-[#089981]" : "text-[#f23645]"}>
+                          {pnl >= 0 ? "+" : "-"}${Math.abs(pnl).toFixed(2)}
+                        </strong>
+                      </div>
+                    </div>
+                    {limited && (
+                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${expired ? "bg-rose-500" : bar}`}
+                          style={{ width: `${Math.min(100, (trades / rules.maxTrades) * 100)}%` }}
+                        />
+                      </div>
+                    )}
                     <span className="text-[10px] text-slate-500 font-mono">
-                      {quotaStats.goldWins >= 2 ? "Abonnement Découverte terminé (2/2)" : `${Math.max(0, 2 - quotaStats.goldWins)} trade(s) restant(s)`}
+                      Objectif par trade : +${(initialStake * rules.targetRate).toFixed(2)} (TP) · risque : -${((initialStake * rules.targetRate) / 2).toFixed(2)} (SL)
                     </span>
-                    {quotaStats.goldWins >= 2 && (
-                      <span className="text-[10px] font-bold text-amber-400 font-mono">
-                        Prolongation Admin Requise
+                    {expired && (
+                      <span className="text-[10px] font-bold text-rose-300 font-mono">
+                        Cycle terminé — nouvelle demande d'activation nécessaire.
                       </span>
                     )}
                   </div>
-                </div>
-              </div>
-
-              {/* Preset 2: FX Trend Quota Card */}
-              <div className="p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-cyan-300">Preset 2 : Nexium FX Trend</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                      quotaStats.fxWins >= 5
-                        ? "border-rose-500/40 bg-rose-500/20 text-rose-300"
-                        : "border-cyan-500/40 bg-cyan-500/20 text-cyan-300"
-                    }`}>
-                      {quotaStats.fxWins >= 5 ? "EXPIRÉ (5/5)" : `${Math.min(5, quotaStats.fxWins)} / 5 GAINS`}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Limite contractuelle : 5 trades gagnants (+75% de la mise).</p>
-                </div>
-                <div className="mt-3">
-                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${quotaStats.fxWins >= 5 ? "bg-rose-500" : "bg-cyan-400"}`}
-                      style={{ width: `${Math.min(100, (Math.min(5, quotaStats.fxWins) / 5) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {quotaStats.fxWins >= 5 ? "Abonnement Pro terminé (5/5)" : `${Math.max(0, 5 - quotaStats.fxWins)} trade(s) restant(s)`}
-                    </span>
-                    {quotaStats.fxWins >= 5 && (
-                      <span className="text-[10px] font-bold text-cyan-400 font-mono">
-                        Prolongation Admin Requise
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Preset 3: Index Reversion Quota Card */}
-              <div className="p-3 rounded-xl border border-purple-500/30 bg-purple-950/20 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-300">Preset 3 : Nexium Index Reversion</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border border-emerald-500/40 bg-emerald-500/20 text-emerald-300">
-                      ILLIMITÉ (∞)
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Accès illimité sans expiration de quota.</p>
-                </div>
-                <div className="mt-3">
-                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-400 w-full" />
-                  </div>
-                  <span className="text-[10px] text-emerald-400 font-mono block mt-1">
-                    {quotaStats.indexWins} gain(s) exécuté(s) · En continu
-                  </span>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
         )}
