@@ -27,6 +27,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
 import { getUserSlug, getAdminSlug } from "@/lib/user-slug";
+import { isOwnerEmail } from "@/lib/owner";
 import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -66,6 +67,15 @@ function LoginPage() {
 
           // Vérification du rôle Administrateur
           if (profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role)) {
+            // Le propriétaire arrive sur son espace client ; la console admin
+            // reste accessible depuis le menu du dashboard.
+            if (isOwnerEmail(data.user.email)) {
+              const userSlug = getUserSlug({ name: profile.name, email: data.user.email, id: data.user.id });
+              toast.success(`Connexion réussie. Bienvenue, ${profile.name || data.user.email} !`);
+              navigate({ to: "/portal/$slug", params: { slug: userSlug } });
+              return;
+            }
+
             const adminSlug = getAdminSlug({ name: profile.name, email: data.user.email, id: data.user.id });
             toast.success(`Connexion Desk confirmée. Bienvenue, ${profile.name || data.user.email} !`);
             navigate({ to: "/desk/$slug", params: { slug: adminSlug } });

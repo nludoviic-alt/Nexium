@@ -5383,6 +5383,7 @@ function MessagingTab({
 // MAIN DASHBOARD COMPONENT
 // ----------------------------------------------------
 import { getUserSlug } from "@/lib/user-slug";
+import { isOwnerEmail } from "@/lib/owner";
 
 export function NexiumDashboard({
   customSlug,
@@ -6901,6 +6902,16 @@ export function NexiumDashboard({
                     <ExternalLink className="size-3.5" />
                     Site public
                   </Link>
+                  {!adminImpersonateUserId && isOwnerEmail(clientEmail) && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/10 hover:text-white transition cursor-pointer"
+                    >
+                      <ShieldCheck className="size-3.5" />
+                      Console admin
+                    </Link>
+                  )}
                   <div className="my-1 border-t border-white/[0.06]" />
                   <button
                     onClick={handleLogout}
