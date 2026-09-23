@@ -122,7 +122,7 @@ export async function getUserProfile(userId: string): Promise<SupabaseUserProfil
           name: fallbackName,
           country: fallbackCountry,
           role: "TRADER",
-          status: "PENDING_APPROVAL",
+          status: "ACTIVE",
           kyc_status: "PENDING",
           balance: 0.0,
           assigned_advisor: "Desk de Conformité & Risque",

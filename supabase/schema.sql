@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     name TEXT NOT NULL,
     phone TEXT,
     role TEXT NOT NULL DEFAULT 'TRADER' CHECK (role IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT', 'TRADER')),
-    status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
     kyc_status TEXT NOT NULL DEFAULT 'NOT_SUBMITTED' CHECK (kyc_status IN ('VERIFIED', 'PENDING', 'REJECTED', 'NOT_SUBMITTED')),
     mt5_login TEXT,
     mt5_broker TEXT DEFAULT 'Nexium ECN Live',
@@ -54,7 +54,8 @@ ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_status_check;
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_status_check
     CHECK (status IN ('PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED', 'BANNED', 'REVOKED'));
 
-ALTER TABLE public.profiles ALTER COLUMN status SET DEFAULT 'PENDING_APPROVAL';
+-- Les comptes clients sont actifs dès l'inscription (plus de validation préalable).
+ALTER TABLE public.profiles ALTER COLUMN status SET DEFAULT 'ACTIVE';
 
 UPDATE public.profiles SET balance = 0 WHERE balance IS NULL;
 ALTER TABLE public.profiles ALTER COLUMN balance SET NOT NULL;
@@ -553,7 +554,7 @@ CREATE POLICY "profiles_insert" ON public.profiles
         OR (
             auth.uid() = id
             AND role = 'TRADER'
-            AND status = 'PENDING_APPROVAL'
+            AND status IN ('ACTIVE', 'PENDING_APPROVAL')
             AND kyc_status IN ('PENDING', 'NOT_SUBMITTED')
             AND balance = 0
         )
@@ -737,7 +738,7 @@ BEGIN
     v_country,
     v_phone,
     'TRADER',
-    'PENDING_APPROVAL',
+    'ACTIVE',
     'PENDING',
     0.00,
     'Desk de Conformité & Risque'

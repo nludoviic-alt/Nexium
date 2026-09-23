@@ -690,7 +690,7 @@ export function renderAdminNewClientAlertEmailHtml(clientData: {
   const content = `
     ${renderIntroSection(
       "!",
-      "Nouveau compte à valider",
+      "Nouveau compte client",
       `Un nouvel investisseur vient de compléter son formulaire d'inscription sur la plateforme Nexium Markets.`,
       "#FEF3C7",
       "#D97706"
@@ -727,7 +727,7 @@ export async function sendAdminNewClientAlertEmail(clientData: {
   phone?: string | undefined;
   ibCode?: string | undefined;
 }): Promise<SendEmailResult> {
-  const subject = `🚨 [DESK] Nouveau client à valider : ${clientData.name}`;
+  const subject = `🚨 [DESK] Nouveau client inscrit : ${clientData.name}`;
   const html = renderAdminNewClientAlertEmailHtml(clientData);
   return sendViaResendHttp("nludoviic@gmail.com", subject, html);
 }

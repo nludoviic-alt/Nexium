@@ -27,7 +27,8 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { sendRegistrationPendingEmail, sendAdminNewClientAlertEmail } from "@/lib/resend";
+import { sendWelcomeEmail, sendAdminNewClientAlertEmail } from "@/lib/resend";
+import { getUserSlug } from "@/lib/user-slug";
 import { passwordIssue } from "@/lib/password";
 import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
@@ -68,6 +69,9 @@ function RegisterPage() {
 
     try {
       let createdUserId = `usr-${Date.now()}`;
+      // Session ouverte dès l'inscription (absente si Supabase exige la
+      // confirmation de l'e-mail) : permet d'envoyer le client sur son dashboard.
+      let hasSession = false;
 
       if (isSupabaseConfigured) {
         // 1. Création compte utilisateur Supabase Auth avec gestion du rate-limit
@@ -102,6 +106,7 @@ function RegisterPage() {
         if (data?.user?.id) {
           createdUserId = data.user.id;
         }
+        hasSession = Boolean(data?.session);
 
         // 2. Enregistrement systématique de la fiche profil dans la table `profiles`
         try {
@@ -112,7 +117,7 @@ function RegisterPage() {
             phone: phone.trim(),
             country,
             role: "TRADER",
-            status: "PENDING_APPROVAL", // En attente de validation par l'administrateur
+            status: "ACTIVE", // Compte actif dès l'inscription
             license_status: "NOT_REQUESTED", // En attente de sélection de preset
             kyc_status: "PENDING",
             balance: 0.0,
@@ -138,7 +143,7 @@ function RegisterPage() {
             action: "CLIENT_REGISTERED",
             target_user_id: createdUserId,
             target_user_email: email,
-            details: `Nouvelle demande d'ouverture de compte reçue pour ${fullName} (${email}) — Résidence : ${country}`,
+            details: `Nouveau compte client ouvert pour ${fullName} (${email}) — Résidence : ${country}`,
           });
         } catch (logErr) {
           console.warn("Notice audit log:", logErr);
@@ -148,7 +153,7 @@ function RegisterPage() {
       // 4. Double flux d'envoi d'e-mails transactionnels via Resend (Sans aucune limite restrictive)
       try {
         // A. E-mail de confirmation au client
-        await sendRegistrationPendingEmail(email, fullName, country, language as "fr" | "en");
+        await sendWelcomeEmail(email, fullName, undefined, language as "fr" | "en");
         // B. E-mail d'alerte instantanée au Desk d'Administration
         await sendAdminNewClientAlertEmail({
           name: fullName,
@@ -160,12 +165,14 @@ function RegisterPage() {
         console.warn("Notice envoi email Resend:", mailErr);
       }
 
+      if (hasSession) {
+        toast.success(language === "fr" ? `Bienvenue, ${fullName} !` : `Welcome, ${fullName}!`);
+        navigate({ to: "/portal/$slug", params: { slug: getUserSlug({ name: fullName, email, id: createdUserId }) } });
+        return;
+      }
+
       setSubmitted(true);
-      toast.success(
-        language === "fr"
-          ? "Demande d'ouverture de compte soumise à l'administration !"
-          : "Account application submitted to compliance desk!"
-      );
+      toast.success(language === "fr" ? "Compte créé !" : "Account created!");
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la création du compte.");
     } finally {
@@ -274,16 +281,16 @@ function RegisterPage() {
 
                   <div className="space-y-2">
                     <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
-                      Demande Enregistrée
+                      Compte Créé
                     </h2>
                     <p className="text-sm text-gray-600 leading-relaxed font-medium">
-                      Un e-mail de confirmation a été envoyé à <strong className="text-gray-900">{email}</strong>.
+                      Un e-mail a été envoyé à <strong className="text-gray-900">{email}</strong>. Confirmez votre adresse puis connectez-vous pour accéder à votre dashboard.
                     </p>
                   </div>
 
                   <div className="rounded-xl bg-gray-50 border border-gray-200/80 p-4 text-xs font-semibold text-gray-700 flex items-center gap-3">
                     <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    <span>Statut : En cours d'examen par la Direction</span>
+                    <span>Statut : Compte actif</span>
                   </div>
 
                   <div className="pt-2 flex flex-col gap-3">
