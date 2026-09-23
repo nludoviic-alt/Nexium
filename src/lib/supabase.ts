@@ -242,6 +242,14 @@ export async function approvePresetSelection(userId: string, activePresetKeys: s
     };
   }
 
+  const currentQuota = currentConfig.quota_stats || { goldWins: 0, fxWins: 0, indexWins: 0 };
+  const nextQuotaStats = {
+    ...currentQuota,
+    ...(activePresetKeys.includes("AI_GOLD") ? { goldWins: 0 } : {}),
+    ...(activePresetKeys.includes("FX_TREND") ? { fxWins: 0 } : {}),
+  };
+  nextConfig.quota_stats = nextQuotaStats;
+
   const remainingRequested = ((profile?.requested_presets as string[]) || []).filter(
     (p) => !combinedActive.includes(p)
   );

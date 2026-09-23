@@ -137,7 +137,9 @@ function RegisterPage() {
             country,
             role: "TRADER",
             status: "ACTIVE", // Compte actif dès l'inscription
-            license_status: "ACTIVE", // Accès immédiat au dashboard complet
+            license_status: "NOT_REQUESTED", // Presets inactifs par défaut, activation sur demande
+            active_preset: "",
+            requested_presets: [],
             kyc_status: "PENDING",
             balance: 0.0,
             bonus_credit: 0.0,

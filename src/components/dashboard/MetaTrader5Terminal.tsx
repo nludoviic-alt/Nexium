@@ -37,6 +37,9 @@ import {
   MoreHorizontal,
   Edit3,
   X,
+  EyeOff,
+  Shield,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -56,7 +59,36 @@ export interface Mt5Position {
   commission: number;
   swap: number;
   profit: number;
-  comment?: string;
+  comment?: string | undefined;
+}
+
+export interface ChartPoint {
+  x: number;
+  y: number;
+  price?: number | undefined;
+}
+
+export interface ChartDrawing {
+  id: string;
+  type:
+    | "trendline"
+    | "fibonacci"
+    | "brush"
+    | "text"
+    | "patterns"
+    | "prediction"
+    | "icons"
+    | "ruler";
+  points: ChartPoint[];
+  color?: string | undefined;
+  text?: string | undefined;
+  isLocked?: boolean | undefined;
+  params?: {
+    riskReward?: number | undefined;
+    priceDelta?: number | undefined;
+    percentDelta?: number | undefined;
+    barsCount?: number | undefined;
+  } | undefined;
 }
 
 export interface WatchlistSymbol {
@@ -277,18 +309,18 @@ const WATCHLIST_SYMBOLS: WatchlistSymbol[] = [
 
 interface CandleBar {
   dateLabel: string;
-  monthLabel?: string;
+  monthLabel?: string | undefined;
   open: number;
   high: number;
   low: number;
   close: number;
   volume: number;
   isUp: boolean;
-  event?: "D" | "E" | "lightning";
+  event?: "D" | "E" | "lightning" | undefined;
 }
 
 function generateAaplRealisticCandles(): CandleBar[] {
-  const dataPoints: { o: number; h: number; l: number; c: number; v: number; m?: string; d: string; ev?: "D" | "E" | "lightning" }[] = [
+  const dataPoints: { o: number; h: number; l: number; c: number; v: number; m?: string | undefined; d: string; ev?: "D" | "E" | "lightning" | undefined }[] = [
     // Dec
     { o: 250, h: 255, l: 247, c: 253, v: 22, m: "Dec", d: "Dec 01" },
     { o: 253, h: 258, l: 251, c: 257, v: 28, d: "Dec 05" },
@@ -380,6 +412,33 @@ function generateGenericCandles(basePrice: number, count = 52): CandleBar[] {
   }));
 }
 
+export interface PresetQuotaStats {
+  goldWins: number; // Max 2
+  fxWins: number;   // Max 5
+  indexWins: number; // Illimité
+}
+
+export interface PresetStakes {
+  goldStake: number;   // default 100 ($ USD)
+  fxStake: number;     // default 100 ($ USD)
+  indexStake: number;  // default 100 ($ USD)
+}
+
+export interface Mt5HistoryItem {
+  ticket: number;
+  openTime: string;
+  closeTime: string;
+  type: "BUY" | "SELL";
+  lots: number;
+  symbol: string;
+  openPrice: number;
+  closePrice: number;
+  sl: number;
+  tp: number;
+  profit: number;
+  comment: string;
+}
+
 // ----------------------------------------------------
 // MAIN TRADINGVIEW WORKSTATION COMPONENT (DARK THEME & COMPACT SIDEBAR)
 // ----------------------------------------------------
@@ -388,24 +447,54 @@ export function MetaTrader5Terminal({
   bonus = 0,
   mt5AccountNumber = "892041",
   clientName = "Client Nexium",
+  activePreset,
+  bots = [],
   onOpenDeposit,
   onOpenWithdraw,
   onBalanceChange,
+  onPositionsChange,
+  quotaStats = { goldWins: 0, fxWins: 0, indexWins: 0 },
+  onQuotaChange,
+  presetStakes = { goldStake: 100, fxStake: 100, indexStake: 100 },
+  onOpenStakeConfig,
 }: {
   balance?: number;
   bonus?: number;
   mt5AccountNumber?: string;
   clientName?: string;
+  activePreset?: string | null;
+  bots?: Array<{ id: string; name: string; statusBadge: string }>;
   onOpenDeposit?: () => void;
   onOpenWithdraw?: () => void;
   onBalanceChange?: (newBalance: number) => void;
+  onPositionsChange?: (positions: Mt5Position[]) => void;
+  quotaStats?: PresetQuotaStats;
+  onQuotaChange?: (stats: PresetQuotaStats) => void;
+  presetStakes?: PresetStakes;
+  onOpenStakeConfig?: () => void;
 }) {
   // Selected Symbol (Default AAPL)
-  const defaultSymbol = WATCHLIST_SYMBOLS.find((s) => s.symbol === "AAPL") || WATCHLIST_SYMBOLS[0];
+  const defaultSymbol: WatchlistSymbol = WATCHLIST_SYMBOLS.find((s) => s.symbol === "AAPL") || WATCHLIST_SYMBOLS[0] || {
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    category: "STOCKS",
+    last: 232.45,
+    chg: 3.12,
+    chgPct: 1.36,
+    digits: 2,
+    description: "Apple Inc. · NASDAQ",
+    volume: "45.2M",
+    avgVolume: "52.1M",
+  };
   const [selectedSymbol, setSelectedSymbol] = useState<WatchlistSymbol>(defaultSymbol);
   const [watchlist, setWatchlist] = useState<WatchlistSymbol[]>(WATCHLIST_SYMBOLS);
   const [timeframe, setTimeframe] = useState<string>("1D");
-  const [lotSize, setLotSize] = useState<string>("0.06");
+  
+  // Mise / Sizing Mode
+  const [stakeMode, setStakeMode] = useState<"USD" | "LOT">("USD");
+  const [stakeUsd, setStakeUsd] = useState<string>("100");
+  const [lotSize, setLotSize] = useState<string>("0.10");
+  
   const [candles, setCandles] = useState<CandleBar[]>(() =>
     generateAaplRealisticCandles()
   );
@@ -414,6 +503,7 @@ export function MetaTrader5Terminal({
   const [hoveredCandle, setHoveredCandle] = useState<CandleBar | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const chartSvgRef = useRef<SVGSVGElement | null>(null);
+  const tickCounterRef = useRef<number>(0);
 
   // Active Tool state
   const [activeDrawTool, setActiveDrawTool] = useState<string>("crosshair");
@@ -421,26 +511,31 @@ export function MetaTrader5Terminal({
   const [showIndicators, setShowIndicators] = useState(false);
   const [clockTime, setClockTime] = useState<string>("15:04:17 UTC");
 
-  // Account Manager / Positions state
-  const [positions, setPositions] = useState<Mt5Position[]>([
-    {
-      ticket: 8901241,
-      time: "14:22:10",
-      type: "BUY",
-      lots: 0.10,
-      symbol: "AAPL",
-      openPrice: 334.20,
-      currentPrice: 338.43,
-      sl: 326.00,
-      tp: 350.00,
-      commission: -1.20,
-      swap: 0.00,
-      profit: 42.30,
-      comment: "Algorithme Nexium AI Gold",
-    },
-  ]);
+  // Drawing Tools State
+  const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
+  const [inProgressDrawing, setInProgressDrawing] = useState<ChartDrawing | null>(null);
+  const [isBrushActive, setIsBrushActive] = useState<boolean>(false);
+  const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
 
-  const [bottomTab, setBottomTab] = useState<"positions" | "history" | "orders" | "journal">("positions");
+  // Drawing Toolbar Modes & Toggles
+  const [isMagnetOn, setIsMagnetOn] = useState<boolean>(false);
+  const [isLockDrawMode, setIsLockDrawMode] = useState<boolean>(false);
+  const [isLockAll, setIsLockAll] = useState<boolean>(false);
+  const [isDrawingsHidden, setIsDrawingsHidden] = useState<boolean>(false);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+  const [showToolsDrawer, setShowToolsDrawer] = useState<boolean>(false);
+
+  // Account Manager / Positions state
+  const [positions, setPositions] = useState<Mt5Position[]>([]);
+
+  // Closed Trades History
+  const [tradeHistory, setTradeHistory] = useState<Mt5HistoryItem[]>([]);
+
+  useEffect(() => {
+    onPositionsChange?.(positions);
+  }, [positions]);
+
+  const [bottomTab, setBottomTab] = useState<"positions" | "history" | "quotas">("positions");
   const [isBottomOpen, setIsBottomOpen] = useState(true);
 
   // Keep live UTC clock updated
@@ -466,15 +561,144 @@ export function MetaTrader5Terminal({
     }
   }, [selectedSymbol.symbol]);
 
-  // Real-time tick engine
+  // Bot active detection & Quotas verification
+  const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const isGoldActive =
+    activeList.includes("AI_GOLD") &&
+    bots.find((b) => b.id === "nexium-ai-gold")?.statusBadge === "ACTIF" &&
+    (quotaStats?.goldWins ?? 0) < 2;
+
+  const isFxActive =
+    activeList.includes("FX_TREND") &&
+    bots.find((b) => b.id === "nexium-fx-trend")?.statusBadge === "ACTIF" &&
+    (quotaStats?.fxWins ?? 0) < 5;
+
+  const isIndexActive =
+    activeList.includes("INDEX_REVERSION") &&
+    bots.find((b) => b.id === "nexium-index-reversion")?.statusBadge === "ACTIF";
+
+  // Automated trading loop: continuously searches setups and executes trades while bot is active and quota not reached
+  useEffect(() => {
+    if (!isGoldActive && !isFxActive && !isIndexActive) return;
+
+    const botInterval = setInterval(() => {
+      setPositions((prev) => {
+        const next = [...prev];
+        const timeNow = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+        // 1. Preset 1 : Nexium AI Gold (XAUUSD · Gain +50% · Max 2 trades)
+        const hasOpenGold = next.some(
+          (p) => (p.symbol === "GOLD" || p.symbol === "XAUUSD") && (p.comment || "").includes("Preset")
+        );
+        if (isGoldActive && !hasOpenGold && (quotaStats?.goldWins ?? 0) < 2) {
+          const goldSym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "GOLD") || { last: 4390.25, digits: 3 };
+          const p = goldSym.last;
+          const goldLots = +(Math.max(0.02, (presetStakes.goldStake / 1000) * 0.15)).toFixed(2);
+          const startProfit = +(presetStakes.goldStake * 0.50 * 0.25).toFixed(2);
+          next.unshift({
+            ticket: Math.floor(8910000 + Math.random() * 9000),
+            time: timeNow,
+            type: "BUY",
+            lots: goldLots,
+            symbol: "GOLD",
+            openPrice: +(p - 1.25).toFixed(3),
+            currentPrice: p,
+            sl: +(p - 15.0).toFixed(3),
+            tp: +(p + 35.0).toFixed(3),
+            commission: -2.25,
+            swap: 0.00,
+            profit: startProfit,
+            comment: `Preset Nexium AI Gold (Mise: $${presetStakes.goldStake})`,
+          });
+          playTradeAudio();
+          const currentTradeNum = (quotaStats?.goldWins ?? 0) + 1;
+          toast.success(
+            `Nexium AI Gold : Trade #${currentTradeNum}/2 exécuté sur GOLD (Mise : $${presetStakes.goldStake} USD · Cible : +50% / +$${(presetStakes.goldStake * 0.50).toFixed(2)} USD) !`
+          );
+        }
+
+        // 2. Preset 2 : Nexium FX Trend (EURUSD · Gain +75% · Max 5 trades)
+        const hasOpenFx = next.some(
+          (p) => (p.symbol === "DXY" || p.symbol === "EURUSD") && (p.comment || "").includes("Preset")
+        );
+        if (isFxActive && !hasOpenFx && (quotaStats?.fxWins ?? 0) < 5) {
+          const dxySym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "DXY") || { last: 101.034, digits: 3 };
+          const p = dxySym.last;
+          const fxLots = +(Math.max(0.02, (presetStakes.fxStake / 1000) * 0.20)).toFixed(2);
+          const startProfit = +(presetStakes.fxStake * 0.75 * 0.25).toFixed(2);
+          next.unshift({
+            ticket: Math.floor(8920000 + Math.random() * 9000),
+            time: timeNow,
+            type: "BUY",
+            lots: fxLots,
+            symbol: "DXY",
+            openPrice: +(p - 0.08).toFixed(3),
+            currentPrice: p,
+            sl: +(p - 0.40).toFixed(3),
+            tp: +(p + 0.90).toFixed(3),
+            commission: -1.80,
+            swap: 0.00,
+            profit: startProfit,
+            comment: `Preset Nexium FX Trend (Mise: $${presetStakes.fxStake})`,
+          });
+          playTradeAudio();
+          const currentTradeNum = (quotaStats?.fxWins ?? 0) + 1;
+          toast.success(
+            `Nexium FX Trend : Trade #${currentTradeNum}/5 exécuté sur DXY (Mise : $${presetStakes.fxStake} USD · Cible : +75% / +$${(presetStakes.fxStake * 0.75).toFixed(2)} USD) !`
+          );
+        }
+
+        // 3. Preset 3 : Nexium Index Reversion (NAS100 / NDQ · Gain +98% · Illimité)
+        const hasOpenIndex = next.some(
+          (p) =>
+            (p.symbol === "NDQ" || p.symbol === "SPX" || p.symbol === "DJI" || p.symbol === "NAS100") &&
+            (p.comment || "").includes("Preset")
+        );
+        if (isIndexActive && !hasOpenIndex) {
+          const ndqSym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "NDQ") || { last: 30508.52, digits: 2 };
+          const p = ndqSym.last;
+          const indexLots = +(Math.max(0.01, (presetStakes.indexStake / 1000) * 0.10)).toFixed(2);
+          const startProfit = +(presetStakes.indexStake * 0.98 * 0.25).toFixed(2);
+          next.unshift({
+            ticket: Math.floor(8930000 + Math.random() * 9000),
+            time: timeNow,
+            type: "BUY",
+            lots: indexLots,
+            symbol: "NDQ",
+            openPrice: +(p - 12.0).toFixed(2),
+            currentPrice: p,
+            sl: +(p - 60.0).toFixed(2),
+            tp: +(p + 140.0).toFixed(2),
+            commission: -2.00,
+            swap: 0.00,
+            profit: startProfit,
+            comment: `Preset Nexium Index Reversion (Mise: $${presetStakes.indexStake})`,
+          });
+          playTradeAudio();
+          toast.success(
+            `Nexium Index Reversion : Ordre BUY exécuté sur NDQ (Mise : $${presetStakes.indexStake} USD · Cible : +98% / +$${(presetStakes.indexStake * 0.98).toFixed(2)} USD) !`
+          );
+        }
+
+        return next;
+      });
+    }, 2500);
+
+    return () => clearInterval(botInterval);
+  }, [isGoldActive, isFxActive, isIndexActive, presetStakes, quotaStats]);
+
+  // Real-time tick engine & Live PnL fluctuation
   useEffect(() => {
     const interval = setInterval(() => {
+      tickCounterRef.current += 1;
+
+      // 1. Update Watchlist quotes
       setWatchlist((prev) =>
         prev.map((item) => {
-          const delta = (Math.random() - 0.49) * (item.last * 0.0004);
+          const delta = (Math.random() - 0.49) * (item.last * 0.00035);
           const nextLast = +(item.last + delta).toFixed(item.digits);
           const nextChg = +(item.chg + delta).toFixed(item.digits);
-          const nextChgPct = +((nextChg / (item.last - nextChg)) * 100).toFixed(2);
+          const nextChgPct = +((nextChg / (item.last - nextChg || 1)) * 100).toFixed(2);
           return {
             ...item,
             last: nextLast,
@@ -484,12 +708,147 @@ export function MetaTrader5Terminal({
         })
       );
 
-      // Update current chart candle
+      // 2. Update Live Positions PnL & Current Price
+      setPositions((prev) => {
+        const next = prev.map((pos) => {
+          const isGold = pos.symbol === "GOLD" || pos.symbol === "XAUUSD" || (pos.comment || "").includes("AI Gold");
+          const isFx = pos.symbol === "DXY" || pos.symbol === "EURUSD" || (pos.comment || "").includes("FX Trend");
+          const isIndex =
+            pos.symbol === "NDQ" ||
+            pos.symbol === "SPX" ||
+            pos.symbol === "DJI" ||
+            pos.symbol === "NAS100" ||
+            pos.symbol === "US30" ||
+            (pos.comment || "").includes("Index");
+
+          // Target profit based strictly on configured stake percentage
+          const targetProfit = isGold
+            ? +(presetStakes.goldStake * 0.50).toFixed(2)
+            : isFx
+            ? +(presetStakes.fxStake * 0.75).toFixed(2)
+            : isIndex
+            ? +(presetStakes.indexStake * 0.98).toFixed(2)
+            : 25.0;
+
+          const tickDelta = (Math.random() - 0.44) * (pos.openPrice * 0.00025);
+          const nextCurrent = +(pos.currentPrice + tickDelta).toFixed(
+            pos.symbol === "DXY" || pos.symbol === "EURUSD" || pos.symbol === "GOLD" ? 3 : 2
+          );
+
+          // Smooth convergence towards target profit for bot trades
+          const isBotPosition = isGold || isFx || isIndex || (pos.comment || "").includes("Preset");
+          let nextProfit = pos.profit;
+          if (isBotPosition) {
+            const stepIncrement = Math.max(0.50, +(targetProfit * (0.04 + Math.random() * 0.05)).toFixed(2));
+            nextProfit = +(Math.min(targetProfit, pos.profit + stepIncrement)).toFixed(2);
+            if (isIndex) {
+              nextProfit = Math.max(1.50, nextProfit);
+            }
+          } else {
+            const priceDiff = pos.type === "BUY" ? nextCurrent - pos.openPrice : pos.openPrice - nextCurrent;
+            const pnlFactor = pos.symbol === "GOLD" ? 100 : pos.symbol === "EURUSD" ? 200 : 10;
+            nextProfit = +(priceDiff * pos.lots * pnlFactor).toFixed(2);
+          }
+
+          return {
+            ...pos,
+            currentPrice: nextCurrent,
+            profit: nextProfit,
+          };
+        });
+
+        // Check if any bot position reached full take-profit to automatically close and credit wallet
+        const winningPos = next.find((p) => {
+          const isGold = p.symbol === "GOLD" || p.symbol === "XAUUSD" || (p.comment || "").includes("AI Gold");
+          const isFx = p.symbol === "DXY" || p.symbol === "EURUSD" || (p.comment || "").includes("FX Trend");
+          const isIndex =
+            p.symbol === "NDQ" ||
+            p.symbol === "SPX" ||
+            p.symbol === "DJI" ||
+            p.symbol === "NAS100" ||
+            p.symbol === "US30" ||
+            (p.comment || "").includes("Index");
+
+          const targetProfit = isGold
+            ? +(presetStakes.goldStake * 0.50).toFixed(2)
+            : isFx
+            ? +(presetStakes.fxStake * 0.75).toFixed(2)
+            : isIndex
+            ? +(presetStakes.indexStake * 0.98).toFixed(2)
+            : 22.0;
+
+          return ((p.comment || "").includes("Preset") || (p.comment || "").includes("Algorithme")) && p.profit >= targetProfit;
+        });
+
+        if (winningPos) {
+          const isGold = winningPos.symbol === "GOLD" || winningPos.symbol === "XAUUSD" || (winningPos.comment || "").includes("AI Gold");
+          const isFx = winningPos.symbol === "DXY" || winningPos.symbol === "EURUSD" || (winningPos.comment || "").includes("FX Trend");
+          const exactProfit = isGold
+            ? +(presetStakes.goldStake * 0.50).toFixed(2)
+            : isFx
+            ? +(presetStakes.fxStake * 0.75).toFixed(2)
+            : +(presetStakes.indexStake * 0.98).toFixed(2);
+
+          const timeNow = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          setTradeHistory((hist) => [
+            {
+              ticket: winningPos.ticket,
+              openTime: winningPos.time,
+              closeTime: timeNow,
+              type: winningPos.type,
+              lots: winningPos.lots,
+              symbol: winningPos.symbol,
+              openPrice: winningPos.openPrice,
+              closePrice: winningPos.currentPrice,
+              sl: winningPos.sl,
+              tp: winningPos.tp,
+              profit: exactProfit,
+              comment: `${winningPos.comment || "Preset Trade"} — TP Clôturé (+${isGold ? "50%" : isFx ? "75%" : "98%"})`,
+            },
+            ...hist,
+          ]);
+
+          // Crédit immédiat dans le portefeuille / balance
+          if (onBalanceChange) {
+            onBalanceChange(balance + exactProfit);
+          }
+
+          if (isGold) {
+            const nextWins = quotaStats.goldWins + 1;
+            onQuotaChange?.({ ...quotaStats, goldWins: nextWins });
+            if (nextWins >= 2) {
+              toast.success(`🏆 Nexium AI Gold : Gain de +50% (+$${exactProfit} USD) sur mise de $${presetStakes.goldStake} USD ! Quota maximum atteint (2/2) — Abonnement terminé.`);
+            } else {
+              toast.success(`🎯 Nexium AI Gold : Gain de +50% (+$${exactProfit} USD) sur mise de $${presetStakes.goldStake} USD clôturé ! Quota : ${nextWins}/2 trades.`);
+            }
+          } else if (isFx) {
+            const nextWins = quotaStats.fxWins + 1;
+            onQuotaChange?.({ ...quotaStats, fxWins: nextWins });
+            if (nextWins >= 5) {
+              toast.success(`🏆 Nexium FX Trend : Gain de +75% (+$${exactProfit} USD) sur mise de $${presetStakes.fxStake} USD ! Quota maximum atteint (5/5) — Abonnement terminé.`);
+            } else {
+              toast.success(`🎯 Nexium FX Trend : Gain de +75% (+$${exactProfit} USD) sur mise de $${presetStakes.fxStake} USD clôturé ! Quota : ${nextWins}/5 trades.`);
+            }
+          } else {
+            const nextWins = quotaStats.indexWins + 1;
+            onQuotaChange?.({ ...quotaStats, indexWins: nextWins });
+            toast.success(`🎯 Nexium Index Reversion : Gain de +98% (+$${exactProfit} USD) sur mise de $${presetStakes.indexStake} USD clôturé (Trading Illimité ∞).`);
+          }
+
+          return next.filter((p) => p.ticket !== winningPos.ticket);
+        }
+
+        return next;
+      });
+
+      // 3. Update current chart candle and live symbol price
       setCandles((prev) => {
         if (prev.length === 0) return prev;
         const lastCandle = prev[prev.length - 1];
-        const delta = (Math.random() - 0.49) * 0.25;
-        const nextClose = +(lastCandle.close + delta).toFixed(2);
+        if (!lastCandle) return prev;
+        // Dynamic micro tick variation
+        const delta = (Math.random() - 0.48) * (selectedSymbol.last * 0.0006);
+        const nextClose = +(lastCandle.close + delta).toFixed(selectedSymbol.digits || 2);
         const nextHigh = Math.max(lastCandle.high, nextClose);
         const nextLow = Math.min(lastCandle.low, nextClose);
 
@@ -501,12 +860,37 @@ export function MetaTrader5Terminal({
           low: nextLow,
           isUp: nextClose >= lastCandle.open,
         };
+
+        // Sync selectedSymbol live price
+        setSelectedSymbol((s) => ({
+          ...s,
+          last: nextClose,
+          chg: +(s.chg + delta).toFixed(s.digits || 2),
+          chgPct: +((((s.chg + delta) / (nextClose || 1)) * 100)).toFixed(2),
+        }));
+
+        // Every 24 ticks (~9 seconds), spawn a new live candle and push to chart!
+        if (tickCounterRef.current >= 24) {
+          tickCounterRef.current = 0;
+          const timeLabel = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+          const newCandle: CandleBar = {
+            dateLabel: timeLabel,
+            open: nextClose,
+            close: nextClose,
+            high: nextClose,
+            low: nextClose,
+            volume: 500000,
+            isUp: true,
+          };
+          return [...updated.slice(1), newCandle];
+        }
+
         return updated;
       });
-    }, 1800);
+    }, 380);
 
     return () => clearInterval(interval);
-  }, [selectedSymbol]);
+  }, [selectedSymbol.symbol, quotaStats, balance]);
 
   // Audio effect for order execution
   const playTradeAudio = () => {
@@ -526,10 +910,21 @@ export function MetaTrader5Terminal({
     } catch {}
   };
 
-  // One-Click BUY/SELL execution
+  // One-Click BUY/SELL execution with Stake Amount ($ USD) or Lots
   const handleExecuteOrder = (type: "BUY" | "SELL") => {
-    const lots = parseFloat(lotSize) || 0.06;
+    let lots: number;
+    let commentText: string;
     const price = selectedSymbol.last;
+
+    if (stakeMode === "USD") {
+      const stake = Math.max(10, parseFloat(stakeUsd) || 100);
+      lots = +(Math.max(0.01, (stake / (price * 0.05 || 500)))).toFixed(2);
+      commentText = `Ordre 1-Click (Mise: $${stake.toFixed(0)} USD)`;
+    } else {
+      lots = Math.max(0.01, parseFloat(lotSize) || 0.10);
+      commentText = `Ordre 1-Click (${lots} lot)`;
+    }
+
     const slDist = price * 0.015;
     const tpDist = price * 0.03;
 
@@ -546,36 +941,394 @@ export function MetaTrader5Terminal({
       commission: -1.50,
       swap: 0.00,
       profit: 0.00,
-      comment: "Ordre Marché 1-Click",
+      comment: commentText,
     };
 
     setPositions((prev) => [newPos, ...prev]);
     playTradeAudio();
-    toast.success(
-      `Ordre ${type} ${lots} lot(s) exécuté avec succès sur ${selectedSymbol.symbol} à $${selectedSymbol.last} !`
-    );
+    if (stakeMode === "USD") {
+      toast.success(
+        `Ordre ${type} exécuté sur ${selectedSymbol.symbol} (Mise : $${parseFloat(stakeUsd) || 100} USD — ${lots} lot) !`
+      );
+    } else {
+      toast.success(
+        `Ordre ${type} ${lots} lot(s) exécuté avec succès sur ${selectedSymbol.symbol} à $${selectedSymbol.last} !`
+      );
+    }
+  };
+
+  // ----------------------------------------------------
+  // DRAWING TOOLS LOGIC & EVENT HANDLERS
+  // ----------------------------------------------------
+  const handleToolSelect = (toolId: string) => {
+    if (toolId === "magnet") {
+      const next = !isMagnetOn;
+      setIsMagnetOn(next);
+      toast.info(next ? "Mode Aimant activé (Attraction automatique aux mèches des bougies)" : "Mode Aimant désactivé");
+      return;
+    }
+    if (toolId === "lock_draw") {
+      const next = !isLockDrawMode;
+      setIsLockDrawMode(next);
+      toast.info(next ? "Mode dessin continu activé" : "Mode dessin continu désactivé");
+      return;
+    }
+    if (toolId === "lock_all") {
+      const next = !isLockAll;
+      setIsLockAll(next);
+      toast.info(next ? "Tous les tracés et annotations sont verrouillés" : "Tracés déverrouillés");
+      return;
+    }
+    if (toolId === "hide") {
+      const next = !isDrawingsHidden;
+      setIsDrawingsHidden(next);
+      toast.info(next ? "Dessins masqués" : "Dessins affichés");
+      return;
+    }
+    if (toolId === "trash") {
+      if (drawings.length === 0 && !inProgressDrawing) {
+        toast.info("Aucun dessin à supprimer sur le graphique.");
+        return;
+      }
+      setDrawings([]);
+      setInProgressDrawing(null);
+      setSelectedDrawingId(null);
+      toast.success("Graphique réinitialisé : tous les tracés ont été supprimés.");
+      return;
+    }
+    if (toolId === "zoom") {
+      const nextScale = zoomScale === 1 ? 1.45 : 1;
+      setZoomScale(nextScale);
+      toast.info(nextScale > 1 ? "Zoom avant activé (Échelle 145%)" : "Zoom réinitialisé (100%)");
+      return;
+    }
+
+    setActiveDrawTool(toolId);
+    setInProgressDrawing(null);
+    setSelectedDrawingId(null);
+
+    const toolMessages: Record<string, string> = {
+      crosshair: "Mode Curseur Réticule actif.",
+      trendline: "Ligne de tendance : Cliquez sur 2 points du graphique pour tracer la ligne.",
+      fibonacci: "Retracement Fibonacci : Cliquez sur le point haut et le point bas.",
+      brush: "Pinceau : Maintenez le clic gauche et tracez librement sur le graphique.",
+      text: "Texte : Cliquez sur le graphique pour insérer une annotation personnalisée.",
+      patterns: "Harmoniques : Cliquez sur le graphique pour insérer une figure X-A-B-C-D.",
+      prediction: "Prédiction Long / Short : Cliquez pour positionner la boîte Risk/Reward (1:3).",
+      icons: "Signal IA : Cliquez pour insérer un marqueur de flux FIX 4.4.",
+      ruler: "Règle : Cliquez sur 2 points pour mesurer barres, prix et % de variation.",
+    };
+
+    if (toolMessages[toolId]) {
+      toast.info(toolMessages[toolId]);
+    }
+  };
+
+  const handleChartMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (isLockAll) return;
+    if (!chartSvgRef.current) return;
+    const rect = chartSvgRef.current.getBoundingClientRect();
+    const rawX = ((e.clientX - rect.left) / rect.width) * chartWidth;
+    const rawY = ((e.clientY - rect.top) / rect.height) * chartHeight;
+    const snapped = getPointCoordinates(rawX, rawY);
+
+    if (activeDrawTool === "brush") {
+      setIsBrushActive(true);
+      const newBrush: ChartDrawing = {
+        id: `draw-${Date.now()}`,
+        type: "brush",
+        points: [snapped],
+        color: "#00D084",
+      };
+      setInProgressDrawing(newBrush);
+    }
+  };
+
+  const handleChartMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!chartSvgRef.current) return;
+    const rect = chartSvgRef.current.getBoundingClientRect();
+    const rawX = ((e.clientX - rect.left) / rect.width) * chartWidth;
+    const rawY = ((e.clientY - rect.top) / rect.height) * chartHeight;
+    const snapped = getPointCoordinates(rawX, rawY);
+    setMousePos({ x: snapped.x, y: snapped.y });
+
+    const index = Math.floor((snapped.x - 20) / candleSpacing);
+    if (index >= 0 && index < candles.length) {
+      setHoveredCandle(candles[index] ?? null);
+    }
+
+    if (isBrushActive && inProgressDrawing && inProgressDrawing.type === "brush") {
+      setInProgressDrawing((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          points: [...prev.points, snapped],
+        };
+      });
+      return;
+    }
+
+    if (
+      inProgressDrawing &&
+      (inProgressDrawing.type === "trendline" ||
+        inProgressDrawing.type === "fibonacci" ||
+        inProgressDrawing.type === "ruler")
+    ) {
+      const first = inProgressDrawing.points[0];
+      if (first) {
+        setInProgressDrawing((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            points: [first, snapped],
+          };
+        });
+      }
+    }
+  };
+
+  const handleChartMouseUp = () => {
+    if (isBrushActive && inProgressDrawing && inProgressDrawing.type === "brush") {
+      setIsBrushActive(false);
+      if (inProgressDrawing.points.length > 2) {
+        setDrawings((prev) => [...prev, inProgressDrawing]);
+        toast.success("Tracé au pinceau enregistré.");
+      }
+      setInProgressDrawing(null);
+      if (!isLockDrawMode) {
+        setActiveDrawTool("crosshair");
+      }
+    }
+  };
+
+  const handleChartClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (isLockAll) return;
+    if (!chartSvgRef.current) return;
+    const rect = chartSvgRef.current.getBoundingClientRect();
+    const rawX = ((e.clientX - rect.left) / rect.width) * chartWidth;
+    const rawY = ((e.clientY - rect.top) / rect.height) * chartHeight;
+    const snapped = getPointCoordinates(rawX, rawY);
+
+    if (activeDrawTool === "crosshair") {
+      return;
+    }
+
+    if (activeDrawTool === "trendline") {
+      if (!inProgressDrawing) {
+        setInProgressDrawing({
+          id: `draw-${Date.now()}`,
+          type: "trendline",
+          points: [snapped, snapped],
+          color: "#2962ff",
+        });
+      } else {
+        const first = inProgressDrawing.points[0] ?? snapped;
+        const completed: ChartDrawing = {
+          ...inProgressDrawing,
+          points: [first, snapped],
+        };
+        setDrawings((prev) => [...prev, completed]);
+        setInProgressDrawing(null);
+        toast.success("Ligne de tendance tracée avec succès.");
+        if (!isLockDrawMode) setActiveDrawTool("crosshair");
+      }
+      return;
+    }
+
+    if (activeDrawTool === "fibonacci") {
+      if (!inProgressDrawing) {
+        setInProgressDrawing({
+          id: `draw-${Date.now()}`,
+          type: "fibonacci",
+          points: [snapped, snapped],
+          color: "#ff9800",
+        });
+      } else {
+        const first = inProgressDrawing.points[0] ?? snapped;
+        const completed: ChartDrawing = {
+          ...inProgressDrawing,
+          points: [first, snapped],
+        };
+        setDrawings((prev) => [...prev, completed]);
+        setInProgressDrawing(null);
+        toast.success("Niveaux de retracement Fibonacci (0% à 100%) tracés.");
+        if (!isLockDrawMode) setActiveDrawTool("crosshair");
+      }
+      return;
+    }
+
+    if (activeDrawTool === "ruler") {
+      if (!inProgressDrawing) {
+        setInProgressDrawing({
+          id: `draw-${Date.now()}`,
+          type: "ruler",
+          points: [snapped, snapped],
+          color: "#2962ff",
+        });
+      } else {
+        const first = inProgressDrawing.points[0] ?? snapped;
+        const completed: ChartDrawing = {
+          ...inProgressDrawing,
+          points: [first, snapped],
+        };
+        setDrawings((prev) => [...prev, completed]);
+        setInProgressDrawing(null);
+        toast.success("Mesure de distance enregistrée.");
+        if (!isLockDrawMode) setActiveDrawTool("crosshair");
+      }
+      return;
+    }
+
+    if (activeDrawTool === "text") {
+      const defaultText = `Zone Clé @ ${snapped.price || selectedSymbol.last}`;
+      const userText = window.prompt("Texte de l'annotation graphique :", defaultText) || defaultText;
+      const newText: ChartDrawing = {
+        id: `draw-${Date.now()}`,
+        type: "text",
+        points: [snapped],
+        text: userText,
+        color: "#2962ff",
+      };
+      setDrawings((prev) => [...prev, newText]);
+      toast.success("Annotation ajoutée sur le graphique.");
+      if (!isLockDrawMode) setActiveDrawTool("crosshair");
+      return;
+    }
+
+    if (activeDrawTool === "patterns") {
+      const x = snapped.x;
+      const y = snapped.y;
+      const patternDrawing: ChartDrawing = {
+        id: `draw-${Date.now()}`,
+        type: "patterns",
+        points: [
+          { x: Math.max(30, x - 90), y: Math.min(chartHeight - 60, y + 45) },
+          { x: Math.max(50, x - 50), y: Math.max(60, y - 55) },
+          { x: x - 10, y: y + 15 },
+          { x: Math.min(chartWidth - 90, x + 35), y: Math.max(60, y - 35) },
+          { x: Math.min(chartWidth - 70, x + 80), y: Math.min(chartHeight - 60, y + 50) },
+        ],
+        color: "#ff9800",
+      };
+      setDrawings((prev) => [...prev, patternDrawing]);
+      toast.success("Figure harmonique X-A-B-C-D positionnée.");
+      if (!isLockDrawMode) setActiveDrawTool("crosshair");
+      return;
+    }
+
+    if (activeDrawTool === "prediction") {
+      const predDrawing: ChartDrawing = {
+        id: `draw-${Date.now()}`,
+        type: "prediction",
+        points: [snapped],
+        color: "#089981",
+        params: {
+          riskReward: 3.0,
+        },
+      };
+      setDrawings((prev) => [...prev, predDrawing]);
+      toast.success("Outil de Position Long / Short (R:R 1:3.0) positionné.");
+      if (!isLockDrawMode) setActiveDrawTool("crosshair");
+      return;
+    }
+
+    if (activeDrawTool === "icons") {
+      const iconDrawing: ChartDrawing = {
+        id: `draw-${Date.now()}`,
+        type: "icons",
+        points: [snapped],
+        color: "#f59e0b",
+      };
+      setDrawings((prev) => [...prev, iconDrawing]);
+      toast.success("Marqueur de signal IA et flux FIX 4.4 placé.");
+      if (!isLockDrawMode) setActiveDrawTool("crosshair");
+      return;
+    }
   };
 
   const handleClosePosition = (ticket: number) => {
     const pos = positions.find((p) => p.ticket === ticket);
     if (!pos) return;
     setPositions((prev) => prev.filter((p) => p.ticket !== ticket));
+    const timeNow = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+    // Enregistrer dans l'historique
+    setTradeHistory((hist) => [
+      {
+        ticket: pos.ticket,
+        openTime: pos.time,
+        closeTime: timeNow,
+        type: pos.type,
+        lots: pos.lots,
+        symbol: pos.symbol,
+        openPrice: pos.openPrice,
+        closePrice: pos.currentPrice,
+        sl: pos.sl,
+        tp: pos.tp,
+        profit: pos.profit,
+        comment: `${pos.comment || "Trade"} — Clôturé Manuellement`,
+      },
+      ...hist,
+    ]);
+
     if (onBalanceChange) {
       onBalanceChange(balance + pos.profit);
     }
+
+    // Incrémenter le quota en cas de gain sur un trade Preset
+    const posComment = pos.comment || "";
+    if (pos.profit > 0 && (posComment.includes("Preset") || posComment.includes("Algorithme"))) {
+      if (pos.symbol === "GOLD" || pos.symbol === "XAUUSD" || posComment.includes("AI Gold")) {
+        const nextWins = (quotaStats?.goldWins ?? 0) + 1;
+        onQuotaChange?.({ ...quotaStats, goldWins: nextWins });
+        if (nextWins >= 2) {
+          toast.success("🏆 Nexium AI Gold : Quota de 2 trades gagnants atteint (2/2) ! Abonnement pour ce preset terminé.");
+        }
+      } else if (pos.symbol === "DXY" || pos.symbol === "EURUSD" || posComment.includes("FX Trend")) {
+        const nextWins = (quotaStats?.fxWins ?? 0) + 1;
+        onQuotaChange?.({ ...quotaStats, fxWins: nextWins });
+        if (nextWins >= 5) {
+          toast.success("🏆 Nexium FX Trend : Quota de 5 trades gagnants atteint (5/5) ! Abonnement pour ce preset terminé.");
+        }
+      } else {
+        const nextWins = (quotaStats?.indexWins ?? 0) + 1;
+        onQuotaChange?.({ ...quotaStats, indexWins: nextWins });
+      }
+    }
+
     toast.info(`Position #${ticket} clôturée avec un P&L de ${pos.profit >= 0 ? "+" : ""}$${pos.profit.toFixed(2)} USD.`);
   };
 
-  // Fixed Chart Dimensions & Scale
+  // Dynamic Chart Dimensions & Scale based on active candles
   const chartWidth = 1000;
   const chartHeight = 490;
   const paddingRight = 68;
   const paddingBottom = 40;
   const paddingTop = 25;
 
-  const minPrice = 235;
-  const maxPrice = 355;
-  const maxVolume = 120000000;
+  const { minPrice, maxPrice, priceTicks } = useMemo(() => {
+    if (candles.length === 0) {
+      return { minPrice: 235, maxPrice: 355, priceTicks: [350, 340, 330, 320, 310, 300, 290, 280, 270, 260, 250, 240] };
+    }
+    const allLows = candles.map((c) => c.low);
+    const allHighs = candles.map((c) => c.high);
+    const rawMin = Math.min(...allLows, selectedSymbol.last);
+    const rawMax = Math.max(...allHighs, selectedSymbol.last);
+    const pad = (rawMax - rawMin) * 0.08 || 1;
+    const minP = rawMin - pad;
+    const maxP = rawMax + pad;
+    const step = (maxP - minP) / 10;
+    const ticks: number[] = [];
+    for (let i = 1; i <= 9; i++) {
+      ticks.push(minP + step * i);
+    }
+    return { minPrice: minP, maxPrice: maxP, priceTicks: ticks.reverse() };
+  }, [candles, selectedSymbol.last]);
+
+  const maxVolume = useMemo(() => {
+    const vols = candles.map((c) => c.volume);
+    return Math.max(...vols, 1000000);
+  }, [candles]);
 
   const getY = (price: number) => {
     const range = maxPrice - minPrice || 1;
@@ -585,15 +1338,78 @@ export function MetaTrader5Terminal({
     );
   };
 
+  const getPriceFromY = (y: number) => {
+    const range = maxPrice - minPrice || 1;
+    const ratio = (y - paddingTop) / (chartHeight - paddingTop - paddingBottom);
+    return +(minPrice + (1 - ratio) * range).toFixed(selectedSymbol.digits || 2);
+  };
+
   const getVolY = (vol: number) => {
     const maxH = 95;
     return chartHeight - paddingBottom - (vol / (maxVolume || 1)) * maxH;
   };
 
-  const candleSpacing = (chartWidth - paddingRight - 35) / Math.max(candles.length, 1);
+  const candleSpacing = useMemo(() => {
+    return ((chartWidth - paddingRight - 35) / Math.max(candles.length, 1)) * zoomScale;
+  }, [chartWidth, paddingRight, candles.length, zoomScale]);
+
+  const getPointCoordinates = (rawX: number, rawY: number): ChartPoint => {
+    const rawPrice = getPriceFromY(rawY);
+    if (!isMagnetOn || candles.length === 0) {
+      return { x: rawX, y: rawY, price: rawPrice };
+    }
+    const candleIdx = Math.round((rawX - 25) / candleSpacing);
+    const clampedIdx = Math.max(0, Math.min(candles.length - 1, candleIdx));
+    const c = candles[clampedIdx];
+    if (!c) {
+      return { x: rawX, y: rawY, price: rawPrice };
+    }
+    const snapX = 25 + clampedIdx * candleSpacing;
+
+    const prices = [c.high, c.low, c.open, c.close];
+    let bestPrice = c.high;
+    let minDiff = Math.abs(rawY - getY(c.high));
+    for (const p of prices) {
+      const diff = Math.abs(rawY - getY(p));
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestPrice = p;
+      }
+    }
+    return { x: snapX, y: getY(bestPrice), price: bestPrice };
+  };
+
+  // Dynamic Exponential Moving Averages (EMA 9 & EMA 21) for fluid live chart movement
+  const ema9Points = useMemo(() => {
+    if (candles.length < 3 || !candles[0]) return "";
+    const k = 2 / (9 + 1);
+    let ema = candles[0].close;
+    return candles
+      .map((c, i) => {
+        ema = c.close * k + ema * (1 - k);
+        const x = 25 + i * candleSpacing;
+        const y = getY(ema);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [candles, candleSpacing, maxPrice, minPrice]);
+
+  const ema21Points = useMemo(() => {
+    if (candles.length < 3 || !candles[0]) return "";
+    const k = 2 / (21 + 1);
+    let ema = candles[0].close;
+    return candles
+      .map((c, i) => {
+        ema = c.close * k + ema * (1 - k);
+        const x = 25 + i * candleSpacing;
+        const y = getY(ema);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [candles, candleSpacing, maxPrice, minPrice]);
 
   // Active hover candle info
-  const activeCandle = hoveredCandle || (candles.length > 0 ? candles[candles.length - 1] : null);
+  const activeCandle = hoveredCandle ?? (candles.length > 0 ? (candles[candles.length - 1] ?? null) : null);
 
   const totalOpenProfit = useMemo(
     () => positions.reduce((acc, p) => acc + p.profit, 0),
@@ -780,44 +1596,129 @@ export function MetaTrader5Terminal({
       <div className="flex flex-row flex-1 min-h-[580px] relative bg-[#131722]">
         {/* LEFT DRAWING TOOLBAR STRIP (DARK) */}
         <div className="w-11 border-r border-[#2a2e39] bg-[#131722] flex flex-col items-center py-2 gap-1 text-[#787b86] shrink-0 z-10">
+          {/* Top Hamburger Menu */}
+          <button
+            onClick={() => setShowToolsDrawer(!showToolsDrawer)}
+            title="Menu des outils & Presets graphiques"
+            className={`p-1.5 rounded-md transition cursor-pointer mb-0.5 ${
+              showToolsDrawer ? "bg-[#2962ff] text-white shadow-sm" : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
+          >
+            <Menu className="size-4" />
+          </button>
+
+          <div className="w-5 h-px bg-[#2a2e39] mb-0.5" />
+
           {[
             { id: "crosshair", icon: Crosshair, title: "Curseur Réticule (Crosshair)" },
             { id: "trendline", icon: PenTool, title: "Lignes de tendance & Rayons" },
-            { id: "fibonacci", icon: Layers, title: "Fibonacci & Outils de Gann" },
-            { id: "brush", icon: Edit3, title: "Pinceau & Formes géométriques" },
-            { id: "text", icon: Type, title: "Outil Texte & Annotations" },
-            { id: "patterns", icon: Activity, title: "Figures chartistes & Harmoniques" },
-            { id: "prediction", icon: TrendingUp, title: "Position Longue / Courte & R:R" },
-            { id: "icons", icon: Sparkles, title: "Icônes & Émojis" },
-            { id: "ruler", icon: Maximize, title: "Règle de mesure" },
-            { id: "zoom", icon: Search, title: "Zoom avant" },
-            { id: "magnet", icon: Zap, title: "Mode Aimant" },
-            { id: "lock_draw", icon: Lock, title: "Verrouiller le mode dessin" },
-            { id: "lock_all", icon: Lock, title: "Verrouiller tous les outils de dessin" },
-            { id: "hide", icon: Eye, title: "Masquer tous les dessins" },
-            { id: "trash", icon: Trash2, title: "Supprimer les dessins" },
+            { id: "fibonacci", icon: Layers, title: "Retracement de Fibonacci (0% à 100%)" },
+            { id: "brush", icon: Edit3, title: "Pinceau & Tracé libre" },
+            { id: "text", icon: Type, title: "Outil Texte & Annotations personnalisées" },
+            { id: "patterns", icon: Activity, title: "Figures chartistes & Harmoniques (XABCD)" },
+            { id: "prediction", icon: TrendingUp, title: "Position Longue / Courte & Ratio R:R (1:3)" },
+            { id: "icons", icon: Sparkles, title: "Signaux Algorithmiques & Marqueurs IA" },
+            { id: "ruler", icon: Maximize, title: "Règle de mesure (Barres, Prix & %)" },
+            { id: "zoom", icon: Search, title: zoomScale > 1 ? "Zoom 145% (Cliquer pour dézoomer)" : "Zoom avant (145%)" },
+            { id: "magnet", icon: Zap, title: isMagnetOn ? "Mode Aimant ACTIF (Attraction aux mèches)" : "Activer le Mode Aimant" },
+            { id: "lock_draw", icon: Lock, title: isLockDrawMode ? "Mode dessin continu ACTIF" : "Rester en mode dessin" },
+            { id: "lock_all", icon: Shield, title: isLockAll ? "Tous les dessins sont VERROUILLÉS" : "Verrouiller tous les outils de dessin" },
+            { id: "hide", icon: isDrawingsHidden ? EyeOff : Eye, title: isDrawingsHidden ? "Afficher les dessins" : "Masquer tous les dessins" },
+            { id: "trash", icon: Trash2, title: "Supprimer tous les dessins" },
           ].map((tool) => {
             const Icon = tool.icon;
-            const isActive = activeDrawTool === tool.id;
+            const isToolActive = activeDrawTool === tool.id;
+            const isToggleActive =
+              (tool.id === "magnet" && isMagnetOn) ||
+              (tool.id === "lock_draw" && isLockDrawMode) ||
+              (tool.id === "lock_all" && isLockAll) ||
+              (tool.id === "hide" && isDrawingsHidden) ||
+              (tool.id === "zoom" && zoomScale > 1);
+
+            const isHighlighted = isToolActive || isToggleActive;
+
             return (
               <button
                 key={tool.id}
-                onClick={() => {
-                  setActiveDrawTool(tool.id);
-                  if (tool.id === "trash") toast.info("Graphique réinitialisé.");
-                }}
+                onClick={() => handleToolSelect(tool.id)}
                 title={tool.title}
-                className={`p-1.5 rounded-md transition cursor-pointer ${
-                  isActive
-                    ? "bg-[#2962ff]/20 text-[#2962ff]"
+                className={`p-1.5 rounded-md transition cursor-pointer relative ${
+                  isHighlighted
+                    ? "bg-[#2962ff]/25 text-[#2962ff] shadow-sm ring-1 ring-[#2962ff]/50"
                     : "hover:bg-[#2a2e39] hover:text-white"
                 }`}
               >
                 <Icon className="size-4" />
+                {isToggleActive && (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-[#2962ff] ring-1 ring-[#131722]" />
+                )}
               </button>
             );
           })}
         </div>
+
+        {/* Slide-out Tools Drawer when Menu is clicked */}
+        {showToolsDrawer && (
+          <div className="absolute top-0 left-11 z-30 w-72 bg-[#131722]/98 backdrop-blur-md border-r border-b border-[#2a2e39] shadow-2xl p-3.5 flex flex-col gap-3 animate-in fade-in slide-in-from-left duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-[#2a2e39]">
+              <div className="flex items-center gap-1.5">
+                <Menu className="size-4 text-[#2962ff]" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">Outils d'Analyse</span>
+              </div>
+              <button
+                onClick={() => setShowToolsDrawer(false)}
+                className="p-1 hover:bg-[#2a2e39] rounded text-slate-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+
+            {/* Quick Actions List */}
+            <div className="space-y-1.5 text-xs">
+              <span className="text-[10px] font-bold text-[#787b86] uppercase tracking-wider block">Tracés actifs ({drawings.length})</span>
+              {drawings.length === 0 ? (
+                <p className="text-[11px] text-slate-500 italic py-1">Aucun tracé actif. Utilisez les icônes de la barre latérale pour dessiner.</p>
+              ) : (
+                <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                  {drawings.map((d, idx) => (
+                    <div
+                      key={d.id}
+                      className="flex items-center justify-between p-1.5 rounded bg-[#1e222d] border border-[#2a2e39] text-[11px]"
+                    >
+                      <span className="font-mono text-slate-200 capitalize">
+                        #{idx + 1} {d.type} {d.text ? `(${d.text})` : ""}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setDrawings((prev) => prev.filter((item) => item.id !== d.id));
+                          toast.success("Tracé supprimé.");
+                        }}
+                        className="p-0.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded cursor-pointer transition"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Global Actions */}
+            <div className="pt-2 border-t border-[#2a2e39] flex flex-col gap-1.5">
+              <button
+                onClick={() => {
+                  setDrawings([]);
+                  setInProgressDrawing(null);
+                  toast.success("Tous les tracés ont été effacés.");
+                }}
+                className="w-full py-1.5 px-2.5 rounded bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 text-rose-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Trash2 className="size-3 text-rose-400" />
+                <span>Effacer tous les dessins</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* CENTER: CHART CANVAS & SVG (DARK) */}
         <div className="flex-1 flex flex-col relative bg-[#131722] overflow-hidden min-w-0">
@@ -848,47 +1749,154 @@ export function MetaTrader5Terminal({
               )}
             </div>
 
-            {/* ONE-CLICK TRADING ORDER BUTTONS (DARK THEME) */}
-            <div className="flex items-center gap-1 bg-[#1e222d] p-0.5 rounded-lg border border-[#2a2e39] shadow-md w-fit">
-              {/* SELL BOX */}
-              <button
-                onClick={() => handleExecuteOrder("SELL")}
-                className="flex flex-col items-center justify-center bg-[#362128] hover:bg-[#4a242e] border border-[#f23645]/50 rounded-md px-2.5 py-0.5 text-[#f23645] transition cursor-pointer active:scale-95 min-w-[58px]"
-              >
-                <span className="text-[11px] font-bold font-mono tracking-tight leading-tight">
-                  338.41
-                </span>
-                <span className="text-[8px] font-black uppercase tracking-wider">SELL</span>
-              </button>
+            {/* ONE-CLICK TRADING ORDER PANEL (WITH STAKE AMOUNT & LOT SIZE SELECTOR) */}
+            <div className="flex flex-col gap-1 bg-[#131722]/95 backdrop-blur-md p-1.5 rounded-xl border border-[#363a45] shadow-2xl w-fit">
+              {/* Top: Mode Switcher & Quick Stake Chips */}
+              <div className="flex items-center gap-1.5 pb-0.5 border-b border-[#2a2e39]/60">
+                <div className="flex items-center bg-[#1e222d] rounded-md p-0.5 border border-[#363a45]/60">
+                  <button
+                    onClick={() => setStakeMode("USD")}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition cursor-pointer ${
+                      stakeMode === "USD"
+                        ? "bg-[#2962ff] text-white shadow-sm"
+                        : "text-[#787b86] hover:text-white"
+                    }`}
+                  >
+                    $ MISE
+                  </button>
+                  <button
+                    onClick={() => setStakeMode("LOT")}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition cursor-pointer ${
+                      stakeMode === "LOT"
+                        ? "bg-[#2962ff] text-white shadow-sm"
+                        : "text-[#787b86] hover:text-white"
+                    }`}
+                  >
+                    LOTS
+                  </button>
+                </div>
 
-              {/* LOT SIZE INPUT */}
-              <div className="px-1 py-0.5">
-                <input
-                  type="text"
-                  value={lotSize}
-                  onChange={(e) => setLotSize(e.target.value)}
-                  className="w-11 text-center text-xs font-mono font-bold border border-[#363a45] rounded bg-[#131722] py-0.5 text-white focus:outline-none focus:border-[#2962ff]"
-                  title="Taille du lot"
-                />
+                {/* Quick Selection Chips */}
+                <div className="flex items-center gap-1">
+                  {stakeMode === "USD"
+                    ? [
+                        { v: 100, l: "$100" },
+                        { v: 500, l: "$500" },
+                        { v: 1000, l: "$1K" },
+                        { v: 2500, l: "$2.5K" },
+                        { v: 5000, l: "$5K" },
+                        { v: 10000, l: "$10K" },
+                      ].map((item) => (
+                        <button
+                          key={item.v}
+                          onClick={() => setStakeUsd(String(item.v))}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-mono transition cursor-pointer ${
+                            stakeUsd === String(item.v)
+                              ? "bg-amber-500 text-slate-950 shadow-sm"
+                              : "bg-[#1e222d] text-[#787b86] hover:text-white hover:bg-[#2a2e39]"
+                          }`}
+                        >
+                          {item.l}
+                        </button>
+                      ))
+                    : [0.05, 0.10, 0.50, 1.00, 2.00].map((val) => (
+                        <button
+                          key={val}
+                          onClick={() => setLotSize(String(val))}
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-mono transition cursor-pointer ${
+                            lotSize === String(val)
+                              ? "bg-cyan-500 text-slate-950 shadow-sm"
+                              : "bg-[#1e222d] text-[#787b86] hover:text-white hover:bg-[#2a2e39]"
+                          }`}
+                        >
+                          {val}L
+                        </button>
+                      ))}
+                </div>
+
+                {onOpenStakeConfig && (
+                  <button
+                    type="button"
+                    onClick={onOpenStakeConfig}
+                    className="ml-auto flex items-center gap-1 text-[9px] font-mono font-bold text-amber-400/90 hover:text-amber-300 transition cursor-pointer bg-[#1e222d] px-1.5 py-0.5 rounded border border-amber-500/20 hover:border-amber-400/40"
+                    title="Ouvrir la page dédiée Configuration des Mises"
+                  >
+                    <SlidersHorizontal className="size-2.5" />
+                    <span>Mises</span>
+                  </button>
+                )}
               </div>
 
-              {/* BUY BOX */}
-              <button
-                onClick={() => handleExecuteOrder("BUY")}
-                className="flex flex-col items-center justify-center bg-[#172d54] hover:bg-[#1f3b70] border border-[#2962ff]/50 rounded-md px-2.5 py-0.5 text-[#2962ff] transition cursor-pointer active:scale-95 min-w-[58px]"
-              >
-                <span className="text-[11px] font-bold font-mono tracking-tight leading-tight">
-                  338.47
-                </span>
-                <span className="text-[8px] font-black uppercase tracking-wider">BUY</span>
-              </button>
+              {/* Bottom: SELL, INPUT, BUY */}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                {/* SELL BOX */}
+                <button
+                  onClick={() => handleExecuteOrder("SELL")}
+                  className="flex flex-col items-center justify-center bg-gradient-to-b from-[#f23645] to-[#c92534] hover:from-[#ff4d5e] hover:to-[#db2b3b] text-white rounded-lg px-3 py-1 shadow-[0_0_12px_rgba(242,54,69,0.45)] transition-all cursor-pointer active:scale-95 min-w-[72px]"
+                  title="Passer un ordre de Vente (SELL)"
+                >
+                  <span className="text-xs font-black font-mono tracking-tight leading-tight text-white drop-shadow-sm">
+                    {selectedSymbol.last.toFixed(selectedSymbol.digits)}
+                  </span>
+                  <span className="text-[8.5px] font-black uppercase tracking-widest text-white/95 mt-0.5">SELL</span>
+                </button>
+
+                {/* SIZING INPUT */}
+                <div className="px-0.5 flex flex-col items-center">
+                  <div className="relative flex items-center">
+                    {stakeMode === "USD" && (
+                      <span className="absolute left-1.5 text-[10px] font-bold text-amber-400 font-mono pointer-events-none">$</span>
+                    )}
+                    <input
+                      type="text"
+                      value={stakeMode === "USD" ? stakeUsd : lotSize}
+                      onChange={(e) => {
+                        if (stakeMode === "USD") setStakeUsd(e.target.value);
+                        else setLotSize(e.target.value);
+                      }}
+                      className={`w-16 text-center text-xs font-mono font-black border border-[#363a45] rounded-lg bg-[#1e222d] py-1 text-white focus:outline-none focus:border-[#2962ff] shadow-inner ${
+                        stakeMode === "USD" ? "pl-3.5 text-amber-300" : "text-cyan-300"
+                      }`}
+                      title={stakeMode === "USD" ? "Montant de la mise en USD" : "Taille du lot"}
+                    />
+                  </div>
+                  <span className="text-[8px] font-mono text-[#787b86] mt-0.5">
+                    {stakeMode === "USD"
+                      ? `≈ ${(Math.max(0.01, (parseFloat(stakeUsd) || 100) / (selectedSymbol.last * 0.05 || 500))).toFixed(2)} lot`
+                      : `≈ $${((parseFloat(lotSize) || 0.1) * (selectedSymbol.last * 0.05 || 500)).toFixed(0)} USD`}
+                  </span>
+                </div>
+
+                {/* BUY BOX */}
+                <button
+                  onClick={() => handleExecuteOrder("BUY")}
+                  className="flex flex-col items-center justify-center bg-gradient-to-b from-[#2962ff] to-[#1e4bd8] hover:from-[#4377ff] hover:to-[#2454ee] text-white rounded-lg px-3 py-1 shadow-[0_0_12px_rgba(41,98,255,0.45)] transition-all cursor-pointer active:scale-95 min-w-[72px]"
+                  title="Passer un ordre d'Achat (BUY)"
+                >
+                  <span className="text-xs font-black font-mono tracking-tight leading-tight text-white drop-shadow-sm">
+                    {(selectedSymbol.last + (selectedSymbol.digits === 2 ? 0.06 : 0.00015)).toFixed(selectedSymbol.digits)}
+                  </span>
+                  <span className="text-[8.5px] font-black uppercase tracking-widest text-white/95 mt-0.5">BUY</span>
+                </button>
+              </div>
             </div>
 
-            {/* Volume Label */}
-            <div className="flex items-center gap-1 text-[10px] font-mono text-[#787b86]">
-              <span>Vol</span>
-              <strong className="text-[#f23645]">45.65 M</strong>
-              <ChevronDown className="size-2.5 text-[#787b86]" />
+            {/* Volume & Indicators Legend */}
+            <div className="flex items-center gap-2 text-[10px] font-mono flex-wrap">
+              <div className="flex items-center gap-1 text-[#787b86]">
+                <span>Vol</span>
+                <strong className="text-[#f23645]">45.65 M</strong>
+              </div>
+              <span className="text-[#2a2e39]">|</span>
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <span className="text-[#2962ff] font-bold">EMA (9, close)</span>
+                <span className="text-[#ff9800] font-bold">EMA (21, close)</span>
+              </div>
+              <span className="text-[#2a2e39]">|</span>
+              <span className="inline-flex items-center gap-1 text-[#089981] font-bold text-[9px] bg-[#089981]/10 px-1.5 py-0.5 rounded border border-[#089981]/30">
+                <span className="size-1.5 rounded-full bg-[#089981] animate-pulse" />
+                FIX 4.4 LIVE FEED (0.8ms)
+              </span>
             </div>
           </div>
 
@@ -899,29 +1907,26 @@ export function MetaTrader5Terminal({
               className="w-full h-full"
               viewBox={`0 0 ${chartWidth} ${chartHeight}`}
               preserveAspectRatio="none"
-              onMouseMove={(e) => {
-                if (!chartSvgRef.current) return;
-                const rect = chartSvgRef.current.getBoundingClientRect();
-                const x = ((e.clientX - rect.left) / rect.width) * chartWidth;
-                const y = ((e.clientY - rect.top) / rect.height) * chartHeight;
-                setMousePos({ x, y });
-
-                const index = Math.floor((x - 20) / candleSpacing);
-                if (index >= 0 && index < candles.length) {
-                  setHoveredCandle(candles[index]);
-                }
+              onMouseDown={handleChartMouseDown}
+              onMouseMove={handleChartMouseMove}
+              onMouseUp={handleChartMouseUp}
+              onClick={handleChartClick}
+              onDoubleClick={() => {
+                setSelectedDrawingId(null);
+                if (zoomScale > 1) setZoomScale(1);
               }}
               onMouseLeave={() => {
                 setMousePos(null);
                 setHoveredCandle(null);
+                if (isBrushActive) handleChartMouseUp();
               }}
             >
-              {/* Subtle Dark Grid Lines */}
-              {[350, 340, 330, 320, 310, 300, 290, 280, 270, 260, 250, 240].map((price) => {
+              {/* Dynamic Dark Grid Lines */}
+              {priceTicks.map((price, pi) => {
                 const y = getY(price);
                 return (
                   <line
-                    key={`grid-y-${price}`}
+                    key={`grid-y-${pi}`}
                     x1="0"
                     y1={y}
                     x2={chartWidth - paddingRight}
@@ -1054,7 +2059,151 @@ export function MetaTrader5Terminal({
                 );
               })}
 
-              {/* Live Price Line (Red dashed line across chart at 338.44) */}
+              {/* Dynamic Exponential Moving Averages (EMA 9 & EMA 21) */}
+              {ema9Points && (
+                <polyline
+                  points={ema9Points}
+                  fill="none"
+                  stroke="#2962ff"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.85"
+                />
+              )}
+              {ema21Points && (
+                <polyline
+                  points={ema21Points}
+                  fill="none"
+                  stroke="#ff9800"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.85"
+                />
+              )}
+
+              {/* Active Pulsing Laser Beacon on Latest Candle */}
+              {candles.length > 0 && (() => {
+                const lastIndex = candles.length - 1;
+                const lastCandle = candles[lastIndex];
+                if (!lastCandle) return null;
+                const lastX = 25 + lastIndex * candleSpacing;
+                const lastY = getY(lastCandle.close);
+                const color = lastCandle.isUp ? "#089981" : "#f23645";
+                return (
+                  <g>
+                    <circle cx={lastX} cy={lastY} r="8" fill={color} opacity="0.4" className="animate-ping" />
+                    <circle cx={lastX} cy={lastY} r="4" fill={color} />
+                    <circle cx={lastX} cy={lastY} r="2" fill="#ffffff" />
+                  </g>
+                );
+              })()}
+
+              {/* Active Open Positions On-Chart Horizontal SL / TP / Entry Lines */}
+              {positions
+                .filter(
+                  (p) =>
+                    p.symbol === selectedSymbol.symbol ||
+                    (selectedSymbol.symbol === "DJI" && p.symbol === "US30") ||
+                    (selectedSymbol.symbol === "NDQ" && p.symbol === "NAS100") ||
+                    (selectedSymbol.symbol === "GOLD" && p.symbol === "XAUUSD")
+                )
+                .map((pos) => {
+                  const entryY = getY(pos.openPrice);
+                  const tpY = getY(pos.tp);
+                  const slY = getY(pos.sl);
+                  return (
+                    <g key={`pos-chart-${pos.ticket}`}>
+                      {/* Entry Line */}
+                      <line
+                        x1="0"
+                        y1={entryY}
+                        x2={chartWidth - paddingRight}
+                        y2={entryY}
+                        stroke="#2962ff"
+                        strokeWidth="1.2"
+                        strokeDasharray="4 2"
+                      />
+                      <rect
+                        x={10}
+                        y={entryY - 9}
+                        width={140}
+                        height={18}
+                        fill="#1e222d"
+                        stroke="#2962ff"
+                        strokeWidth="1"
+                        rx="3"
+                      />
+                      <text
+                        x={16}
+                        y={entryY + 3.5}
+                        fill="#2962ff"
+                        fontSize="9"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        {pos.type} {pos.lots}L @ {pos.openPrice}
+                      </text>
+
+                      {/* TP Line */}
+                      <line
+                        x1="0"
+                        y1={tpY}
+                        x2={chartWidth - paddingRight}
+                        y2={tpY}
+                        stroke="#089981"
+                        strokeWidth="1.2"
+                        strokeDasharray="4 2"
+                      />
+                      <rect
+                        x={10}
+                        y={tpY - 9}
+                        width={85}
+                        height={18}
+                        fill="#089981"
+                        rx="3"
+                      />
+                      <text
+                        x={16}
+                        y={tpY + 3.5}
+                        fill="#ffffff"
+                        fontSize="9"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        TP: {pos.tp}
+                      </text>
+
+                      {/* SL Line */}
+                      <line
+                        x1="0"
+                        y1={slY}
+                        x2={chartWidth - paddingRight}
+                        y2={slY}
+                        stroke="#f23645"
+                        strokeWidth="1.2"
+                        strokeDasharray="4 2"
+                      />
+                      <rect
+                        x={10}
+                        y={slY - 9}
+                        width={85}
+                        height={18}
+                        fill="#f23645"
+                        rx="3"
+                      />
+                      <text
+                        x={16}
+                        y={slY + 3.5}
+                        fill="#ffffff"
+                        fontSize="9"
+                        fontFamily="monospace"
+                        fontWeight="bold"
+                      >
+                        SL: {pos.sl}
+                      </text>
+                    </g>
+                  );
+                })}
+
+              {/* Live Price Line (Red dashed line across chart) */}
               {(() => {
                 const curPriceY = getY(selectedSymbol.last);
                 return (
@@ -1099,6 +2248,391 @@ export function MetaTrader5Terminal({
                   </g>
                 );
               })()}
+
+              {/* ── DRAWINGS & ANNOTATIONS LAYER ── */}
+              {!isDrawingsHidden && (
+                <g className="drawings-layer">
+                  {[...drawings, ...(inProgressDrawing ? [inProgressDrawing] : [])].map((d) => {
+                    const isSelected = selectedDrawingId === d.id;
+
+                    if (d.type === "trendline" && d.points.length >= 2) {
+                      const p1 = d.points[0];
+                      const p2 = d.points[1];
+                      if (!p1 || !p2) return null;
+                      const price1 = p1.price ?? getPriceFromY(p1.y);
+                      const price2 = p2.price ?? getPriceFromY(p2.y);
+                      const pDiff = price2 - price1;
+                      const pPct = price1 ? (pDiff / price1) * 100 : 0;
+                      const midX = (p1.x + p2.x) / 2;
+                      const midY = (p1.y + p2.y) / 2;
+                      const color = d.color || "#2962ff";
+
+                      return (
+                        <g
+                          key={d.id}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="transparent" strokeWidth="14" />
+                          <line
+                            x1={p1.x}
+                            y1={p1.y}
+                            x2={p2.x}
+                            y2={p2.y}
+                            stroke={color}
+                            strokeWidth={isSelected ? "2.5" : "2"}
+                            strokeDasharray={isSelected ? "4 2" : undefined}
+                          />
+                          <circle cx={p1.x} cy={p1.y} r={isSelected ? "5" : "4"} fill={color} stroke="#ffffff" strokeWidth="1.5" />
+                          <circle cx={p2.x} cy={p2.y} r={isSelected ? "5" : "4"} fill={color} stroke="#ffffff" strokeWidth="1.5" />
+                          <g transform={`translate(${midX}, ${midY})`}>
+                            <rect
+                              x="-48"
+                              y="-10"
+                              width="96"
+                              height="20"
+                              rx="4"
+                              fill="#131722"
+                              stroke={color}
+                              strokeWidth="1"
+                              opacity="0.95"
+                            />
+                            <text
+                              x="0"
+                              y="3.5"
+                              fill="#ffffff"
+                              fontSize="8.5"
+                              fontFamily="monospace"
+                              fontWeight="bold"
+                              textAnchor="middle"
+                            >
+                              {pDiff >= 0 ? "+" : ""}{pDiff.toFixed(2)} ({pPct >= 0 ? "+" : ""}{pPct.toFixed(1)}%)
+                            </text>
+                          </g>
+                        </g>
+                      );
+                    }
+
+                    if (d.type === "fibonacci" && d.points.length >= 2) {
+                      const p1 = d.points[0];
+                      const p2 = d.points[1];
+                      if (!p1 || !p2) return null;
+                      const topY = Math.min(p1.y, p2.y);
+                      const botY = Math.max(p1.y, p2.y);
+                      const totalH = botY - topY || 1;
+                      const leftX = Math.min(p1.x, p2.x);
+                      const rightX = Math.max(chartWidth - paddingRight - 10, Math.max(p1.x, p2.x) + 140);
+                      const width = rightX - leftX;
+
+                      const fibSteps = [
+                        { lvl: 0.0, col: "#787b86", bg: "rgba(120, 123, 134, 0.06)", txt: "0.0% (0.000)" },
+                        { lvl: 0.236, col: "#f23645", bg: "rgba(242, 54, 69, 0.08)", txt: "23.6% (0.236)" },
+                        { lvl: 0.382, col: "#ff9800", bg: "rgba(255, 152, 0, 0.08)", txt: "38.2% (0.382)" },
+                        { lvl: 0.50, col: "#089981", bg: "rgba(8, 153, 129, 0.10)", txt: "50.0% (0.500)" },
+                        { lvl: 0.618, col: "#2962ff", bg: "rgba(41, 98, 255, 0.12)", txt: "61.8% (0.618 Golden)" },
+                        { lvl: 0.786, col: "#9c27b0", bg: "rgba(156, 39, 176, 0.08)", txt: "78.6% (0.786)" },
+                        { lvl: 1.0, col: "#787b86", bg: "rgba(120, 123, 134, 0.06)", txt: "100.0% (1.000)" },
+                      ];
+
+                      return (
+                        <g
+                          key={d.id}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          {fibSteps.slice(0, -1).map((step, idx) => {
+                            const nextStep = fibSteps[idx + 1];
+                            if (!nextStep) return null;
+                            const y1 = topY + totalH * step.lvl;
+                            const y2 = topY + totalH * nextStep.lvl;
+                            return (
+                              <rect
+                                key={`fib-band-${idx}`}
+                                x={leftX}
+                                y={y1}
+                                width={width}
+                                height={y2 - y1}
+                                fill={nextStep.bg}
+                              />
+                            );
+                          })}
+                          {fibSteps.map((step, idx) => {
+                            const yPos = topY + totalH * step.lvl;
+                            const levelPrice = getPriceFromY(yPos);
+                            return (
+                              <g key={`fib-lvl-${idx}`}>
+                                <line
+                                  x1={leftX}
+                                  y1={yPos}
+                                  x2={rightX}
+                                  y2={yPos}
+                                  stroke={step.col}
+                                  strokeWidth="1"
+                                  strokeDasharray="3 2"
+                                  opacity="0.85"
+                                />
+                                <text
+                                  x={leftX + 4}
+                                  y={yPos - 3}
+                                  fill={step.col}
+                                  fontSize="8.5"
+                                  fontFamily="monospace"
+                                  fontWeight="bold"
+                                >
+                                  {step.txt} · {levelPrice.toFixed(selectedSymbol.digits || 2)}
+                                </text>
+                              </g>
+                            );
+                          })}
+                        </g>
+                      );
+                    }
+
+                    if (d.type === "brush" && d.points.length >= 2) {
+                      const pathStr = d.points.reduce((acc, p, idx) => {
+                        return idx === 0 ? `M ${p.x.toFixed(1)} ${p.y.toFixed(1)}` : `${acc} L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+                      }, "");
+
+                      return (
+                        <g
+                          key={d.id}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          <path
+                            d={pathStr}
+                            stroke={d.color || "#00D084"}
+                            strokeWidth={isSelected ? "3.5" : "2.5"}
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            opacity={isSelected ? 1 : 0.88}
+                          />
+                        </g>
+                      );
+                    }
+
+                    if (d.type === "text" && d.points.length >= 1) {
+                      const p = d.points[0];
+                      if (!p) return null;
+                      const txt = d.text || `Zone Clé @ ${p.price || selectedSymbol.last}`;
+                      const boxW = Math.max(120, txt.length * 7.5 + 24);
+
+                      return (
+                        <g
+                          key={d.id}
+                          transform={`translate(${p.x}, ${p.y})`}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          <rect
+                            x="-10"
+                            y="-14"
+                            width={boxW}
+                            height="28"
+                            rx="6"
+                            fill="#1e222d"
+                            stroke={isSelected ? "#00D084" : "#2962ff"}
+                            strokeWidth={isSelected ? "2" : "1.5"}
+                            opacity="0.95"
+                          />
+                          <text
+                            x="4"
+                            y="4"
+                            fill="#ffffff"
+                            fontSize="10"
+                            fontFamily="monospace"
+                            fontWeight="bold"
+                          >
+                            {txt}
+                          </text>
+                        </g>
+                      );
+                    }
+
+                    if (d.type === "patterns" && d.points.length >= 5) {
+                      const [pX, pA, pB, pC, pD] = d.points;
+                      if (!pX || !pA || !pB || !pC || !pD) return null;
+                      return (
+                        <g
+                          key={d.id}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          <polygon
+                            points={`${pX.x},${pX.y} ${pA.x},${pA.y} ${pB.x},${pB.y}`}
+                            fill="rgba(255, 152, 0, 0.12)"
+                            stroke="none"
+                          />
+                          <polygon
+                            points={`${pB.x},${pB.y} ${pC.x},${pC.y} ${pD.x},${pD.y}`}
+                            fill="rgba(41, 98, 255, 0.12)"
+                            stroke="none"
+                          />
+                          <polyline
+                            points={`${pX.x},${pX.y} ${pA.x},${pA.y} ${pB.x},${pB.y} ${pC.x},${pC.y} ${pD.x},${pD.y}`}
+                            fill="none"
+                            stroke="#ff9800"
+                            strokeWidth="1.8"
+                            strokeDasharray={isSelected ? "4 2" : undefined}
+                          />
+                          {[
+                            { p: pX, label: "X" },
+                            { p: pA, label: "A (0.618)" },
+                            { p: pB, label: "B (0.382)" },
+                            { p: pC, label: "C (0.886)" },
+                            { p: pD, label: "D (1.272 TP)" },
+                          ].map((v, vIdx) => (
+                            <g key={`v-${vIdx}`} transform={`translate(${v.p.x}, ${v.p.y})`}>
+                              <circle cx="0" cy="0" r="4" fill="#ff9800" stroke="#ffffff" strokeWidth="1.5" />
+                              <text x="6" y="3" fill="#ff9800" fontSize="8.5" fontFamily="monospace" fontWeight="bold">
+                                {v.label}
+                              </text>
+                            </g>
+                          ))}
+                        </g>
+                      );
+                    }
+
+                    if (d.type === "prediction" && d.points.length >= 1) {
+                      const entryP = d.points[0];
+                      if (!entryP) return null;
+                      const targetH = 65;
+                      const stopH = 30;
+                      const boxW = 160;
+                      const leftX = entryP.x;
+
+                      return (
+                        <g
+                          key={d.id}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          <rect
+                            x={leftX}
+                            y={entryP.y - targetH}
+                            width={boxW}
+                            height={targetH}
+                            fill="rgba(8, 153, 129, 0.20)"
+                            stroke="#089981"
+                            strokeWidth="1.2"
+                            rx="2"
+                          />
+                          <text x={leftX + 6} y={entryP.y - targetH + 14} fill="#089981" fontSize="9" fontWeight="bold" fontFamily="monospace">
+                            TARGET TP: +$300.00 (+3.0%)
+                          </text>
+
+                          <rect
+                            x={leftX}
+                            y={entryP.y}
+                            width={boxW}
+                            height={stopH}
+                            fill="rgba(242, 54, 69, 0.20)"
+                            stroke="#f23645"
+                            strokeWidth="1.2"
+                            rx="2"
+                          />
+                          <text x={leftX + 6} y={entryP.y + 18} fill="#f23645" fontSize="9" fontWeight="bold" fontFamily="monospace">
+                            STOP LOSS: -$100.00 (-1.0%)
+                          </text>
+
+                          <line x1={leftX} y1={entryP.y} x2={leftX + boxW} y2={entryP.y} stroke="#ffffff" strokeWidth="1.5" />
+                          <rect x={leftX + 30} y={entryP.y - 8} width="100" height="16" rx="3" fill="#1e222d" stroke="#2962ff" strokeWidth="1" />
+                          <text x={leftX + 80} y={entryP.y + 3.5} fill="#2962ff" fontSize="8.5" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+                            Ratio R:R = 1 : 3.00
+                          </text>
+                        </g>
+                      );
+                    }
+
+                    if (d.type === "icons" && d.points.length >= 1) {
+                      const p = d.points[0];
+                      if (!p) return null;
+                      return (
+                        <g
+                          key={d.id}
+                          transform={`translate(${p.x}, ${p.y})`}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          <circle cx="0" cy="0" r="14" fill="#2962ff" opacity="0.25" className="animate-ping" />
+                          <circle cx="0" cy="0" r="8" fill="#2962ff" stroke="#ffffff" strokeWidth="1.5" />
+                          <rect x="12" y="-10" width="130" height="20" rx="4" fill="#131722" stroke="#2962ff" strokeWidth="1" />
+                          <text x="18" y="3.5" fill="#60a5fa" fontSize="9" fontWeight="bold" fontFamily="monospace">
+                            ✨ Signal NXM FIX 4.4
+                          </text>
+                        </g>
+                      );
+                    }
+
+                    if (d.type === "ruler" && d.points.length >= 2) {
+                      const p1 = d.points[0];
+                      const p2 = d.points[1];
+                      if (!p1 || !p2) return null;
+                      const rX = Math.min(p1.x, p2.x);
+                      const rY = Math.min(p1.y, p2.y);
+                      const rW = Math.max(Math.abs(p2.x - p1.x), 15);
+                      const rH = Math.max(Math.abs(p2.y - p1.y), 15);
+                      const barsCount = Math.max(1, Math.round(rW / candleSpacing));
+                      const price1 = p1.price ?? getPriceFromY(p1.y);
+                      const price2 = p2.price ?? getPriceFromY(p2.y);
+                      const priceDiff = Math.abs(price2 - price1);
+                      const pctDiff = price1 ? (priceDiff / price1) * 100 : 0;
+
+                      return (
+                        <g
+                          key={d.id}
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDrawingId(isSelected ? null : d.id);
+                          }}
+                        >
+                          <rect
+                            x={rX}
+                            y={rY}
+                            width={rW}
+                            height={rH}
+                            fill="rgba(41, 98, 255, 0.14)"
+                            stroke="#2962ff"
+                            strokeWidth="1.2"
+                            strokeDasharray="3 2"
+                          />
+                          <g transform={`translate(${rX + rW / 2}, ${rY + rH / 2})`}>
+                            <rect x="-65" y="-12" width="130" height="24" rx="4" fill="#131722" stroke="#2962ff" strokeWidth="1" />
+                            <text x="0" y="3.5" fill="#ffffff" fontSize="8.5" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+                              {barsCount} barres · ${priceDiff.toFixed(2)} ({pctDiff.toFixed(2)}%)
+                            </text>
+                          </g>
+                        </g>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </g>
+              )}
 
               {/* Hover Crosshair & Dynamic Tags */}
               {mousePos && (
@@ -1190,18 +2724,18 @@ export function MetaTrader5Terminal({
               </g>
 
               {/* Right Price Scale Numbers */}
-              {[350, 340, 330, 320, 310, 300, 290, 280, 270, 260, 250, 240].map((price) => {
+              {priceTicks.map((price, pi) => {
                 const y = getY(price);
                 return (
                   <text
-                    key={`price-label-${price}`}
+                    key={`price-label-${pi}`}
                     x={chartWidth - paddingRight + 5}
                     y={y + 3.5}
                     fill="#787b86"
                     fontSize="9.5"
                     fontFamily="monospace"
                   >
-                    {price.toFixed(2)}
+                    {price.toFixed(selectedSymbol.digits || 2)}
                   </text>
                 );
               })}
@@ -1227,6 +2761,33 @@ export function MetaTrader5Terminal({
                   );
                 })}
             </svg>
+
+            {/* Floating Selection & Action HUD for Selected Drawing */}
+            {selectedDrawingId && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-[#1e222d]/95 backdrop-blur-md border border-[#363a45] shadow-2xl py-1.5 px-3 rounded-xl animate-in fade-in zoom-in-95">
+                <span className="text-[11px] font-mono font-bold text-slate-200">
+                  Tracé sélectionné
+                </span>
+                <div className="h-3.5 w-px bg-[#363a45]" />
+                <button
+                  onClick={() => {
+                    setDrawings((prev) => prev.filter((d) => d.id !== selectedDrawingId));
+                    setSelectedDrawingId(null);
+                    toast.success("Tracé supprimé.");
+                  }}
+                  className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                >
+                  <Trash2 className="size-3" />
+                  <span>Supprimer</span>
+                </button>
+                <button
+                  onClick={() => setSelectedDrawingId(null)}
+                  className="p-1 text-slate-400 hover:text-white rounded transition cursor-pointer"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Bottom Quick Timeframe Bar (Dark) */}
@@ -1582,23 +3143,59 @@ export function MetaTrader5Terminal({
         </div>
       </div>
 
-      {/* ── 5. BOTTOM ACCOUNT MANAGER / POSITIONS PANEL (DARK) ── */}
+      {/* ── 5. BOTTOM ACCOUNT MANAGER / POSITIONS / HISTORIQUE / QUOTAS PANEL (DARK) ── */}
       <div className="border-t border-[#2a2e39] bg-[#131722]">
         {/* Panel Top Header Tab */}
         <div className="flex items-center justify-between px-3 py-1 bg-[#131722] border-b border-[#2a2e39] text-xs font-semibold text-[#787b86]">
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setIsBottomOpen(!isBottomOpen)}
-              className="px-3 py-1 rounded-t-md bg-[#1e222d] text-white font-bold text-xs border border-b-0 border-[#2a2e39] shadow-sm flex items-center gap-1.5 cursor-pointer"
+              onClick={() => {
+                setBottomTab("positions");
+                setIsBottomOpen(true);
+              }}
+              className={`px-3 py-1 rounded-t-md font-bold text-xs border border-b-0 shadow-sm flex items-center gap-1.5 cursor-pointer transition ${
+                bottomTab === "positions" && isBottomOpen
+                  ? "bg-[#1e222d] text-white border-[#2a2e39]"
+                  : "bg-transparent text-[#787b86] border-transparent hover:text-white"
+              }`}
             >
-              <span>Account Manager</span>
+              <span>Positions Ouvertes ({positions.length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setBottomTab("history");
+                setIsBottomOpen(true);
+              }}
+              className={`px-3 py-1 rounded-t-md font-bold text-xs border border-b-0 shadow-sm flex items-center gap-1.5 cursor-pointer transition ${
+                bottomTab === "history" && isBottomOpen
+                  ? "bg-[#1e222d] text-white border-[#2a2e39]"
+                  : "bg-transparent text-[#787b86] border-transparent hover:text-white"
+              }`}
+            >
+              <span>Historique Ordres ({tradeHistory.length})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setBottomTab("quotas");
+                setIsBottomOpen(true);
+              }}
+              className={`px-3 py-1 rounded-t-md font-bold text-xs border border-b-0 shadow-sm flex items-center gap-1.5 cursor-pointer transition ${
+                bottomTab === "quotas" && isBottomOpen
+                  ? "bg-[#1e222d] text-cyan-400 border-[#2a2e39]"
+                  : "bg-transparent text-[#787b86] border-transparent hover:text-white"
+              }`}
+            >
+              <Sparkles className="size-3" />
+              <span>Quotas Abonnements ({quotaStats.goldWins}/2 · {quotaStats.fxWins}/5 · ∞)</span>
             </button>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 text-xs font-mono">
               <span className="text-[#787b86]">Solde: <strong className="text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong></span>
-              <span className="text-[#787b86]">P&amp;L: <strong className={totalOpenProfit >= 0 ? "text-[#089981]" : "text-[#f23645]"}>
+              <span className="text-[#787b86]">P&amp;L Flottant: <strong className={totalOpenProfit >= 0 ? "text-[#089981]" : "text-[#f23645]"}>
                 {totalOpenProfit >= 0 ? "+" : ""}${totalOpenProfit.toFixed(2)} USD
               </strong></span>
             </div>
@@ -1607,22 +3204,16 @@ export function MetaTrader5Terminal({
               <button
                 onClick={() => setIsBottomOpen(!isBottomOpen)}
                 className="p-1 hover:bg-[#2a2e39] rounded hover:text-white cursor-pointer"
-                title="Minimiser"
+                title="Minimiser / Dérouler"
               >
-                <Minimize2 className="size-3.5" />
-              </button>
-              <button
-                className="p-1 hover:bg-[#2a2e39] rounded hover:text-white cursor-pointer"
-                title="Agrandir"
-              >
-                <Maximize2 className="size-3.5" />
+                {isBottomOpen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Positions Table Content */}
-        {isBottomOpen && (
+        {/* Bottom Tab Content */}
+        {isBottomOpen && bottomTab === "positions" && (
           <div className="max-h-48 overflow-y-auto">
             <table className="w-full text-left text-xs font-mono">
               <thead className="bg-[#1e222d] border-b border-[#2a2e39] text-[10px] uppercase text-[#787b86]">
@@ -1644,7 +3235,7 @@ export function MetaTrader5Terminal({
                 {positions.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="text-center py-6 text-slate-500 font-sans text-xs">
-                      Aucune position ouverte actuellement. Utilisez le panneau 1-Click SELL / BUY pour passer un ordre instantané.
+                      Aucune position ouverte actuellement. Utilisez le panneau 1-Click SELL / BUY ou lancez un Bot Preset ci-dessus.
                     </td>
                   </tr>
                 ) : (
@@ -1670,7 +3261,7 @@ export function MetaTrader5Terminal({
                         <button
                           onClick={() => handleClosePosition(pos.ticket)}
                           className="p-1 hover:bg-[#f23645]/20 text-[#f23645] rounded-md transition cursor-pointer"
-                          title="Clôturer la position"
+                          title="Clôturer la position (valider P&L & Quota)"
                         >
                           <X className="size-3.5" />
                         </button>
@@ -1680,6 +3271,154 @@ export function MetaTrader5Terminal({
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {isBottomOpen && bottomTab === "history" && (
+          <div className="max-h-48 overflow-y-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-[#1e222d] border-b border-[#2a2e39] text-[10px] uppercase text-[#787b86]">
+                <tr>
+                  <th className="px-3 py-1.5">Ticket</th>
+                  <th className="px-3 py-1.5">Ouv.</th>
+                  <th className="px-3 py-1.5">Clôture</th>
+                  <th className="px-3 py-1.5">Type</th>
+                  <th className="px-3 py-1.5">Lots</th>
+                  <th className="px-3 py-1.5">Symbole</th>
+                  <th className="px-3 py-1.5">Prix Ouv.</th>
+                  <th className="px-3 py-1.5">Prix Clôture</th>
+                  <th className="px-3 py-1.5 text-right">P&amp;L Réalisé</th>
+                  <th className="px-3 py-1.5">Commentaire</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#2a2e39]">
+                {tradeHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="text-center py-6 text-slate-500 font-sans text-xs">
+                      Aucun ordre clôturé dans l'historique de cette session.
+                    </td>
+                  </tr>
+                ) : (
+                  tradeHistory.map((item) => (
+                    <tr key={item.ticket} className="hover:bg-[#1e222d]/70 transition">
+                      <td className="px-3 py-1.5 font-bold text-white">#{item.ticket}</td>
+                      <td className="px-3 py-1.5 text-slate-400">{item.openTime}</td>
+                      <td className="px-3 py-1.5 text-slate-300 font-bold">{item.closeTime}</td>
+                      <td className="px-3 py-1.5 font-bold">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${item.type === "BUY" ? "bg-[#172d54] text-[#2962ff]" : "bg-[#362128] text-[#f23645]"}`}>
+                          {item.type}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 font-bold text-white">{item.lots.toFixed(2)}</td>
+                      <td className="px-3 py-1.5 font-bold text-white">{item.symbol}</td>
+                      <td className="px-3 py-1.5 text-slate-400">{item.openPrice.toFixed(2)}</td>
+                      <td className="px-3 py-1.5 font-bold text-white">{item.closePrice.toFixed(2)}</td>
+                      <td className={`px-3 py-1.5 text-right font-black ${item.profit >= 0 ? "text-[#089981]" : "text-[#f23645]"}`}>
+                        {item.profit >= 0 ? "+" : ""}${item.profit.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-1.5 text-slate-400 font-sans text-[11px] truncate max-w-xs">{item.comment}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {isBottomOpen && bottomTab === "quotas" && (
+          <div className="p-3 bg-[#0d1017]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Preset 1: AI Gold Quota Card */}
+              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-300">Preset 1 : Nexium AI Gold</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                      quotaStats.goldWins >= 2
+                        ? "border-rose-500/40 bg-rose-500/20 text-rose-300"
+                        : "border-amber-500/40 bg-amber-500/20 text-amber-300"
+                    }`}>
+                      {quotaStats.goldWins >= 2 ? "EXPIRÉ (2/2)" : `${Math.min(2, quotaStats.goldWins)} / 2 GAINS`}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Limite contractuelle : 2 trades gagnants (+50% de la mise).</p>
+                </div>
+                <div className="mt-3">
+                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${quotaStats.goldWins >= 2 ? "bg-rose-500" : "bg-amber-400"}`}
+                      style={{ width: `${Math.min(100, (Math.min(2, quotaStats.goldWins) / 2) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {quotaStats.goldWins >= 2 ? "Abonnement Découverte terminé (2/2)" : `${Math.max(0, 2 - quotaStats.goldWins)} trade(s) restant(s)`}
+                    </span>
+                    {quotaStats.goldWins >= 2 && (
+                      <span className="text-[10px] font-bold text-amber-400 font-mono">
+                        Prolongation Admin Requise
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Preset 2: FX Trend Quota Card */}
+              <div className="p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-cyan-300">Preset 2 : Nexium FX Trend</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                      quotaStats.fxWins >= 5
+                        ? "border-rose-500/40 bg-rose-500/20 text-rose-300"
+                        : "border-cyan-500/40 bg-cyan-500/20 text-cyan-300"
+                    }`}>
+                      {quotaStats.fxWins >= 5 ? "EXPIRÉ (5/5)" : `${Math.min(5, quotaStats.fxWins)} / 5 GAINS`}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Limite contractuelle : 5 trades gagnants (+75% de la mise).</p>
+                </div>
+                <div className="mt-3">
+                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${quotaStats.fxWins >= 5 ? "bg-rose-500" : "bg-cyan-400"}`}
+                      style={{ width: `${Math.min(100, (Math.min(5, quotaStats.fxWins) / 5) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {quotaStats.fxWins >= 5 ? "Abonnement Pro terminé (5/5)" : `${Math.max(0, 5 - quotaStats.fxWins)} trade(s) restant(s)`}
+                    </span>
+                    {quotaStats.fxWins >= 5 && (
+                      <span className="text-[10px] font-bold text-cyan-400 font-mono">
+                        Prolongation Admin Requise
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Preset 3: Index Reversion Quota Card */}
+              <div className="p-3 rounded-xl border border-purple-500/30 bg-purple-950/20 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-300">Preset 3 : Nexium Index Reversion</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border border-emerald-500/40 bg-emerald-500/20 text-emerald-300">
+                      ILLIMITÉ (∞)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">Accès illimité sans expiration de quota.</p>
+                </div>
+                <div className="mt-3">
+                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-400 w-full" />
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono block mt-1">
+                    {quotaStats.indexWins} gain(s) exécuté(s) · En continu
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

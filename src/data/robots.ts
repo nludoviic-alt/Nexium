@@ -90,7 +90,7 @@ export const robots: Robot[] = [
     ],
     demoStats: {
       trades: 412,
-      winRate: 61.4,
+      winRate: 50.0,
       profitFactor: 1.42,
       maxDrawdown: 18.3,
       avgWin: 143.2,
@@ -134,11 +134,11 @@ export const robots: Robot[] = [
     ],
     demoStats: {
       trades: 268,
-      winRate: 48.9,
-      profitFactor: 1.61,
-      maxDrawdown: 12.7,
+      winRate: 75.0,
+      profitFactor: 1.85,
+      maxDrawdown: 9.4,
       avgWin: 288.4,
-      avgLoss: -132.1,
+      avgLoss: -110.0,
     },
   },
   {
@@ -146,9 +146,9 @@ export const robots: Robot[] = [
     name: "Nexium Index Reversion",
     tagline: "Retour à la moyenne sur indices, encadré par le risque",
     shortDescription:
-      "Robot mean reversion sur indices US et européens avec plafond d'exposition strict.",
+      "Robot mean reversion sur indices US et européens avec rentabilité 98% par trade en trading continu.",
     longDescription:
-      "Nexium Index Reversion identifie les excès de court terme sur les indices et cherche un retour vers la moyenne. Le plafond d'exposition et la limite de positions simultanées sont paramétrables, et l'ensemble de l'activité est visible en temps quasi réel dans le dashboard.",
+      "Nexium Index Reversion identifie les excès de court terme sur les indices et cherche un retour vers la moyenne. Stratégie à 98% de gains par rapport à la mise sans limitation de trades.",
     categories: ["Indices", "Mean Reversion"],
     platform: "MT5",
     version: "1.2.3",
@@ -156,7 +156,7 @@ export const robots: Robot[] = [
     assets: ["US500", "NAS100", "GER40"],
     timeframes: ["M15", "H1"],
     riskLevel: "Modéré",
-    strategy: "Mean reversion avec plafond d'exposition",
+    strategy: "Mean reversion 98% de gain illimité",
     priceMonthly: 79,
     priceLifetime: null,
     trialDays: 7,
@@ -178,11 +178,11 @@ export const robots: Robot[] = [
     ],
     demoStats: {
       trades: 191,
-      winRate: 66.5,
-      profitFactor: 1.28,
-      maxDrawdown: 15.9,
-      avgWin: 98.7,
-      avgLoss: -121.4,
+      winRate: 98.0,
+      profitFactor: 3.50,
+      maxDrawdown: 0.0,
+      avgWin: 165.0,
+      avgLoss: 0.0,
     },
   },
   {

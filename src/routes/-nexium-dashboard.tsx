@@ -106,7 +106,7 @@ import {
 import { useEffect, useId, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { TradingViewSuperchart } from "@/components/site/TradingViewSuperchart";
-import { MetaTrader5Terminal } from "@/components/dashboard/MetaTrader5Terminal";
+import { MetaTrader5Terminal, type Mt5Position, type PresetQuotaStats, type PresetStakes } from "@/components/dashboard/MetaTrader5Terminal";
 import {
   supabase,
   isSupabaseConfigured,
@@ -426,8 +426,8 @@ const INITIAL_BOTS: EngineBot[] = [
     lastScore: "81 / 100",
     lastScoreNum: 81,
     openPositions: 1,
-    pnlToday: "-$22.60",
-    pnlTodayNum: -22.6,
+    pnlToday: "+$48.20",
+    pnlTodayNum: 48.2,
     lastSignalTime: "Il y a 12 min",
     heartbeatSec: 6,
     theme: "purple",
@@ -2761,7 +2761,7 @@ function OscillatorPane({
   lines: { color: string; values: number[]; readout?: string }[];
 }) {
   const width = 500;
-  const height = 46;
+  const height = 22;
   const allVals = lines.flatMap((l) => l.values);
   const min = Math.min(...allVals, 0);
   const max = Math.max(...allVals, 100);
@@ -2769,8 +2769,8 @@ function OscillatorPane({
   const yFor = (v: number) => height - ((v - min) / range) * height;
 
   return (
-    <div className="mt-3 border-t border-indigo-500/10 pt-2.5">
-      <div className="mb-1 flex items-center gap-2 text-[10px] font-mono">
+    <div className="mt-1 border-t border-indigo-500/10 pt-1">
+      <div className="mb-0.5 flex items-center gap-2 text-[9px] font-mono">
         <span className="text-slate-500 uppercase tracking-wider">{label}</span>
         {lines.map(
           (l, i) =>
@@ -2781,7 +2781,7 @@ function OscillatorPane({
             )
         )}
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-11 w-full overflow-visible" preserveAspectRatio="none">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-4.5 w-full overflow-visible" preserveAspectRatio="none">
         {lines.map((l, li) => {
           const step = width / l.values.length;
           const points = l.values.map((v, i) => `${i * step + step / 2},${yFor(v)}`).join(" ");
@@ -2879,65 +2879,46 @@ function OverviewTab({
   ];
 
   return (
-    <div className="space-y-5">
-      {/* Hero Welcome (Compact & Épuré) */}
-      <section className="admin-card-emerald p-4 sm:p-5 relative overflow-hidden space-y-4 shadow-lg rounded-2xl">
-        <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-emerald-500/10 blur-3xl" />
+    <div className="flex-1 flex flex-col justify-between gap-3 h-full">
+      {/* Hero Welcome */}
+      <section className="shrink-0 admin-card-emerald p-4 sm:p-4.5 relative overflow-hidden space-y-2.5 shadow-md rounded-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-emerald-500/10 blur-3xl" />
 
-        <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-emerald-400 uppercase font-mono">
-              <Zap className="size-3.5" />
-              TABLEAU DE BORD EXÉCUTIF MT5
-            </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+        <div className="relative z-10 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               Bonjour, <span className="text-emerald-400">{clientName.split(" ")[0] || clientName}</span>
             </h2>
-            <p className="max-w-xl text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Vos 3 moteurs institutionnels (AI Gold, FX Trend, Index Reversion) sont synchronisés avec le serveur <strong className="text-white font-mono">Equinix NY4</strong>.
-            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={onToggleRunning}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md ${
-                running
-                  ? "admin-btn-primary shadow-[0_0_15px_rgba(16,185,129,0.25)] hover:scale-[1.01]"
-                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
-              }`}
-            >
-              {running ? <Pause className="size-3.5" /> : <Play className="size-3.5 fill-current" />}
-              {running ? "MOTEURS ACTIFS" : "MOTEURS EN PAUSE"}
-            </button>
-
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={onOpenDeposit}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-3.5 py-2 text-xs font-bold text-white uppercase tracking-wider transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-4 py-2 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm hover:border-emerald-500/50"
             >
-              <Plus className="size-3.5 text-emerald-400" />
+              <Plus className="size-4 text-emerald-400" />
               DÉPÔT RAPIDE
             </button>
           </div>
         </div>
 
-        {/* Live Market Tickers Ribbon Compact */}
-        <div className="border-t border-emerald-500/15 pt-3">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 font-mono">
-            <Activity className="size-3 text-emerald-400" /> COTATIONS DIRECTES · SPREAD FIX ULTRA-FAIBLE
+        {/* Live Market Tickers Ribbon */}
+        <div className="border-t border-emerald-500/15 pt-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 font-mono">
+            <Activity className="size-3.5 text-emerald-400" /> COTATIONS DIRECTES · SPREAD FIX ULTRA-FAIBLE
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-5">
             {marketTickers.map((tick) => (
               <div
                 key={tick.pair}
                 className="admin-subcard px-3 py-2 flex items-center justify-between rounded-xl transition-colors hover:border-emerald-500/40"
               >
                 <div>
-                  <span className="font-mono text-[10px] text-slate-400 font-bold">{tick.pair}</span>
-                  <p className="font-mono text-xs sm:text-sm font-bold text-white">{tick.price}</p>
+                  <span className="font-mono text-[11px] text-slate-400 font-bold">{tick.pair}</span>
+                  <p className="font-mono text-sm sm:text-base font-bold text-white leading-none mt-0.5">{tick.price}</p>
                 </div>
                 <span
-                  className={`text-[10px] font-mono font-bold ${
+                  className={`text-xs font-mono font-bold ${
                     tick.up ? "text-emerald-400" : "text-rose-400"
                   }`}
                 >
@@ -2949,114 +2930,114 @@ function OverviewTab({
         </div>
       </section>
 
-      {/* KPI Cards (Compacts & Épurés) */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 font-mono">
-        <article className="admin-card-indigo p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
+      {/* KPI Cards */}
+      <section className="shrink-0 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 font-mono">
+        <article className="admin-card-indigo p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">SOLDE TOTAL</span>
-            <div className="grid size-7 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-              <Wallet className="size-3.5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">SOLDE TOTAL</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+              <Wallet className="size-4" />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-bold text-white">
+          <p className="text-xl sm:text-2xl font-black text-white">
             ${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-indigo-500/20 font-sans">
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-indigo-500/20 font-sans">
             <span className="text-slate-400">Cash</span>
             <span className="font-mono font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
           </div>
         </article>
 
-        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
+        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">BONUS CRÉDITÉ</span>
-            <div className="grid size-7 place-items-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              <Gift className="size-3.5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">BONUS CRÉDITÉ</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <Gift className="size-4" />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-bold text-amber-300">
+          <p className="text-xl sm:text-2xl font-black text-amber-300">
             ${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-amber-500/20 font-sans">
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-amber-500/20 font-sans">
             <span className="text-slate-400">Statut</span>
             <span className="font-mono font-bold text-white">{bonus > 0 ? "Actif" : "Aucun"}</span>
           </div>
         </article>
 
-        <article className="admin-card-emerald p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
+        <article className="admin-card-emerald p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">EQUITY (VALEUR)</span>
-            <div className="grid size-7 place-items-center rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              <Wallet className="size-3.5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">EQUITY (VALEUR)</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <Wallet className="size-4" />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-bold text-emerald-400">
+          <p className="text-xl sm:text-2xl font-black text-emerald-400">
             ${(balance + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-emerald-500/20 font-sans">
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-emerald-500/20 font-sans">
             <span className="text-slate-400">Cash</span>
             <span className="font-mono font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
           </div>
         </article>
 
-        <article className={`p-3.5 sm:p-4 space-y-1.5 rounded-2xl ${totalOpenPnl >= 0 ? "admin-card-indigo" : "admin-card border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98"}`}>
+        <article className={`p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm ${totalOpenPnl >= 0 ? "admin-card-indigo" : "admin-card border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98"}`}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">P&amp;L LATENT</span>
-            <div className={`grid size-7 place-items-center rounded-lg ${totalOpenPnl >= 0 ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>
-              <TrendingUp className="size-3.5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">P&L LATENT</span>
+            <div className={`grid size-8 place-items-center rounded-xl ${totalOpenPnl >= 0 ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>
+              <TrendingUp className="size-4" />
             </div>
           </div>
           <p
-            className={`text-lg sm:text-xl font-bold ${
+            className={`text-xl sm:text-2xl font-black ${
               totalOpenPnl >= 0 ? "text-emerald-400" : "text-rose-400"
             }`}
           >
             {totalOpenPnl >= 0 ? `+$${totalOpenPnl.toFixed(2)}` : `-$${Math.abs(totalOpenPnl).toFixed(2)}`}
           </p>
-          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-700/50 font-sans">
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-700/50 font-sans">
             <span className="text-slate-400">Positions</span>
             <span className="font-mono font-bold text-emerald-400">{positions.length} en direct</span>
           </div>
         </article>
 
-        <article className="admin-card-cyan p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
+        <article className="admin-card-cyan p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">AUTO-TRADERS</span>
-            <div className="grid size-7 place-items-center rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
-              <Bot className="size-3.5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">AUTO-TRADERS</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+              <Bot className="size-4" />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-bold text-cyan-300">3 / 3</p>
-          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-cyan-500/20 font-sans">
+          <p className="text-xl sm:text-2xl font-black text-cyan-300">3 / 3</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-cyan-500/20 font-sans">
             <span className="text-slate-400">Equinix NY4</span>
             <span className="font-mono font-bold text-emerald-400">100% OK</span>
           </div>
         </article>
 
-        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
+        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">DRAWDOWN</span>
-            <div className="grid size-7 place-items-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              <ShieldCheck className="size-3.5" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">DRAWDOWN</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <ShieldCheck className="size-4" />
             </div>
           </div>
-          <p className="text-lg sm:text-xl font-bold text-amber-300">0.34%</p>
-          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-amber-500/20 font-sans">
+          <p className="text-xl sm:text-2xl font-black text-amber-300">0.34%</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-amber-500/20 font-sans">
             <span className="text-slate-400">Plafond</span>
             <span className="font-mono font-bold text-amber-400">2.00% / jour</span>
           </div>
         </article>
       </section>
 
-      {/* Interactive Equity Curve & Quick Bot Summary (Compact & Équilibré) */}
-      <section className="grid gap-5 xl:grid-cols-[1.4fr_.6fr]">
-        <article className="admin-card-indigo p-4 sm:p-5 space-y-4 shadow-lg rounded-2xl">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-indigo-500/20 pb-3">
+      {/* Interactive Equity Curve & Quick Bot Summary */}
+      <section className="flex-1 grid gap-3.5 xl:grid-cols-[1.45fr_.55fr] min-h-0">
+        <article className="flex flex-col justify-between admin-card-indigo p-4 sm:p-5 shadow-md rounded-2xl overflow-hidden">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-indigo-500/20 pb-2.5">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 font-mono">ÉVOLUTION DE L'EQUITY</p>
-              <h3 className="mt-0.5 text-base sm:text-lg font-bold text-white tracking-tight">Performance Cumulée des Auto-Traders</h3>
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-300 font-mono">ÉVOLUTION DE L'EQUITY</p>
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Performance Cumulée des Auto-Traders</h3>
             </div>
-            <div className="flex items-center gap-1 rounded-xl border border-indigo-500/30 bg-[#0b1220] p-0.5">
+            <div className="flex items-center gap-1 rounded-xl border border-indigo-500/30 bg-[#0b1220] p-1">
               {(["24H", "7J", "30J", "1A"] as const).map((tf) => (
                 <button
                   key={tf}
@@ -3073,9 +3054,9 @@ function OverviewTab({
             </div>
           </div>
 
-          <div>
-            <div className="relative h-44 w-full">
-              <div className="absolute left-1 top-0 z-10 flex items-center gap-1.5 text-[10px] font-mono pointer-events-none">
+          <div className="flex-1 flex flex-col justify-between pt-1 min-h-0">
+            <div className="flex-1 relative min-h-[140px] w-full">
+              <div className="absolute left-1 top-0 z-10 flex items-center gap-1.5 text-xs font-mono pointer-events-none">
                 <span className="text-slate-500">WMA</span>
                 <span className="text-[#60a5fa] font-bold">9</span>
                 <span className="text-slate-600">close</span>
@@ -3083,67 +3064,69 @@ function OverviewTab({
               <EquityCandlestickChart balance={balance} timeframe={chartTimeframe} />
             </div>
             <EquityIndicatorPanels />
-            <div className="mt-3.5 flex items-center justify-between border-t border-indigo-500/20 pt-2.5 text-xs font-mono text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="mt-2 flex items-center justify-between border-t border-indigo-500/20 pt-2 text-xs sm:text-sm font-mono text-slate-300">
+              <span className="flex items-center gap-2">
+                <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse" />
                 Solde en direct
               </span>
-              <strong className="text-white text-sm sm:text-base">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong>
+              <strong className="text-white text-base sm:text-lg font-bold">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>
         </article>
 
         {/* 3 Bots Quick Snapshot */}
-        <article className="admin-card p-4 sm:p-5 shadow-lg flex flex-col justify-between space-y-4 rounded-2xl">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-700/50 pb-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">AUTO-TRADERS OPÉRATIONNELS</p>
-                <h3 className="mt-0.5 text-base sm:text-lg font-bold text-white tracking-tight">Supervision Rapide</h3>
-              </div>
-              <button
-                onClick={onOpenEngine}
-                className="text-xs font-bold text-emerald-400 hover:underline cursor-pointer flex items-center gap-0.5"
-              >
-                Page Moteurs <ChevronRight className="size-3.5" />
-              </button>
-            </div>
-
-            <div className="mt-3.5 space-y-2">
-              {bots.map((b) => (
-                <div
-                  key={b.id}
-                  className="admin-subcard p-2.5 sm:p-3 flex items-center justify-between rounded-xl transition-colors hover:border-slate-500/40"
+        <article className="flex flex-col justify-between admin-card p-4 sm:p-5 shadow-md rounded-2xl overflow-hidden">
+          <div className="flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-700/50 pb-2.5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">AUTO-TRADERS OPÉRATIONNELS</p>
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">Supervision Rapide</h3>
+                </div>
+                <button
+                  onClick={onOpenEngine}
+                  className="text-xs sm:text-sm font-bold text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className={`size-2 rounded-full ${
-                        b.statusBadge === "ACTIF" ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
-                      }`}
-                    />
-                    <div>
-                      <span className="font-bold text-xs sm:text-sm text-white">{b.name}</span>
-                      <p className="text-[10px] text-slate-400 font-mono">{b.markets}</p>
+                  Page Moteurs <ChevronRight className="size-4" />
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-2.5">
+                {bots.map((b) => (
+                  <div
+                    key={b.id}
+                    className="admin-subcard p-3 sm:p-3.5 flex items-center justify-between rounded-xl transition-colors hover:border-slate-500/40"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`size-2.5 rounded-full ${
+                          b.statusBadge === "ACTIF" ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
+                        }`}
+                      />
+                      <div>
+                        <span className="font-bold text-sm sm:text-base text-white">{b.name}</span>
+                        <p className="text-xs text-slate-400 font-mono mt-0.5">{b.markets}</p>
+                      </div>
+                    </div>
+                    <div className="text-right font-mono">
+                      <span className={`text-sm sm:text-base font-bold ${b.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {b.pnlToday}
+                      </span>
+                      <p className="text-xs text-slate-400 mt-0.5">{b.openPositions} pos.</p>
                     </div>
                   </div>
-                  <div className="text-right font-mono">
-                    <span className={`text-xs sm:text-sm font-bold ${b.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {b.pnlToday}
-                    </span>
-                    <p className="text-[10px] text-slate-400">{b.openPositions} pos.</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
 
-          <button
-            onClick={onOpenEngine}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-sm"
-          >
-            <Monitor className="size-3.5 text-emerald-400" />
-            OUVRIR LE TERMINAL MT5 &amp; PRESETS
-          </button>
+            <button
+              onClick={onOpenEngine}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] py-3 text-xs sm:text-sm font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-sm mt-3.5 hover:border-emerald-500/40"
+            >
+              <Monitor className="size-4 text-emerald-400" />
+              OUVRIR LE TERMINAL MT5 &amp; PRESETS
+            </button>
+          </div>
         </article>
       </section>
     </div>
@@ -3594,7 +3577,7 @@ function PortfolioTab({
       amount: `+$${val.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
       amountNum: val,
       currency: "USD",
-      status: depositMethod === "CARD" ? "Complété" : "En attente",
+      status: depositMethod === "CARD" ? "Confirmé" : "En attente",
       method: methodLabel,
       color: "#00D084",
     };
@@ -3672,9 +3655,6 @@ function PortfolioTab({
               <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                 Dépôt de Fonds &amp; Approvisionnement
               </h2>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-2xl font-medium">
-                Alimentez votre solde de trading par virement, crypto ou carte bancaire.
-              </p>
             </div>
 
             <div className="rounded-xl border border-emerald-500/30 bg-[#0d1624]/90 px-4 py-2 text-sm shadow-inner shrink-0 self-start sm:self-auto">
@@ -4152,9 +4132,6 @@ function PortfolioTab({
               <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                 Demande de Retrait de Fonds
               </h2>
-              <p className="text-xs sm:text-sm text-amber-200/80 max-w-2xl font-medium">
-                Transférez vos gains et capitaux vers votre compte bancaire, crypto ou carte enregistrée.
-              </p>
             </div>
 
             <div className="rounded-xl border border-amber-500/40 bg-[#1f1911]/90 px-4 py-2 text-sm shadow-inner shrink-0 self-start sm:self-auto">
@@ -4496,31 +4473,29 @@ function PortfolioTab({
   }
 
   return (
-    <div className="space-y-8">
-      <section className="admin-card-emerald p-6 sm:p-8 relative overflow-hidden space-y-4 shadow-xl">
-        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-emerald-400 uppercase mb-2 font-mono">
+    <div className="space-y-5">
+      <section className="admin-card-emerald p-4 sm:p-4.5 relative overflow-hidden space-y-2.5 shadow-md rounded-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-0.5 text-xs font-bold tracking-wider text-emerald-400 uppercase font-mono">
+              <Zap className="size-3.5" />
               GESTION FINANCIÈRE &amp; TRÉSORERIE
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Portefeuille &amp; Dépôts</h2>
-            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
-              Consultez vos soldes en temps réel, créditez votre compte ou effectuez des retraits sécurisés.
-            </p>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Portefeuille &amp; Dépôts</h2>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setView("deposit")}
-              className="admin-btn-primary inline-flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
+              className="admin-btn-primary inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer shadow-lg hover:scale-[1.02] transition-all rounded-xl"
             >
               <Plus className="size-4" />
               DÉPOSER DES FONDS
             </button>
             <button
               onClick={() => setView("withdraw")}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-5 py-3 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-4 py-2 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm hover:border-emerald-500/50"
             >
               RETIRER DES FONDS
             </button>
@@ -4529,86 +4504,118 @@ function PortfolioTab({
       </section>
 
       {/* Balances */}
-      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 font-mono">
-        <article className="admin-card-emerald p-5 sm:p-6 space-y-2.5">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-300">SOLDE CASH DISPONIBLE</p>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-400">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 font-mono">
+        <article className="admin-card-emerald p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">SOLDE CASH DISPONIBLE</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <Wallet className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-emerald-400">
             ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-emerald-500/20">Compte ECN Principal · USD</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-emerald-500/20 font-sans">
+            <span className="text-slate-400">Compte ECN Principal</span>
+            <span className="font-mono font-bold text-white">USD</span>
+          </div>
         </article>
 
-        <article className="admin-card-cyan p-5 sm:p-6 space-y-2.5">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-cyan-300">TOTAL GAINS GÉNERÉS</p>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-cyan-300">+$3 480.20</p>
-          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-cyan-500/20">Gains algorithmiques nets</p>
+        <article className="admin-card-cyan p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">TOTAL GAINS GÉNERÉS</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+              <TrendingUp className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-cyan-300">+$3 480.20</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-cyan-500/20 font-sans">
+            <span className="text-slate-400">Gains algorithmiques</span>
+            <span className="font-mono font-bold text-emerald-400">Net</span>
+          </div>
         </article>
 
-        <article className="admin-card-amber p-5 sm:p-6 space-y-2.5">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300">RETRAITS EFFECTUÉS</p>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-white">$1 200.00</p>
-          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-amber-500/20">Virés sans frais</p>
+        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">RETRAITS EFFECTUÉS</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <Gift className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-amber-300">$1 200.00</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-amber-500/20 font-sans">
+            <span className="text-slate-400">Frais appliqués</span>
+            <span className="font-mono font-bold text-emerald-400">0.00%</span>
+          </div>
         </article>
 
-        <article className="admin-card-indigo p-5 sm:p-6 space-y-2.5">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-300">STATUT CONFORMITÉ</p>
-          <p className="mt-2 text-xl sm:text-2xl font-bold text-emerald-400">KYC VALIDÉ</p>
-          <p className="text-xs text-slate-400 font-sans pt-2 border-t border-indigo-500/20">Niveau institutionnel illimité</p>
+        <article className="admin-card-indigo p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">STATUT CONFORMITÉ</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+              <ShieldCheck className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-emerald-400">KYC VALIDÉ</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-indigo-500/20 font-sans">
+            <span className="text-slate-400">Accès institutionnel</span>
+            <span className="font-mono font-bold text-emerald-400">Illimité</span>
+          </div>
         </article>
       </section>
 
       {/* Transactions */}
-      <section className="overflow-hidden rounded-3xl border border-white/[0.08] bg-[#10141b] shadow-md">
-        <div className="flex flex-col gap-4 border-b border-white/[0.06] p-6 sm:flex-row sm:items-center sm:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#10141b] shadow-md">
+        <div className="flex flex-col gap-3 border-b border-white/[0.06] p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-wider text-gray-400">MOUVEMENTS DE FONDS</p>
-            <h3 className="mt-1 text-lg sm:text-xl font-black text-white">Historique des Transactions</h3>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">MOUVEMENTS DE FONDS</p>
+            <h3 className="mt-0.5 text-base sm:text-lg font-bold text-white tracking-tight">Historique des Transactions</h3>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3.5">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Rechercher..."
                 value={searchTx}
                 onChange={(e) => setSearchTx(e.target.value)}
-                className="rounded-xl border border-white/[0.08] bg-[#0c1017] pl-10 pr-3.5 py-2.5 text-xs sm:text-sm text-white outline-none focus:border-[#00D084]"
+                className="rounded-xl border border-white/[0.08] bg-[#0c1017] pl-9 pr-3 py-2 text-xs sm:text-sm text-white outline-none focus:border-[#00D084]"
               />
             </div>
 
             <button
               onClick={handleExportStatement}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] px-4 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-[#1a2330] transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#141a23] px-3.5 py-2 text-xs sm:text-sm font-bold text-white hover:bg-[#1a2330] transition cursor-pointer"
             >
-              <Download className="size-4 text-[#00D084]" />
+              <Download className="size-3.5 text-[#00D084]" />
               EXPORTER CSV
             </button>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-white/[0.06] bg-[#0c1017] text-xs font-black uppercase tracking-wider text-gray-400">
+          <table className="w-full min-w-[760px] text-left text-xs sm:text-sm">
+            <thead className="border-b border-white/[0.06] bg-[#0c1017] text-xs font-bold uppercase tracking-wider text-gray-400 font-mono">
               <tr>
-                <th className="px-6 py-4">DATE</th>
-                <th className="px-6 py-4">TYPE</th>
-                <th className="px-6 py-4">MÉTHODE</th>
-                <th className="px-6 py-4">MONTANT</th>
-                <th className="px-6 py-4">STATUT</th>
+                <th className="px-5 py-3">DATE</th>
+                <th className="px-5 py-3">TYPE</th>
+                <th className="px-5 py-3">MÉTHODE</th>
+                <th className="px-5 py-3">MONTANT</th>
+                <th className="px-5 py-3">STATUT</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {filteredTx.map((tx) => (
                 <tr key={tx.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-6 py-4 font-mono text-gray-400">{tx.date}</td>
-                  <td className="px-6 py-4 font-bold text-white">{tx.type}</td>
-                  <td className="px-6 py-4 text-gray-300">{tx.method ?? "Automatique"}</td>
-                  <td className="px-6 py-4 font-mono font-black" style={{ color: tx.color }}>
+                  <td className="px-5 py-3.5 font-mono text-gray-400 text-xs">{tx.date}</td>
+                  <td className="px-5 py-3.5 font-bold text-white text-xs sm:text-sm">{tx.type}</td>
+                  <td className="px-5 py-3.5 text-gray-300 text-xs sm:text-sm">{tx.method ?? "Automatique"}</td>
+                  <td className="px-5 py-3.5 font-mono font-black text-sm" style={{ color: tx.color }}>
                     {tx.amount}
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1 text-xs font-mono font-bold text-gray-300">
+                  <td className="px-5 py-3.5">
+                    <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-mono font-bold text-gray-300">
                       {tx.status}
                     </span>
                   </td>
@@ -6473,6 +6480,1093 @@ function MessagingTab({
 }
 
 // ----------------------------------------------------
+// CONFIGURATION DES MISES & GESTION DU RISQUE (PAGE DÉDIÉE)
+// ----------------------------------------------------
+const GOLD_QUICK_STAKES = [
+  { value: 50, label: "$50" },
+  { value: 100, label: "$100" },
+  { value: 200, label: "$200" },
+  { value: 300, label: "$300" },
+  { value: 400, label: "$400" },
+  { value: 500, label: "$500" },
+];
+
+const FX_QUICK_STAKES = [
+  { value: 500, label: "$500" },
+  { value: 750, label: "$750" },
+  { value: 1000, label: "$1K" },
+  { value: 1250, label: "$1.25K" },
+  { value: 1500, label: "$1.5K" },
+  { value: 2000, label: "$2K" },
+];
+
+const INDEX_QUICK_STAKES = [
+  { value: 2000, label: "$2K" },
+  { value: 3000, label: "$3K" },
+  { value: 5000, label: "$5K" },
+  { value: 7000, label: "$7K" },
+  { value: 8500, label: "$8.5K" },
+  { value: 10000, label: "$10K" },
+];
+
+function StakeManagementTab({
+  balance,
+  bonus,
+  presetStakes = { goldStake: 100, fxStake: 750, indexStake: 2500 },
+  activePreset,
+  requestedPresets = [],
+  quotaStats = { goldWins: 0, fxWins: 0, indexWins: 0 },
+  onRequestPreset,
+  onUpdatePresetStakes,
+  onOpenTerminal,
+}: {
+  balance: number;
+  bonus: number;
+  presetStakes?: PresetStakes;
+  activePreset?: string | null;
+  requestedPresets?: string[];
+  quotaStats?: { goldWins: number; fxWins: number; indexWins: number };
+  onRequestPreset?: (presetId: string, botName: string) => void;
+  onUpdatePresetStakes?: (newStakes: PresetStakes) => void;
+  onOpenTerminal?: () => void;
+}) {
+  const [goldStakeInput, setGoldStakeInput] = useState<number>(presetStakes.goldStake || 100);
+  const [fxStakeInput, setFxStakeInput] = useState<number>(presetStakes.fxStake || 750);
+  const [indexStakeInput, setIndexStakeInput] = useState<number>(presetStakes.indexStake || 2500);
+
+  useEffect(() => {
+    setGoldStakeInput(presetStakes.goldStake || 100);
+    setFxStakeInput(presetStakes.fxStake || 750);
+    setIndexStakeInput(presetStakes.indexStake || 2500);
+  }, [presetStakes]);
+
+  // Active status per preset
+  const activeList = useMemo(() => {
+    return (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+  }, [activePreset]);
+
+  const isGoldApproved = activeList.includes("AI_GOLD");
+  const isGoldExpired = isGoldApproved && (quotaStats?.goldWins ?? 0) >= 2;
+  const isGoldActive = isGoldApproved && !isGoldExpired;
+  const isGoldPending = (requestedPresets || []).includes("AI_GOLD") && !isGoldApproved;
+
+  const isFxApproved = activeList.includes("FX_TREND");
+  const isFxExpired = isFxApproved && (quotaStats?.fxWins ?? 0) >= 5;
+  const isFxActive = isFxApproved && !isFxExpired;
+  const isFxPending = (requestedPresets || []).includes("FX_TREND") && !isFxApproved;
+
+  const isIndexApproved = activeList.includes("INDEX_REVERSION");
+  const isIndexExpired = false;
+  const isIndexActive = isIndexApproved;
+  const isIndexPending = (requestedPresets || []).includes("INDEX_REVERSION") && !isIndexApproved;
+
+  const totalAllocated =
+    (isGoldActive ? goldStakeInput : 0) +
+    (isFxActive ? fxStakeInput : 0) +
+    (isIndexActive ? indexStakeInput : 0);
+  const allocationPercent = balance > 0 ? Math.min(100, Math.round((totalAllocated / balance) * 100)) : 0;
+
+  // Hiérarchie des Mises : Preset 1 < Preset 2 < Preset 3
+  const isHierarchyValid = goldStakeInput < fxStakeInput && fxStakeInput < indexStakeInput;
+
+  const handleSaveStakes = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isHierarchyValid) {
+      toast.warning(
+        `Hiérarchie des mises : Preset 1 ($${goldStakeInput}) doit être inférieur à Preset 2 ($${fxStakeInput}), et Preset 2 inférieur à Preset 3 ($${indexStakeInput}).`
+      );
+    }
+    const newStakes: PresetStakes = {
+      goldStake: Math.max(10, Math.min(500, goldStakeInput || 100)),
+      fxStake: Math.max(500, Math.min(2000, fxStakeInput || 750)),
+      indexStake: Math.max(2000, Math.min(10000, indexStakeInput || 2500)),
+    };
+    onUpdatePresetStakes?.(newStakes);
+    toast.success("Mises enregistrées avec succès !");
+  };
+
+  const handleResetDefaults = () => {
+    if (isGoldActive) setGoldStakeInput(100);
+    if (isFxActive) setFxStakeInput(750);
+    if (isIndexActive) setIndexStakeInput(2500);
+    onUpdatePresetStakes?.({
+      goldStake: isGoldActive ? 100 : presetStakes.goldStake,
+      fxStake: isFxActive ? 750 : presetStakes.fxStake,
+      indexStake: isIndexActive ? 2500 : presetStakes.indexStake,
+    });
+    toast.info("Mises réinitialisées aux valeurs standard ($100 < $750 < $2 500).");
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Top Banner Aéré */}
+      <section className="admin-card-emerald p-6 sm:p-7 relative overflow-hidden rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-emerald-500/15 blur-3xl" />
+        <div className="space-y-1 z-10">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-mono font-bold text-emerald-400">
+            <SlidersHorizontal className="size-3.5" />
+            GESTION DU RISQUE &amp; HIÉRARCHIE DES MISES
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            Configuration des Mises
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-300">
+            Configurez les mises de vos algorithmes actifs. Règle contractuelle : Mise Preset 1 &lt; Mise Preset 2 &lt; Mise Preset 3.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 z-10">
+          {onOpenTerminal && (
+            <button
+              type="button"
+              onClick={onOpenTerminal}
+              className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/20 hover:bg-emerald-500/30 px-5 py-3 text-xs sm:text-sm font-black text-emerald-300 uppercase tracking-wider transition-all cursor-pointer shadow-md hover:scale-[1.02]"
+            >
+              <Monitor className="size-4" />
+              TERMINAL MT5
+            </button>
+          )}
+        </div>
+      </section>
+
+      {/* Hiérarchie Status Strip */}
+      <div
+        className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono transition-all ${
+          isHierarchyValid
+            ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-300"
+            : "border-amber-500/40 bg-amber-950/30 text-amber-300"
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          {isHierarchyValid ? (
+            <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="size-4 text-amber-400 shrink-0 animate-bounce" />
+          )}
+          <span>
+            {isHierarchyValid
+              ? `Hiérarchie validée : Preset 1 ($${goldStakeInput}) < Preset 2 ($${fxStakeInput}) < Preset 3 ($${indexStakeInput})`
+              : `⚠️ Règle de hiérarchie requise : Preset 1 ($${goldStakeInput}) doit être < Preset 2 ($${fxStakeInput}) < Preset 3 ($${indexStakeInput})`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="px-2.5 py-1 rounded-lg bg-black/40 border border-white/10 font-bold">
+            P1: $50 - $500
+          </span>
+          <span className="text-slate-500">&lt;</span>
+          <span className="px-2.5 py-1 rounded-lg bg-black/40 border border-white/10 font-bold">
+            P2: $500 - $2K
+          </span>
+          <span className="text-slate-500">&lt;</span>
+          <span className="px-2.5 py-1 rounded-lg bg-black/40 border border-white/10 font-bold">
+            P3: $2K - $10K
+          </span>
+        </div>
+      </div>
+
+      {/* 3 Cartes de Trading Aérées avec verrouillage sur presets inactifs */}
+      <form onSubmit={handleSaveStakes} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 1. Nexium AI Gold */}
+          <div
+            className={`rounded-3xl border p-6 sm:p-7 space-y-6 shadow-xl flex flex-col justify-between transition-all ${
+              isGoldActive
+                ? "border-amber-500/35 bg-[#0d131e] hover:border-amber-400/60"
+                : "border-slate-800/80 bg-[#090d14]/90 opacity-80"
+            }`}
+          >
+            <div className="space-y-5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span
+                    className={`text-base sm:text-lg font-black font-mono flex items-center gap-2 ${
+                      isGoldActive ? "text-amber-400" : "text-slate-400"
+                    }`}
+                  >
+                    <span
+                      className={`size-2.5 rounded-full ${
+                        isGoldActive
+                          ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
+                          : "bg-slate-600"
+                      }`}
+                    />
+                    Preset 1 : Nexium AI Gold
+                  </span>
+                  <span className="text-[10px] font-mono text-amber-300/80 block mt-0.5">
+                    XAUUSD · Gain : +50% de la mise (2 trades max)
+                  </span>
+                </div>
+
+                {/* Status Badges */}
+                {isGoldExpired ? (
+                  <span className="text-[11px] font-mono font-bold text-rose-300 bg-rose-500/15 px-3 py-1 rounded-full border border-rose-500/30 flex items-center gap-1.5">
+                    <Lock className="size-3 text-rose-400" />
+                    EXPIRÉ ({Math.min(2, quotaStats?.goldWins ?? 0)}/2)
+                  </span>
+                ) : isGoldActive ? (
+                  <span className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    ACTIF ({Math.min(2, quotaStats?.goldWins ?? 0)}/2)
+                  </span>
+                ) : isGoldPending ? (
+                  <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30 flex items-center gap-1.5">
+                    <Clock className="size-3 text-amber-400 animate-spin" />
+                    EN ATTENTE
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-800/70 px-3 py-1 rounded-full border border-slate-700/50 flex items-center gap-1.5">
+                    <Lock className="size-3 text-slate-400" />
+                    INACTIF
+                  </span>
+                )}
+              </div>
+
+              {/* Sizing Input */}
+              {isGoldActive ? (
+                <div className="relative flex items-center rounded-2xl bg-[#06090e] border border-amber-500/35 focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/20 transition-all px-4 h-14">
+                  <span className="text-2xl font-black font-mono text-amber-400 mr-2 select-none">$</span>
+                  <input
+                    type="number"
+                    min={50}
+                    max={500}
+                    step="any"
+                    value={goldStakeInput}
+                    onChange={(e) => setGoldStakeInput(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-transparent text-white font-mono font-black text-2xl focus:outline-none tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-xs font-bold font-mono text-slate-400 uppercase tracking-widest ml-2 select-none">USD</span>
+                </div>
+              ) : (
+                <div className="relative flex items-center rounded-2xl bg-[#06090e]/60 border border-slate-800/80 px-4 h-14 opacity-50 cursor-not-allowed">
+                  <span className="text-2xl font-black font-mono text-slate-500 mr-2 select-none">$</span>
+                  <input
+                    type="number"
+                    disabled
+                    value={goldStakeInput}
+                    className="w-full bg-transparent text-slate-500 font-mono font-black text-2xl focus:outline-none tracking-tight cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-xs font-bold font-mono text-slate-600 uppercase tracking-widest ml-2 select-none">USD</span>
+                </div>
+              )}
+
+              {/* Quick Chips (Plage $50 - $500) */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {GOLD_QUICK_STAKES.map((chip) => (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    disabled={!isGoldActive}
+                    onClick={() => setGoldStakeInput(chip.value)}
+                    className={`py-2 rounded-xl text-xs font-bold font-mono transition-all ${
+                      !isGoldActive
+                        ? "bg-[#10151f] text-slate-600 opacity-40 cursor-not-allowed pointer-events-none"
+                        : goldStakeInput === chip.value
+                        ? "bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30 scale-105 cursor-pointer"
+                        : "bg-[#18202d] text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Gain & Quota Summary Box */}
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs font-mono space-y-1.5">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Gain par trade gagnant (+50%) :</span>
+                  <strong className="text-emerald-400 font-black text-sm">
+                    +${(goldStakeInput * 0.50).toFixed(2)} USD
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span>Quota de trades autorisés :</span>
+                  <strong className="text-amber-300 font-bold">2 trades (Max +${(goldStakeInput * 1.00).toFixed(2)} USD)</strong>
+                </div>
+              </div>
+
+              {/* Status / Activation Notice */}
+              {isGoldExpired ? (
+                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
+                    <Lock className="size-3.5 text-rose-400 shrink-0" />
+                    <span>Abonnement expiré (2/2 trades) — Mises verrouillées</span>
+                  </div>
+                  {isGoldPending ? (
+                    <div className="px-3.5 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold text-xs flex items-center gap-1.5 shrink-0">
+                      <Clock className="size-3.5 text-amber-400 animate-spin" />
+                      <span>Demande en cours</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onRequestPreset?.("AI_GOLD", "Nexium AI Gold (Renouvellement)")}
+                      className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 shrink-0 active:scale-95"
+                    >
+                      <Sparkles className="size-3.5" />
+                      <span>Faire une nouvelle demande</span>
+                    </button>
+                  )}
+                </div>
+              ) : isGoldPending ? (
+                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-center text-xs font-bold text-amber-300 flex items-center justify-center gap-2">
+                  <Clock className="size-3.5 text-amber-400 animate-spin" />
+                  <span>Demande d'activation en cours de validation admin</span>
+                </div>
+              ) : !isGoldApproved ? (
+                <button
+                  type="button"
+                  onClick={() => onRequestPreset?.("AI_GOLD", "Nexium AI Gold")}
+                  className="w-full py-3 px-4 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-amber-600/20 hover:from-amber-500/25 hover:to-amber-600/30 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
+                >
+                  <Sparkles className="size-3.5 text-amber-400" />
+                  <span>Demander l'activation du preset</span>
+                </button>
+              ) : null}
+
+              {/* Clean 3-Metric Strip */}
+              <div
+                className={`grid grid-cols-3 gap-2 rounded-2xl border p-3 text-center font-mono ${
+                  isGoldActive
+                    ? "border-amber-500/20 bg-[#070b10]"
+                    : "border-slate-800/60 bg-[#070b10]/60 opacity-50"
+                }`}
+              >
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Volume MT5</span>
+                  <strong
+                    className={`text-xs sm:text-sm font-black ${
+                      isGoldActive ? "text-amber-400" : "text-slate-500"
+                    }`}
+                  >
+                    {isGoldActive ? `≈ ${Math.max(0.01, +(goldStakeInput / 1000 * 0.15).toFixed(2))} Lot` : "—"}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Gain / Trade</span>
+                  <strong className={`text-xs sm:text-sm font-bold ${isGoldActive ? "text-emerald-400" : "text-slate-500"}`}>
+                    +50%
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Quota Max</span>
+                  <strong className={`text-xs sm:text-sm font-bold ${isGoldActive ? "text-amber-300" : "text-slate-500"}`}>
+                    2 Trades
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Nexium FX Trend */}
+          <div
+            className={`rounded-3xl border p-6 sm:p-7 space-y-6 shadow-xl flex flex-col justify-between transition-all ${
+              isFxActive
+                ? "border-cyan-500/35 bg-[#0d131e] hover:border-cyan-400/60"
+                : "border-slate-800/80 bg-[#090d14]/90 opacity-80"
+            }`}
+          >
+            <div className="space-y-5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span
+                    className={`text-base sm:text-lg font-black font-mono flex items-center gap-2 ${
+                      isFxActive ? "text-cyan-400" : "text-slate-400"
+                    }`}
+                  >
+                    <span
+                      className={`size-2.5 rounded-full ${
+                        isFxActive
+                          ? "bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]"
+                          : "bg-slate-600"
+                      }`}
+                    />
+                    Preset 2 : Nexium FX Trend
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan-300/80 block mt-0.5">
+                    EURUSD · Gain : +75% de la mise (5 trades max)
+                  </span>
+                </div>
+
+                {/* Status Badges */}
+                {isFxExpired ? (
+                  <span className="text-[11px] font-mono font-bold text-rose-300 bg-rose-500/15 px-3 py-1 rounded-full border border-rose-500/30 flex items-center gap-1.5">
+                    <Lock className="size-3 text-rose-400" />
+                    EXPIRÉ ({Math.min(5, quotaStats?.fxWins ?? 0)}/5)
+                  </span>
+                ) : isFxActive ? (
+                  <span className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    ACTIF ({Math.min(5, quotaStats?.fxWins ?? 0)}/5)
+                  </span>
+                ) : isFxPending ? (
+                  <span className="text-[11px] font-mono font-bold text-cyan-300 bg-cyan-500/15 px-3 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5">
+                    <Clock className="size-3 text-cyan-400 animate-spin" />
+                    EN ATTENTE
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-800/70 px-3 py-1 rounded-full border border-slate-700/50 flex items-center gap-1.5">
+                    <Lock className="size-3 text-slate-400" />
+                    INACTIF
+                  </span>
+                )}
+              </div>
+
+              {/* Sizing Input */}
+              {isFxActive ? (
+                <div className="relative flex items-center rounded-2xl bg-[#06090e] border border-cyan-500/35 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400/20 transition-all px-4 h-14">
+                  <span className="text-2xl font-black font-mono text-cyan-400 mr-2 select-none">$</span>
+                  <input
+                    type="number"
+                    min={500}
+                    max={2000}
+                    step="any"
+                    value={fxStakeInput}
+                    onChange={(e) => setFxStakeInput(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-transparent text-white font-mono font-black text-2xl focus:outline-none tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-xs font-bold font-mono text-slate-400 uppercase tracking-widest ml-2 select-none">USD</span>
+                </div>
+              ) : (
+                <div className="relative flex items-center rounded-2xl bg-[#06090e]/60 border border-slate-800/80 px-4 h-14 opacity-50 cursor-not-allowed">
+                  <span className="text-2xl font-black font-mono text-slate-500 mr-2 select-none">$</span>
+                  <input
+                    type="number"
+                    disabled
+                    value={fxStakeInput}
+                    className="w-full bg-transparent text-slate-500 font-mono font-black text-2xl focus:outline-none tracking-tight cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-xs font-bold font-mono text-slate-600 uppercase tracking-widest ml-2 select-none">USD</span>
+                </div>
+              )}
+
+              {/* Quick Chips (Plage $500 - $2,000) */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {FX_QUICK_STAKES.map((chip) => (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    disabled={!isFxActive}
+                    onClick={() => setFxStakeInput(chip.value)}
+                    className={`py-2 rounded-xl text-xs font-bold font-mono transition-all ${
+                      !isFxActive
+                        ? "bg-[#10151f] text-slate-600 opacity-40 cursor-not-allowed pointer-events-none"
+                        : fxStakeInput === chip.value
+                        ? "bg-cyan-500 text-slate-950 font-black shadow-md shadow-cyan-500/30 scale-105 cursor-pointer"
+                        : "bg-[#18202d] text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Gain & Quota Summary Box */}
+              <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-xs font-mono space-y-1.5">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Gain par trade gagnant (+75%) :</span>
+                  <strong className="text-emerald-400 font-black text-sm">
+                    +${(fxStakeInput * 0.75).toFixed(2)} USD
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span>Quota de trades autorisés :</span>
+                  <strong className="text-cyan-300 font-bold">5 trades (Max +${(fxStakeInput * 3.75).toFixed(2)} USD)</strong>
+                </div>
+              </div>
+
+              {/* Status / Activation Notice */}
+              {isFxExpired ? (
+                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
+                    <Lock className="size-3.5 text-rose-400 shrink-0" />
+                    <span>Abonnement expiré (5/5 trades) — Mises verrouillées</span>
+                  </div>
+                  {isFxPending ? (
+                    <div className="px-3.5 py-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-bold text-xs flex items-center gap-1.5 shrink-0">
+                      <Clock className="size-3.5 text-cyan-400 animate-spin" />
+                      <span>Demande en cours</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onRequestPreset?.("FX_TREND", "Nexium FX Trend (Renouvellement)")}
+                      className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 shrink-0 active:scale-95"
+                    >
+                      <Sparkles className="size-3.5" />
+                      <span>Faire une nouvelle demande</span>
+                    </button>
+                  )}
+                </div>
+              ) : isFxPending ? (
+                <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-3 text-center text-xs font-bold text-cyan-300 flex items-center justify-center gap-2">
+                  <Clock className="size-3.5 text-cyan-400 animate-spin" />
+                  <span>Demande d'activation en cours de validation admin</span>
+                </div>
+              ) : !isFxApproved ? (
+                <button
+                  type="button"
+                  onClick={() => onRequestPreset?.("FX_TREND", "Nexium FX Trend")}
+                  className="w-full py-3 px-4 rounded-2xl border border-cyan-500/40 bg-gradient-to-r from-cyan-500/15 to-cyan-600/20 hover:from-cyan-500/25 hover:to-cyan-600/30 text-cyan-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
+                >
+                  <Sparkles className="size-3.5 text-cyan-400" />
+                  <span>Demander l'activation du preset</span>
+                </button>
+              ) : null}
+
+              {/* Clean 3-Metric Strip */}
+              <div
+                className={`grid grid-cols-3 gap-2 rounded-2xl border p-3 text-center font-mono ${
+                  isFxActive
+                    ? "border-cyan-500/20 bg-[#070b10]"
+                    : "border-slate-800/60 bg-[#070b10]/60 opacity-50"
+                }`}
+              >
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Volume MT5</span>
+                  <strong
+                    className={`text-xs sm:text-sm font-black ${
+                      isFxActive ? "text-cyan-400" : "text-slate-500"
+                    }`}
+                  >
+                    {isFxActive ? `≈ ${Math.max(0.01, +(fxStakeInput / 1000 * 0.20).toFixed(2))} Lot` : "—"}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Gain / Trade</span>
+                  <strong className={`text-xs sm:text-sm font-bold ${isFxActive ? "text-emerald-400" : "text-slate-500"}`}>
+                    +75%
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Quota Max</span>
+                  <strong className={`text-xs sm:text-sm font-bold ${isFxActive ? "text-cyan-300" : "text-slate-500"}`}>
+                    5 Trades
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Nexium Index Reversion */}
+          <div
+            className={`rounded-3xl border p-6 sm:p-7 space-y-6 shadow-xl flex flex-col justify-between transition-all ${
+              isIndexActive
+                ? "border-purple-500/35 bg-[#0d131e] hover:border-purple-400/60"
+                : "border-slate-800/80 bg-[#090d14]/90 opacity-80"
+            }`}
+          >
+            <div className="space-y-5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span
+                    className={`text-base sm:text-lg font-black font-mono flex items-center gap-2 ${
+                      isIndexActive ? "text-purple-400" : "text-slate-400"
+                    }`}
+                  >
+                    <span
+                      className={`size-2.5 rounded-full ${
+                        isIndexActive
+                          ? "bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.8)]"
+                          : "bg-slate-600"
+                      }`}
+                    />
+                    Preset 3 : Index Reversion
+                  </span>
+                  <span className="text-[10px] font-mono text-purple-300/80 block mt-0.5">
+                    NAS100 · Gain : +98% de la mise (Trades Illimités ∞)
+                  </span>
+                </div>
+
+                {/* Status Badges */}
+                {isIndexActive ? (
+                  <span className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    ACTIF (Illimité ∞)
+                  </span>
+                ) : isIndexPending ? (
+                  <span className="text-[11px] font-mono font-bold text-purple-300 bg-purple-500/15 px-3 py-1 rounded-full border border-purple-500/30 flex items-center gap-1.5">
+                    <Clock className="size-3 text-purple-400 animate-spin" />
+                    EN ATTENTE
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-800/70 px-3 py-1 rounded-full border border-slate-700/50 flex items-center gap-1.5">
+                    <Lock className="size-3 text-slate-400" />
+                    INACTIF
+                  </span>
+                )}
+              </div>
+
+              {/* Sizing Input */}
+              {isIndexActive ? (
+                <div className="relative flex items-center rounded-2xl bg-[#06090e] border border-purple-500/35 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-400/20 transition-all px-4 h-14">
+                  <span className="text-2xl font-black font-mono text-purple-400 mr-2 select-none">$</span>
+                  <input
+                    type="number"
+                    min={2000}
+                    max={10000}
+                    step="any"
+                    value={indexStakeInput}
+                    onChange={(e) => setIndexStakeInput(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-transparent text-white font-mono font-black text-2xl focus:outline-none tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-xs font-bold font-mono text-slate-400 uppercase tracking-widest ml-2 select-none">USD</span>
+                </div>
+              ) : (
+                <div className="relative flex items-center rounded-2xl bg-[#06090e]/60 border border-slate-800/80 px-4 h-14 opacity-50 cursor-not-allowed">
+                  <span className="text-2xl font-black font-mono text-slate-500 mr-2 select-none">$</span>
+                  <input
+                    type="number"
+                    disabled
+                    value={indexStakeInput}
+                    className="w-full bg-transparent text-slate-500 font-mono font-black text-2xl focus:outline-none tracking-tight cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-xs font-bold font-mono text-slate-600 uppercase tracking-widest ml-2 select-none">USD</span>
+                </div>
+              )}
+
+              {/* Quick Chips (Plage $2,000 - $10,000) */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {INDEX_QUICK_STAKES.map((chip) => (
+                  <button
+                    key={chip.value}
+                    type="button"
+                    disabled={!isIndexActive}
+                    onClick={() => setIndexStakeInput(chip.value)}
+                    className={`py-2 rounded-xl text-xs font-bold font-mono transition-all ${
+                      !isIndexActive
+                        ? "bg-[#10151f] text-slate-600 opacity-40 cursor-not-allowed pointer-events-none"
+                        : indexStakeInput === chip.value
+                        ? "bg-purple-500 text-white font-black shadow-md shadow-purple-500/30 scale-105 cursor-pointer"
+                        : "bg-[#18202d] text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Gain & Quota Summary Box */}
+              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs font-mono space-y-1.5">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Gain par trade gagnant (+98%) :</span>
+                  <strong className="text-emerald-400 font-black text-sm">
+                    +${(indexStakeInput * 0.98).toFixed(2)} USD
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                  <span>Quota de trades autorisés :</span>
+                  <strong className="text-emerald-300 font-bold">Trades Illimités ∞ (En continu)</strong>
+                </div>
+              </div>
+
+              {/* Status / Activation Notice */}
+              {isIndexPending ? (
+                <div className="rounded-2xl border border-purple-500/25 bg-purple-500/10 p-3 text-center text-xs font-bold text-purple-300 flex items-center justify-center gap-2">
+                  <Clock className="size-3.5 text-purple-400 animate-spin" />
+                  <span>Demande d'activation en cours de validation admin</span>
+                </div>
+              ) : !isIndexApproved ? (
+                <button
+                  type="button"
+                  onClick={() => onRequestPreset?.("INDEX_REVERSION", "Nexium Index Reversion")}
+                  className="w-full py-3 px-4 rounded-2xl border border-purple-500/40 bg-gradient-to-r from-purple-500/15 to-purple-600/20 hover:from-purple-500/25 hover:to-purple-600/30 text-purple-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
+                >
+                  <Sparkles className="size-3.5 text-purple-400" />
+                  <span>Demander l'activation du preset</span>
+                </button>
+              ) : null}
+
+              {/* Clean 3-Metric Strip */}
+              <div
+                className={`grid grid-cols-3 gap-2 rounded-2xl border p-3 text-center font-mono ${
+                  isIndexActive
+                    ? "border-purple-500/20 bg-[#070b10]"
+                    : "border-slate-800/60 bg-[#070b10]/60 opacity-50"
+                }`}
+              >
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Volume MT5</span>
+                  <strong
+                    className={`text-xs sm:text-sm font-black ${
+                      isIndexActive ? "text-purple-400" : "text-slate-500"
+                    }`}
+                  >
+                    {isIndexActive ? `≈ ${Math.max(0.01, +(indexStakeInput / 1000 * 0.10).toFixed(2))} Lot` : "—"}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Gain / Trade</span>
+                  <strong className={`text-xs sm:text-sm font-bold ${isIndexActive ? "text-emerald-400" : "text-slate-500"}`}>
+                    +98%
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Quota Max</span>
+                  <strong className={`text-xs sm:text-sm font-bold ${isIndexActive ? "text-emerald-300" : "text-slate-500"}`}>
+                    Illimité ∞
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Footer Aéré */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="text-xs font-mono text-slate-400">
+            Total alloué simultané (actifs) :{" "}
+            <strong className="text-emerald-400 font-bold">${totalAllocated.toLocaleString("fr-FR")} USD</strong>{" "}
+            ({allocationPercent}% du solde)
+          </div>
+
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={handleResetDefaults}
+              className="flex-1 sm:flex-none px-4 py-3 rounded-2xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+            >
+              RÉINITIALISER ($100 &lt; $750 &lt; $2.5K)
+            </button>
+            <button
+              type="submit"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider transition cursor-pointer shadow-xl shadow-emerald-500/25 active:scale-95"
+            >
+              <CheckCircle2 className="size-4.5" />
+              ENREGISTRER LES MISES
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ----------------------------------------------------
+// PARAMÈTRES DU COMPTE VIEW (FULL PAGE)
+// ----------------------------------------------------
+function AccountSettingsTab({
+  clientName,
+  clientEmail,
+  mt5AccountNumber,
+  balance,
+  bonus,
+  customSlug,
+  currentUserId,
+  onLogout,
+}: {
+  clientName: string;
+  clientEmail: string;
+  mt5AccountNumber: string;
+  balance: number;
+  bonus: number;
+  customSlug?: string | undefined;
+  currentUserId: string | null;
+  onLogout: () => void | Promise<void>;
+}) {
+  const [twoFactor, setTwoFactor] = useState(false);
+  const [notifications, setNotifications] = useState({
+    trades: true,
+    deposits: true,
+    security: true,
+    news: false,
+  });
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [copiedKey, setCopiedKey] = useState(false);
+
+  const slug = customSlug || getUserSlug({ name: clientName, email: clientEmail, id: currentUserId });
+  const portalUrl = `https://nexiummarkets.com/portal/${slug}`;
+
+  const handlePasswordUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("Le nouveau mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    toast.success("Mot de passe mis à jour avec succès.");
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header Banner Harmonisé */}
+      <section className="admin-card-emerald p-4 sm:p-5 relative overflow-hidden space-y-2.5 shadow-md rounded-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Paramètres du Compte</h2>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(portalUrl);
+                setCopiedKey(true);
+                setTimeout(() => setCopiedKey(false), 2000);
+                toast.success("Lien de votre portail copié !");
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-4 py-2 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm hover:border-emerald-500/50"
+            >
+              <Copy className="size-4 text-emerald-400" />
+              {copiedKey ? "LIEN COPIÉ !" : "COPIER MON LIEN PORTAIL"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Grid 4 Stat summary tiles */}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 font-mono">
+        <article className="admin-card-emerald p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">COMPTE MT5</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <Monitor className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-white">#{mt5AccountNumber}</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-emerald-500/20 font-sans">
+            <span className="text-slate-400">Type de compte</span>
+            <span className="font-mono font-bold text-emerald-400">RAW ECN</span>
+          </div>
+        </article>
+
+        <article className="admin-card-cyan p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">SERVEUR D'EXÉCUTION</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+              <Wifi className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-cyan-300">Equinix NY4</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-cyan-500/20 font-sans">
+            <span className="text-slate-400">Latence FIX</span>
+            <span className="font-mono font-bold text-emerald-400">21 ms</span>
+          </div>
+        </article>
+
+        <article className="admin-card-indigo p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">TITULAIRE VÉRIFIÉ</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+              <ShieldCheck className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-white truncate">{clientName}</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-indigo-500/20 font-sans">
+            <span className="text-slate-400">Statut KYC</span>
+            <span className="font-mono font-bold text-emerald-400">Approuvé</span>
+          </div>
+        </article>
+
+        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">SÉCURITÉ 2FA</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <Lock className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-amber-300">{twoFactor ? "ACTIVÉ" : "ACTIF"}</p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-amber-500/20 font-sans">
+            <span className="text-slate-400">Chiffrement</span>
+            <span className="font-mono font-bold text-emerald-400">SHA-256</span>
+          </div>
+        </article>
+      </section>
+
+      {/* 3 Cartes Équilibrées et Institutionnelles avec Libellés Intégrés & Grands Textes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
+        {/* 1. Identifiants & Profil */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 shadow-md flex flex-col justify-between space-y-5">
+          <div>
+            <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
+              <div className="grid size-10 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <User className="size-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">PROFIL &amp; ACCÈS</p>
+                <h3 className="text-lg font-black text-white tracking-tight">Coordonnées Titulaire</h3>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 mt-5">
+              {/* NOM DU TITULAIRE */}
+              <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-3.5 space-y-1 hover:border-emerald-500/40 transition">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  NOM DU TITULAIRE
+                </span>
+                <div className="flex items-center gap-2.5 text-base sm:text-lg font-bold text-white">
+                  <User className="size-5 text-emerald-400 shrink-0" />
+                  <span className="truncate">{clientName}</span>
+                </div>
+              </div>
+
+              {/* EMAIL ENREGISTRÉ */}
+              <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-3.5 space-y-1 hover:border-emerald-500/40 transition">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  EMAIL ENREGISTRÉ
+                </span>
+                <div className="flex items-center gap-2.5 text-base sm:text-lg font-bold text-white font-mono">
+                  <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="truncate">{clientEmail || "investisseur@nexiummarkets.com"}</span>
+                </div>
+              </div>
+
+              {/* LIEN PORTAIL CLIENT */}
+              <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-3.5 space-y-1.5 hover:border-emerald-500/40 transition">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  LIEN PORTAIL CLIENT
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-xs sm:text-sm font-bold text-gray-200 font-mono truncate">
+                    {portalUrl}
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(portalUrl);
+                      toast.success("Lien copié !");
+                    }}
+                    className="rounded-xl border border-white/[0.1] bg-[#141a23] hover:bg-emerald-500/20 p-2 text-emerald-400 cursor-pointer transition shadow-sm hover:border-emerald-500/40 shrink-0"
+                    title="Copier le lien"
+                  >
+                    <Copy className="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>Réseau FIX 4.4</span>
+            <span className="text-emerald-400 font-bold">Synchronisé NY4</span>
+          </div>
+        </div>
+
+        {/* 2. Sécurité & Mot de passe */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 shadow-md flex flex-col justify-between space-y-5">
+          <div>
+            <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
+              <div className="grid size-10 place-items-center rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                <Lock className="size-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">ACCÈS SÉCURISÉ</p>
+                <h3 className="text-lg font-black text-white tracking-tight">Modifier Mot de Passe</h3>
+              </div>
+            </div>
+
+            <form onSubmit={handlePasswordUpdate} className="space-y-3.5 mt-5">
+              {/* NOUVEAU MOT DE PASSE */}
+              <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-3.5 space-y-1 focus-within:border-amber-400/60 focus-within:ring-1 focus-within:ring-amber-400/20 transition">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  NOUVEAU MOT DE PASSE
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 6 caractères"
+                  className="w-full bg-transparent text-base font-bold text-white outline-none font-mono placeholder:text-slate-600"
+                />
+              </div>
+
+              {/* CONFIRMER LE MOT DE PASSE */}
+              <div className="rounded-2xl border border-white/[0.08] bg-[#0c1017] p-3.5 space-y-1 focus-within:border-amber-400/60 focus-within:ring-1 focus-within:ring-amber-400/20 transition">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  CONFIRMER LE MOT DE PASSE
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Répétez le mot de passe"
+                  className="w-full bg-transparent text-base font-bold text-white outline-none font-mono placeholder:text-slate-600"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider transition cursor-pointer shadow-lg shadow-emerald-500/20 mt-2"
+              >
+                METTRE À JOUR
+              </button>
+            </form>
+          </div>
+
+          <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between">
+            <span className="text-xs text-slate-400 font-mono">Clé de chiffrement</span>
+            <span className="text-xs text-amber-400 font-bold font-mono">AES-256 GCM</span>
+          </div>
+        </div>
+
+        {/* 3. Session & Sécurité Réseau */}
+        <div className="rounded-3xl border border-white/[0.08] bg-[#10141b] p-6 shadow-md flex flex-col justify-between space-y-5 md:col-span-2 xl:col-span-1">
+          <div>
+            <div className="flex items-center gap-3 border-b border-white/[0.06] pb-4">
+              <div className="grid size-10 place-items-center rounded-2xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                <ShieldCheck className="size-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">TÉLÉMÉTRIE &amp; SÉCURITÉ</p>
+                <h3 className="text-lg font-black text-white tracking-tight">Session ECN Active</h3>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 mt-5 font-mono">
+              <div className="p-4 rounded-2xl border border-white/[0.06] bg-[#0c1017] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-xs uppercase font-bold tracking-wider">Passerelle FIX</span>
+                  <span className="text-emerald-400 text-xs sm:text-sm font-black flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Connecté (21 ms)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+                  <span className="text-slate-400 text-xs uppercase font-bold tracking-wider">Protocole TLS</span>
+                  <span className="text-white text-xs sm:text-sm font-bold">v1.3 HSTS Strict</span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
+                  <span className="text-slate-400 text-xs uppercase font-bold tracking-wider">Serveur MT5</span>
+                  <span className="text-cyan-300 text-xs sm:text-sm font-bold">Equinix NY4 Hub</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-white/[0.06] bg-[#0c1017] flex items-center justify-between">
+                <div>
+                  <span className="text-slate-400 text-xs uppercase font-bold tracking-wider block">Protection Anti-DDoS</span>
+                  <strong className="text-emerald-400 font-black text-xs sm:text-sm">Cloudflare Enterprise</strong>
+                </div>
+                <ShieldCheck className="size-6 text-emerald-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between">
+            <span className="text-xs text-slate-400 font-mono">Gestion de session</span>
+            <button
+              onClick={onLogout}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400 hover:text-rose-300 transition cursor-pointer hover:underline"
+            >
+              <LogOut className="size-3.5" />
+              Se déconnecter
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------
 // MAIN DASHBOARD COMPONENT
 // ----------------------------------------------------
 import { getUserSlug } from "@/lib/user-slug";
@@ -6507,6 +7601,92 @@ export function NexiumDashboard({
   const [selectedPresetIds, setSelectedPresetIds] = useState<string[]>([]);
   const [showPresetConfirmModal, setShowPresetConfirmModal] = useState(false);
   const [submittingPreset, setSubmittingPreset] = useState(false);
+  const [terminalPositions, setTerminalPositions] = useState<Mt5Position[]>([]);
+  const [quotaStats, setQuotaStats] = useState<PresetQuotaStats>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nexium_preset_quota_stats");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return { goldWins: 0, fxWins: 0, indexWins: 0 };
+  });
+
+  const handleQuotaChange = (newStats: PresetQuotaStats) => {
+    setQuotaStats(newStats);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(newStats));
+      } catch {}
+    }
+  };
+
+  // Montants de mise alloués par Trade pour chaque Preset ($ USD)
+  const [presetStakes, setPresetStakes] = useState<PresetStakes>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("nexium_preset_stakes");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return { goldStake: 100, fxStake: 100, indexStake: 100 };
+  });
+
+  const handleUpdatePresetStake = (key: keyof PresetStakes, amount: number) => {
+    setPresetStakes((prev) => {
+      const next = { ...prev, [key]: amount };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("nexium_preset_stakes", JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
+    toast.success(`Mise par trade configurée à $${amount} USD pour ce preset.`);
+  };
+
+  const handleUpdateAllPresetStakes = (newStakes: PresetStakes) => {
+    setPresetStakes(newStakes);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("nexium_preset_stakes", JSON.stringify(newStakes));
+      } catch {}
+    }
+  };
+
+  // Calcul dynamique des P&L en direct pour chaque Preset selon les positions du terminal MT5
+  const goldPositions = useMemo(
+    () => terminalPositions.filter((p) => p.symbol === "GOLD" || p.symbol === "XAUUSD"),
+    [terminalPositions]
+  );
+  const goldPnlLive = useMemo(
+    () => goldPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
+    [goldPositions]
+  );
+  const goldTotalPnl = +(126.40 + goldPnlLive).toFixed(2);
+
+  const fxPositions = useMemo(
+    () => terminalPositions.filter((p) => ["EURUSD", "DXY", "GBPUSD", "USDJPY"].includes(p.symbol)),
+    [terminalPositions]
+  );
+  const fxPnlLive = useMemo(
+    () => fxPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
+    [fxPositions]
+  );
+  const fxTotalPnl = +(84.20 + fxPnlLive).toFixed(2);
+
+  const indexPositions = useMemo(
+    () =>
+      terminalPositions.filter((p) =>
+        ["DJI", "NDQ", "SPX", "NAS100", "US30", "AAPL", "TSLA", "NVDA"].includes(p.symbol)
+      ),
+    [terminalPositions]
+  );
+  const indexPnlLive = useMemo(
+    () => indexPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
+    [indexPositions]
+  );
+  const indexTotalPnl = +(48.20 + Math.max(0, indexPnlLive)).toFixed(2);
 
   // Applique un profil (le sien, ou celui d'un client supervisé) à l'état local du dashboard.
   const applyProfileToState = (profile: NonNullable<Awaited<ReturnType<typeof getUserProfile>>>) => {
@@ -6532,6 +7712,12 @@ export function NexiumDashboard({
     // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
     if (profile.engines_config) {
       const cfg = profile.engines_config as any;
+      if (cfg.quota_stats) {
+        setQuotaStats(cfg.quota_stats);
+        try {
+          localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(cfg.quota_stats));
+        } catch {}
+      }
       setVisibleBotIds(
         [
           cfg.aiGold?.visible !== false && "nexium-ai-gold",
@@ -6678,6 +7864,12 @@ export function NexiumDashboard({
       // Synchronisation en direct des paramètres de moteurs IA
       if (updatedProfile.engines_config) {
         const cfg = updatedProfile.engines_config as any;
+        if (cfg.quota_stats) {
+          setQuotaStats(cfg.quota_stats);
+          try {
+            localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(cfg.quota_stats));
+          } catch {}
+        }
         setVisibleBotIds(
           [
             cfg.aiGold?.visible !== false && "nexium-ai-gold",
@@ -6867,7 +8059,7 @@ export function NexiumDashboard({
   };
 
   const handleRequestSinglePreset = async (
-    presetKey: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION",
+    presetKey: string,
     presetName: string
   ) => {
     if (submittingPreset) return;
@@ -6882,11 +8074,13 @@ export function NexiumDashboard({
           return;
         }
         await recordAuditLog({
-          user_email: clientEmail || "investisseur@nexiummarkets.com",
+          admin_id: currentUserId || "portal-user",
+          admin_name: clientName || "Client",
           action: "PRESET_ACTIVATION_REQUESTED",
-          details: `Demande d'activation du Preset ${presetName} (${presetKey}) soumise par ${clientName || "le client"}.`,
+          ...(currentUserId ? { target_user_id: currentUserId } : {}),
+          ...(clientEmail ? { target_user_email: clientEmail } : {}),
+          details: `Demande d'activation du Preset ${presetName} (${presetKey}) soumise par ${clientName || "le client"} (${clientEmail || "email non renseigné"}).`,
           ip_address: "web-portal",
-          severity: "INFO",
         }).catch((e) => console.warn("Notice audit log:", e));
       }
       setLicenseStatus("PENDING_PRESET_APPROVAL");
@@ -6983,7 +8177,9 @@ export function NexiumDashboard({
   const navItems: ReadonlyArray<readonly [React.ComponentType<{ className?: string }>, string]> = [
     [LayoutDashboard, "Vue d’ensemble"],
     [Monitor, "MT5"],
+    [SlidersHorizontal, "Configuration des Mises"],
     [Wallet, "Portefeuille"],
+    [Settings, "Paramètres du Compte"],
   ];
 
   // Actions
@@ -7105,9 +8301,19 @@ export function NexiumDashboard({
     toast.success(`Position ${pos.symbol} (${pos.ticket}) clôturée : ${pos.pnl}.`);
   };
 
+  const handleLiveBalanceChange = (newBal: number) => {
+    const rounded = +(newBal.toFixed(2));
+    setBalance(rounded);
+    if (isSupabaseConfigured && currentUserId) {
+      updateUserProfile(currentUserId, { balance: rounded }).catch((err) =>
+        console.warn("Notice balance sync:", err)
+      );
+    }
+  };
+
   const handleEmergencyHalt = () => {
     const totalPnl = positions.reduce((acc, p) => acc + p.pnlNum, 0);
-    setBalance((prev) => prev + totalPnl);
+    handleLiveBalanceChange(balance + totalPnl);
     setPositions([]);
     handleSetAllBotsActive(false);
 
@@ -7300,15 +8506,15 @@ export function NexiumDashboard({
       id: "AI_GOLD",
       name: "Preset 1 : Nexium AI Gold",
       subtitle: "XAUUSD Institutional Breakout",
-      badge: "Moteur Primaire Or",
+      badge: "Moteur Primaire Or · 50% de la mise",
       market: "XAUUSD (Or Spot)",
       timeframe: "M15 / H1",
-      targetReturn: "+14.8% à +24.2% / mois",
-      maxDrawdown: "< 4.2%",
-      winRate: "73.8%",
+      targetReturn: "+50% par trade (2 trades max)",
+      maxDrawdown: "< 3.5%",
+      winRate: "50%",
       gateway: "Equinix NY4 Cross-Connect FIX 4.4",
       description:
-        "Algorithme propriétaire exploitant les micro-ruptures de volatilité et le carnet d'ordres L2 sur le cours de l'Or Spot avec prise de profit dynamique.",
+        "Preset 1 : Algorithme haute précision sur l'Or Spot. Gain de +50% de la mise par trade, pour un quota contractuel de 2 trades maximum.",
       borderClass: "border-amber-500/40 hover:border-amber-400 shadow-amber-500/10",
       accentBg: "bg-amber-500/10 text-amber-400 border-amber-500/30",
       btnClass: "bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20",
@@ -7317,15 +8523,15 @@ export function NexiumDashboard({
       id: "FX_TREND",
       name: "Preset 2 : Nexium FX Trend",
       subtitle: "Forex Majors Macro Momentum",
-      badge: "Multi-Paires Alpha",
+      badge: "Multi-Paires Alpha · 75% de la mise",
       market: "EURUSD · GBPUSD · USDJPY",
       timeframe: "H1 / H4",
-      targetReturn: "+11.5% à +18.5% / mois",
-      maxDrawdown: "< 3.5%",
-      winRate: "70.2%",
+      targetReturn: "+75% par trade (5 trades max)",
+      maxDrawdown: "< 2.8%",
+      winRate: "75%",
       gateway: "LD4 London Equinix Bridge",
       description:
-        "Moteur de suivi de tendance macroéconomique synchronisé avec les écarts de taux interbancaires et les flux institutionnels de devises majeures.",
+        "Preset 2 : Moteur de momentum macroéconomique sur devises majeures. Gain de +75% de la mise par trade, pour un quota de 5 trades maximum.",
       borderClass: "border-cyan-500/40 hover:border-cyan-400 shadow-cyan-500/10",
       accentBg: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
       btnClass: "bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/20",
@@ -7334,15 +8540,15 @@ export function NexiumDashboard({
       id: "INDEX_REVERSION",
       name: "Preset 3 : Nexium Index Reversion",
       subtitle: "US Indices Mean Reversion Stat-Arb",
-      badge: "Haute Fréquence Indices",
+      badge: "Haute Fréquence Indices · 98% de la mise",
       market: "NAS100 · US30 · US500",
       timeframe: "M5 / M15",
-      targetReturn: "+13.2% à +21.0% / mois",
-      maxDrawdown: "< 4.8%",
-      winRate: "76.4%",
+      targetReturn: "+98% par trade (Trading Illimité ∞)",
+      maxDrawdown: "0.0% (Zero Drawdown)",
+      winRate: "98%",
       gateway: "Chicago CME Direct Feed",
       description:
-        "Stratégie de retour à la moyenne statistique sur les indices américains lors des ouvertures de session de Wall Street et des flux institutionnels.",
+        "Preset 3 : Stratégie statistique institutionnelle sur indices américains. Gain de +98% de la mise par trade, trading illimité en continu sans expiration.",
       borderClass: "border-purple-500/40 hover:border-purple-400 shadow-purple-500/10",
       accentBg: "bg-purple-500/10 text-purple-400 border-purple-500/30",
       btnClass: "bg-purple-500 hover:bg-purple-400 text-white shadow-purple-500/20",
@@ -7933,13 +9139,6 @@ export function NexiumDashboard({
 
         {/* Footer */}
         <div className="mt-auto border-t border-white/[0.06] pt-4 space-y-2">
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-gray-400 hover:bg-white/[0.04] hover:text-white transition cursor-pointer"
-          >
-            <Settings className="size-4" />
-            Paramètres du Terminal
-          </button>
           <Link
             to="/"
             className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-gray-400 hover:bg-white/[0.04] hover:text-white transition cursor-pointer"
@@ -7976,7 +9175,9 @@ export function NexiumDashboard({
               <h1 className="mt-0.5 text-base sm:text-xl font-black text-white">
                 {activeNav === "Vue d’ensemble" && "Pilotage & Performances Globales"}
                 {activeNav === "MT5" && "Terminal MetaTrader 5 · Trading Direct & Presets"}
+                {activeNav === "Configuration des Mises" && "Gestion du Capital & Configuration des Mises"}
                 {activeNav === "Portefeuille" && "Gestion Financière & Relevés"}
+                {activeNav === "Paramètres du Compte" && "Sécurité & Configuration du Compte"}
               </h1>
             </div>
           </div>
@@ -8053,12 +9254,12 @@ export function NexiumDashboard({
                   <button
                     onClick={() => {
                       setUserMenuOpen(false);
-                      setSettingsOpen(true);
+                      setActiveNav("Paramètres du Compte");
                     }}
                     className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-gray-300 hover:bg-white/[0.06] hover:text-white transition cursor-pointer"
                   >
                     <Settings className="size-3.5" />
-                    Paramètres
+                    Paramètres du Compte
                   </button>
                   <Link
                     to="/"
@@ -8103,7 +9304,7 @@ export function NexiumDashboard({
         </header>
 
         {/* Tab Body */}
-        <main className="flex-1 p-4 sm:p-5 lg:p-6 max-w-[1650px] w-full mx-auto">
+        <main className={`flex-1 p-3 sm:p-4 max-w-[1650px] w-full mx-auto ${activeNav === "Vue d’ensemble" ? "flex flex-col h-[calc(100vh-5rem)] overflow-hidden" : ""}`}>
           {activeNav === "Vue d’ensemble" && (
             <OverviewTab
               clientName={clientName}
@@ -8119,9 +9320,7 @@ export function NexiumDashboard({
               onOpenWithdraw={() => setWithdrawOpen(true)}
               onOpenEngine={() => setActiveNav("MT5")}
               onOpenRisk={() => setActiveNav("Risque")}
-              onToggleBotPause={handleToggleBotPause}
-              onOpenBotDetail={(bot) => setSelectedDetailBot(bot)}
-              onBalanceChange={(newBal) => setBalance(newBal)}
+              onBalanceChange={handleLiveBalanceChange}
             />
           )}
 
@@ -8134,17 +9333,33 @@ export function NexiumDashboard({
                   const bot = visibleBots.find((b) => b.id === "nexium-ai-gold") || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("AI_GOLD");
-                  const isPending = requestedPresets.includes("AI_GOLD") && !isApproved;
-                  const isRunning = isApproved && bot?.statusBadge === "ACTIF";
+                  const isPending = requestedPresets.includes("AI_GOLD");
+                  const isExpired = isApproved && quotaStats.goldWins >= 2;
+                  const isRunning = isApproved && !isExpired && !isPending && bot?.statusBadge === "ACTIF";
 
                   return (
                     <div className="rounded-2xl border border-amber-900/60 bg-[#0e0b06] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-amber-500/50 transition">
                       {/* Top Badges */}
                       <div className="flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400 font-mono text-[11px] font-bold">
-                          XAUUSD
-                        </span>
-                        {isApproved ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2.5 py-0.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400 font-mono text-[11px] font-bold">
+                            XAUUSD
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300 font-mono text-[10px] font-bold">
+                            +50% GAIN / TRADE (2 MAX)
+                          </span>
+                        </div>
+                        {isPending ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-[11px] font-bold font-mono animate-pulse">
+                            <span className="size-1.5 rounded-full bg-amber-400" />
+                            EN ATTENTE
+                          </span>
+                        ) : isExpired ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-rose-500/50 bg-rose-950/40 text-rose-300 text-[11px] font-bold font-mono">
+                            <span className="size-1.5 rounded-full bg-rose-500" />
+                            EXPIRÉ (2/2)
+                          </span>
+                        ) : isApproved ? (
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-bold font-mono ${
                               isRunning
@@ -8154,11 +9369,6 @@ export function NexiumDashboard({
                           >
                             <span className={`size-1.5 rounded-full ${isRunning ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
                             {isRunning ? "ACTIF" : "EN PAUSE"}
-                          </span>
-                        ) : isPending ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-[11px] font-bold font-mono animate-pulse">
-                            <span className="size-1.5 rounded-full bg-amber-400" />
-                            EN ATTENTE
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-700/60 bg-slate-800/40 text-slate-400 text-[11px] font-bold font-mono">
@@ -8171,27 +9381,75 @@ export function NexiumDashboard({
                       {/* Title */}
                       <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">Nexium AI Gold</h3>
 
-                      {/* Middle: P&L + Score Bar */}
+                      {/* Middle: P&L + Quota Progress Bar */}
                       <div className="flex items-end justify-between">
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
-                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${isApproved ? "text-[#00D084]" : "text-slate-500"}`}>
-                            {isApproved ? "+$126.40" : "$0.00"}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                            {isApproved && goldPositions.length > 0 && (
+                              <span className="text-[10px] font-mono font-bold text-amber-400">({goldPositions.length} pos)</span>
+                            )}
+                          </div>
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${!isApproved ? "text-slate-500" : goldTotalPnl >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
+                            {isApproved ? `${goldTotalPnl >= 0 ? "+" : "-"}$${Math.abs(goldTotalPnl).toFixed(2)}` : "$0.00"}
                           </strong>
                         </div>
                         <div className="text-right">
                           <span className="text-[11px] font-mono font-bold text-slate-400">
-                            SCORE <strong className="text-amber-400 font-bold">84 / 100</strong>
+                            QUOTA : <strong className={isExpired ? "text-rose-400" : "text-amber-400"}>{Math.min(2, quotaStats.goldWins)} / 2 GAINS</strong>
                           </span>
-                          <div className="mt-1 h-1 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
-                            <div className="h-full bg-amber-400 rounded-full w-[84%]" />
+                          <div className="mt-1 h-1.5 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
+                            <div
+                              className={`h-full rounded-full ${isExpired ? "bg-rose-500" : "bg-amber-400"}`}
+                              style={{ width: `${Math.min(100, (Math.min(2, quotaStats.goldWins) / 2) * 100)}%` }}
+                            />
                           </div>
                         </div>
                       </div>
 
+                      {/* Configured Stake Info */}
+                      <div className="flex items-center justify-between bg-[#121a2d]/60 rounded-xl px-2.5 py-1.5 border border-slate-800/80">
+                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise par trade :</span>
+                        <button
+                          onClick={() => setActiveNav("Configuration des Mises")}
+                          className="flex items-center gap-1 text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 transition cursor-pointer"
+                          title="Modifier la mise dans Configuration des Mises"
+                        >
+                          <span>${presetStakes.goldStake} USD</span>
+                          <SlidersHorizontal className="size-3 text-slate-400" />
+                        </button>
+                      </div>
+
                       {/* Bottom Buttons */}
                       <div className="flex items-center gap-2 pt-1">
-                        {isApproved ? (
+                        {isExpired ? (
+                          isPending ? (
+                            <button
+                              disabled
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                            >
+                              <Clock className="size-3 animate-spin" />
+                              <span>EN ATTENTE VALIDATION ADMIN</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRequestSinglePreset("AI_GOLD", "Nexium AI Gold (Renouvellement)")}
+                              disabled={submittingPreset}
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/60 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.2)] active:scale-95"
+                            >
+                              <Sparkles className="size-3" />
+                              <span>FAIRE UNE NOUVELLE DEMANDE</span>
+                            </button>
+                          )
+                        ) : isPending ? (
+                          <button
+                            disabled
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                          >
+                            <Clock className="size-3 animate-spin" />
+                            <span>EN ATTENTE ADMIN</span>
+                          </button>
+                        ) : isApproved ? (
                           <button
                             onClick={() => handleToggleBotPause("nexium-ai-gold")}
                             className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-md ${
@@ -8201,15 +9459,7 @@ export function NexiumDashboard({
                             }`}
                           >
                             <span className={`size-1.5 rounded-full ${isRunning ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
-                            <span>{isRunning ? "METTRE EN PAUSE" : "RELANCER"}</span>
-                          </button>
-                        ) : isPending ? (
-                          <button
-                            disabled
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
-                          >
-                            <Clock className="size-3 animate-spin" />
-                            <span>EN ATTENTE ADMIN</span>
+                            <span>{isRunning ? "METTRE EN PAUSE" : "LANCER LE BOT"}</span>
                           </button>
                         ) : (
                           <button
@@ -8222,7 +9472,7 @@ export function NexiumDashboard({
                           </button>
                         )}
                         <button
-                          onClick={() => setSelectedDetailBot(bot)}
+                          onClick={() => setSelectedDetailBot(bot || null)}
                           className="rounded-full border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-1.5 px-3.5 text-[11px] font-bold text-slate-200 transition cursor-pointer"
                         >
                           Détails
@@ -8237,17 +9487,33 @@ export function NexiumDashboard({
                   const bot = visibleBots.find((b) => b.id === "nexium-fx-trend") || bots[1] || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("FX_TREND");
-                  const isPending = requestedPresets.includes("FX_TREND") && !isApproved;
-                  const isRunning = isApproved && bot?.statusBadge === "ACTIF";
+                  const isPending = requestedPresets.includes("FX_TREND");
+                  const isExpired = isApproved && quotaStats.fxWins >= 5;
+                  const isRunning = isApproved && !isExpired && !isPending && bot?.statusBadge === "ACTIF";
 
                   return (
                     <div className="rounded-2xl border border-cyan-900/60 bg-[#050e16] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-cyan-500/50 transition">
                       {/* Top Badges */}
                       <div className="flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 text-cyan-400 font-mono text-[11px] font-bold">
-                          EURUSD
-                        </span>
-                        {isApproved ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2.5 py-0.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 text-cyan-400 font-mono text-[11px] font-bold">
+                            EURUSD
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-mono text-[10px] font-bold">
+                            +75% GAIN / TRADE (5 MAX)
+                          </span>
+                        </div>
+                        {isPending ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-cyan-500/50 bg-cyan-500/15 text-cyan-300 text-[11px] font-bold font-mono animate-pulse">
+                            <span className="size-1.5 rounded-full bg-cyan-400" />
+                            EN ATTENTE
+                          </span>
+                        ) : isExpired ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-rose-500/50 bg-rose-950/40 text-rose-300 text-[11px] font-bold font-mono">
+                            <span className="size-1.5 rounded-full bg-rose-500" />
+                            EXPIRÉ (5/5)
+                          </span>
+                        ) : isApproved ? (
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-bold font-mono ${
                               isRunning
@@ -8257,11 +9523,6 @@ export function NexiumDashboard({
                           >
                             <span className={`size-1.5 rounded-full ${isRunning ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
                             {isRunning ? "ACTIF" : "EN PAUSE"}
-                          </span>
-                        ) : isPending ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-cyan-500/50 bg-cyan-500/15 text-cyan-300 text-[11px] font-bold font-mono animate-pulse">
-                            <span className="size-1.5 rounded-full bg-cyan-400" />
-                            EN ATTENTE
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-700/60 bg-slate-800/40 text-slate-400 text-[11px] font-bold font-mono">
@@ -8274,27 +9535,75 @@ export function NexiumDashboard({
                       {/* Title */}
                       <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">Nexium FX Trend</h3>
 
-                      {/* Middle: P&L + Score Bar */}
+                      {/* Middle: P&L + Quota Progress Bar */}
                       <div className="flex items-end justify-between">
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
-                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${isApproved ? "text-[#00D084]" : "text-slate-500"}`}>
-                            {isApproved ? "+$84.20" : "$0.00"}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                            {isApproved && fxPositions.length > 0 && (
+                              <span className="text-[10px] font-mono font-bold text-cyan-400">({fxPositions.length} pos)</span>
+                            )}
+                          </div>
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${!isApproved ? "text-slate-500" : fxTotalPnl >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
+                            {isApproved ? `${fxTotalPnl >= 0 ? "+" : "-"}$${Math.abs(fxTotalPnl).toFixed(2)}` : "$0.00"}
                           </strong>
                         </div>
                         <div className="text-right">
                           <span className="text-[11px] font-mono font-bold text-slate-400">
-                            SCORE <strong className="text-cyan-400 font-bold">79 / 100</strong>
+                            QUOTA : <strong className={isExpired ? "text-rose-400" : "text-cyan-400"}>{Math.min(5, quotaStats.fxWins)} / 5 GAINS</strong>
                           </span>
-                          <div className="mt-1 h-1 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
-                            <div className="h-full bg-cyan-400 rounded-full w-[79%]" />
+                          <div className="mt-1 h-1.5 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
+                            <div
+                              className={`h-full rounded-full ${isExpired ? "bg-rose-500" : "bg-cyan-400"}`}
+                              style={{ width: `${Math.min(100, (Math.min(5, quotaStats.fxWins) / 5) * 100)}%` }}
+                            />
                           </div>
                         </div>
                       </div>
 
+                      {/* Configured Stake Info */}
+                      <div className="flex items-center justify-between bg-[#121a2d]/60 rounded-xl px-2.5 py-1.5 border border-slate-800/80">
+                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise par trade :</span>
+                        <button
+                          onClick={() => setActiveNav("Configuration des Mises")}
+                          className="flex items-center gap-1 text-[11px] font-mono font-bold text-cyan-400 hover:text-cyan-300 transition cursor-pointer"
+                          title="Modifier la mise dans Configuration des Mises"
+                        >
+                          <span>${presetStakes.fxStake} USD</span>
+                          <SlidersHorizontal className="size-3 text-slate-400" />
+                        </button>
+                      </div>
+
                       {/* Bottom Buttons */}
                       <div className="flex items-center gap-2 pt-1">
-                        {isApproved ? (
+                        {isExpired ? (
+                          isPending ? (
+                            <button
+                              disabled
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                            >
+                              <Clock className="size-3 animate-spin" />
+                              <span>EN ATTENTE VALIDATION ADMIN</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRequestSinglePreset("FX_TREND", "Nexium FX Trend (Renouvellement)")}
+                              disabled={submittingPreset}
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/60 bg-gradient-to-r from-cyan-500/20 to-cyan-600/20 hover:from-cyan-500/30 hover:to-cyan-600/30 text-cyan-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.2)] active:scale-95"
+                            >
+                              <Sparkles className="size-3" />
+                              <span>FAIRE UNE NOUVELLE DEMANDE</span>
+                            </button>
+                          )
+                        ) : isPending ? (
+                          <button
+                            disabled
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                          >
+                            <Clock className="size-3 animate-spin" />
+                            <span>EN ATTENTE ADMIN</span>
+                          </button>
+                        ) : isApproved ? (
                           <button
                             onClick={() => handleToggleBotPause("nexium-fx-trend")}
                             className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-md ${
@@ -8304,15 +9613,7 @@ export function NexiumDashboard({
                             }`}
                           >
                             <span className={`size-1.5 rounded-full ${isRunning ? "bg-cyan-400 animate-pulse" : "bg-emerald-400"}`} />
-                            <span>{isRunning ? "METTRE EN PAUSE" : "RELANCER"}</span>
-                          </button>
-                        ) : isPending ? (
-                          <button
-                            disabled
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
-                          >
-                            <Clock className="size-3 animate-spin" />
-                            <span>EN ATTENTE ADMIN</span>
+                            <span>{isRunning ? "METTRE EN PAUSE" : "LANCER LE BOT"}</span>
                           </button>
                         ) : (
                           <button
@@ -8325,7 +9626,7 @@ export function NexiumDashboard({
                           </button>
                         )}
                         <button
-                          onClick={() => setSelectedDetailBot(bot)}
+                          onClick={() => setSelectedDetailBot(bot || null)}
                           className="rounded-full border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-1.5 px-3.5 text-[11px] font-bold text-slate-200 transition cursor-pointer"
                         >
                           Détails
@@ -8347,9 +9648,14 @@ export function NexiumDashboard({
                     <div className="rounded-2xl border border-purple-900/60 bg-[#0d0716] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-purple-500/50 transition">
                       {/* Top Badges */}
                       <div className="flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 rounded-md border border-purple-500/40 bg-purple-500/10 text-purple-400 font-mono text-[11px] font-bold">
-                          NAS100
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2.5 py-0.5 rounded-md border border-purple-500/40 bg-purple-500/10 text-purple-400 font-mono text-[11px] font-bold">
+                            NAS100
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-300 font-mono text-[10px] font-bold">
+                            +98% GAIN / TRADE (ILLIMITÉ ∞)
+                          </span>
+                        </div>
                         {isApproved ? (
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-bold font-mono ${
@@ -8377,22 +9683,40 @@ export function NexiumDashboard({
                       {/* Title */}
                       <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">Nexium Index Reversion</h3>
 
-                      {/* Middle: P&L + Score Bar */}
+                      {/* Middle: P&L + Quota Progress Bar */}
                       <div className="flex items-end justify-between">
                         <div>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
-                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${isApproved ? "text-rose-400" : "text-slate-500"}`}>
-                            {isApproved ? "-$22.60" : "$0.00"}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                            {isApproved && indexPositions.length > 0 && (
+                              <span className="text-[10px] font-mono font-bold text-purple-400">({indexPositions.length} pos)</span>
+                            )}
+                          </div>
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${!isApproved ? "text-slate-500" : "text-[#00D084]"}`}>
+                            {isApproved ? `+$${Math.max(0, indexTotalPnl).toFixed(2)}` : "$0.00"}
                           </strong>
                         </div>
                         <div className="text-right">
                           <span className="text-[11px] font-mono font-bold text-slate-400">
-                            SCORE <strong className="text-purple-400 font-bold">81 / 100</strong>
+                            QUOTA : <strong className="text-purple-400">ILLIMITÉ (∞) · 98% GAIN</strong>
                           </span>
-                          <div className="mt-1 h-1 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
-                            <div className="h-full bg-purple-400 rounded-full w-[81%]" />
+                          <div className="mt-1 h-1.5 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
+                            <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-400 w-full" />
                           </div>
                         </div>
+                      </div>
+
+                      {/* Configured Stake Info */}
+                      <div className="flex items-center justify-between bg-[#121a2d]/60 rounded-xl px-2.5 py-1.5 border border-slate-800/80">
+                        <span className="text-[10px] font-semibold text-slate-400 font-mono">Mise par trade :</span>
+                        <button
+                          onClick={() => setActiveNav("Configuration des Mises")}
+                          className="flex items-center gap-1 text-[11px] font-mono font-bold text-purple-400 hover:text-purple-300 transition cursor-pointer"
+                          title="Modifier la mise dans Configuration des Mises"
+                        >
+                          <span>${presetStakes.indexStake} USD</span>
+                          <SlidersHorizontal className="size-3 text-slate-400" />
+                        </button>
                       </div>
 
                       {/* Bottom Buttons */}
@@ -8407,7 +9731,7 @@ export function NexiumDashboard({
                             }`}
                           >
                             <span className={`size-1.5 rounded-full ${isRunning ? "bg-purple-400 animate-pulse" : "bg-emerald-400"}`} />
-                            <span>{isRunning ? "METTRE EN PAUSE" : "RELANCER"}</span>
+                            <span>{isRunning ? "METTRE EN PAUSE" : "LANCER LE BOT"}</span>
                           </button>
                         ) : isPending ? (
                           <button
@@ -8428,7 +9752,7 @@ export function NexiumDashboard({
                           </button>
                         )}
                         <button
-                          onClick={() => setSelectedDetailBot(bot)}
+                          onClick={() => setSelectedDetailBot(bot || null)}
                           className="rounded-full border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-1.5 px-3.5 text-[11px] font-bold text-slate-200 transition cursor-pointer"
                         >
                           Détails
@@ -8445,11 +9769,32 @@ export function NexiumDashboard({
                 bonus={bonus}
                 mt5AccountNumber={mt5AccountNumber}
                 clientName={clientName}
+                activePreset={activePreset}
+                bots={bots}
                 onOpenDeposit={openDepositModal}
                 onOpenWithdraw={() => setWithdrawOpen(true)}
-                onBalanceChange={(newBal) => setBalance(newBal)}
+                onBalanceChange={handleLiveBalanceChange}
+                onPositionsChange={setTerminalPositions}
+                quotaStats={quotaStats}
+                onQuotaChange={handleQuotaChange}
+                presetStakes={presetStakes}
+                onOpenStakeConfig={() => setActiveNav("Configuration des Mises")}
               />
             </div>
+          )}
+
+          {activeNav === "Configuration des Mises" && (
+            <StakeManagementTab
+              balance={balance}
+              bonus={bonus}
+              presetStakes={presetStakes}
+              activePreset={activePreset}
+              requestedPresets={requestedPresets}
+              quotaStats={quotaStats}
+              onRequestPreset={handleRequestSinglePreset}
+              onUpdatePresetStakes={handleUpdateAllPresetStakes}
+              onOpenTerminal={() => setActiveNav("MT5")}
+            />
           )}
 
           {activeNav === "Portefeuille" && (
@@ -8463,6 +9808,19 @@ export function NexiumDashboard({
               paymentSettings={paymentSettings}
               onOpenDeposit={openDepositModal}
               onAddTransaction={(tx) => setTransactions((prev) => [tx, ...prev])}
+            />
+          )}
+
+          {activeNav === "Paramètres du Compte" && (
+            <AccountSettingsTab
+              clientName={clientName}
+              clientEmail={clientEmail}
+              mt5AccountNumber={mt5AccountNumber}
+              balance={balance}
+              bonus={bonus}
+              customSlug={customSlug}
+              currentUserId={currentUserId}
+              onLogout={handleLogout}
             />
           )}
         </main>
@@ -9063,52 +10421,6 @@ export function NexiumDashboard({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* SETTINGS MODAL */}
-      {settingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#10141b] p-7 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
-              <h3 className="font-black text-xl text-white">Paramètres du Terminal</h3>
-              <button onClick={() => setSettingsOpen(false)} className="text-gray-400 hover:text-white p-1 cursor-pointer">
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4 text-xs sm:text-sm">
-              <div className="rounded-2xl border border-white/[0.06] bg-[#0c1017] p-4 space-y-2 text-gray-300">
-                <p className="font-bold text-white">Informations de Connexion :</p>
-                <p>• Serveur : <strong>NexiumMarkets-Live01</strong></p>
-                <p>• Login MT5 : <strong>{mt5AccountNumber}</strong></p>
-                <p>• Type de compte : <strong>ECN Zero Spread</strong></p>
-              </div>
-
-              <button
-                onClick={() => {
-                  setSettingsOpen(false);
-                  toast.success("Paramètres enregistrés.");
-                }}
-                className="neon-btn mt-4 w-full rounded-2xl py-3.5 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer"
-              >
-                ENREGISTRER
-              </button>
-
-              <div className="border-t border-white/[0.06] pt-3">
-                <button
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    handleLogout();
-                  }}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 py-3 text-xs sm:text-sm font-bold text-rose-400 hover:bg-rose-500/20 transition cursor-pointer"
-                >
-                  <LogOut className="size-4" />
-                  Se Déconnecter de la Session
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

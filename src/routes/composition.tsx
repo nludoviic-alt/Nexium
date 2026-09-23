@@ -2046,6 +2046,67 @@ function NexiumAdminDashboard({
     toast.success(`Preset(s) [${presetsLabel}] validé(s) ! Le Dashboard de ${client.name} est maintenant accessible.`);
   };
 
+  // 1-CLIC : Prolongation de l'Abonnement & Réinitialisation des Quotas de Trading (SOUVERAINETÉ ADMIN)
+  const handleProlongSubscription = async (client: UserProfile) => {
+    if (!isSuperAdmin) {
+      toast.error("Privilège insuffisant : Seul le Super Administrateur / Direction peut prolonger les abonnements.");
+      return;
+    }
+
+    const activePresetsList = client.activePreset
+      ? client.activePreset.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : client.requestedPresets && client.requestedPresets.length > 0
+      ? client.requestedPresets
+      : ["AI_GOLD", "FX_TREND", "INDEX_REVERSION"];
+
+    const presetsLabel = activePresetsList.join(", ");
+
+    const nextEngines = {
+      ...client.engines,
+      aiGold: { ...(client.engines?.aiGold || {}), active: activePresetsList.includes("AI_GOLD"), visible: true },
+      fxTrend: { ...(client.engines?.fxTrend || {}), active: activePresetsList.includes("FX_TREND"), visible: true },
+      indexReversion: { ...(client.engines?.indexReversion || {}), active: activePresetsList.includes("INDEX_REVERSION"), visible: true },
+      quota_stats: { goldWins: 0, fxWins: 0, indexWins: 0 },
+    };
+
+    if (isSupabaseConfigured) {
+      await updateUserProfile(client.id, {
+        license_status: "ACTIVE",
+        status: "ACTIVE",
+        active_preset: presetsLabel,
+        engines_config: nextEngines,
+      });
+    }
+
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id === client.id) {
+          return {
+            ...c,
+            licenseStatus: "ACTIVE",
+            activePreset: presetsLabel,
+            status: "ACTIVE",
+            engines: nextEngines,
+          };
+        }
+        return c;
+      })
+    );
+
+    sendCustomDeskEmail(
+      client.email,
+      "Prolongation de votre Abonnement & Quotas de Trading — Nexium Markets",
+      `Bonjour ${client.name},\n\nVotre abonnement aux algorithmes de trading Nexium Markets [${presetsLabel}] ainsi que vos quotas de trading ont été prolongés avec succès par la Direction.\n\nVos algorithmes de trading et votre Terminal MT5 sont immédiatement réactivés pour vos prochaines sessions.\n\nAccédez à votre espace sécurisé : https://nexiummarkets.com/login\n\nBien cordialement,\nLa Direction des Opérations Nexium Markets`
+    ).catch((err) => console.warn("Resend email error:", err));
+
+    addAuditLog(
+      "SUBSCRIPTION_PROLONGED",
+      `Abonnement et quotas de trading prolongés en 1 clic pour ${client.name} (${client.email}). Presets [${presetsLabel}] réactivés et quotas remis à zéro.`,
+      client.name
+    );
+    toast.success(`Abonnement prolongé en 1 clic pour ${client.name} ! (Quotas réinitialisés, bots actifs)`);
+  };
+
   // Attribution d'un client à un Administrateur / Conseiller Dédié
   const handleAssignAdvisor = async (client: UserProfile, newAdvisor: string) => {
     if (!isSuperAdmin) {
@@ -4230,13 +4291,25 @@ function NexiumAdminDashboard({
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => handleOpenClientProfile(c)}
-                            className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-bold py-1.5 px-3.5 transition cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
-                          >
-                            <span>Ouvrir Fiche</span>
-                            <ChevronRight className="size-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            {isSuperAdmin && (
+                              <button
+                                onClick={() => handleProlongSubscription(c)}
+                                title="Prolonger l'abonnement et réinitialiser les quotas de trading en 1 clic"
+                                className="rounded-xl border border-emerald-500/50 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-bold py-1.5 px-2.5 transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
+                              >
+                                <Sparkles className="size-3.5 text-emerald-400" />
+                                <span>Prolonger</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleOpenClientProfile(c)}
+                              className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-bold py-1.5 px-3.5 transition cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                            >
+                              <span>Ouvrir Fiche</span>
+                              <ChevronRight className="size-3.5" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     ),
@@ -4361,6 +4434,16 @@ function NexiumAdminDashboard({
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => handleProlongSubscription(activeClient)}
+                      className="rounded-xl border border-emerald-500/60 bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 hover:from-emerald-500/30 hover:to-emerald-600/30 text-emerald-300 px-4 py-2 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow flex items-center gap-2"
+                    >
+                      <Sparkles className="size-4 text-emerald-400" />
+                      <span>Prolonger l'Abonnement (1 Clic)</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleStartImpersonation(activeClient)}
                     className="rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 px-4 py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow flex items-center gap-2"
@@ -4786,10 +4869,44 @@ function NexiumAdminDashboard({
 
               {/* ── 6. ATTRIBUTION DES 3 MOTEURS & PRESETS ── */}
               <section className="admin-card-purple p-6 sm:p-7 space-y-5">
-                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
-                  <Sliders className="size-5 text-purple-400" />
-                  Attribution des Moteurs &amp; Stratégies pour {activeClient.name}
-                </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
+                    <Sliders className="size-5 text-purple-400" />
+                    Attribution des Moteurs &amp; Stratégies pour {activeClient.name}
+                  </h2>
+                  {isSuperAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleProlongSubscription(activeClient)}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-md flex items-center justify-center gap-2 self-start sm:self-auto active:scale-95"
+                    >
+                      <Sparkles className="size-3.5" />
+                      <span>Prolonger Abonnement (1 Clic)</span>
+                    </button>
+                  )}
+                </div>
+
+                {isSuperAdmin && (
+                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <Sparkles className="size-5 text-emerald-400 shrink-0" />
+                      <div>
+                        <h4 className="font-bold text-sm text-white">Prolongation d'Abonnement &amp; Réinitialisation des Quotas</h4>
+                        <p className="text-xs text-slate-300 font-mono">
+                          Prolonge l'abonnement du client, réactive les moteurs configurés et remet à zéro les compteurs de trades gagnants (Gold: 50% gains, FX: 75% gains, Index: 100% gains sans perte).
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleProlongSubscription(activeClient)}
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-md flex items-center justify-center gap-2 shrink-0 active:scale-95"
+                    >
+                      <CheckCircle2 className="size-4" />
+                      <span>Prolonger Tout</span>
+                    </button>
+                  </div>
+                )}
 
                 <div className="grid gap-5 lg:grid-cols-3">
                   <div className="admin-subcard p-5 space-y-3.5 border-amber-500/25">
