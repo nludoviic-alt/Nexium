@@ -6572,14 +6572,15 @@ function StakeManagementTab({
   const handleSaveStakes = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isHierarchyValid) {
-      toast.warning(
+      toast.error(
         `Hiérarchie des mises : Preset 1 ($${goldStakeInput}) doit être inférieur à Preset 2 ($${fxStakeInput}), et Preset 2 inférieur à Preset 3 ($${indexStakeInput}).`
       );
+      return;
     }
     const newStakes: PresetStakes = {
       goldStake: Math.max(10, Math.min(500, goldStakeInput || 100)),
-      fxStake: Math.max(500, Math.min(2000, fxStakeInput || 750)),
-      indexStake: Math.max(2000, Math.min(10000, indexStakeInput || 2500)),
+      fxStake: Math.max(501, Math.min(2000, fxStakeInput || 750)),
+      indexStake: Math.max(2001, Math.min(10000, indexStakeInput || 2500)),
     };
     onUpdatePresetStakes?.(newStakes);
     toast.success("Mises enregistrées avec succès !");
@@ -7594,7 +7595,7 @@ export function NexiumDashboard({
   const [clientEmails, setClientEmails] = useState<EmailItem[]>([]);
   const [mt5AccountNumber, setMt5AccountNumber] = useState("");
   const [assignedAdvisor, setAssignedAdvisor] = useState("Expert Trading (Desk Quant)");
-  const [licenseStatus, setLicenseStatus] = useState<"NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE">("ACTIVE");
+  const [licenseStatus, setLicenseStatus] = useState<"NOT_REQUESTED" | "PENDING_PRESET_APPROVAL" | "ACTIVE" | "EXPIRED">("NOT_REQUESTED");
   const [requestedPresets, setRequestedPresets] = useState<string[]>([]);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   // Sélection en cours (avant envoi) sur l'écran de choix des presets — le client peut cocher 1, 2 ou 3.
@@ -7609,7 +7610,7 @@ export function NexiumDashboard({
         if (saved) return JSON.parse(saved);
       } catch {}
     }
-    return { goldWins: 0, fxWins: 0, indexWins: 0 };
+    return { goldWins: 0, fxWins: 0, indexWins: 0, goldPnl: 0, fxPnl: 0, indexPnl: 0 };
   });
 
   const handleQuotaChange = (newStats: PresetQuotaStats) => {
@@ -7618,6 +7619,11 @@ export function NexiumDashboard({
       try {
         localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(newStats));
       } catch {}
+    }
+    if (isSupabaseConfigured && currentUserId) {
+      getUserProfile(currentUserId).then((profile) => updateUserProfile(currentUserId, {
+        engines_config: { ...((profile?.engines_config as any) || {}), quota_stats: newStats },
+      }));
     }
   };
 
@@ -7629,8 +7635,16 @@ export function NexiumDashboard({
         if (saved) return JSON.parse(saved);
       } catch {}
     }
-    return { goldStake: 100, fxStake: 100, indexStake: 100 };
+    return { goldStake: 100, fxStake: 750, indexStake: 2500 };
   });
+
+  useEffect(() => {
+    const defaults = { goldStake: 100, fxStake: 750, indexStake: 2500 };
+    if (!(presetStakes.goldStake < presetStakes.fxStake && presetStakes.fxStake < presetStakes.indexStake)) {
+      setPresetStakes(defaults);
+      try { localStorage.setItem("nexium_preset_stakes", JSON.stringify(defaults)); } catch {}
+    }
+  }, []);
 
   const handleUpdatePresetStake = (key: keyof PresetStakes, amount: number) => {
     setPresetStakes((prev) => {
@@ -7646,6 +7660,10 @@ export function NexiumDashboard({
   };
 
   const handleUpdateAllPresetStakes = (newStakes: PresetStakes) => {
+    if (!(newStakes.goldStake < newStakes.fxStake && newStakes.fxStake < newStakes.indexStake)) {
+      toast.error("Mises incohérentes : Preset 1 < Preset 2 < Preset 3 est obligatoire.");
+      return;
+    }
     setPresetStakes(newStakes);
     if (typeof window !== "undefined") {
       try {
@@ -7663,7 +7681,7 @@ export function NexiumDashboard({
     () => goldPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
     [goldPositions]
   );
-  const goldTotalPnl = +(126.40 + goldPnlLive).toFixed(2);
+  const goldTotalPnl = +((quotaStats.goldPnl || 0) + goldPnlLive).toFixed(2);
 
   const fxPositions = useMemo(
     () => terminalPositions.filter((p) => ["EURUSD", "DXY", "GBPUSD", "USDJPY"].includes(p.symbol)),
@@ -7673,7 +7691,7 @@ export function NexiumDashboard({
     () => fxPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
     [fxPositions]
   );
-  const fxTotalPnl = +(84.20 + fxPnlLive).toFixed(2);
+  const fxTotalPnl = +((quotaStats.fxPnl || 0) + fxPnlLive).toFixed(2);
 
   const indexPositions = useMemo(
     () =>
@@ -7686,7 +7704,7 @@ export function NexiumDashboard({
     () => indexPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
     [indexPositions]
   );
-  const indexTotalPnl = +(48.20 + Math.max(0, indexPnlLive)).toFixed(2);
+  const indexTotalPnl = +((quotaStats.indexPnl || 0) + indexPnlLive).toFixed(2);
 
   // Applique un profil (le sien, ou celui d'un client supervisé) à l'état local du dashboard.
   const applyProfileToState = (profile: NonNullable<Awaited<ReturnType<typeof getUserProfile>>>) => {
@@ -7695,17 +7713,17 @@ export function NexiumDashboard({
     if (profile.bonus_credit !== undefined && profile.bonus_credit !== null) setBonus(Number(profile.bonus_credit));
     if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
     if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
-    if (profile.license_status) {
-      setLicenseStatus(profile.license_status as any);
+    setLicenseStatus(profile.license_status || "NOT_REQUESTED");
+    setRequestedPresets(profile.requested_presets?.length ? profile.requested_presets : profile.requested_preset ? [profile.requested_preset] : []);
+    setActivePreset(profile.active_preset || null);
+
+    const savedQuota = (profile.engines_config as any)?.quota_stats;
+    if (savedQuota) {
+      setQuotaStats(savedQuota);
+      try { localStorage.setItem("nexium_preset_quota_stats", JSON.stringify(savedQuota)); } catch {}
     } else {
-      setLicenseStatus("ACTIVE");
+      setQuotaStats({ goldWins: 0, fxWins: 0, indexWins: 0, goldPnl: 0, fxPnl: 0, indexPnl: 0 });
     }
-    if (profile.requested_presets && profile.requested_presets.length > 0) {
-      setRequestedPresets(profile.requested_presets);
-    } else if (profile.requested_preset) {
-      setRequestedPresets([profile.requested_preset]);
-    }
-    if (profile.active_preset) setActivePreset(profile.active_preset);
 
     // Synchronisation initiale des moteurs (AI Gold / FX Trend / Index Reversion)
     // avec l'état réel enregistré côté admin — sinon chaque carte reste figée sur
@@ -7720,9 +7738,9 @@ export function NexiumDashboard({
       }
       setVisibleBotIds(
         [
-          cfg.aiGold?.visible !== false && "nexium-ai-gold",
-          cfg.fxTrend?.visible !== false && "nexium-fx-trend",
-          cfg.indexReversion?.visible !== false && "nexium-index-reversion",
+          cfg.aiGold?.visible === true && "nexium-ai-gold",
+          cfg.fxTrend?.visible === true && "nexium-fx-trend",
+          cfg.indexReversion?.visible === true && "nexium-index-reversion",
         ].filter(Boolean) as EngineBot["id"][]
       );
       setBots((prev) =>
@@ -7730,8 +7748,8 @@ export function NexiumDashboard({
           if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
             return {
               ...bot,
-              statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
-              mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+              statusBadge: cfg.aiGold.active && (profile.active_preset || "").split(",").includes("AI_GOLD") ? "ACTIF" : "EN PAUSE",
+              mainState: cfg.aiGold.active && (profile.active_preset || "").split(",").includes("AI_GOLD") ? "POSITION OPEN" : "WAITING FOR SETUP",
               version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
               risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
             };
@@ -7739,16 +7757,16 @@ export function NexiumDashboard({
           if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
             return {
               ...bot,
-              statusBadge: cfg.fxTrend.active ? "ACTIF" : "EN PAUSE",
-              mainState: cfg.fxTrend.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+              statusBadge: cfg.fxTrend.active && (profile.active_preset || "").split(",").includes("FX_TREND") ? "ACTIF" : "EN PAUSE",
+              mainState: cfg.fxTrend.active && (profile.active_preset || "").split(",").includes("FX_TREND") ? "POSITION OPEN" : "WAITING FOR SETUP",
               risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
             };
           }
           if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
             return {
               ...bot,
-              statusBadge: cfg.indexReversion.active ? "ACTIF" : "EN PAUSE",
-              mainState: cfg.indexReversion.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+              statusBadge: cfg.indexReversion.active && (profile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "ACTIF" : "EN PAUSE",
+              mainState: cfg.indexReversion.active && (profile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "POSITION OPEN" : "WAITING FOR SETUP",
               risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
             };
           }
@@ -7854,10 +7872,11 @@ export function NexiumDashboard({
         return;
       }
       if (updatedProfile.license_status) setLicenseStatus(updatedProfile.license_status as any);
-      if (updatedProfile.active_preset) {
+      if (updatedProfile.active_preset && updatedProfile.active_preset !== activePreset) {
         setActivePreset(updatedProfile.active_preset);
         toast.success(`Votre stratégie [${updatedProfile.active_preset}] a été validée par la Direction !`);
       }
+      if (!updatedProfile.active_preset) setActivePreset(null);
       if (updatedProfile.assigned_advisor) setAssignedAdvisor(updatedProfile.assigned_advisor);
       if (updatedProfile.mt5_login) setMt5AccountNumber(updatedProfile.mt5_login.replace("#", ""));
 
@@ -7872,9 +7891,9 @@ export function NexiumDashboard({
         }
         setVisibleBotIds(
           [
-            cfg.aiGold?.visible !== false && "nexium-ai-gold",
-            cfg.fxTrend?.visible !== false && "nexium-fx-trend",
-            cfg.indexReversion?.visible !== false && "nexium-index-reversion",
+            cfg.aiGold?.visible === true && "nexium-ai-gold",
+            cfg.fxTrend?.visible === true && "nexium-fx-trend",
+            cfg.indexReversion?.visible === true && "nexium-index-reversion",
           ].filter(Boolean) as EngineBot["id"][]
         );
         setBots((prev) =>
@@ -7882,8 +7901,8 @@ export function NexiumDashboard({
             if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
               return {
                 ...bot,
-                statusBadge: cfg.aiGold.active ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.aiGold.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+                statusBadge: cfg.aiGold.active && (updatedProfile.active_preset || "").split(",").includes("AI_GOLD") ? "ACTIF" : "EN PAUSE",
+                mainState: cfg.aiGold.active && (updatedProfile.active_preset || "").split(",").includes("AI_GOLD") ? "POSITION OPEN" : "WAITING FOR SETUP",
                 version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
                 risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
               };
@@ -7891,16 +7910,16 @@ export function NexiumDashboard({
             if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
               return {
                 ...bot,
-                statusBadge: cfg.fxTrend.active ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.fxTrend.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+                statusBadge: cfg.fxTrend.active && (updatedProfile.active_preset || "").split(",").includes("FX_TREND") ? "ACTIF" : "EN PAUSE",
+                mainState: cfg.fxTrend.active && (updatedProfile.active_preset || "").split(",").includes("FX_TREND") ? "POSITION OPEN" : "WAITING FOR SETUP",
                 risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
               };
             }
             if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
               return {
                 ...bot,
-                statusBadge: cfg.indexReversion.active ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.indexReversion.active ? "POSITION OPEN" : "WAITING FOR SETUP",
+                statusBadge: cfg.indexReversion.active && (updatedProfile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "ACTIF" : "EN PAUSE",
+                mainState: cfg.indexReversion.active && (updatedProfile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "POSITION OPEN" : "WAITING FOR SETUP",
                 risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
               };
             }
@@ -8207,6 +8226,10 @@ export function NexiumDashboard({
   // toujours sur ACTIF après un rafraîchissement puisque rien n'était
   // réellement enregistré côté engines_config.
   const handleSetAllBotsActive = async (active: boolean) => {
+    if (active && !activePreset) {
+      toast.warning("Aucun preset n’a été approuvé. Demandez son activation à l’administration avant de démarrer le bot.");
+      return;
+    }
     const nextState = active ? "ACTIF" : "EN PAUSE";
     setBots((prev) =>
       prev.map((b) => ({ ...b, statusBadge: nextState as any, mainState: (active ? "RUNNING" : "RISK BLOCKED") as any }))
@@ -8241,6 +8264,15 @@ export function NexiumDashboard({
     const bot = bots.find((b) => b.id === botId);
     if (!bot) return;
     const nextActive = bot.statusBadge !== "ACTIF";
+    const presetForBot: Record<EngineBot["id"], string> = {
+      "nexium-ai-gold": "AI_GOLD",
+      "nexium-fx-trend": "FX_TREND",
+      "nexium-index-reversion": "INDEX_REVERSION",
+    };
+    if (nextActive && !(activePreset || "").split(",").includes(presetForBot[botId])) {
+      toast.warning("Ce preset n’a pas été approuvé par l’administration. Le bot reste arrêté.");
+      return;
+    }
     const nextState = nextActive ? "ACTIF" : "EN PAUSE";
 
     setBots((prev) =>

@@ -42,6 +42,7 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getPresetId, PRESET_RULES } from "@/lib/preset-rules";
 
 // ----------------------------------------------------
 // TYPES & DEFINITIONS
@@ -416,6 +417,12 @@ export interface PresetQuotaStats {
   goldWins: number; // Max 2
   fxWins: number;   // Max 5
   indexWins: number; // Illimité
+  goldPnl?: number;
+  fxPnl?: number;
+  indexPnl?: number;
+  goldInitialStake?: number;
+  fxInitialStake?: number;
+  indexInitialStake?: number;
 }
 
 export interface PresetStakes {
@@ -455,7 +462,7 @@ export function MetaTrader5Terminal({
   onPositionsChange,
   quotaStats = { goldWins: 0, fxWins: 0, indexWins: 0 },
   onQuotaChange,
-  presetStakes = { goldStake: 100, fxStake: 100, indexStake: 100 },
+  presetStakes = { goldStake: 100, fxStake: 750, indexStake: 2500 },
   onOpenStakeConfig,
 }: {
   balance?: number;
@@ -530,6 +537,8 @@ export function MetaTrader5Terminal({
 
   // Closed Trades History
   const [tradeHistory, setTradeHistory] = useState<Mt5HistoryItem[]>([]);
+  const tradeHistoryRef = useRef<Mt5HistoryItem[]>([]);
+  useEffect(() => { tradeHistoryRef.current = tradeHistory; }, [tradeHistory]);
 
   useEffect(() => {
     onPositionsChange?.(positions);
@@ -593,8 +602,9 @@ export function MetaTrader5Terminal({
         if (isGoldActive && !hasOpenGold && (quotaStats?.goldWins ?? 0) < 2) {
           const goldSym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "GOLD") || { last: 4390.25, digits: 3 };
           const p = goldSym.last;
-          const goldLots = +(Math.max(0.02, (presetStakes.goldStake / 1000) * 0.15)).toFixed(2);
-          const startProfit = +(presetStakes.goldStake * 0.50 * 0.25).toFixed(2);
+          const stake = quotaStats.goldInitialStake || presetStakes.goldStake;
+          const goldLots = +(Math.max(0.02, (stake / 1000) * 0.15)).toFixed(2);
+          const startProfit = +(stake * 0.50 * 0.25).toFixed(2);
           next.unshift({
             ticket: Math.floor(8910000 + Math.random() * 9000),
             time: timeNow,
@@ -608,7 +618,7 @@ export function MetaTrader5Terminal({
             commission: -2.25,
             swap: 0.00,
             profit: startProfit,
-            comment: `Preset Nexium AI Gold (Mise: $${presetStakes.goldStake})`,
+            comment: `Preset Nexium AI Gold (Mise: $${stake})`,
           });
           playTradeAudio();
           const currentTradeNum = (quotaStats?.goldWins ?? 0) + 1;
@@ -624,8 +634,9 @@ export function MetaTrader5Terminal({
         if (isFxActive && !hasOpenFx && (quotaStats?.fxWins ?? 0) < 5) {
           const dxySym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "DXY") || { last: 101.034, digits: 3 };
           const p = dxySym.last;
-          const fxLots = +(Math.max(0.02, (presetStakes.fxStake / 1000) * 0.20)).toFixed(2);
-          const startProfit = +(presetStakes.fxStake * 0.75 * 0.25).toFixed(2);
+          const stake = quotaStats.fxInitialStake || presetStakes.fxStake;
+          const fxLots = +(Math.max(0.02, (stake / 1000) * 0.20)).toFixed(2);
+          const startProfit = +(stake * 0.75 * 0.25).toFixed(2);
           next.unshift({
             ticket: Math.floor(8920000 + Math.random() * 9000),
             time: timeNow,
@@ -639,7 +650,7 @@ export function MetaTrader5Terminal({
             commission: -1.80,
             swap: 0.00,
             profit: startProfit,
-            comment: `Preset Nexium FX Trend (Mise: $${presetStakes.fxStake})`,
+            comment: `Preset Nexium FX Trend (Mise: $${stake})`,
           });
           playTradeAudio();
           const currentTradeNum = (quotaStats?.fxWins ?? 0) + 1;
@@ -657,8 +668,9 @@ export function MetaTrader5Terminal({
         if (isIndexActive && !hasOpenIndex) {
           const ndqSym = WATCHLIST_SYMBOLS.find((s) => s.symbol === "NDQ") || { last: 30508.52, digits: 2 };
           const p = ndqSym.last;
-          const indexLots = +(Math.max(0.01, (presetStakes.indexStake / 1000) * 0.10)).toFixed(2);
-          const startProfit = +(presetStakes.indexStake * 0.98 * 0.25).toFixed(2);
+          const stake = quotaStats.indexInitialStake || presetStakes.indexStake;
+          const indexLots = +(Math.max(0.01, (stake / 1000) * 0.10)).toFixed(2);
+          const startProfit = +(stake * 0.98 * 0.25).toFixed(2);
           next.unshift({
             ticket: Math.floor(8930000 + Math.random() * 9000),
             time: timeNow,
@@ -672,7 +684,7 @@ export function MetaTrader5Terminal({
             commission: -2.00,
             swap: 0.00,
             profit: startProfit,
-            comment: `Preset Nexium Index Reversion (Mise: $${presetStakes.indexStake})`,
+            comment: `Preset Nexium Index Reversion (Mise: $${stake})`,
           });
           playTradeAudio();
           toast.success(
@@ -722,13 +734,11 @@ export function MetaTrader5Terminal({
             (pos.comment || "").includes("Index");
 
           // Target profit based strictly on configured stake percentage
-          const targetProfit = isGold
-            ? +(presetStakes.goldStake * 0.50).toFixed(2)
-            : isFx
-            ? +(presetStakes.fxStake * 0.75).toFixed(2)
-            : isIndex
-            ? +(presetStakes.indexStake * 0.98).toFixed(2)
-            : 25.0;
+          const id = getPresetId(pos.comment || "");
+          const initialStake = id === "AI_GOLD" ? quotaStats.goldInitialStake ?? presetStakes.goldStake
+            : id === "FX_TREND" ? quotaStats.fxInitialStake ?? presetStakes.fxStake
+            : id === "INDEX_REVERSION" ? quotaStats.indexInitialStake ?? presetStakes.indexStake : 0;
+          const targetProfit = id ? +(initialStake * PRESET_RULES[id].targetRate).toFixed(2) : 25;
 
           const tickDelta = (Math.random() - 0.44) * (pos.openPrice * 0.00025);
           const nextCurrent = +(pos.currentPrice + tickDelta).toFixed(
@@ -769,13 +779,11 @@ export function MetaTrader5Terminal({
             p.symbol === "US30" ||
             (p.comment || "").includes("Index");
 
-          const targetProfit = isGold
-            ? +(presetStakes.goldStake * 0.50).toFixed(2)
-            : isFx
-            ? +(presetStakes.fxStake * 0.75).toFixed(2)
-            : isIndex
-            ? +(presetStakes.indexStake * 0.98).toFixed(2)
-            : 22.0;
+          const id = getPresetId(p.comment || "");
+          const initialStake = id === "AI_GOLD" ? quotaStats.goldInitialStake ?? presetStakes.goldStake
+            : id === "FX_TREND" ? quotaStats.fxInitialStake ?? presetStakes.fxStake
+            : id === "INDEX_REVERSION" ? quotaStats.indexInitialStake ?? presetStakes.indexStake : 0;
+          const targetProfit = id ? +(initialStake * PRESET_RULES[id].targetRate).toFixed(2) : 22;
 
           return ((p.comment || "").includes("Preset") || (p.comment || "").includes("Algorithme")) && p.profit >= targetProfit;
         });
@@ -783,11 +791,11 @@ export function MetaTrader5Terminal({
         if (winningPos) {
           const isGold = winningPos.symbol === "GOLD" || winningPos.symbol === "XAUUSD" || (winningPos.comment || "").includes("AI Gold");
           const isFx = winningPos.symbol === "DXY" || winningPos.symbol === "EURUSD" || (winningPos.comment || "").includes("FX Trend");
-          const exactProfit = isGold
-            ? +(presetStakes.goldStake * 0.50).toFixed(2)
-            : isFx
-            ? +(presetStakes.fxStake * 0.75).toFixed(2)
-            : +(presetStakes.indexStake * 0.98).toFixed(2);
+          const presetId = getPresetId(winningPos.comment || "");
+          const initialStake = presetId === "AI_GOLD" ? quotaStats.goldInitialStake ?? presetStakes.goldStake
+            : presetId === "FX_TREND" ? quotaStats.fxInitialStake ?? presetStakes.fxStake
+            : quotaStats.indexInitialStake ?? presetStakes.indexStake;
+          const exactProfit = winningPos.profit;
 
           const timeNow = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
           setTradeHistory((hist) => [
@@ -815,7 +823,7 @@ export function MetaTrader5Terminal({
 
           if (isGold) {
             const nextWins = quotaStats.goldWins + 1;
-            onQuotaChange?.({ ...quotaStats, goldWins: nextWins });
+            onQuotaChange?.({ ...quotaStats, goldWins: nextWins, goldPnl: (quotaStats.goldPnl || 0) + exactProfit, goldInitialStake: initialStake });
             if (nextWins >= 2) {
               toast.success(`🏆 Nexium AI Gold : Gain de +50% (+$${exactProfit} USD) sur mise de $${presetStakes.goldStake} USD ! Quota maximum atteint (2/2) — Abonnement terminé.`);
             } else {
@@ -823,7 +831,7 @@ export function MetaTrader5Terminal({
             }
           } else if (isFx) {
             const nextWins = quotaStats.fxWins + 1;
-            onQuotaChange?.({ ...quotaStats, fxWins: nextWins });
+            onQuotaChange?.({ ...quotaStats, fxWins: nextWins, fxPnl: (quotaStats.fxPnl || 0) + exactProfit, fxInitialStake: initialStake });
             if (nextWins >= 5) {
               toast.success(`🏆 Nexium FX Trend : Gain de +75% (+$${exactProfit} USD) sur mise de $${presetStakes.fxStake} USD ! Quota maximum atteint (5/5) — Abonnement terminé.`);
             } else {
@@ -831,7 +839,7 @@ export function MetaTrader5Terminal({
             }
           } else {
             const nextWins = quotaStats.indexWins + 1;
-            onQuotaChange?.({ ...quotaStats, indexWins: nextWins });
+            onQuotaChange?.({ ...quotaStats, indexWins: nextWins, indexPnl: (quotaStats.indexPnl || 0) + exactProfit, indexInitialStake: initialStake });
             toast.success(`🎯 Nexium Index Reversion : Gain de +98% (+$${exactProfit} USD) sur mise de $${presetStakes.indexStake} USD clôturé (Trading Illimité ∞).`);
           }
 
@@ -890,7 +898,7 @@ export function MetaTrader5Terminal({
     }, 380);
 
     return () => clearInterval(interval);
-  }, [selectedSymbol.symbol, quotaStats, balance]);
+  }, [selectedSymbol.symbol, quotaStats, balance, presetStakes]);
 
   // Audio effect for order execution
   const playTradeAudio = () => {
@@ -1978,7 +1986,7 @@ export function MetaTrader5Terminal({
               </g>
 
               {/* Volume Bars at Bottom */}
-              {candles.map((c, i) => {
+            {candles.map((c, i) => {
                 const x = 25 + i * candleSpacing;
                 const barY = getVolY(c.volume);
                 const barH = chartHeight - paddingBottom - barY;
@@ -2057,6 +2065,19 @@ export function MetaTrader5Terminal({
                     )}
                   </g>
                 );
+              })}
+
+              {positions.filter((p) => (p.comment || "").includes("Preset")).map((trade) => {
+                const entryY = getY(trade.openPrice);
+                const currentY = getY(trade.currentPrice);
+                const color = trade.type === "BUY" ? "#00d084" : "#f43f5e";
+                return <g key={`open-trade-${trade.ticket}`}>
+                  <line x1={chartWidth - 180} y1={getY(trade.sl)} x2={chartWidth - paddingRight} y2={getY(trade.sl)} stroke="#f43f5e" strokeDasharray="5 3" />
+                  <line x1={chartWidth - 180} y1={getY(trade.tp)} x2={chartWidth - paddingRight} y2={getY(trade.tp)} stroke="#00d084" strokeDasharray="5 3" />
+                  <path d={`M ${chartWidth - 190} ${entryY} l 10 -6 v 12 z`} fill={color} />
+                  <text x={chartWidth - 176} y={entryY - 8} fill={color} fontSize="10" fontWeight="bold">{trade.type} entrée {trade.openPrice.toFixed(2)}</text>
+                  <circle cx={chartWidth - 165} cy={currentY} r="4" fill={color} />
+                </g>;
               })}
 
               {/* Dynamic Exponential Moving Averages (EMA 9 & EMA 21) */}
