@@ -4,6 +4,7 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowDownRight,
+  ArrowLeft,
   ArrowUpRight,
   BarChart2,
   BarChart3,
@@ -55,6 +56,7 @@ import {
   Mic,
   MicOff,
   Minimize2,
+  Monitor,
   MoreVertical,
   Paperclip,
   Pause,
@@ -104,12 +106,14 @@ import {
 import { useEffect, useId, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { TradingViewSuperchart } from "@/components/site/TradingViewSuperchart";
+import { MetaTrader5Terminal } from "@/components/dashboard/MetaTrader5Terminal";
 import {
   supabase,
   isSupabaseConfigured,
   getUserProfile,
   updateUserProfile,
   requestPresetsActivation,
+  recordAuditLog,
   getClientChatMessages,
   sendChatMessage,
   subscribeToDirectMessages,
@@ -2831,11 +2835,13 @@ function OverviewTab({
   onToggleRunning,
   bots,
   positions,
+  mt5AccountNumber,
   onClosePosition,
   onOpenDeposit,
   onOpenWithdraw,
   onOpenEngine,
   onOpenRisk,
+  onBalanceChange,
 }: {
   clientName: string;
   balance: number;
@@ -2844,11 +2850,13 @@ function OverviewTab({
   onToggleRunning: () => void;
   bots: EngineBot[];
   positions: PositionItem[];
+  mt5AccountNumber: string;
   onClosePosition: (pos: PositionItem) => void;
   onOpenDeposit: () => void;
   onOpenWithdraw: () => void;
   onOpenEngine: () => void;
   onOpenRisk: () => void;
+  onBalanceChange?: (newBalance: number) => void;
 }) {
   const [chartTimeframe, setChartTimeframe] = useState<"24H" | "7J" | "30J" | "1A">("30J");
   const [tickerTick, setTickerTick] = useState(0);
@@ -2871,65 +2879,65 @@ function OverviewTab({
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Hero Welcome (Harmonisé avec le Profil Client) */}
-      <section className="admin-card-emerald p-6 sm:p-8 relative overflow-hidden space-y-6 shadow-xl">
-        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-emerald-500/10 blur-3xl" />
+    <div className="space-y-5">
+      {/* Hero Welcome (Compact & Épuré) */}
+      <section className="admin-card-emerald p-4 sm:p-5 relative overflow-hidden space-y-4 shadow-lg rounded-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-emerald-500/10 blur-3xl" />
 
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-emerald-400 uppercase font-mono">
-              <Zap className="size-4" />
+        <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-emerald-400 uppercase font-mono">
+              <Zap className="size-3.5" />
               TABLEAU DE BORD EXÉCUTIF MT5
             </div>
-            <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Bonjour, <span className="text-emerald-400">{clientName.split(" ")[0] || clientName}</span>
             </h2>
-            <p className="max-w-xl text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
+            <p className="max-w-xl text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
               Vos 3 moteurs institutionnels (AI Gold, FX Trend, Index Reversion) sont synchronisés avec le serveur <strong className="text-white font-mono">Equinix NY4</strong>.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={onToggleRunning}
-              className={`inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer shadow-lg ${
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md ${
                 running
-                  ? "admin-btn-primary shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02]"
+                  ? "admin-btn-primary shadow-[0_0_15px_rgba(16,185,129,0.25)] hover:scale-[1.01]"
                   : "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
               }`}
             >
-              {running ? <Pause className="size-4" /> : <Play className="size-4 fill-current" />}
+              {running ? <Pause className="size-3.5" /> : <Play className="size-3.5 fill-current" />}
               {running ? "MOTEURS ACTIFS" : "MOTEURS EN PAUSE"}
             </button>
 
             <button
               onClick={onOpenDeposit}
-              className="inline-flex items-center gap-2.5 rounded-2xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-5 py-3.5 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-3.5 py-2 text-xs font-bold text-white uppercase tracking-wider transition-all cursor-pointer"
             >
-              <Plus className="size-4 text-emerald-400" />
+              <Plus className="size-3.5 text-emerald-400" />
               DÉPÔT RAPIDE
             </button>
           </div>
         </div>
 
-        {/* Live Market Tickers Ribbon */}
-        <div className="border-t border-emerald-500/20 pt-5">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 font-mono">
-            <Activity className="size-3.5 text-emerald-400" /> COTATIONS DIRECTES · SPREAD FIX ULTRA-FAIBLE
+        {/* Live Market Tickers Ribbon Compact */}
+        <div className="border-t border-emerald-500/15 pt-3">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 font-mono">
+            <Activity className="size-3 text-emerald-400" /> COTATIONS DIRECTES · SPREAD FIX ULTRA-FAIBLE
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
             {marketTickers.map((tick) => (
               <div
                 key={tick.pair}
-                className="admin-subcard px-4 py-3 flex items-center justify-between transition-colors hover:border-emerald-500/40"
+                className="admin-subcard px-3 py-2 flex items-center justify-between rounded-xl transition-colors hover:border-emerald-500/40"
               >
                 <div>
-                  <span className="font-mono text-xs text-slate-400 font-bold">{tick.pair}</span>
-                  <p className="font-mono text-sm sm:text-base font-bold text-white mt-0.5">{tick.price}</p>
+                  <span className="font-mono text-[10px] text-slate-400 font-bold">{tick.pair}</span>
+                  <p className="font-mono text-xs sm:text-sm font-bold text-white">{tick.price}</p>
                 </div>
                 <span
-                  className={`text-xs font-mono font-bold ${
+                  className={`text-[10px] font-mono font-bold ${
                     tick.up ? "text-emerald-400" : "text-rose-400"
                   }`}
                 >
@@ -2941,119 +2949,119 @@ function OverviewTab({
         </div>
       </section>
 
-      {/* KPI Cards (Harmonisées avec les Cartes Analytiques de Gains et Pertes du Profil) */}
-      <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 font-mono">
-        <article className="admin-card-indigo p-5 sm:p-6 space-y-2.5">
+      {/* KPI Cards (Compacts & Épurés) */}
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 font-mono">
+        <article className="admin-card-indigo p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">SOLDE TOTAL</span>
-            <div className="grid size-9 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-              <Wallet className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">SOLDE TOTAL</span>
+            <div className="grid size-7 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+              <Wallet className="size-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-white">
+          <p className="text-lg sm:text-xl font-bold text-white">
             ${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-indigo-500/20 font-sans">
-            <span className="text-slate-400">Solde cash</span>
+          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-indigo-500/20 font-sans">
+            <span className="text-slate-400">Cash</span>
             <span className="font-mono font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
           </div>
         </article>
 
-        <article className="admin-card-amber p-5 sm:p-6 space-y-2.5">
+        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">BONUS CRÉDITÉ</span>
-            <div className="grid size-9 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              <Gift className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">BONUS CRÉDITÉ</span>
+            <div className="grid size-7 place-items-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <Gift className="size-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-amber-300">
+          <p className="text-lg sm:text-xl font-bold text-amber-300">
             ${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-amber-500/20 font-sans">
+          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-amber-500/20 font-sans">
             <span className="text-slate-400">Statut</span>
-            <span className="font-mono font-bold text-white">{bonus > 0 ? "Bonus actif" : "Aucun bonus"}</span>
+            <span className="font-mono font-bold text-white">{bonus > 0 ? "Actif" : "Aucun"}</span>
           </div>
         </article>
 
-        <article className="admin-card-emerald p-5 sm:p-6 space-y-2.5">
+        <article className="admin-card-emerald p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">VALEUR DU COMPTE (EQUITY)</span>
-            <div className="grid size-9 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              <Wallet className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">EQUITY (VALEUR)</span>
+            <div className="grid size-7 place-items-center rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <Wallet className="size-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-emerald-400">
+          <p className="text-lg sm:text-xl font-bold text-emerald-400">
             ${(balance + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
-          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-emerald-500/20 font-sans">
-            <span className="text-slate-400">Solde cash</span>
+          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-emerald-500/20 font-sans">
+            <span className="text-slate-400">Cash</span>
             <span className="font-mono font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
           </div>
         </article>
 
-        <article className={`p-5 sm:p-6 space-y-2.5 ${totalOpenPnl >= 0 ? "admin-card-indigo" : "admin-card border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98"}`}>
+        <article className={`p-3.5 sm:p-4 space-y-1.5 rounded-2xl ${totalOpenPnl >= 0 ? "admin-card-indigo" : "admin-card border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98"}`}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">P&amp;L LATENT (EN COURS)</span>
-            <div className={`grid size-9 place-items-center rounded-xl ${totalOpenPnl >= 0 ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>
-              <TrendingUp className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">P&amp;L LATENT</span>
+            <div className={`grid size-7 place-items-center rounded-lg ${totalOpenPnl >= 0 ? "bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" : "bg-rose-500/15 text-rose-400 border border-rose-500/30"}`}>
+              <TrendingUp className="size-3.5" />
             </div>
           </div>
           <p
-            className={`mt-2 text-2xl sm:text-3xl font-bold ${
+            className={`text-lg sm:text-xl font-bold ${
               totalOpenPnl >= 0 ? "text-emerald-400" : "text-rose-400"
             }`}
           >
             {totalOpenPnl >= 0 ? `+$${totalOpenPnl.toFixed(2)}` : `-$${Math.abs(totalOpenPnl).toFixed(2)}`}
           </p>
-          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-700/50 font-sans">
-            <span className="text-slate-400">Positions actives</span>
+          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-700/50 font-sans">
+            <span className="text-slate-400">Positions</span>
             <span className="font-mono font-bold text-emerald-400">{positions.length} en direct</span>
           </div>
         </article>
 
-        <article className="admin-card-cyan p-5 sm:p-6 space-y-2.5">
+        <article className="admin-card-cyan p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">AUTO-TRADERS EN LIGNE</span>
-            <div className="grid size-9 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
-              <Bot className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">AUTO-TRADERS</span>
+            <div className="grid size-7 place-items-center rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+              <Bot className="size-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-cyan-300">3 / 3</p>
-          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-cyan-500/20 font-sans">
+          <p className="text-lg sm:text-xl font-bold text-cyan-300">3 / 3</p>
+          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-cyan-500/20 font-sans">
             <span className="text-slate-400">Equinix NY4</span>
-            <span className="font-mono font-bold text-emerald-400">100% Opérationnel</span>
+            <span className="font-mono font-bold text-emerald-400">100% OK</span>
           </div>
         </article>
 
-        <article className="admin-card-amber p-5 sm:p-6 space-y-2.5">
+        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-300">RISQUE &amp; DRAWDOWN</span>
-            <div className="grid size-9 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              <ShieldCheck className="size-4.5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">DRAWDOWN</span>
+            <div className="grid size-7 place-items-center rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <ShieldCheck className="size-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl sm:text-3xl font-bold text-amber-300">0.34%</p>
-          <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-amber-500/20 font-sans">
-            <span className="text-slate-400">Limite max autorisée</span>
+          <p className="text-lg sm:text-xl font-bold text-amber-300">0.34%</p>
+          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-amber-500/20 font-sans">
+            <span className="text-slate-400">Plafond</span>
             <span className="font-mono font-bold text-amber-400">2.00% / jour</span>
           </div>
         </article>
       </section>
 
-      {/* Interactive Equity Curve & Quick Bot Summary (Harmonisé) */}
-      <section className="grid gap-6 xl:grid-cols-[1.4fr_.6fr]">
-        <article className="admin-card-indigo p-6 sm:p-8 space-y-5 shadow-xl">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-indigo-500/20 pb-4">
+      {/* Interactive Equity Curve & Quick Bot Summary (Compact & Équilibré) */}
+      <section className="grid gap-5 xl:grid-cols-[1.4fr_.6fr]">
+        <article className="admin-card-indigo p-4 sm:p-5 space-y-4 shadow-lg rounded-2xl">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-indigo-500/20 pb-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-indigo-300 font-mono">ÉVOLUTION DE L'EQUITY</p>
-              <h3 className="mt-1 text-lg sm:text-xl font-bold text-white tracking-tight">Performance Cumulée des Auto-Traders</h3>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 font-mono">ÉVOLUTION DE L'EQUITY</p>
+              <h3 className="mt-0.5 text-base sm:text-lg font-bold text-white tracking-tight">Performance Cumulée des Auto-Traders</h3>
             </div>
-            <div className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-[#0b1220] p-1">
+            <div className="flex items-center gap-1 rounded-xl border border-indigo-500/30 bg-[#0b1220] p-0.5">
               {(["24H", "7J", "30J", "1A"] as const).map((tf) => (
                 <button
                   key={tf}
                   onClick={() => setChartTimeframe(tf)}
-                  className={`rounded-lg px-3.5 py-1.5 text-xs sm:text-sm font-mono font-bold transition-all cursor-pointer ${
+                  className={`rounded-lg px-2.5 py-1 text-xs font-mono font-bold transition-all cursor-pointer ${
                     chartTimeframe === tf
                       ? "bg-emerald-500 text-black font-bold shadow"
                       : "text-slate-400 hover:text-white"
@@ -3065,8 +3073,8 @@ function OverviewTab({
             </div>
           </div>
 
-          <div className="mt-6">
-            <div className="relative h-52 w-full">
+          <div>
+            <div className="relative h-44 w-full">
               <div className="absolute left-1 top-0 z-10 flex items-center gap-1.5 text-[10px] font-mono pointer-events-none">
                 <span className="text-slate-500">WMA</span>
                 <span className="text-[#60a5fa] font-bold">9</span>
@@ -3075,54 +3083,54 @@ function OverviewTab({
               <EquityCandlestickChart balance={balance} timeframe={chartTimeframe} />
             </div>
             <EquityIndicatorPanels />
-            <div className="mt-5 flex items-center justify-between border-t border-indigo-500/20 pt-3 text-xs sm:text-sm font-mono text-slate-300">
+            <div className="mt-3.5 flex items-center justify-between border-t border-indigo-500/20 pt-2.5 text-xs font-mono text-slate-300">
               <span className="flex items-center gap-1.5">
                 <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
                 Solde en direct
               </span>
-              <strong className="text-white text-base">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong>
+              <strong className="text-white text-sm sm:text-base">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong>
             </div>
           </div>
         </article>
 
         {/* 3 Bots Quick Snapshot */}
-        <article className="admin-card p-6 sm:p-8 shadow-xl flex flex-col justify-between space-y-5">
+        <article className="admin-card p-4 sm:p-5 shadow-lg flex flex-col justify-between space-y-4 rounded-2xl">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-700/50 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-700/50 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">AUTO-TRADERS OPÉRATIONNELS</p>
-                <h3 className="mt-1 text-lg sm:text-xl font-bold text-white tracking-tight">Supervision Rapide</h3>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">AUTO-TRADERS OPÉRATIONNELS</p>
+                <h3 className="mt-0.5 text-base sm:text-lg font-bold text-white tracking-tight">Supervision Rapide</h3>
               </div>
               <button
                 onClick={onOpenEngine}
-                className="text-xs sm:text-sm font-bold text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+                className="text-xs font-bold text-emerald-400 hover:underline cursor-pointer flex items-center gap-0.5"
               >
-                Page Auto-Trader <ChevronRight className="size-4" />
+                Page Moteurs <ChevronRight className="size-3.5" />
               </button>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-3.5 space-y-2">
               {bots.map((b) => (
                 <div
                   key={b.id}
-                  className="admin-subcard p-4 flex items-center justify-between transition-colors hover:border-slate-500/40"
+                  className="admin-subcard p-2.5 sm:p-3 flex items-center justify-between rounded-xl transition-colors hover:border-slate-500/40"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <span
-                      className={`size-2.5 rounded-full ${
+                      className={`size-2 rounded-full ${
                         b.statusBadge === "ACTIF" ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
                       }`}
                     />
                     <div>
-                      <span className="font-bold text-sm sm:text-base text-white">{b.name}</span>
-                      <p className="text-xs text-slate-400 font-mono mt-0.5">{b.markets}</p>
+                      <span className="font-bold text-xs sm:text-sm text-white">{b.name}</span>
+                      <p className="text-[10px] text-slate-400 font-mono">{b.markets}</p>
                     </div>
                   </div>
                   <div className="text-right font-mono">
-                    <span className={`text-sm sm:text-base font-bold ${b.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    <span className={`text-xs sm:text-sm font-bold ${b.pnlTodayNum >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                       {b.pnlToday}
                     </span>
-                    <p className="text-xs text-slate-400">{b.openPositions} pos.</p>
+                    <p className="text-[10px] text-slate-400">{b.openPositions} pos.</p>
                   </div>
                 </div>
               ))}
@@ -3131,10 +3139,10 @@ function OverviewTab({
 
           <button
             onClick={onOpenEngine}
-            className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-slate-700/60 bg-[#121a2d] py-3.5 text-xs sm:text-sm font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-sm"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-sm"
           >
-            <Zap className="size-4 text-emerald-400" />
-            OUVRIR L'AUTO-TRADER &amp; LE SUPERCHART
+            <Monitor className="size-3.5 text-emerald-400" />
+            OUVRIR LE TERMINAL MT5 &amp; PRESETS
           </button>
         </article>
       </section>
@@ -3153,23 +3161,23 @@ function StrategiesTab({
   onOpenBotDetail: (bot: EngineBot) => void;
 }) {
   return (
-    <div className="space-y-8">
-      <section className="admin-card-indigo p-6 sm:p-8 relative overflow-hidden space-y-4 shadow-xl">
-        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5">
+      <section className="admin-card-indigo p-4 sm:p-5 relative overflow-hidden space-y-2.5 shadow-lg rounded-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-indigo-300 uppercase mb-2 font-mono">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-indigo-300 uppercase mb-1 font-mono">
               BIBLIOTHÈQUE STRATÉGIQUE MT5
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Auto-Traders &amp; Algorithmes Certifiés</h2>
-            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Auto-Traders &amp; Algorithmes Certifiés</h2>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
               Chaque algorithme Auto-Trader est optimisé pour une classe d'actifs dédiée et opère selon un cahier des charges quantitatif institutionnel.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-3">
         {bots.map((b) => {
           const cardVariant =
             b.id === "nexium-ai-gold"
@@ -3187,19 +3195,19 @@ function StrategiesTab({
           return (
             <article
               key={b.id}
-              className={`${cardVariant} p-6 shadow-xl flex flex-col justify-between transition-all hover:scale-[1.01]`}
+              className={`${cardVariant} p-4 sm:p-5 shadow-lg rounded-2xl flex flex-col justify-between transition-all hover:scale-[1.01] space-y-4`}
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">{b.name}</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">{b.name}</h3>
                   <StatusPill variant={b.statusBadge === "ACTIF" ? "emerald" : "rose"}>
                     {b.statusBadge}
                   </StatusPill>
                 </div>
-                <p className={`mt-1 font-mono text-xs sm:text-sm ${accentColor} font-bold`}>{b.specialty}</p>
-                <p className="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">{b.subtitle}</p>
+                <p className={`mt-0.5 font-mono text-xs ${accentColor} font-bold`}>{b.specialty}</p>
+                <p className="mt-2 text-xs text-slate-300 leading-relaxed font-medium">{b.subtitle}</p>
 
-                <div className="mt-5 space-y-2 text-xs sm:text-sm admin-subcard p-3.5">
+                <div className="mt-3.5 space-y-1.5 text-xs admin-subcard p-3 rounded-xl">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Marchés :</span>
                     <span className="font-mono font-bold text-white">{b.markets}</span>
@@ -3217,7 +3225,7 @@ function StrategiesTab({
 
               <button
                 onClick={() => onOpenBotDetail(b)}
-                className={`mt-5 w-full rounded-xl py-3 text-xs sm:text-sm font-bold transition cursor-pointer border ${
+                className={`w-full rounded-xl py-2.5 text-xs font-bold transition cursor-pointer border ${
                   b.id === "nexium-ai-gold"
                     ? "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
                     : b.id === "nexium-fx-trend"
@@ -3264,15 +3272,15 @@ function RiskTab({
   };
 
   return (
-    <div className="space-y-8">
-      <section className="admin-card p-6 sm:p-8 border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98 relative overflow-hidden space-y-4 shadow-xl">
-        <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-rose-500/10 blur-3xl" />
-        <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5">
+      <section className="admin-card p-4 sm:p-5 border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98 relative overflow-hidden space-y-3 shadow-lg rounded-2xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-rose-500/10 blur-3xl" />
+        <div className="relative z-10 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/15 px-3.5 py-1 text-xs font-bold tracking-wider text-rose-400 uppercase mb-2 font-mono">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 bg-rose-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-rose-400 uppercase font-mono">
               RISK GOVERNOR &amp; SÉCURITÉ DU CAPITAL
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Protection Active du Capital</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Protection Active du Capital</h2>
             <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
               Le moteur applique un coupe-circuit strict dès que les tolérances de drawdown ou d'exposition sont atteintes.
             </p>
@@ -3281,18 +3289,18 @@ function RiskTab({
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
-        <article className="admin-card-emerald p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="border-b border-emerald-500/20 pb-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-300 font-mono">RÉGLAGES EN DIRECT</p>
-            <h3 className="mt-1 text-lg sm:text-xl font-bold text-white tracking-tight">Seuils de Tolérance Algorithmique</h3>
+      <section className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
+        <article className="admin-card-emerald p-4 sm:p-5 shadow-lg space-y-4 rounded-2xl">
+          <div className="border-b border-emerald-500/20 pb-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 font-mono">RÉGLAGES EN DIRECT</p>
+            <h3 className="mt-0.5 text-base sm:text-lg font-bold text-white tracking-tight">Seuils de Tolérance Algorithmique</h3>
           </div>
 
-          <div className="space-y-4">
-            <div className="admin-subcard p-4 space-y-2">
-              <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-200">
+          <div className="space-y-3">
+            <div className="admin-subcard p-3 space-y-1.5 rounded-xl">
+              <div className="flex justify-between text-xs font-bold text-slate-200">
                 <span>DRAWDOWN JOURNALIER MAXIMUM</span>
-                <span className="font-mono text-emerald-400 text-base">{maxDrawdownPercent.toFixed(1)}%</span>
+                <span className="font-mono text-emerald-400 text-sm">{maxDrawdownPercent.toFixed(1)}%</span>
               </div>
               <input
                 type="range"
@@ -3305,10 +3313,10 @@ function RiskTab({
               />
             </div>
 
-            <div className="admin-subcard p-4 space-y-2">
-              <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-200">
+            <div className="admin-subcard p-3 space-y-1.5 rounded-xl">
+              <div className="flex justify-between text-xs font-bold text-slate-200">
                 <span>EXPOSITION TOTALE MAXIMALE</span>
-                <span className="font-mono text-cyan-300 text-base">{maxExposureLots.toFixed(1)} lots</span>
+                <span className="font-mono text-cyan-300 text-sm">{maxExposureLots.toFixed(1)} lots</span>
               </div>
               <input
                 type="range"
@@ -3321,10 +3329,10 @@ function RiskTab({
               />
             </div>
 
-            <div className="admin-subcard p-4 space-y-2">
-              <div className="flex justify-between text-xs sm:text-sm font-bold text-slate-200">
+            <div className="admin-subcard p-3 space-y-1.5 rounded-xl">
+              <div className="flex justify-between text-xs font-bold text-slate-200">
                 <span>RISQUE ENGAGÉ PAR ORDRE</span>
-                <span className="font-mono text-purple-300 text-base">{riskPerTrade.toFixed(2)}%</span>
+                <span className="font-mono text-purple-300 text-sm">{riskPerTrade.toFixed(2)}%</span>
               </div>
               <input
                 type="range"
@@ -3340,28 +3348,28 @@ function RiskTab({
 
           <button
             onClick={handleSaveRisk}
-            className="admin-btn-primary w-full py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer transition-all shadow-lg"
+            className="admin-btn-primary w-full py-2.5 text-xs font-bold uppercase tracking-wider cursor-pointer transition-all shadow-md rounded-xl"
           >
             ENREGISTRER LES LIMITES DE RISQUE
           </button>
         </article>
 
         {/* Emergency Kill Switch */}
-        <article className="admin-card p-6 sm:p-8 border-rose-500/40 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98 shadow-xl flex flex-col justify-between space-y-6">
+        <article className="admin-card p-4 sm:p-5 border-rose-500/40 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98 shadow-lg flex flex-col justify-between space-y-4 rounded-2xl">
           <div>
             <div className="flex items-center gap-2 text-rose-400">
-              <ShieldAlert className="size-5" />
-              <p className="text-xs font-bold uppercase tracking-wider font-mono">INTERRUPTEUR D'URGENCE (KILL SWITCH)</p>
+              <ShieldAlert className="size-4" />
+              <p className="text-[10px] font-bold uppercase tracking-wider font-mono">INTERRUPTEUR D'URGENCE (KILL SWITCH)</p>
             </div>
-            <h3 className="mt-2.5 text-xl font-bold text-white tracking-tight">Arrêt d'Urgence Immédiat</h3>
-            <p className="mt-3 text-xs sm:text-sm leading-relaxed text-slate-300 font-medium">
+            <h3 className="mt-1.5 text-lg font-bold text-white tracking-tight">Arrêt d'Urgence Immédiat</h3>
+            <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-300 font-medium">
               Coupe instantanément tous les signaux actifs, ferme l'intégralité des positions ouvertes sur MT5 et passe l'ensemble des Auto-Traders en mode sécurisé.
             </p>
           </div>
 
           <button
             onClick={onEmergencyHalt}
-            className="w-full rounded-2xl bg-rose-600 hover:bg-rose-700 py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all cursor-pointer"
+            className="w-full rounded-xl bg-rose-600 hover:bg-rose-700 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg transition-all cursor-pointer"
           >
             🚨 DÉCLENCHER LE COUPE-CIRCUIT IMMÉDIAT
           </button>
@@ -3374,18 +3382,235 @@ function RiskTab({
 // ----------------------------------------------------
 // 5. PORTEFEUILLE & HISTORIQUE DES TRANSACTIONS
 // ----------------------------------------------------
+// ----------------------------------------------------
+// ----------------------------------------------------
+// 5. PORTEFEUILLE VIEW (AVEC PAGE DE RETRAIT DÉDIÉE)
+// ----------------------------------------------------
 function PortfolioTab({
   balance,
+  bonus = 0,
   transactions,
+  clientName = "Client Nexium",
+  currentUserId,
+  isSupabaseConfigured = false,
+  paymentSettings,
   onOpenDeposit,
-  onOpenWithdraw,
+  onAddTransaction,
 }: {
   balance: number;
+  bonus?: number;
   transactions: TransactionItem[];
-  onOpenDeposit: () => void;
-  onOpenWithdraw: () => void;
+  clientName?: string;
+  currentUserId?: string | null;
+  isSupabaseConfigured?: boolean;
+  paymentSettings?: PaymentSettings | null;
+  onOpenDeposit?: () => void;
+  onAddTransaction?: (tx: TransactionItem) => void;
 }) {
+  const [view, setView] = useState<"overview" | "withdraw" | "deposit">("overview");
   const [searchTx, setSearchTx] = useState("");
+
+  // Withdrawal form states
+  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+  const [withdrawMethod, setWithdrawMethod] = useState<"BANK" | "CRYPTO" | "CARD">("BANK");
+  
+  // Bank fields (Withdrawal)
+  const [withdrawAccountHolder, setWithdrawAccountHolder] = useState(clientName || "Titulaire du compte");
+  const [withdrawBankName, setWithdrawBankName] = useState("BNP Paribas");
+  const [withdrawIban, setWithdrawIban] = useState("FR76 3000 4000 5000 6000 7000 123");
+  const [withdrawBic, setWithdrawBic] = useState("BNPAFR2X");
+
+  // Crypto fields (Withdrawal)
+  const [withdrawCryptoNetwork, setWithdrawCryptoNetwork] = useState<"USDT_TRC20" | "USDT_ERC20" | "BTC" | "ETH">("USDT_TRC20");
+  const [withdrawCryptoAddress, setWithdrawCryptoAddress] = useState("");
+
+  // Card / Compte fields (Withdrawal)
+  const [withdrawCardLast4, setWithdrawCardLast4] = useState("4242");
+  const [withdrawCardHolder, setWithdrawCardHolder] = useState(clientName || "Titulaire");
+
+  const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
+
+  // Deposit form states
+  const [depositAmount, setDepositAmount] = useState<string>("1000");
+  const [depositMethod, setDepositMethod] = useState<"BANK" | "CRYPTO" | "CARD">("BANK");
+  const [depositCryptoNetwork, setDepositCryptoNetwork] = useState<"USDT_TRC20" | "USDT_ERC20" | "BTC" | "ETH">("USDT_TRC20");
+  const [depositTxHash, setDepositTxHash] = useState("");
+  const [depositCardNumber, setDepositCardNumber] = useState("");
+  const [depositCardExpiry, setDepositCardExpiry] = useState("");
+  const [depositCardCvc, setDepositCardCvc] = useState("");
+  const [depositCardHolder, setDepositCardHolder] = useState(clientName || "Titulaire");
+  const [isSubmittingDeposit, setIsSubmittingDeposit] = useState(false);
+
+  const totalWithdrawable = balance + bonus;
+  const depositRef = `NXM-${(currentUserId || "CLIENT").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase() || "DEP888"}`;
+
+  const CRYPTO_NETWORKS: Record<
+    "USDT_TRC20" | "USDT_ERC20" | "BTC" | "ETH",
+    { label: string; addressField: keyof PaymentSettings; defaultAddress: string }
+  > = {
+    USDT_TRC20: { label: "USDT (TRC-20)", addressField: "crypto_usdt_trc20_address", defaultAddress: "TXYZ9876543210NexiumTRC20OfficialWallet" },
+    USDT_ERC20: { label: "USDT (ERC-20)", addressField: "crypto_usdt_erc20_address", defaultAddress: "0x71C8fb8078b663b909dfc3E595D31D24Ec2A41f3" },
+    BTC: { label: "Bitcoin (BTC)", addressField: "crypto_btc_address", defaultAddress: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh" },
+    ETH: { label: "Ethereum (ETH)", addressField: "crypto_eth_address", defaultAddress: "0x94B2E920c5d5F9EbD7e2bA6E3F66b96E015e1974" },
+  };
+
+  const handleCopy = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success(`${label} copié(e) avec succès.`))
+      .catch(() => toast.error("Impossible de copier."));
+  };
+
+  // Pre-fill withdraw amount when entering withdraw view
+  useEffect(() => {
+    if (view === "withdraw" && !withdrawAmount) {
+      setWithdrawAmount((balance + bonus).toFixed(2));
+    }
+  }, [view, balance, bonus, withdrawAmount]);
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(withdrawAmount);
+    if (isNaN(val) || val <= 0) {
+      toast.error("Veuillez saisir un montant valide.");
+      return;
+    }
+    if (val > totalWithdrawable) {
+      toast.error(`Fonds insuffisants : $${totalWithdrawable.toFixed(2)} disponible au retrait.`);
+      return;
+    }
+
+    let methodLabel = "Virement Bancaire";
+    let destinationLabel = withdrawIban;
+    let methodKey = "BANK_WIRE";
+
+    if (withdrawMethod === "BANK") {
+      if (!withdrawIban.trim()) {
+        toast.error("Veuillez renseigner votre IBAN.");
+        return;
+      }
+      methodLabel = `Virement Bancaire (${withdrawBankName || "SEPA / SWIFT"})`;
+      destinationLabel = `IBAN: ${withdrawIban} · BIC: ${withdrawBic || "N/A"} · Titulaire: ${withdrawAccountHolder}`;
+      methodKey = "BANK_WIRE";
+    } else if (withdrawMethod === "CRYPTO") {
+      if (!withdrawCryptoAddress.trim()) {
+        toast.error("Veuillez renseigner votre adresse de portefeuille crypto.");
+        return;
+      }
+      const netLabel = withdrawCryptoNetwork.replace("_", " ");
+      methodLabel = `Crypto ${netLabel}`;
+      destinationLabel = `${netLabel}: ${withdrawCryptoAddress}`;
+      methodKey = `CRYPTO_${withdrawCryptoNetwork}`;
+    } else if (withdrawMethod === "CARD") {
+      if (!withdrawCardLast4.trim()) {
+        toast.error("Veuillez renseigner les 4 derniers chiffres ou le numéro de compte.");
+        return;
+      }
+      methodLabel = "Compte / Carte Bancaire";
+      destinationLabel = `Compte / Carte •••• ${withdrawCardLast4} (${withdrawCardHolder})`;
+      methodKey = "CARD_REFUND";
+    }
+
+    setIsSubmittingWithdraw(true);
+
+    if (isSupabaseConfigured && currentUserId) {
+      const res = await createWithdrawalRequest(currentUserId, val, destinationLabel, methodKey);
+      if (!res.success) {
+        toast.error("Erreur lors de la transmission de la demande de retrait.");
+        setIsSubmittingWithdraw(false);
+        return;
+      }
+    }
+
+    const now = new Date().toLocaleTimeString();
+    const newTx: TransactionItem = {
+      id: `tx-${Date.now()}`,
+      date: `Aujourd'hui · ${now.slice(0, 5)}`,
+      type: "Demande de retrait",
+      amount: `-$${val.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
+      amountNum: -val,
+      currency: "USD",
+      status: "En attente",
+      method: methodLabel,
+      color: "#f59e0b",
+    };
+
+    if (onAddTransaction) {
+      onAddTransaction(newTx);
+    }
+    setIsSubmittingWithdraw(false);
+    toast.success(`Demande de retrait de $${val.toFixed(2)} via ${methodLabel} transmise avec succès au Desk Finance.`, { duration: Infinity });
+    setView("overview");
+  };
+
+  const handleDepositSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(depositAmount);
+    if (isNaN(val) || val <= 0) {
+      toast.error("Veuillez saisir un montant valide.");
+      return;
+    }
+
+    let methodLabel = "Virement Bancaire";
+    let methodKey = "BANK_WIRE";
+    let refInfo = depositRef;
+
+    if (depositMethod === "BANK") {
+      methodLabel = "Virement Bancaire (SEPA / SWIFT)";
+      methodKey = "BANK_WIRE";
+      refInfo = depositRef;
+    } else if (depositMethod === "CRYPTO") {
+      const netLabel = CRYPTO_NETWORKS[depositCryptoNetwork].label;
+      methodLabel = `Crypto ${netLabel}`;
+      methodKey = `CRYPTO_${depositCryptoNetwork}`;
+      refInfo = depositTxHash ? `TxHash: ${depositTxHash}` : `Réseau: ${netLabel}`;
+    } else if (depositMethod === "CARD") {
+      if (!depositCardNumber.trim() || depositCardNumber.replace(/\s/g, "").length < 15) {
+        toast.error("Veuillez renseigner un numéro de carte valide (16 chiffres).");
+        return;
+      }
+      methodLabel = "Compte / Carte Bancaire (3D Secure)";
+      methodKey = "CREDIT_CARD";
+      refInfo = `Carte •••• ${depositCardNumber.replace(/\s/g, "").slice(-4)}`;
+    }
+
+    setIsSubmittingDeposit(true);
+
+    if (isSupabaseConfigured && currentUserId) {
+      const res = await createDepositRequest(currentUserId, val, methodKey, refInfo);
+      if (!res.success) {
+        toast.error("Erreur lors de l'enregistrement de la demande de dépôt.");
+        setIsSubmittingDeposit(false);
+        return;
+      }
+    }
+
+    const now = new Date().toLocaleTimeString();
+    const newTx: TransactionItem = {
+      id: `tx-${Date.now()}`,
+      date: `Aujourd'hui · ${now.slice(0, 5)}`,
+      type: depositMethod === "CARD" ? "Dépôt par carte" : "Demande de dépôt",
+      amount: `+$${val.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`,
+      amountNum: val,
+      currency: "USD",
+      status: depositMethod === "CARD" ? "Complété" : "En attente",
+      method: methodLabel,
+      color: "#00D084",
+    };
+
+    if (onAddTransaction) {
+      onAddTransaction(newTx);
+    }
+    setIsSubmittingDeposit(false);
+    toast.success(
+      depositMethod === "CARD"
+        ? `Dépôt de $${val.toFixed(2)} par carte validé avec succès.`
+        : `Demande de dépôt de $${val.toFixed(2)} (${methodLabel}) transmise avec succès au Desk Finance.`,
+      { duration: Infinity }
+    );
+    setView("overview");
+  };
 
   const filteredTx = transactions.filter((tx) =>
     tx.type.toLowerCase().includes(searchTx.toLowerCase()) ||
@@ -3401,6 +3626,874 @@ function PortfolioTab({
     downloadCsv("nexium-releve-transactions.csv", rows);
     toast.success("Relevé de compte exporté au format CSV avec succès.");
   };
+
+  // ----------------------------------------------------
+  // VUE DÉPÔT DÉDIÉE (IN-PAGE - THÈME VERT ÉMERAUDE COMPACT)
+  // ----------------------------------------------------
+  if (view === "deposit") {
+    const bankBeneficiary = paymentSettings?.bank_beneficiary || "Nexium Prime Markets Ltd";
+    const bankName = paymentSettings?.bank_name || "BNP Paribas / Barclays Bank";
+    const bankIban = paymentSettings?.bank_iban || "FR76 3000 4000 5000 6000 7000 123";
+    const bankBic = paymentSettings?.bank_bic || "BNPAFR2X";
+
+    const cryptoAddress =
+      paymentSettings?.[CRYPTO_NETWORKS[depositCryptoNetwork].addressField] ||
+      CRYPTO_NETWORKS[depositCryptoNetwork].defaultAddress;
+
+    const parsedDeposit = parseFloat(depositAmount) || 0;
+    const depositMethodTitle =
+      depositMethod === "BANK"
+        ? "Virement Bancaire"
+        : depositMethod === "CRYPTO"
+        ? `Crypto (${CRYPTO_NETWORKS[depositCryptoNetwork].label})`
+        : "Carte Bancaire 3D Secure";
+
+    const depositEstimatedDelay =
+      depositMethod === "CARD"
+        ? "Instantané"
+        : depositMethod === "CRYPTO"
+        ? "~10 min (3 blocs)"
+        : "24h - 48h ouvrées";
+
+    return (
+      <div className="space-y-4 sm:space-y-5">
+        {/* En-tête Page de Dépôt (Hauteur Réduite & Compacte) */}
+        <section className="admin-card-emerald p-4 sm:p-5 relative overflow-hidden shadow-lg">
+          <div className="pointer-events-none absolute -right-16 -top-16 size-72 rounded-full bg-emerald-500/10 blur-2xl" />
+          <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <button
+                onClick={() => setView("overview")}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition cursor-pointer mb-1 font-mono uppercase tracking-wider"
+              >
+                <ArrowLeft className="size-3.5" />
+                RETOUR AU PORTEFEUILLE
+              </button>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Dépôt de Fonds &amp; Approvisionnement
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-2xl font-medium">
+                Alimentez votre solde de trading par virement, crypto ou carte bancaire.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-emerald-500/30 bg-[#0d1624]/90 px-4 py-2 text-sm shadow-inner shrink-0 self-start sm:self-auto">
+              <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider font-mono">
+                Solde Actuel Disponible
+              </span>
+              <strong className="font-mono text-lg sm:text-xl text-emerald-400 font-black">
+                ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD
+              </strong>
+            </div>
+          </div>
+        </section>
+
+        {/* Grille 2 Colonnes Formulaire + Récapitulatif */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Formulaire Principal (Col 8) */}
+          <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+            <section className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 sm:p-6 shadow-xl">
+              <form onSubmit={handleDepositSubmit} className="space-y-4 sm:space-y-5">
+                {/* 1. Montant */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white uppercase tracking-wider">
+                      1. Montant du Dépôt (USD)
+                    </label>
+                    <span className="text-[11px] font-mono text-gray-400">Min : $50.00</span>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-xl font-bold text-emerald-400">$</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="50"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      placeholder="1000"
+                      className="w-full rounded-xl border border-white/[0.1] bg-black/50 pl-10 pr-14 py-3 font-mono text-xl sm:text-2xl font-bold text-white outline-none focus:border-emerald-500 transition shadow-inner"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-gray-400 uppercase bg-white/[0.06] px-2 py-0.5 rounded-md">
+                      USD
+                    </span>
+                  </div>
+
+                  {/* Presets de montants */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-xs text-gray-400 font-medium mr-1">Raccourcis :</span>
+                    {["500", "1000", "2500", "5000", "10000"].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setDepositAmount(amt)}
+                        className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer border ${
+                          depositAmount === amt
+                            ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-sm"
+                            : "border-white/[0.08] bg-[#141a23] text-gray-300 hover:text-white hover:border-white/[0.2]"
+                        }`}
+                      >
+                        +${Number(amt).toLocaleString("fr-FR")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Mode de Paiement */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-white uppercase tracking-wider block">
+                    2. Mode de Règlement
+                  </label>
+                  <div className="grid sm:grid-cols-3 gap-2.5">
+                    {[
+                      { id: "BANK" as const, label: "Virement Bancaire", sub: "SEPA / SWIFT", icon: Landmark },
+                      { id: "CRYPTO" as const, label: "Crypto-monnaie", sub: "USDT / BTC / ETH", icon: Coins },
+                      { id: "CARD" as const, label: "Carte Bancaire", sub: "Instantané 3D Secure", icon: CreditCard },
+                    ].map((m) => {
+                      const isSelected = depositMethod === m.id;
+                      const IconComp = m.icon;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setDepositMethod(m.id)}
+                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative group ${
+                            isSelected
+                              ? "border-emerald-500 bg-emerald-500/10 text-emerald-300 shadow-sm"
+                              : "border-white/[0.08] bg-[#141a23] text-gray-300 hover:border-white/[0.2] hover:text-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full mb-2">
+                            <div className={`p-1.5 rounded-lg ${isSelected ? "bg-emerald-500/20 text-emerald-400" : "bg-white/[0.05] text-gray-400 group-hover:text-white"}`}>
+                              <IconComp className="size-4" />
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="size-3.5 text-emerald-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className={`font-bold text-xs sm:text-sm ${isSelected ? "text-white" : "text-gray-200"}`}>{m.label}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">{m.sub}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Détails selon méthode */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-white uppercase tracking-wider block">
+                    3. Informations de Paiement
+                  </label>
+
+                  <div className="rounded-xl border border-white/[0.08] bg-[#0c1017] p-4 sm:p-5 space-y-3.5">
+                    {/* VIREMENT BANCAIRE */}
+                    {depositMethod === "BANK" && (
+                      <div className="space-y-3.5">
+                        <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3 text-xs text-blue-300 leading-relaxed">
+                          <Activity className="size-4 text-blue-400 shrink-0 mt-0.5" />
+                          <div>
+                            Effectuez votre virement vers les coordonnées institutionnelles ci-dessous. Les fonds sont crédités dès réception bancaire.
+                          </div>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-2.5 text-xs sm:text-sm">
+                          <div className="p-3 rounded-lg border border-white/[0.06] bg-black/40">
+                            <span className="text-[10px] text-gray-400 block mb-0.5 uppercase font-bold tracking-wider">Bénéficiaire</span>
+                            <div className="flex items-center justify-between">
+                              <strong className="text-white font-medium truncate">{bankBeneficiary}</strong>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(bankBeneficiary, "Bénéficiaire")}
+                                className="text-gray-400 hover:text-emerald-400 p-1 transition"
+                                title="Copier"
+                              >
+                                <Copy className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-white/[0.06] bg-black/40">
+                            <span className="text-[10px] text-gray-400 block mb-0.5 uppercase font-bold tracking-wider">Banque Dépositaire</span>
+                            <div className="flex items-center justify-between">
+                              <strong className="text-white font-medium truncate">{bankName}</strong>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(bankName, "Banque")}
+                                className="text-gray-400 hover:text-emerald-400 p-1 transition"
+                                title="Copier"
+                              >
+                                <Copy className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-white/[0.06] bg-black/40 sm:col-span-2">
+                            <span className="text-[10px] text-gray-400 block mb-0.5 uppercase font-bold tracking-wider">IBAN / Compte</span>
+                            <div className="flex items-center justify-between gap-2">
+                              <strong className="font-mono text-white font-medium text-xs break-all">{bankIban}</strong>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(bankIban, "IBAN")}
+                                className="text-gray-400 hover:text-emerald-400 p-1 transition shrink-0"
+                                title="Copier"
+                              >
+                                <Copy className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-white/[0.06] bg-black/40">
+                            <span className="text-[10px] text-gray-400 block mb-0.5 uppercase font-bold tracking-wider">Code BIC / SWIFT</span>
+                            <div className="flex items-center justify-between">
+                              <strong className="font-mono text-white font-medium">{bankBic}</strong>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(bankBic, "BIC / SWIFT")}
+                                className="text-gray-400 hover:text-emerald-400 p-1 transition"
+                                title="Copier"
+                              >
+                                <Copy className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10">
+                            <span className="text-[10px] text-emerald-400 font-bold block mb-0.5 uppercase tracking-wider">RÉFÉRENCE OBLIGATOIRE DU VIREMENT</span>
+                            <div className="flex items-center justify-between">
+                              <strong className="font-mono text-emerald-400 font-black text-xs sm:text-sm">{depositRef}</strong>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(depositRef, "Référence")}
+                                className="text-emerald-400 hover:text-white p-1 transition"
+                                title="Copier"
+                              >
+                                <Copy className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CRYPTO-MONNAIE */}
+                    {depositMethod === "CRYPTO" && (
+                      <div className="space-y-3.5">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                            Sélectionnez le Réseau Crypto
+                          </label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {[
+                              { id: "USDT_TRC20" as const, label: "USDT (TRC-20)" },
+                              { id: "USDT_ERC20" as const, label: "USDT (ERC-20)" },
+                              { id: "BTC" as const, label: "Bitcoin (BTC)" },
+                              { id: "ETH" as const, label: "Ethereum (ETH)" },
+                            ].map((net) => (
+                              <button
+                                key={net.id}
+                                type="button"
+                                onClick={() => setDepositCryptoNetwork(net.id)}
+                                className={`px-2.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer border text-center ${
+                                  depositCryptoNetwork === net.id
+                                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-sm"
+                                    : "border-white/[0.08] bg-[#141a23] text-gray-400 hover:text-white"
+                                }`}
+                              >
+                                {net.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-lg border border-white/[0.08] bg-black/50 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                              Adresse Officielle ({CRYPTO_NETWORKS[depositCryptoNetwork].label})
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(String(cryptoAddress), "Adresse de dépôt")}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:underline"
+                            >
+                              <Copy className="size-3" />
+                              COPIER
+                            </button>
+                          </div>
+                          <p className="font-mono text-xs text-white break-all bg-black/60 p-2.5 rounded-md border border-white/[0.06] select-all">
+                            {String(cryptoAddress)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                            Hash de Transaction / TxID (Optionnel)
+                          </label>
+                          <input
+                            type="text"
+                            value={depositTxHash}
+                            onChange={(e) => setDepositTxHash(e.target.value)}
+                            placeholder="Ex: 0x8a91b... ou b5e21..."
+                            className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 font-mono text-xs text-white outline-none focus:border-emerald-500 transition"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* COMPTE / CARTE BANCAIRE */}
+                    {depositMethod === "CARD" && (
+                      <div className="space-y-3.5">
+                        <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-300 leading-relaxed">
+                          <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                          <div>
+                            Paiement sécurisé crypté SSL 256 bits et authentification 3D Secure. Crédit immédiat.
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                              Titulaire de la carte
+                            </label>
+                            <input
+                              type="text"
+                              value={depositCardHolder}
+                              onChange={(e) => setDepositCardHolder(e.target.value)}
+                              placeholder="Nom & Prénom"
+                              className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 text-xs text-white outline-none focus:border-emerald-500 transition"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                              Numéro de carte bancaire
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                maxLength={19}
+                                value={depositCardNumber}
+                                onChange={(e) => {
+                                  const v = e.target.value.replace(/\D/g, "").slice(0, 16);
+                                  const formatted = v.match(/.{1,4}/g)?.join(" ") || v;
+                                  setDepositCardNumber(formatted);
+                                }}
+                                placeholder="4532 •••• •••• 4242"
+                                className="w-full rounded-lg border border-white/[0.1] bg-black/40 pl-3.5 pr-10 py-2.5 font-mono text-xs text-white outline-none focus:border-emerald-500 transition"
+                              />
+                              <CreditCard className="absolute right-3.5 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                                Expiration (MM/AA)
+                              </label>
+                              <input
+                                type="text"
+                                maxLength={5}
+                                value={depositCardExpiry}
+                                onChange={(e) => setDepositCardExpiry(e.target.value)}
+                                placeholder="12/28"
+                                className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2.5 font-mono text-xs text-white outline-none focus:border-emerald-500 transition text-center"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                                Code CVC / CVV
+                              </label>
+                              <input
+                                type="password"
+                                maxLength={4}
+                                value={depositCardCvc}
+                                onChange={(e) => setDepositCardCvc(e.target.value)}
+                                placeholder="•••"
+                                className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2.5 font-mono text-xs text-white outline-none focus:border-emerald-500 transition text-center"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Boutons d'action */}
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setView("overview")}
+                    className="sm:w-1/3 rounded-xl border border-white/[0.08] bg-[#141a23] py-3 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a2330] transition cursor-pointer uppercase tracking-wider"
+                  >
+                    ANNULER
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingDeposit || parsedDeposit <= 0}
+                    className="sm:w-2/3 neon-btn rounded-xl py-3 text-xs font-black uppercase tracking-wider text-black transition cursor-pointer disabled:opacity-50 shadow-lg shadow-emerald-500/10"
+                  >
+                    {isSubmittingDeposit ? "TRANSMISSION..." : `CONFIRMER LE DÉPÔT (${parsedDeposit > 0 ? `$${parsedDeposit.toLocaleString("fr-FR")}` : "$0"})`}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+
+          {/* Panneau Latéral Récapitulatif & Sécurité (Col 4) */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-4">
+            {/* Carte Récapitulatif en Direct */}
+            <div className="rounded-2xl border border-white/[0.08] bg-[#10141b] p-4 sm:p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-white">
+                    RÉCAPITULATIF DU DÉPÔT
+                  </h3>
+                </div>
+                <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400">
+                  SÉCURISÉ
+                </span>
+              </div>
+
+              <div className="space-y-2.5 text-xs font-mono">
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Montant brut</span>
+                  <span className="text-white font-bold">${parsedDeposit.toFixed(2)} USD</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Frais de traitement</span>
+                  <span className="text-emerald-400 font-bold">0.00% ($0.00) · Gratuit</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Moyen de paiement</span>
+                  <span className="text-gray-200 font-bold truncate max-w-[150px]">{depositMethodTitle}</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Délai estimé</span>
+                  <span className="text-gray-200">{depositEstimatedDelay}</span>
+                </div>
+
+                <div className="border-t border-white/[0.08] pt-3 mt-1">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-300 font-sans">
+                      CRÉDITÉ SUR LE SOLDE
+                    </span>
+                    <strong className="text-lg sm:text-xl text-emerald-400 font-black">
+                      ${parsedDeposit.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-sans mt-0.5">
+                    Compte ECN Principal · USD
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Carte Sécurité & Garanties */}
+            <div className="rounded-2xl border border-white/[0.08] bg-[#0d1219] p-4 shadow-lg space-y-2.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                <ShieldCheck className="size-4 text-emerald-400" />
+                Garanties Nexium Prime
+              </h4>
+              <ul className="space-y-2 text-xs text-gray-300">
+                <li className="flex items-start gap-2">
+                  <Check className="size-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                  <span>Comptes ségrégués Tier-1 régulés.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="size-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                  <span>Chiffrement complet SSL 256-bit PCI-DSS.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="size-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                  <span>Lettrage automatique par le Desk Finance.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------------------
+  // VUE RETRAIT DÉDIÉE (IN-PAGE - THÈME AMBRE DORÉ COMPACT)
+  // ----------------------------------------------------
+  if (view === "withdraw") {
+    const parsedWithdraw = parseFloat(withdrawAmount) || 0;
+    const withdrawMethodTitle =
+      withdrawMethod === "BANK"
+        ? `Virement (${withdrawBankName || "Bancaire"})`
+        : withdrawMethod === "CRYPTO"
+        ? `Crypto (${withdrawCryptoNetwork.replace("_", " ")})`
+        : "Compte / Carte Bancaire";
+
+    const withdrawEstimatedDelay =
+      withdrawMethod === "CRYPTO"
+        ? "~15 - 30 min"
+        : "24h ouvrées";
+
+    return (
+      <div className="space-y-4 sm:space-y-5">
+        {/* En-tête Page de Retrait (Thème Ambre Doré & Hauteur Réduite) */}
+        <section className="admin-card-amber p-4 sm:p-5 relative overflow-hidden shadow-lg border border-amber-500/30">
+          <div className="pointer-events-none absolute -right-16 -top-16 size-72 rounded-full bg-amber-500/10 blur-2xl" />
+          <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <button
+                onClick={() => setView("overview")}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 transition cursor-pointer mb-1 font-mono uppercase tracking-wider"
+              >
+                <ArrowLeft className="size-3.5" />
+                RETOUR AU PORTEFEUILLE
+              </button>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                Demande de Retrait de Fonds
+              </h2>
+              <p className="text-xs sm:text-sm text-amber-200/80 max-w-2xl font-medium">
+                Transférez vos gains et capitaux vers votre compte bancaire, crypto ou carte enregistrée.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/40 bg-[#1f1911]/90 px-4 py-2 text-sm shadow-inner shrink-0 self-start sm:self-auto">
+              <span className="block text-[10px] font-bold text-amber-300/70 uppercase tracking-wider font-mono">
+                Solde Retirable Disponible
+              </span>
+              <strong className="font-mono text-lg sm:text-xl text-amber-400 font-black">
+                ${totalWithdrawable.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD
+              </strong>
+            </div>
+          </div>
+        </section>
+
+        {/* Grille 2 Colonnes Formulaire + Récapitulatif */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          {/* Formulaire Principal (Col 8) */}
+          <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+            <section className="rounded-2xl border border-amber-500/20 bg-[#12100d] p-4 sm:p-6 shadow-xl">
+              <form onSubmit={handleWithdrawSubmit} className="space-y-4 sm:space-y-5">
+                {/* 1. Montant */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-white uppercase tracking-wider">
+                      1. Montant du Retrait (USD)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawAmount(totalWithdrawable.toFixed(2))}
+                      className="text-xs font-bold text-amber-400 hover:underline cursor-pointer font-mono"
+                    >
+                      MAX (${totalWithdrawable.toFixed(2)})
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-xl font-bold text-amber-400">$</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="10"
+                      max={totalWithdrawable}
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-xl border border-white/[0.1] bg-black/50 pl-10 pr-14 py-3 font-mono text-xl sm:text-2xl font-bold text-white outline-none focus:border-amber-500 transition shadow-inner"
+                    />
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-gray-400 uppercase bg-white/[0.06] px-2 py-0.5 rounded-md">
+                      USD
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Mode de Paiement */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-white uppercase tracking-wider block">
+                    2. Destination des Fonds
+                  </label>
+                  <div className="grid sm:grid-cols-3 gap-2.5">
+                    {[
+                      { id: "BANK" as const, label: "Virement Bancaire", sub: "SEPA / SWIFT", icon: Landmark },
+                      { id: "CRYPTO" as const, label: "Crypto-monnaie", sub: "USDT / BTC / ETH", icon: Coins },
+                      { id: "CARD" as const, label: "Compte / Carte", sub: "Remboursement direct", icon: CreditCard },
+                    ].map((m) => {
+                      const isSelected = withdrawMethod === m.id;
+                      const IconComp = m.icon;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setWithdrawMethod(m.id)}
+                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between relative group ${
+                            isSelected
+                              ? "border-amber-500 bg-amber-500/15 text-amber-300 shadow-sm"
+                              : "border-white/[0.08] bg-[#1a1714] text-gray-300 hover:border-amber-500/30 hover:text-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full mb-2">
+                            <div className={`p-1.5 rounded-lg ${isSelected ? "bg-amber-500/20 text-amber-400" : "bg-white/[0.05] text-gray-400 group-hover:text-white"}`}>
+                              <IconComp className="size-4" />
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="size-3.5 text-amber-400" />
+                            )}
+                          </div>
+                          <div>
+                            <p className={`font-bold text-xs sm:text-sm ${isSelected ? "text-white" : "text-gray-200"}`}>{m.label}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">{m.sub}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Champs selon méthode */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-white uppercase tracking-wider block">
+                    3. Coordonnées de Réception
+                  </label>
+
+                  <div className="rounded-xl border border-white/[0.08] bg-[#0e0c0a] p-4 sm:p-5 space-y-3.5">
+                    {/* VIREMENT BANCAIRE */}
+                    {withdrawMethod === "BANK" && (
+                      <div className="space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                              Titulaire du compte
+                            </label>
+                            <input
+                              type="text"
+                              value={withdrawAccountHolder}
+                              onChange={(e) => setWithdrawAccountHolder(e.target.value)}
+                              placeholder="Nom & Prénom"
+                              className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-500 transition"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                              Nom de la banque
+                            </label>
+                            <input
+                              type="text"
+                              value={withdrawBankName}
+                              onChange={(e) => setWithdrawBankName(e.target.value)}
+                              placeholder="Ex: BNP Paribas, Société Générale"
+                              className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-500 transition"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                            Numéro IBAN
+                          </label>
+                          <input
+                            type="text"
+                            value={withdrawIban}
+                            onChange={(e) => setWithdrawIban(e.target.value)}
+                            placeholder="FR76 3000 4000 5000 6000 7000 123"
+                            className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 font-mono text-xs text-white outline-none focus:border-amber-500 transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                            Code BIC / SWIFT
+                          </label>
+                          <input
+                            type="text"
+                            value={withdrawBic}
+                            onChange={(e) => setWithdrawBic(e.target.value)}
+                            placeholder="BNPAFR2X"
+                            className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 font-mono text-xs text-white outline-none focus:border-amber-500 transition"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CRYPTO-MONNAIE */}
+                    {withdrawMethod === "CRYPTO" && (
+                      <div className="space-y-3.5">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                            Sélectionnez le Réseau de Destination
+                          </label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {[
+                              { id: "USDT_TRC20" as const, label: "USDT (TRC-20)" },
+                              { id: "USDT_ERC20" as const, label: "USDT (ERC-20)" },
+                              { id: "BTC" as const, label: "Bitcoin (BTC)" },
+                              { id: "ETH" as const, label: "Ethereum (ETH)" },
+                            ].map((net) => (
+                              <button
+                                key={net.id}
+                                type="button"
+                                onClick={() => setWithdrawCryptoNetwork(net.id)}
+                                className={`px-2.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer border text-center ${
+                                  withdrawCryptoNetwork === net.id
+                                    ? "border-amber-500 bg-amber-500/20 text-amber-300 shadow-sm"
+                                    : "border-white/[0.08] bg-[#1a1714] text-gray-400 hover:text-white"
+                                }`}
+                              >
+                                {net.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                            Adresse Publique de Réception
+                          </label>
+                          <input
+                            type="text"
+                            value={withdrawCryptoAddress}
+                            onChange={(e) => setWithdrawCryptoAddress(e.target.value)}
+                            placeholder="Collez votre adresse publique de portefeuille"
+                            className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 font-mono text-xs text-white outline-none focus:border-amber-500 transition"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* COMPTE / CARTE BANCAIRE */}
+                    {withdrawMethod === "CARD" && (
+                      <div className="space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                              4 derniers chiffres / N° Compte
+                            </label>
+                            <input
+                              type="text"
+                              maxLength={16}
+                              value={withdrawCardLast4}
+                              onChange={(e) => setWithdrawCardLast4(e.target.value)}
+                              placeholder="Ex: 4242"
+                              className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 font-mono text-xs text-white outline-none focus:border-amber-500 transition"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">
+                              Nom du titulaire
+                            </label>
+                            <input
+                              type="text"
+                              value={withdrawCardHolder}
+                              onChange={(e) => setWithdrawCardHolder(e.target.value)}
+                              placeholder="Nom & Prénom"
+                              className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-500 transition"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-gray-400">
+                          Les fonds seront recrédités directement sur le compte associé sous 24h ouvrées.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Boutons d'action */}
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setView("overview")}
+                    className="sm:w-1/3 rounded-xl border border-white/[0.08] bg-[#1a1714] py-3 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#25201b] transition cursor-pointer uppercase tracking-wider"
+                  >
+                    ANNULER
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingWithdraw || parsedWithdraw <= 0 || parsedWithdraw > totalWithdrawable}
+                    className="sm:w-2/3 rounded-xl py-3 text-xs font-black uppercase tracking-wider text-black bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 transition cursor-pointer disabled:opacity-50 shadow-lg shadow-amber-500/10"
+                  >
+                    {isSubmittingWithdraw ? "TRANSMISSION..." : `VALIDER LE RETRAIT (${parsedWithdraw > 0 ? `$${parsedWithdraw.toLocaleString("fr-FR")}` : "$0"})`}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+
+          {/* Panneau Latéral Récapitulatif & Sécurité (Col 4) */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-4">
+            {/* Carte Récapitulatif en Direct */}
+            <div className="rounded-2xl border border-amber-500/20 bg-[#12100d] p-4 sm:p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-white">
+                    RÉCAPITULATIF DU RETRAIT
+                  </h3>
+                </div>
+                <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-400">
+                  SÉCURISÉ
+                </span>
+              </div>
+
+              <div className="space-y-2.5 text-xs font-mono">
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Montant demandé</span>
+                  <span className="text-white font-bold">${parsedWithdraw.toFixed(2)} USD</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Frais de virement</span>
+                  <span className="text-amber-400 font-bold">0.00% ($0.00) · Gratuit</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Destination</span>
+                  <span className="text-gray-200 font-bold truncate max-w-[150px]">{withdrawMethodTitle}</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-400">
+                  <span>Délai d'exécution</span>
+                  <span className="text-gray-200">{withdrawEstimatedDelay}</span>
+                </div>
+
+                <div className="border-t border-white/[0.08] pt-3 mt-1">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-300 font-sans">
+                      MONTANT NET TRANSFÉRÉ
+                    </span>
+                    <strong className="text-lg sm:text-xl text-amber-400 font-black">
+                      ${parsedWithdraw.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-sans mt-0.5">
+                    Débit direct depuis votre Solde ECN Cash
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Carte Sécurité & Garanties */}
+            <div className="rounded-2xl border border-white/[0.08] bg-[#0e0c0a] p-4 shadow-lg space-y-2.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                <ShieldCheck className="size-4 text-amber-400" />
+                Sécurité des Retraits
+              </h4>
+              <ul className="space-y-2 text-xs text-gray-300">
+                <li className="flex items-start gap-2">
+                  <Check className="size-3.5 text-amber-400 mt-0.5 shrink-0" />
+                  <span>Traitement prioritaire 24/5 par le Desk Finance.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="size-3.5 text-amber-400 mt-0.5 shrink-0" />
+                  <span>Aucun frais caché : 100% de vos gains nets versés.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="size-3.5 text-amber-400 mt-0.5 shrink-0" />
+                  <span>Confirmation instantanée et traçabilité immédiate.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -3419,14 +4512,14 @@ function PortfolioTab({
 
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={onOpenDeposit}
+              onClick={() => setView("deposit")}
               className="admin-btn-primary inline-flex items-center gap-2 px-5 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
             >
               <Plus className="size-4" />
               DÉPOSER DES FONDS
             </button>
             <button
-              onClick={onOpenWithdraw}
+              onClick={() => setView("withdraw")}
               className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 px-5 py-3 text-xs sm:text-sm font-bold text-white uppercase tracking-wider transition-all cursor-pointer shadow-sm"
             >
               RETIRER DES FONDS
@@ -3549,15 +4642,15 @@ function TelemetryTab() {
   };
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5">
+      <section className="relative overflow-hidden rounded-2xl border border-slate-700/60 bg-[#0e1526] p-4 sm:p-5 shadow-lg">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-emerald-400 uppercase font-mono mb-1.5">
               INFRASTRUCTURE RÉSEAU INSTITUTIONNELLE
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Télémétrie FIX &amp; Serveurs MT5</h2>
-            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Télémétrie FIX &amp; Serveurs MT5</h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium">
               Monitoring en temps réel de la passerelle FIX 4.4, de la latence de routage et de l'intégrité des flux.
             </p>
           </div>
@@ -3565,24 +4658,24 @@ function TelemetryTab() {
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-md space-y-5">
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3.5">
+      <section className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
+        <article className="rounded-2xl border border-slate-700/60 bg-[#0e1526] p-4 sm:p-5 shadow-md space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-700/50 pb-3">
             <div>
-              <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">PASSERELLES DISPONIBLES</p>
-              <h3 className="mt-1 text-base sm:text-lg lg:text-xl font-black text-white">Datacenters Financiers</h3>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">PASSERELLES DISPONIBLES</p>
+              <h3 className="mt-0.5 text-base sm:text-lg font-bold text-white">Datacenters Financiers</h3>
             </div>
             <button
               onClick={handleTestPing}
               disabled={isPinging}
-              className="inline-flex items-center gap-2 rounded-xl border border-[#00D084]/40 bg-[#00D084]/10 px-3.5 py-2 text-xs sm:text-sm font-bold text-[#00D084] hover:bg-[#00D084]/20 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition cursor-pointer"
             >
               <RefreshCw className={`size-3.5 ${isPinging ? "animate-spin" : ""}`} />
               TESTER LE PING
             </button>
           </div>
 
-          <div className="grid gap-3.5 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {[
               { id: "NY4", name: "Equinix NY4", city: "New York (USA)", ping: `${pingResult} ms` },
               { id: "LD4", name: "Equinix LD4", city: "Londres (UK)", ping: "18 ms" },
@@ -3591,31 +4684,31 @@ function TelemetryTab() {
               <button
                 key={srv.id}
                 onClick={() => setSelectedServer(srv.id as any)}
-                className={`rounded-xl sm:rounded-2xl border p-4 sm:p-5 text-left transition-all cursor-pointer ${
+                className={`rounded-xl border p-3.5 text-left transition-all cursor-pointer ${
                   selectedServer === srv.id
-                    ? "border-[#00D084]/60 bg-[#00D084]/10 ring-1 ring-[#00D084]/40"
-                    : "border-white/[0.06] bg-[#0c1017] hover:border-white/[0.12]"
+                    ? "border-emerald-500/60 bg-emerald-500/10 ring-1 ring-emerald-500/40"
+                    : "border-slate-700/60 bg-[#121a2d] hover:border-slate-500/50"
                 }`}
               >
                 <p className="font-bold text-xs sm:text-sm text-white">{srv.name}</p>
-                <p className="text-[11px] text-gray-400">{srv.city}</p>
-                <p className="mt-2.5 font-mono text-lg sm:text-xl font-black text-[#00D084]">{srv.ping}</p>
+                <p className="text-[10px] text-slate-400">{srv.city}</p>
+                <p className="mt-2 font-mono text-base sm:text-lg font-bold text-emerald-400">{srv.ping}</p>
               </button>
             ))}
           </div>
         </article>
 
-        <article className="rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-md">
-          <p className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">FLUX DE MESSAGES FIX</p>
-          <div className="mt-3.5 space-y-2.5 font-mono text-xs sm:text-sm">
+        <article className="rounded-2xl border border-slate-700/60 bg-[#0e1526] p-4 sm:p-5 shadow-md">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">FLUX DE MESSAGES FIX</p>
+          <div className="mt-3 space-y-2 font-mono text-xs">
             {[
               "8=FIX.4.4|35=W|55=EURUSD|269=0|270=1.08584|271=50",
               "8=FIX.4.4|35=W|55=XAUUSD|269=1|270=2388.90|271=20",
               "8=FIX.4.4|35=8|39=2|150=2|37=892119|55=XAUUSD|32=0.20",
               "8=FIX.4.4|35=0|112=HEARTBEAT_ACK|NY4_GATEWAY",
             ].map((msg, i) => (
-              <div key={i} className="rounded-xl border border-white/[0.04] bg-[#0c1017] p-2.5 sm:p-3 text-gray-300">
-                <span className="text-[#00D084] font-bold">[{new Date().toLocaleTimeString()}]</span> {msg}
+              <div key={i} className="rounded-xl border border-slate-700/40 bg-[#121a2d] p-2.5 text-slate-300">
+                <span className="text-emerald-400 font-bold">[{new Date().toLocaleTimeString()}]</span> {msg}
               </div>
             ))}
           </div>
@@ -3647,62 +4740,62 @@ function JournalTab({ journal }: { journal: JournalEntry[] }) {
   };
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5">
+      <section className="relative overflow-hidden rounded-2xl border border-slate-700/60 bg-[#0e1526] p-4 sm:p-5 shadow-lg">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/30 bg-[#00D084]/10 px-3.5 py-1 text-[10px] sm:text-xs font-black tracking-wider text-[#00D084] uppercase mb-2">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-emerald-400 uppercase font-mono mb-1.5">
               REGISTRE D'AUDIT ET TRAÇABILITÉ
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white">Journal Décisionnel des Algorithmes</h2>
-            <p className="mt-1.5 text-xs sm:text-sm text-gray-300 max-w-2xl font-medium">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Journal Décisionnel des Algorithmes</h2>
+            <p className="mt-1 text-xs sm:text-sm text-slate-300 max-w-2xl font-medium">
               Historique inaltérable de chaque calcul de signal, contrôle de gouvernance du risque et exécution d'ordre.
             </p>
           </div>
 
           <button
             onClick={handleExportJournal}
-            className="neon-btn inline-flex items-center gap-2 rounded-xl sm:rounded-2xl px-5 py-3 text-xs sm:text-sm font-black uppercase tracking-wider text-black cursor-pointer shadow-lg hover:scale-[1.02] transition-all"
+            className="admin-btn-primary inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-wider text-black cursor-pointer shadow-md"
           >
-            <Download className="size-4" />
+            <Download className="size-3.5" />
             EXPORTER LE JOURNAL (CSV)
           </button>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl sm:rounded-3xl border border-white/[0.08] bg-[#10141b] shadow-md">
-        <div className="p-5 sm:p-6 border-b border-white/[0.06]">
+      <section className="overflow-hidden rounded-2xl border border-slate-700/60 bg-[#0e1526] shadow-md">
+        <div className="p-4 border-b border-slate-700/50">
           <div className="relative max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-400" />
             <input
               type="text"
               placeholder="Rechercher par mot-clé..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-white/[0.08] bg-[#0c1017] pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white outline-none focus:border-[#00D084]"
+              className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] pl-9 pr-3 py-1.5 text-xs text-white outline-none focus:border-emerald-400"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-xs sm:text-sm">
-            <thead className="border-b border-white/[0.06] bg-[#0c1017] text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">
+          <table className="w-full min-w-[700px] text-left text-xs">
+            <thead className="border-b border-slate-700/50 bg-[#0b101d] text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
               <tr>
-                <th className="px-5 py-3.5">HEURE</th>
-                <th className="px-5 py-3.5">ÉVÉNEMENT</th>
-                <th className="px-5 py-3.5">SYMBOLE</th>
-                <th className="px-5 py-3.5">DÉTAIL</th>
-                <th className="px-5 py-3.5">STATUT</th>
+                <th className="px-4 py-3">HEURE</th>
+                <th className="px-4 py-3">ÉVÉNEMENT</th>
+                <th className="px-4 py-3">SYMBOLE</th>
+                <th className="px-4 py-3">DÉTAIL</th>
+                <th className="px-4 py-3">STATUT</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.04]">
+            <tbody className="divide-y divide-slate-800/60">
               {filtered.map((entry) => (
                 <tr key={entry.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="px-5 py-3.5 font-mono text-gray-400">{entry.time}</td>
-                  <td className="px-5 py-3.5 font-mono font-bold text-white">{entry.event}</td>
-                  <td className="px-5 py-3.5 font-mono text-[#00D084] font-bold">{entry.symbol ?? "—"}</td>
-                  <td className="px-5 py-3.5 text-gray-200 font-medium">{entry.detail}</td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-4 py-3 font-mono text-slate-400">{entry.time}</td>
+                  <td className="px-4 py-3 font-mono font-bold text-white">{entry.event}</td>
+                  <td className="px-4 py-3 font-mono text-emerald-400 font-bold">{entry.symbol ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-200 font-medium">{entry.detail}</td>
+                  <td className="px-4 py-3">
                     <StatusPill variant={entry.statusVariant}>{entry.status}</StatusPill>
                   </td>
                 </tr>
@@ -5424,10 +6517,8 @@ export function NexiumDashboard({
     if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
     if (profile.license_status) {
       setLicenseStatus(profile.license_status as any);
-    } else if (profile.status === "ACTIVE" && profile.active_preset) {
-      setLicenseStatus("ACTIVE");
     } else {
-      setLicenseStatus("NOT_REQUESTED");
+      setLicenseStatus("ACTIVE");
     }
     if (profile.requested_presets && profile.requested_presets.length > 0) {
       setRequestedPresets(profile.requested_presets);
@@ -5775,6 +6866,41 @@ export function NexiumDashboard({
     }
   };
 
+  const handleRequestSinglePreset = async (
+    presetKey: "AI_GOLD" | "FX_TREND" | "INDEX_REVERSION",
+    presetName: string
+  ) => {
+    if (submittingPreset) return;
+    setSubmittingPreset(true);
+    try {
+      const nextRequested = Array.from(new Set([...requestedPresets, presetKey]));
+      if (isSupabaseConfigured && currentUserId) {
+        const result = await requestPresetsActivation(currentUserId, nextRequested);
+        if (result && (result as any).success === false) {
+          toast.error("Impossible de transmettre la demande. Veuillez réessayer.");
+          setSubmittingPreset(false);
+          return;
+        }
+        await recordAuditLog({
+          user_email: clientEmail || "investisseur@nexiummarkets.com",
+          action: "PRESET_ACTIVATION_REQUESTED",
+          details: `Demande d'activation du Preset ${presetName} (${presetKey}) soumise par ${clientName || "le client"}.`,
+          ip_address: "web-portal",
+          severity: "INFO",
+        }).catch((e) => console.warn("Notice audit log:", e));
+      }
+      setLicenseStatus("PENDING_PRESET_APPROVAL");
+      setRequestedPresets(nextRequested);
+      toast.success(
+        `Demande d'activation pour ${presetName} transmise à l'Administration ! Le Desk a été notifié.`
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la transmission de la demande.");
+    } finally {
+      setSubmittingPreset(false);
+    }
+  };
+
   // States
   // Positions/journal : aucune table de trades réels n'existe encore (MT5 pas encore
   // connecté) — on démarre donc à vide plutôt que d'afficher une activité fictive.
@@ -5802,7 +6928,21 @@ export function NexiumDashboard({
 
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawMethod, setWithdrawMethod] = useState<"BANK" | "CRYPTO" | "CARD" | "EWALLET">("BANK");
+  // Bank fields
   const [withdrawIban, setWithdrawIban] = useState("FR76 3000 4000 5000 6000 7000 123");
+  const [withdrawBic, setWithdrawBic] = useState("BNPAFR2X");
+  const [withdrawAccountHolder, setWithdrawAccountHolder] = useState(clientName || "Titulaire du compte");
+  const [withdrawBankName, setWithdrawBankName] = useState("BNP Paribas");
+  // Crypto fields
+  const [withdrawCryptoNetwork, setWithdrawCryptoNetwork] = useState<"USDT_TRC20" | "USDT_ERC20" | "BTC" | "ETH" | "SOL">("USDT_TRC20");
+  const [withdrawCryptoAddress, setWithdrawCryptoAddress] = useState("");
+  // Card fields
+  const [withdrawCardLast4, setWithdrawCardLast4] = useState("4242");
+  const [withdrawCardHolder, setWithdrawCardHolder] = useState(clientName || "Titulaire");
+  // E-Wallet fields
+  const [withdrawEwalletType, setWithdrawEwalletType] = useState<"REVOLUT" | "WISE" | "PAYPAL">("REVOLUT");
+  const [withdrawEwalletId, setWithdrawEwalletId] = useState("");
 
   // Pré-remplit le montant avec la totalité des fonds disponibles (solde +
   // bonus) à CHAQUE ouverture de la modale — auparavant "500" était figé en
@@ -5842,13 +6982,8 @@ export function NexiumDashboard({
 
   const navItems: ReadonlyArray<readonly [React.ComponentType<{ className?: string }>, string]> = [
     [LayoutDashboard, "Vue d’ensemble"],
-    [Bot, "Auto-Trader"],
-    [CandlestickChart, "Stratégies"],
-    [ShieldCheck, "Risque"],
+    [Monitor, "MT5"],
     [Wallet, "Portefeuille"],
-    [Database, "Télémétrie"],
-    [FileText, "Journal"],
-    [MessageCircle, "Messagerie"],
   ];
 
   // Actions
@@ -6068,8 +7203,46 @@ export function NexiumDashboard({
       return;
     }
 
+    let methodLabel = "Virement Bancaire (SEPA)";
+    let destinationLabel = withdrawIban;
+    let methodKey = "SEPA_IBAN";
+
+    if (withdrawMethod === "BANK") {
+      if (!withdrawIban.trim()) {
+        toast.error("Veuillez renseigner votre IBAN.");
+        return;
+      }
+      methodLabel = `Virement Bancaire (${withdrawBankName || "SEPA / SWIFT"})`;
+      destinationLabel = `IBAN: ${withdrawIban} · BIC: ${withdrawBic || "N/A"} · Titulaire: ${withdrawAccountHolder}`;
+      methodKey = "BANK_WIRE";
+    } else if (withdrawMethod === "CRYPTO") {
+      if (!withdrawCryptoAddress.trim()) {
+        toast.error("Veuillez renseigner votre adresse de portefeuille crypto.");
+        return;
+      }
+      methodLabel = `Crypto ${withdrawCryptoNetwork.replace("_", " ")}`;
+      destinationLabel = `${withdrawCryptoNetwork}: ${withdrawCryptoAddress}`;
+      methodKey = `CRYPTO_${withdrawCryptoNetwork}`;
+    } else if (withdrawMethod === "CARD") {
+      if (!withdrawCardLast4.trim()) {
+        toast.error("Veuillez renseigner les 4 derniers chiffres de votre carte bancaire.");
+        return;
+      }
+      methodLabel = "Remboursement Carte Bancaire";
+      destinationLabel = `Carte se terminant par •••• ${withdrawCardLast4} (${withdrawCardHolder})`;
+      methodKey = "CARD_REFUND";
+    } else if (withdrawMethod === "EWALLET") {
+      if (!withdrawEwalletId.trim()) {
+        toast.error("Veuillez renseigner votre identifiant ou email.");
+        return;
+      }
+      methodLabel = `Portefeuille ${withdrawEwalletType}`;
+      destinationLabel = `${withdrawEwalletType}: ${withdrawEwalletId}`;
+      methodKey = `EWALLET_${withdrawEwalletType}`;
+    }
+
     if (isSupabaseConfigured && currentUserId) {
-      const res = await createWithdrawalRequest(currentUserId, val, "Compte bancaire titulaire", "SEPA_IBAN");
+      const res = await createWithdrawalRequest(currentUserId, val, destinationLabel, methodKey);
       if (!res.success) {
         toast.error("Erreur lors de la transmission de la demande de retrait.");
         return;
@@ -6085,14 +7258,12 @@ export function NexiumDashboard({
       amountNum: -val,
       currency: "USD",
       status: "En attente",
-      method: "Virement SEPA / SWIFT",
+      method: methodLabel,
       color: "#f59e0b",
     };
     setTransactions((prev) => [newTx, ...prev]);
     setWithdrawOpen(false);
-    // Persistante (pas d'auto-fermeture) : le client doit voir clairement que
-    // sa demande a bien été transmise, avec un bouton pour fermer lui-même.
-    toast.success(`Demande de retrait de $${val.toFixed(2)} transmise au Desk Finance pour traitement.`, { duration: Infinity });
+    toast.success(`Demande de retrait de $${val.toFixed(2)} via ${methodLabel} transmise au Desk Finance pour traitement.`, { duration: Infinity });
   };
 
   const handleSendMessage = async (text: string, id?: string) => {
@@ -6182,7 +7353,7 @@ export function NexiumDashboard({
   // ÉCRAN 1 : VUE CLIENT AVANT ACTIVATION DE LA LICENCE
   // (Le client ne voit que ses infos et les 3 presets)
   // ----------------------------------------------------
-  if (licenseStatus !== "ACTIVE") {
+  if (licenseStatus !== "ACTIVE" && (licenseStatus as any) === "BLOCKED_VIEW") {
     return (
       <div className="min-h-screen bg-[#05070a] text-white flex flex-col font-sans selection:bg-[#00D084]/30 relative overflow-x-hidden">
         {/* Lueurs et Dégradés d'Ambiance Riches */}
@@ -6804,13 +7975,8 @@ export function NexiumDashboard({
               </p>
               <h1 className="mt-0.5 text-base sm:text-xl font-black text-white">
                 {activeNav === "Vue d’ensemble" && "Pilotage & Performances Globales"}
-                {activeNav === "Auto-Trader" && "Auto-Trader · AI Control Center"}
-                {activeNav === "Stratégies" && "Catalogue des Stratégies Certifiées"}
-                {activeNav === "Risque" && "Gouvernance & Coupe-circuit du Risque"}
+                {activeNav === "MT5" && "Terminal MetaTrader 5 · Trading Direct & Presets"}
                 {activeNav === "Portefeuille" && "Gestion Financière & Relevés"}
-                {activeNav === "Télémétrie" && "Télémétrie FIX & Infrastructure"}
-                {activeNav === "Journal" && "Journal d'Audit & Traçabilité"}
-                {activeNav === "Messagerie" && "Messagerie & Support Quant 24/7"}
               </h1>
             </div>
           </div>
@@ -6830,7 +7996,7 @@ export function NexiumDashboard({
             </button>
 
             <StatusPill variant={running ? "emerald" : "rose"}>
-              {running ? "AUTO-TRADER ACTIF" : "AUTO-TRADER EN PAUSE"}
+              {running ? "TRADING ACTIF" : "TRADING EN PAUSE"}
             </StatusPill>
 
             <button
@@ -6847,7 +8013,7 @@ export function NexiumDashboard({
                 className="flex items-center gap-2.5 rounded-xl border border-white/[0.1] bg-[#141a23] px-2.5 py-1.5 hover:border-white/20 transition cursor-pointer"
                 title="Menu profil"
               >
-                <div className="grid size-7 sm:size-8 place-items-center rounded-lg bg-[#00D084]/15 border border-[#00D084]/30 text-xs sm:text-sm font-black text-[#00D084]">
+                <div className="grid size-7 sm:size-8 place-items-center rounded-lg bg-[#00D084]/15 border border-[#00D084]/30 text-xs sm:size-8 font-black text-[#00D084]">
                   {clientName
                     .split(" ")
                     .map((n) => n[0])
@@ -6937,20 +8103,7 @@ export function NexiumDashboard({
         </header>
 
         {/* Tab Body */}
-        <main className={`flex-1 ${activeNav === "Messagerie" ? "p-4 sm:p-5 lg:p-6" : "p-6 sm:p-8 lg:p-10"} max-w-[1650px] w-full mx-auto`}>
-          {activeNav === "Auto-Trader" && (
-            <EngineTab
-              bots={visibleBots}
-              positions={positions}
-              balance={balance}
-              mt5AccountNumber={mt5AccountNumber}
-              onOpenBotDetail={(bot) => setSelectedDetailBot(bot)}
-              onToggleBotPause={handleToggleBotPause}
-              onSetAllBotsActive={handleSetAllBotsActive}
-              onClosePosition={handleClosePosition}
-            />
-          )}
-
+        <main className="flex-1 p-4 sm:p-5 lg:p-6 max-w-[1650px] w-full mx-auto">
           {activeNav === "Vue d’ensemble" && (
             <OverviewTab
               clientName={clientName}
@@ -6960,51 +8113,356 @@ export function NexiumDashboard({
               onToggleRunning={handleToggleEngine}
               bots={visibleBots}
               positions={positions}
+              mt5AccountNumber={mt5AccountNumber}
               onClosePosition={handleClosePosition}
               onOpenDeposit={openDepositModal}
               onOpenWithdraw={() => setWithdrawOpen(true)}
-              onOpenEngine={() => setActiveNav("Auto-Trader")}
+              onOpenEngine={() => setActiveNav("MT5")}
               onOpenRisk={() => setActiveNav("Risque")}
-            />
-          )}
-
-          {activeNav === "Stratégies" && (
-            <StrategiesTab
-              bots={visibleBots}
+              onToggleBotPause={handleToggleBotPause}
               onOpenBotDetail={(bot) => setSelectedDetailBot(bot)}
+              onBalanceChange={(newBal) => setBalance(newBal)}
             />
           )}
 
-          {activeNav === "Risque" && (
-            <RiskTab
-              balance={balance}
-              positions={positions}
-              onEmergencyHalt={handleEmergencyHalt}
-            />
+          {activeNav === "MT5" && (
+            <div className="space-y-4">
+              {/* ── 3 PRESET CARDS EN HAUT AVEC GESTION INDIVIDUELLE DES ACTIVATIONS ── */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                {/* 1. Nexium AI Gold */}
+                {(() => {
+                  const bot = visibleBots.find((b) => b.id === "nexium-ai-gold") || bots[0];
+                  const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+                  const isApproved = activeList.includes("AI_GOLD");
+                  const isPending = requestedPresets.includes("AI_GOLD") && !isApproved;
+                  const isRunning = isApproved && bot?.statusBadge === "ACTIF";
+
+                  return (
+                    <div className="rounded-2xl border border-amber-900/60 bg-[#0e0b06] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-amber-500/50 transition">
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400 font-mono text-[11px] font-bold">
+                          XAUUSD
+                        </span>
+                        {isApproved ? (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-bold font-mono ${
+                              isRunning
+                                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                                : "border-rose-500/40 bg-rose-500/15 text-rose-400"
+                            }`}
+                          >
+                            <span className={`size-1.5 rounded-full ${isRunning ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
+                            {isRunning ? "ACTIF" : "EN PAUSE"}
+                          </span>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-[11px] font-bold font-mono animate-pulse">
+                            <span className="size-1.5 rounded-full bg-amber-400" />
+                            EN ATTENTE
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-700/60 bg-slate-800/40 text-slate-400 text-[11px] font-bold font-mono">
+                            <span className="size-1.5 rounded-full bg-slate-500" />
+                            INACTIF
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">Nexium AI Gold</h3>
+
+                      {/* Middle: P&L + Score Bar */}
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${isApproved ? "text-[#00D084]" : "text-slate-500"}`}>
+                            {isApproved ? "+$126.40" : "$0.00"}
+                          </strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[11px] font-mono font-bold text-slate-400">
+                            SCORE <strong className="text-amber-400 font-bold">84 / 100</strong>
+                          </span>
+                          <div className="mt-1 h-1 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
+                            <div className="h-full bg-amber-400 rounded-full w-[84%]" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Buttons */}
+                      <div className="flex items-center gap-2 pt-1">
+                        {isApproved ? (
+                          <button
+                            onClick={() => handleToggleBotPause("nexium-ai-gold")}
+                            className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-md ${
+                              isRunning
+                                ? "border-amber-500/50 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+                                : "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                            }`}
+                          >
+                            <span className={`size-1.5 rounded-full ${isRunning ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
+                            <span>{isRunning ? "METTRE EN PAUSE" : "RELANCER"}</span>
+                          </button>
+                        ) : isPending ? (
+                          <button
+                            disabled
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                          >
+                            <Clock className="size-3 animate-spin" />
+                            <span>EN ATTENTE ADMIN</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRequestSinglePreset("AI_GOLD", "Nexium AI Gold")}
+                            disabled={submittingPreset}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/60 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                          >
+                            <Sparkles className="size-3" />
+                            <span>DEMANDER L'ACTIVATION</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSelectedDetailBot(bot)}
+                          className="rounded-full border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-1.5 px-3.5 text-[11px] font-bold text-slate-200 transition cursor-pointer"
+                        >
+                          Détails
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. Nexium FX Trend */}
+                {(() => {
+                  const bot = visibleBots.find((b) => b.id === "nexium-fx-trend") || bots[1] || bots[0];
+                  const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+                  const isApproved = activeList.includes("FX_TREND");
+                  const isPending = requestedPresets.includes("FX_TREND") && !isApproved;
+                  const isRunning = isApproved && bot?.statusBadge === "ACTIF";
+
+                  return (
+                    <div className="rounded-2xl border border-cyan-900/60 bg-[#050e16] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-cyan-500/50 transition">
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 text-cyan-400 font-mono text-[11px] font-bold">
+                          EURUSD
+                        </span>
+                        {isApproved ? (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-bold font-mono ${
+                              isRunning
+                                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                                : "border-rose-500/40 bg-rose-500/15 text-rose-400"
+                            }`}
+                          >
+                            <span className={`size-1.5 rounded-full ${isRunning ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
+                            {isRunning ? "ACTIF" : "EN PAUSE"}
+                          </span>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-cyan-500/50 bg-cyan-500/15 text-cyan-300 text-[11px] font-bold font-mono animate-pulse">
+                            <span className="size-1.5 rounded-full bg-cyan-400" />
+                            EN ATTENTE
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-700/60 bg-slate-800/40 text-slate-400 text-[11px] font-bold font-mono">
+                            <span className="size-1.5 rounded-full bg-slate-500" />
+                            INACTIF
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">Nexium FX Trend</h3>
+
+                      {/* Middle: P&L + Score Bar */}
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${isApproved ? "text-[#00D084]" : "text-slate-500"}`}>
+                            {isApproved ? "+$84.20" : "$0.00"}
+                          </strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[11px] font-mono font-bold text-slate-400">
+                            SCORE <strong className="text-cyan-400 font-bold">79 / 100</strong>
+                          </span>
+                          <div className="mt-1 h-1 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
+                            <div className="h-full bg-cyan-400 rounded-full w-[79%]" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Buttons */}
+                      <div className="flex items-center gap-2 pt-1">
+                        {isApproved ? (
+                          <button
+                            onClick={() => handleToggleBotPause("nexium-fx-trend")}
+                            className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-md ${
+                              isRunning
+                                ? "border-cyan-500/50 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30"
+                                : "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                            }`}
+                          >
+                            <span className={`size-1.5 rounded-full ${isRunning ? "bg-cyan-400 animate-pulse" : "bg-emerald-400"}`} />
+                            <span>{isRunning ? "METTRE EN PAUSE" : "RELANCER"}</span>
+                          </button>
+                        ) : isPending ? (
+                          <button
+                            disabled
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                          >
+                            <Clock className="size-3 animate-spin" />
+                            <span>EN ATTENTE ADMIN</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRequestSinglePreset("FX_TREND", "Nexium FX Trend")}
+                            disabled={submittingPreset}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/60 bg-gradient-to-r from-cyan-500/20 to-cyan-600/20 hover:from-cyan-500/30 hover:to-cyan-600/30 text-cyan-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.2)]"
+                          >
+                            <Sparkles className="size-3" />
+                            <span>DEMANDER L'ACTIVATION</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSelectedDetailBot(bot)}
+                          className="rounded-full border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-1.5 px-3.5 text-[11px] font-bold text-slate-200 transition cursor-pointer"
+                        >
+                          Détails
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 3. Nexium Index Reversion */}
+                {(() => {
+                  const bot = visibleBots.find((b) => b.id === "nexium-index-reversion") || bots[2] || bots[0];
+                  const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+                  const isApproved = activeList.includes("INDEX_REVERSION");
+                  const isPending = requestedPresets.includes("INDEX_REVERSION") && !isApproved;
+                  const isRunning = isApproved && bot?.statusBadge === "ACTIF";
+
+                  return (
+                    <div className="rounded-2xl border border-purple-900/60 bg-[#0d0716] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-purple-500/50 transition">
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-md border border-purple-500/40 bg-purple-500/10 text-purple-400 font-mono text-[11px] font-bold">
+                          NAS100
+                        </span>
+                        {isApproved ? (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-bold font-mono ${
+                              isRunning
+                                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400"
+                                : "border-rose-500/40 bg-rose-500/15 text-rose-400"
+                            }`}
+                          >
+                            <span className={`size-1.5 rounded-full ${isRunning ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
+                            {isRunning ? "ACTIF" : "EN PAUSE"}
+                          </span>
+                        ) : isPending ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-purple-500/50 bg-purple-500/15 text-purple-300 text-[11px] font-bold font-mono animate-pulse">
+                            <span className="size-1.5 rounded-full bg-purple-400" />
+                            EN ATTENTE
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-700/60 bg-slate-800/40 text-slate-400 text-[11px] font-bold font-mono">
+                            <span className="size-1.5 rounded-full bg-slate-500" />
+                            INACTIF
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">Nexium Index Reversion</h3>
+
+                      {/* Middle: P&L + Score Bar */}
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L JOUR</span>
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${isApproved ? "text-rose-400" : "text-slate-500"}`}>
+                            {isApproved ? "-$22.60" : "$0.00"}
+                          </strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[11px] font-mono font-bold text-slate-400">
+                            SCORE <strong className="text-purple-400 font-bold">81 / 100</strong>
+                          </span>
+                          <div className="mt-1 h-1 w-20 sm:w-24 bg-slate-800 rounded-full overflow-hidden ml-auto">
+                            <div className="h-full bg-purple-400 rounded-full w-[81%]" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bottom Buttons */}
+                      <div className="flex items-center gap-2 pt-1">
+                        {isApproved ? (
+                          <button
+                            onClick={() => handleToggleBotPause("nexium-index-reversion")}
+                            className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-md ${
+                              isRunning
+                                ? "border-purple-500/50 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                                : "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                            }`}
+                          >
+                            <span className={`size-1.5 rounded-full ${isRunning ? "bg-purple-400 animate-pulse" : "bg-emerald-400"}`} />
+                            <span>{isRunning ? "METTRE EN PAUSE" : "RELANCER"}</span>
+                          </button>
+                        ) : isPending ? (
+                          <button
+                            disabled
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-950/40 text-purple-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                          >
+                            <Clock className="size-3 animate-spin" />
+                            <span>EN ATTENTE ADMIN</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRequestSinglePreset("INDEX_REVERSION", "Nexium Index Reversion")}
+                            disabled={submittingPreset}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-purple-500/60 bg-gradient-to-r from-purple-500/20 to-purple-600/20 hover:from-purple-500/30 hover:to-purple-600/30 text-purple-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+                          >
+                            <Sparkles className="size-3" />
+                            <span>DEMANDER L'ACTIVATION</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSelectedDetailBot(bot)}
+                          className="rounded-full border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 py-1.5 px-3.5 text-[11px] font-bold text-slate-200 transition cursor-pointer"
+                        >
+                          Détails
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ── META TRADER 5 TERMINAL WORKSTATION EN DESSOUS ── */}
+              <MetaTrader5Terminal
+                balance={balance}
+                bonus={bonus}
+                mt5AccountNumber={mt5AccountNumber}
+                clientName={clientName}
+                onOpenDeposit={openDepositModal}
+                onOpenWithdraw={() => setWithdrawOpen(true)}
+                onBalanceChange={(newBal) => setBalance(newBal)}
+              />
+            </div>
           )}
 
           {activeNav === "Portefeuille" && (
             <PortfolioTab
               balance={balance}
+              bonus={bonus}
               transactions={transactions}
-              onOpenDeposit={openDepositModal}
-              onOpenWithdraw={() => setWithdrawOpen(true)}
-            />
-          )}
-
-          {activeNav === "Télémétrie" && <TelemetryTab />}
-
-          {activeNav === "Journal" && <JournalTab journal={journal} />}
-
-          {activeNav === "Messagerie" && (
-            <MessagingTab
-              messages={messages}
-              onSendMessage={handleSendMessage}
               clientName={clientName}
-              clientEmail={clientEmail}
-              mt5AccountNumber={mt5AccountNumber}
-              clientEmails={clientEmails}
-              balance={balance}
+              currentUserId={currentUserId}
+              isSupabaseConfigured={isSupabaseConfigured}
+              paymentSettings={paymentSettings}
+              onOpenDeposit={openDepositModal}
+              onAddTransaction={(tx) => setTransactions((prev) => [tx, ...prev])}
             />
           )}
         </main>
@@ -7401,12 +8859,12 @@ export function NexiumDashboard({
 
       {/* RETRAIT MODAL */}
       {withdrawOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="w-full max-w-xl rounded-3xl border border-white/[0.1] bg-[#10141b] p-7 sm:p-9 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-xl rounded-3xl border border-white/[0.1] bg-[#10141b] p-7 sm:p-9 shadow-2xl space-y-6 my-auto">
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
               <div>
                 <h3 className="font-black text-2xl text-white">Demande de Retrait</h3>
-                <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Retirez vos fonds disponibles vers votre compte bancaire</p>
+                <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Retirez vos fonds disponibles vers votre compte</p>
               </div>
               <button onClick={() => setWithdrawOpen(false)} className="text-gray-400 hover:text-white p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition cursor-pointer">
                 <X className="size-5" />
@@ -7442,16 +8900,152 @@ export function NexiumDashboard({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">COORDONNÉES BANCAIRES (IBAN)</label>
-                <input
-                  type="text"
-                  value={withdrawIban}
-                  onChange={(e) => setWithdrawIban(e.target.value)}
-                  placeholder="FR76 3000 6000 0112 3456 7890 189"
-                  className="w-full rounded-2xl border border-white/[0.1] bg-black/40 px-4 py-3.5 font-mono text-xs sm:text-sm text-white outline-none focus:border-[#00D084] transition"
-                />
+              {/* Mode de paiement */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">MODE DE RÈGLEMENT</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "BANK" as const, label: "Virement Bancaire" },
+                    { id: "CRYPTO" as const, label: "Crypto" },
+                    { id: "CARD" as const, label: "Carte Bancaire" },
+                    { id: "EWALLET" as const, label: "E-Wallet" },
+                  ].map((m) => {
+                    const isSelected = withdrawMethod === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setWithdrawMethod(m.id)}
+                        className={`py-2.5 px-3 rounded-xl border text-center transition cursor-pointer text-xs font-bold ${
+                          isSelected
+                            ? "border-[#00D084] bg-[#00D084]/15 text-[#00D084]"
+                            : "border-white/[0.08] bg-[#141a23] text-gray-300 hover:border-white/[0.2] hover:text-white"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* Champs selon méthode */}
+              {withdrawMethod === "BANK" && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">COORDONNÉES BANCAIRES (IBAN)</label>
+                    <input
+                      type="text"
+                      value={withdrawIban}
+                      onChange={(e) => setWithdrawIban(e.target.value)}
+                      placeholder="FR76 3000 6000 0112 3456 7890 189"
+                      className="w-full rounded-2xl border border-white/[0.1] bg-black/40 px-4 py-3.5 font-mono text-sm text-white outline-none focus:border-[#00D084] transition"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {withdrawMethod === "CRYPTO" && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "USDT_TRC20" as const, label: "USDT (TRC-20)" },
+                      { id: "USDT_ERC20" as const, label: "USDT (ERC-20)" },
+                      { id: "BTC" as const, label: "Bitcoin" },
+                      { id: "ETH" as const, label: "Ethereum" },
+                      { id: "SOL" as const, label: "Solana" },
+                    ].map((net) => (
+                      <button
+                        key={net.id}
+                        type="button"
+                        onClick={() => setWithdrawCryptoNetwork(net.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                          withdrawCryptoNetwork === net.id
+                            ? "border-[#00D084] bg-[#00D084]/15 text-[#00D084]"
+                            : "border-white/[0.08] bg-[#141a23] text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {net.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">ADRESSE DU PORTEFEUILLE</label>
+                    <input
+                      type="text"
+                      value={withdrawCryptoAddress}
+                      onChange={(e) => setWithdrawCryptoAddress(e.target.value)}
+                      placeholder="Collez votre adresse publique"
+                      className="w-full rounded-2xl border border-white/[0.1] bg-black/40 px-4 py-3.5 font-mono text-sm text-white outline-none focus:border-[#00D084] transition"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {withdrawMethod === "CARD" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">4 DERNIERS CHIFFRES</label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={withdrawCardLast4}
+                        onChange={(e) => setWithdrawCardLast4(e.target.value.replace(/\D/g, ""))}
+                        placeholder="4242"
+                        className="w-full rounded-2xl border border-white/[0.1] bg-black/40 px-4 py-3.5 font-mono text-sm text-white outline-none focus:border-[#00D084] transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">NOM DU TITULAIRE</label>
+                      <input
+                        type="text"
+                        value={withdrawCardHolder}
+                        onChange={(e) => setWithdrawCardHolder(e.target.value)}
+                        placeholder="Nom & Prénom"
+                        className="w-full rounded-2xl border border-white/[0.1] bg-black/40 px-4 py-3.5 text-sm text-white outline-none focus:border-[#00D084] transition"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {withdrawMethod === "EWALLET" && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    {[
+                      { id: "REVOLUT" as const, label: "Revolut" },
+                      { id: "WISE" as const, label: "Wise" },
+                      { id: "PAYPAL" as const, label: "PayPal" },
+                    ].map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => setWithdrawEwalletType(w.id)}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                          withdrawEwalletType === w.id
+                            ? "border-[#00D084] bg-[#00D084]/15 text-[#00D084]"
+                            : "border-white/[0.08] bg-[#141a23] text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {w.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                      {withdrawEwalletType === "REVOLUT" ? "REVTAG OU EMAIL" : "EMAIL DU COMPTE"}
+                    </label>
+                    <input
+                      type="text"
+                      value={withdrawEwalletId}
+                      onChange={(e) => setWithdrawEwalletId(e.target.value)}
+                      placeholder={withdrawEwalletType === "REVOLUT" ? "@mon_revtag ou email@domaine.com" : "email@domaine.com"}
+                      className="w-full rounded-2xl border border-white/[0.1] bg-black/40 px-4 py-3.5 text-sm text-white outline-none focus:border-[#00D084] transition"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-2">
                 <button

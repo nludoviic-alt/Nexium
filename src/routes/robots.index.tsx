@@ -64,7 +64,7 @@ function RobotsPage() {
       {/* 1. Header */}
       <PageHeader
         eyebrow={language === "fr" ? "TRILOGIE ALGORITHMIQUE MT5" : "MT5 ALGORITHMIC TRILOGY"}
-        title={language === "fr" ? "Expert Advisors MetaTrader 5" : "MetaTrader 5 Expert Advisors"}
+        title={language === "fr" ? "Robots de Trading MetaTrader 5" : "MetaTrader 5 Expert Advisors"}
         description={
           language === "fr"
             ? "Une sélection strictement limitée aux 3 robots haute précision. Licences chiffrées Hardware-Bound et colocalisation Equinix NY4 (<38ms)."
@@ -202,8 +202,8 @@ function RobotsPage() {
                     >
                       <span>
                         {language === "fr"
-                          ? `Examiner la Fiche ${r.name}`
-                          : `View Details for ${r.name}`}
+                          ? "Voir la fiche"
+                          : "View Details"}
                       </span>
                       <ArrowRight className="size-4" />
                     </Link>

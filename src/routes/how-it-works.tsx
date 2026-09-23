@@ -139,13 +139,13 @@ function HowItWorksPage() {
           </div>
 
           {/* Bottom Callout */}
-          <div className="rounded-[32px] bg-gradient-to-br from-gray-900 via-gray-900 to-black p-8 sm:p-12 text-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="space-y-2 max-w-xl">
+          <div className="rounded-[32px] bg-gradient-to-br from-gray-900 via-gray-900 to-black p-8 sm:p-12 text-white shadow-2xl relative overflow-hidden flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="space-y-2 max-w-3xl flex-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00ff66]/10 border border-[#00ff66]/30 text-[#00ff66] text-xs font-bold font-mono">
                 <ShieldCheck className="size-4" />
                 <span>{language === "fr" ? "SÉCURITÉ GARANTIE" : "GUARANTEED SECURITY"}</span>
               </div>
-              <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
+              <h3 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight sm:whitespace-nowrap">
                 {t.howItWorks.ctaTitle}
               </h3>
               <p className="text-sm text-gray-400 font-medium leading-relaxed">
@@ -153,8 +153,8 @@ function HowItWorksPage() {
               </p>
             </div>
 
-            <Link to="/register">
-              <Button className="bg-[#00ff66] hover:bg-[#00d054] text-black font-black px-8 py-6 rounded-2xl text-sm shadow-[0_0_25px_rgba(0,255,102,0.3)] hover:scale-105 transition cursor-pointer">
+            <Link to="/register" className="shrink-0">
+              <Button className="bg-[#00ff66] hover:bg-[#00d054] text-black font-black px-8 py-6 rounded-2xl text-sm shadow-[0_0_25px_rgba(0,255,102,0.3)] hover:scale-105 transition cursor-pointer whitespace-nowrap">
                 <span>{t.howItWorks.ctaBtn}</span>
                 <ArrowRight className="size-4 ml-2" />
               </Button>

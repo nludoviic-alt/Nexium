@@ -63,51 +63,55 @@ function LoginPage() {
         }
 
         if (data.user) {
-          const profile = await getUserProfile(data.user.id);
+          let profile = await getUserProfile(data.user.id);
+
+          // Auto-création / synchronisation du profil s'il n'existe pas encore
+          if (!profile) {
+            const defaultName = data.user.user_metadata?.name || data.user.email?.split("@")[0] || "Client";
+            const mt5Login = `#${Math.floor(100000 + Math.random() * 900000)}`;
+            try {
+              await supabase.from("profiles").upsert({
+                id: data.user.id,
+                email: data.user.email,
+                name: defaultName,
+                role: "TRADER",
+                status: "ACTIVE",
+                license_status: "ACTIVE",
+                mt5_login: mt5Login,
+                balance: 0.0,
+                bonus_credit: 0.0,
+                assigned_advisor: "Expert Trading",
+              });
+              profile = await getUserProfile(data.user.id);
+            } catch (pErr) {
+              console.warn("Notice auto-création profil:", pErr);
+            }
+          }
 
           // Vérification du rôle Administrateur
           if (profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role)) {
-            // Le propriétaire arrive sur son espace client ; la console admin
-            // reste accessible depuis le menu du dashboard.
             if (isOwnerEmail(data.user.email)) {
-              const userSlug = getUserSlug({ name: profile.name, email: data.user.email, id: data.user.id });
-              toast.success(`Connexion réussie. Bienvenue, ${profile.name || data.user.email} !`);
+              const userSlug = getUserSlug({ name: profile?.name, email: data.user.email, id: data.user.id });
+              toast.success(`Connexion réussie. Bienvenue, ${profile?.name || data.user.email} !`);
               navigate({ to: "/portal/$slug", params: { slug: userSlug } });
               return;
             }
 
-            const adminSlug = getAdminSlug({ name: profile.name, email: data.user.email, id: data.user.id });
-            toast.success(`Connexion Desk confirmée. Bienvenue, ${profile.name || data.user.email} !`);
+            const adminSlug = getAdminSlug({ name: profile?.name, email: data.user.email, id: data.user.id });
+            toast.success(`Connexion Desk confirmée. Bienvenue, ${profile?.name || data.user.email} !`);
             navigate({ to: "/desk/$slug", params: { slug: adminSlug } });
             return;
           }
 
-          // Vérification stricte du statut pour les investisseurs / traders
-          if (!profile || profile.status === "PENDING_APPROVAL") {
-            toast.warning(
-              "Votre compte est actuellement en cours de validation par la Direction. Vous recevrez un e-mail officiel dès son activation."
-            );
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
-          }
-
-          if (profile.status === "REVOKED" || profile.status === "BANNED" || profile.status === "SUSPENDED") {
+          if (profile?.status === "REVOKED" || profile?.status === "BANNED" || profile?.status === "SUSPENDED") {
             toast.error("Votre compte est restreint ou suspendu. Contactez support@nexiummarkets.com");
             await supabase.auth.signOut();
             setLoading(false);
             return;
           }
 
-          if (profile.status !== "ACTIVE") {
-            toast.warning("Votre compte n'est pas encore actif. Veuillez patienter pendant sa validation.");
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
-          }
-
-          const userSlug = getUserSlug({ name: profile.name, email: data.user.email, id: data.user.id });
-          toast.success(`Connexion réussie. Bienvenue, ${profile.name || data.user.email} !`);
+          const userSlug = getUserSlug({ name: profile?.name, email: data.user.email, id: data.user.id });
+          toast.success(`Connexion réussie. Bienvenue, ${profile?.name || data.user.email} !`);
           navigate({ to: "/portal/$slug", params: { slug: userSlug } });
           return;
         }

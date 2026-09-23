@@ -226,18 +226,30 @@ export async function approvePresetSelection(userId: string, activePresetKeys: s
   const profile = await getUserProfile(userId);
   const currentConfig = (profile?.engines_config as any) || {};
 
+  const existingActive = (profile?.active_preset || "")
+    .split(",")
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+  const combinedActive = Array.from(new Set([...existingActive, ...activePresetKeys]));
+
   const nextConfig = { ...currentConfig };
   for (const [presetId, engineKey] of Object.entries(PRESET_TO_ENGINE_KEY)) {
+    const isNowActive = combinedActive.includes(presetId);
     nextConfig[engineKey] = {
       ...(currentConfig[engineKey] || {}),
-      active: activePresetKeys.includes(presetId),
-      visible: activePresetKeys.includes(presetId) ? true : (currentConfig[engineKey]?.visible ?? true),
+      active: isNowActive,
+      visible: isNowActive ? true : (currentConfig[engineKey]?.visible ?? true),
     };
   }
 
+  const remainingRequested = ((profile?.requested_presets as string[]) || []).filter(
+    (p) => !combinedActive.includes(p)
+  );
+
   return updateUserProfile(userId, {
     license_status: "ACTIVE",
-    active_preset: activePresetKeys.join(","),
+    requested_presets: remainingRequested,
+    active_preset: combinedActive.join(","),
     engines_config: nextConfig,
   });
 }

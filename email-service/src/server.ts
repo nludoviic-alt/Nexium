@@ -12,8 +12,28 @@ import { syncRouter } from "./routes/sync.js";
 export function createServer() {
   const app = express();
 
-  app.use(cors({ origin: env.CORS_ORIGIN }));
+  const corsOrigins = env.CORS_ORIGIN.split(",").map((s) => s.trim());
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || env.CORS_ORIGIN === "*" || corsOrigins.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error("Non autorisé par CORS"));
+        }
+      },
+    })
+  );
   app.use(express.json({ limit: "2mb" }));
+
+  app.get("/", (_req, res) => {
+    res.json({
+      service: "nexium-email-service",
+      status: "running",
+      health: "/health",
+      api: "/api",
+    });
+  });
 
   app.get("/health", (_req, res) => res.json({ ok: true }));
 

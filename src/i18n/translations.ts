@@ -234,7 +234,7 @@ export const translations = {
     robotsPage: {
       badge: "CATALOGUE OFFICIEL MQL5",
       title: "Robots de Trading Certifiés MT5",
-      subtitle: "Explorez notre gamme complète d'Expert Advisors optimisés pour les marchés du Forex, de l'Or et des Indices.",
+      subtitle: "Explorez notre gamme complète de robots de trading optimisés pour les marchés du Forex, de l'Or et des Indices.",
       filterAll: "Tous les Robots",
       filterForex: "Forex Majeures",
       filterGold: "Métaux & Or",

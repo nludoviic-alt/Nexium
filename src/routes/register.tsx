@@ -108,7 +108,26 @@ function RegisterPage() {
         }
         hasSession = Boolean(data?.session);
 
+        // Si la session n'est pas retournée directement par signUp, on connecte immédiatement l'utilisateur
+        if (!hasSession) {
+          try {
+            const { data: signInData } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+            if (signInData?.session) {
+              hasSession = true;
+              if (signInData.user?.id) {
+                createdUserId = signInData.user.id;
+              }
+            }
+          } catch (signInErr) {
+            console.warn("Notice connexion automatique post-inscription:", signInErr);
+          }
+        }
+
         // 2. Enregistrement systématique de la fiche profil dans la table `profiles`
+        const mt5RawLogin = Math.floor(100000 + Math.random() * 900000).toString();
         try {
           const { error: profileError } = await supabase.from("profiles").upsert({
             id: createdUserId,
@@ -118,24 +137,21 @@ function RegisterPage() {
             country,
             role: "TRADER",
             status: "ACTIVE", // Compte actif dès l'inscription
-            license_status: "NOT_REQUESTED", // En attente de sélection de preset
+            license_status: "ACTIVE", // Accès immédiat au dashboard complet
             kyc_status: "PENDING",
             balance: 0.0,
+            bonus_credit: 0.0,
+            mt5_login: `#${mt5RawLogin}`,
             assigned_advisor: "Expert Trading",
           });
           if (profileError) {
             console.error("Erreur enregistrement profil Supabase:", profileError);
-            toast.error("Votre compte a été créé, mais vos coordonnées n’ont pas pu être enregistrées. Contactez le support.");
           }
         } catch (profileErr) {
           console.warn("Notice enregistrement profil Supabase:", profileErr);
         }
 
-        // 3. Écriture immédiate dans le journal d'audit. Colonnes alignées sur
-        // le schéma réel (audit_logs n'a pas de colonne `client_id`, et
-        // `admin_id` est NOT NULL) ; pas d'IP fabriquée — un build statique
-        // sans backend n'a aucun moyen fiable de connaître l'IP réelle du
-        // client, donc on ne prétend pas en avoir une.
+        // 3. Écriture immédiate dans le journal d'audit
         try {
           await supabase.from("audit_logs").insert({
             admin_id: createdUserId,
@@ -150,11 +166,9 @@ function RegisterPage() {
         }
       }
 
-      // 4. Double flux d'envoi d'e-mails transactionnels via Resend (Sans aucune limite restrictive)
+      // 4. Double flux d'envoi d'e-mails transactionnels via Resend
       try {
-        // A. E-mail de confirmation au client
         await sendWelcomeEmail(email, fullName, undefined, language as "fr" | "en");
-        // B. E-mail d'alerte instantanée au Desk d'Administration
         await sendAdminNewClientAlertEmail({
           name: fullName,
           email,
@@ -165,14 +179,10 @@ function RegisterPage() {
         console.warn("Notice envoi email Resend:", mailErr);
       }
 
-      if (hasSession) {
-        toast.success(language === "fr" ? `Bienvenue, ${fullName} !` : `Welcome, ${fullName}!`);
-        navigate({ to: "/portal/$slug", params: { slug: getUserSlug({ name: fullName, email, id: createdUserId }) } });
-        return;
-      }
-
-      setSubmitted(true);
-      toast.success(language === "fr" ? "Compte créé !" : "Account created!");
+      const userSlug = getUserSlug({ name: fullName, email, id: createdUserId });
+      toast.success(language === "fr" ? `Bienvenue sur votre compte, ${fullName} !` : `Welcome to your account, ${fullName}!`);
+      navigate({ to: "/portal/$slug", params: { slug: userSlug } });
+      return;
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de la création du compte.");
     } finally {

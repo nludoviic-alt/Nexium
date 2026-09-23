@@ -81,14 +81,6 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
           </div>
 
           <div className="hidden items-center gap-4 text-xs font-medium lg:flex">
-            <Link to="/about" className="cursor-pointer transition-colors hover:text-white">
-              {t.nav.technology}
-            </Link>
-            <span className="text-gray-700">|</span>
-            <Link to="/performance" className="cursor-pointer transition-colors hover:text-white">
-              {t.nav.control}
-            </Link>
-            <span className="text-gray-700">|</span>
             <Link to="/contact" className="transition-colors hover:text-white">
               {t.nav.support247}
             </Link>

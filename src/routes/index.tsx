@@ -65,7 +65,7 @@ function TradingHero({
       titleHighlight: language === "fr" ? "MetaTrader 5" : "MetaTrader 5",
       description:
         language === "fr"
-          ? "Déployez et pilotez vos Expert Advisors MT5 depuis un espace unique, avec une surveillance continue et des garde-fous de risque configurables."
+          ? "Déployez et pilotez vos robots de trading MT5 depuis un espace unique, avec une surveillance continue et des garde-fous de risque configurables."
           : "Deploy and control your MT5 Expert Advisors from a single terminal, backed by continuous monitoring and customizable risk safeguards.",
       primaryCta: { label: t.hero.ctaPrimary, to: "/robots" },
       secondaryCta: { label: t.hero.ctaSecondary, to: "/NEXIUM" },

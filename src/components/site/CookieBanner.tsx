@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Cookie, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { useLanguage } from "@/context/LanguageContext";
 
 const COOKIE_STORAGE_KEY = "nexium_cookie_consent_v1";
@@ -39,7 +38,6 @@ export function CookieBanner() {
       console.error(e);
     }
     setIsVisible(false);
-    toast.success(language === "fr" ? "Préférences de cookies enregistrées (Tous acceptés)." : "Cookie preferences saved (All accepted).");
   };
 
   const handleRefuseOptional = () => {
@@ -52,7 +50,6 @@ export function CookieBanner() {
       console.error(e);
     }
     setIsVisible(false);
-    toast.info(language === "fr" ? "Seuls les cookies strictement nécessaires sont activés." : "Only strictly necessary cookies are enabled.");
   };
 
   const handleSaveCustom = () => {
@@ -65,7 +62,6 @@ export function CookieBanner() {
       console.error(e);
     }
     setIsVisible(false);
-    toast.success(language === "fr" ? "Vos préférences personnalisées ont été enregistrées." : "Your customized preferences have been saved.");
   };
 
   if (!isVisible) return null;
