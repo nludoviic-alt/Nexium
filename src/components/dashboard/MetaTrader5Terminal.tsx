@@ -927,17 +927,50 @@ export function MetaTrader5Terminal({
       for (const id of PRESET_IDS) {
         if (!L.runningPresets[id]) {
           delete nextSetupAtRef.current[id];
+          if (storageKey) {
+            try { localStorage.removeItem(`nexium_bot_setup_${storageKey}_${id}`); } catch {}
+          }
           continue;
         }
         const { trades, initialStake } = presetCycleStats(stats, L.presetStakes, id);
         if (isPresetExpired(id, trades) || nextPositions.some((p) => p.presetId === id)) continue;
-        const due = nextSetupAtRef.current[id];
+        let due = nextSetupAtRef.current[id];
         if (due === undefined) {
-          nextSetupAtRef.current[id] = now + 5000 + Math.random() * 7000;
+          const storageSetupKey = storageKey ? `nexium_bot_setup_${storageKey}_${id}` : null;
+          const cachedDue = storageSetupKey ? Number(localStorage.getItem(storageSetupKey)) : 0;
+          if (cachedDue && cachedDue > now) {
+            due = cachedDue;
+          } else {
+            // Espacement de temps aléatoire : minimum strict 10 min (600s), jusqu'à 25 min (1500s)
+            const MIN_DELAY_MS = 10 * 60 * 1000; // 10 minutes minimum
+            const EXTRA_RANDOM_MS = Math.floor(Math.random() * 15 * 60 * 1000); // +0 à 15 minutes supplémentaires
+            due = now + MIN_DELAY_MS + EXTRA_RANDOM_MS;
+            if (storageSetupKey) {
+              try { localStorage.setItem(storageSetupKey, String(due)); } catch {}
+            }
+            const minutesLeft = Math.round((due - now) / 60000);
+            notices.push(() => {
+              setTerminalNotifications((prev) => [
+                {
+                  id: `tn-setup-${id}-${Date.now()}`,
+                  title: `${PRESET_LABEL[id]} · Analyse Algorithmique`,
+                  desc: `Recherche d'un setup haute probabilité. Prochaine opportunité estimée dans ~${minutesLeft} min.`,
+                  time: "À l'instant",
+                  type: "info" as const,
+                  badge: "En attente",
+                },
+                ...prev.slice(0, 30),
+              ]);
+            });
+          }
+          nextSetupAtRef.current[id] = due;
           continue;
         }
         if (now < due) continue;
         delete nextSetupAtRef.current[id];
+        if (storageKey) {
+          try { localStorage.removeItem(`nexium_bot_setup_${storageKey}_${id}`); } catch {}
+        }
         const pos = buildBotPosition(id, initialStake, trades + 1);
         nextPositions.unshift(pos);
         notices.push(() => {
@@ -3628,8 +3661,20 @@ export function MetaTrader5Terminal({
               <tbody className="divide-y divide-[#2a2e39]">
                 {positions.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="text-center py-6 text-slate-500 font-sans text-xs">
-                      Aucune position ouverte actuellement. Utilisez le panneau 1-Click SELL / BUY ou lancez un Bot Preset ci-dessus.
+                    <td colSpan={11} className="text-center py-5 text-slate-500 font-sans text-xs">
+                      {Object.values(runningPresets).some(Boolean) ? (
+                        <div className="flex flex-col items-center justify-center gap-1.5">
+                          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-300 font-mono text-[11px] font-bold animate-pulse">
+                            <span className="size-2 rounded-full bg-cyan-400" />
+                            <span>Analyse algorithmique active · Recherche de setup haute probabilité (espacement 10–25 min)</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Le bot patiente pour un point d'entrée optimal afin de sécuriser le Take Profit de votre preset.
+                          </span>
+                        </div>
+                      ) : (
+                        "Aucune position ouverte actuellement. Utilisez le panneau 1-Click SELL / BUY ou lancez un Bot Preset ci-dessus."
+                      )}
                     </td>
                   </tr>
                 ) : (
