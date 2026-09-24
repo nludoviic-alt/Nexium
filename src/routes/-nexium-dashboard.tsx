@@ -3020,8 +3020,8 @@ function OverviewTab({
       </section>
 
       {/* ── CARTE MAÎTRE : TOTAL ABSOLU CONSOLIDÉ (SOLDE + BONUS + GAINS + P&L) ── */}
-      <section className="shrink-0 rounded-2xl border border-emerald-500/30 bg-[#0b121e] p-4 sm:p-4.5 shadow-md relative overflow-hidden">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <section className="shrink-0 rounded-2xl border border-emerald-500/30 bg-[#0b121e] p-4 sm:p-5 shadow-md relative overflow-hidden">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xl sm:text-2xl font-black text-white">
               ${(balance + bonus + totalGains + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm sm:text-base font-bold text-emerald-400">USD</span>
@@ -3496,6 +3496,7 @@ function PortfolioTab({
   balance,
   bonus = 0,
   totalGains = 0,
+  totalOpenPnl = 0,
   transactions,
   clientName = "Client Nexium",
   currentUserId,
@@ -3507,6 +3508,7 @@ function PortfolioTab({
   balance: number;
   bonus?: number;
   totalGains?: number;
+  totalOpenPnl?: number;
   transactions: TransactionItem[];
   clientName?: string;
   currentUserId?: string | null;
@@ -4625,15 +4627,15 @@ function PortfolioTab({
       </section>
 
       {/* ── CARTE MAÎTRE : TOTAL CAPITAL ABSOLU CONSOLIDÉ ── */}
-      <section className="rounded-2xl border border-emerald-500/30 bg-[#0b121e] p-4 sm:p-4.5 shadow-md relative overflow-hidden">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <section className="rounded-2xl border border-emerald-500/30 bg-[#0b121e] p-4 sm:p-5 shadow-md relative overflow-hidden">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xl sm:text-2xl font-black text-white">
-              ${(balance + bonus + totalGains).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm sm:text-base font-bold text-emerald-400">USD</span>
+              ${(balance + bonus + totalGains + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm sm:text-base font-bold text-emerald-400">USD</span>
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 font-mono text-xs z-10">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs z-10">
             <div className="rounded-xl border border-slate-700/60 bg-black/40 px-3 py-1.5 space-y-0.5">
               <span className="text-[10px] text-slate-400 font-bold uppercase block">1. Solde Cash</span>
               <span className="text-xs sm:text-sm font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
@@ -4643,8 +4645,14 @@ function PortfolioTab({
               <span className="text-xs sm:text-sm font-bold text-amber-300">+{bonus > 0 ? `$${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "$0.00"}</span>
             </div>
             <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 px-3 py-1.5 space-y-0.5">
-              <span className="text-[10px] text-cyan-300/80 font-bold uppercase block">3. Gains Générés</span>
+              <span className="text-[10px] text-cyan-300/80 font-bold uppercase block">3. Gains Bots (P&L)</span>
               <span className="text-xs sm:text-sm font-bold text-cyan-300">+{totalGains > 0 ? `$${totalGains.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}</span>
+            </div>
+            <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-indigo-300/80 font-bold uppercase block">4. P&L Flottant</span>
+              <span className={`text-xs sm:text-sm font-bold ${totalOpenPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {totalOpenPnl >= 0 ? `+$${totalOpenPnl.toFixed(2)}` : `-$${Math.abs(totalOpenPnl).toFixed(2)}`}
+              </span>
             </div>
           </div>
         </div>
@@ -4692,10 +4700,10 @@ function PortfolioTab({
             </div>
           </div>
           <p className="text-xl sm:text-2xl font-black text-white">
-            ${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+            ${(balance + bonus + totalGains + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
           <div className="flex items-center justify-between text-xs pt-1.5 border-t border-indigo-500/20 font-sans">
-            <span className="text-slate-400">Valeur totale (Cash + Bonus)</span>
+            <span className="text-slate-400">Cash + Bonus + Gains + P&L</span>
             <span className="font-mono font-bold text-emerald-400">Disponible</span>
           </div>
         </article>
@@ -6856,7 +6864,7 @@ function StakeManagementTab({
 
       {/* 3 Cartes de Trading Aérées avec verrouillage sur presets inactifs */}
       <form onSubmit={handleSaveStakes} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* 1. Nexium AI Gold */}
           <div
             className={`rounded-3xl border p-6 sm:p-7 space-y-6 shadow-xl flex flex-col justify-between transition-all ${
@@ -6867,7 +6875,7 @@ function StakeManagementTab({
           >
             <div className="space-y-5">
               {/* Header */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <span
                     className={`text-base sm:text-lg font-black font-mono flex items-center gap-2 ${
@@ -7058,7 +7066,7 @@ function StakeManagementTab({
           >
             <div className="space-y-5">
               {/* Header */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <span
                     className={`text-base sm:text-lg font-black font-mono flex items-center gap-2 ${
@@ -7249,7 +7257,7 @@ function StakeManagementTab({
           >
             <div className="space-y-5">
               {/* Header */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <span
                     className={`text-base sm:text-lg font-black font-mono flex items-center gap-2 ${
@@ -9951,30 +9959,30 @@ export function NexiumDashboard({
       {/* Main Content */}
       <div className="lg:ml-76 flex flex-col min-h-screen">
         {/* Top Header */}
-        <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-white/[0.08] bg-[#0b0d10]/95 px-6 sm:px-8 backdrop-blur-2xl">
-          <div className="flex items-center gap-4">
+        <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-white/[0.08] bg-[#0b0d10]/95 px-3 sm:px-6 lg:px-8 backdrop-blur-2xl">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-1 text-gray-400 hover:text-white cursor-pointer"
+              className="lg:hidden shrink-0 p-1 text-gray-400 hover:text-white cursor-pointer"
               aria-label="Ouvrir le menu"
             >
               <Menu className="size-6" />
             </button>
-            <div>
-              <p className="text-xs font-black uppercase tracking-wider text-gray-400 font-mono">
+            <div className="min-w-0">
+              <p className="hidden sm:block text-xs font-black uppercase tracking-wider text-gray-400 font-mono truncate">
                 NEXIUM MARKETS / {activeNav.toUpperCase()}
               </p>
-              <h1 className="mt-0.5 text-base sm:text-xl font-black text-white">
-                {activeNav === "Vue d’ensemble" && "Pilotage & Performances Globales"}
-                {activeNav === "MT5" && "Terminal MetaTrader 5 · Trading Direct & Presets"}
-                {activeNav === "Configuration des Mises" && "Gestion du Capital & Configuration des Mises"}
-                {activeNav === "Portefeuille" && "Gestion Financière & Relevés"}
-                {activeNav === "Paramètres du Compte" && "Sécurité & Configuration du Compte"}
+              <h1 className="mt-0.5 text-sm sm:text-base lg:text-xl font-black text-white truncate leading-tight">
+                {activeNav === "Vue d'ensemble" && "Pilotage & Performances"}
+                {activeNav === "MT5" && "Terminal MetaTrader 5"}
+                {activeNav === "Configuration des Mises" && "Configuration des Mises"}
+                {activeNav === "Portefeuille" && "Gestion Financière"}
+                {activeNav === "Paramètres du Compte" && "Paramètres du Compte"}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3.5">
             <button
               onClick={() => setAlertsOpen(true)}
               title={`Centre de notifications & alertes (${unreadNotifsCount} non lues)`}
@@ -9992,9 +10000,11 @@ export function NexiumDashboard({
               ) : null}
             </button>
 
-            <StatusPill variant={running ? "emerald" : "rose"}>
-              {running ? "TRADING ACTIF" : "TRADING EN PAUSE"}
-            </StatusPill>
+            <span className="hidden sm:inline-flex">
+              <StatusPill variant={running ? "emerald" : "rose"}>
+                {running ? "TRADING ACTIF" : "TRADING EN PAUSE"}
+              </StatusPill>
+            </span>
 
             <button
               onClick={openDepositModal}
@@ -10048,9 +10058,15 @@ export function NexiumDashboard({
                           <span className="font-bold">+${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
                         </div>
                       )}
+                      {totalPresetPnl > 0 && (
+                        <div className="flex items-center justify-between text-cyan-300">
+                          <span>Gains Bots :</span>
+                          <span className="font-bold">+${totalPresetPnl.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between text-emerald-400 font-bold border-t border-white/5 pt-1">
                         <span>Equity Totale :</span>
-                        <span>${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD</span>
+                        <span>${(balance + bonus + totalPresetPnl + positions.reduce((acc, p) => acc + p.pnlNum, 0)).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD</span>
                       </div>
                     </div>
                     <div className="mt-1.5 flex items-center justify-between rounded-lg bg-black/40 px-2 py-1 border border-white/5">
@@ -10147,7 +10163,7 @@ export function NexiumDashboard({
           {activeNav === "MT5" && (
             <div className="space-y-4">
               {/* ── 3 PRESET CARDS EN HAUT AVEC GESTION INDIVIDUELLE DES ACTIVATIONS ── */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-1">
                 {/* 1. Nexium AI Gold */}
                 {(() => {
                   const bot = visibleBotsWithLiveStats.find((b) => b.id === "nexium-ai-gold") || visibleBotsWithLiveStats[0] || bots[0];
@@ -10161,12 +10177,12 @@ export function NexiumDashboard({
                   return (
                     <div className="rounded-2xl border border-amber-900/60 bg-[#0e0b06] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-amber-500/50 transition">
                       {/* Top Badges */}
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5">
                           <span className="px-2.5 py-0.5 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-400 font-mono text-[11px] font-bold">
                             XAUUSD
                           </span>
-                          <span className="px-2 py-0.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300 font-mono text-[10px] font-bold">
+                          <span className="px-2 py-0.5 rounded-md border border-amber-500/30 bg-amber-500/10 text-amber-300 font-mono text-[10px] font-bold whitespace-nowrap">
                             OBJECTIF +50% / TRADE · 2 MAX
                           </span>
                         </div>
@@ -10249,7 +10265,7 @@ export function NexiumDashboard({
                             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-300 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
                           >
                             <Clock className="size-3 animate-spin text-amber-400" />
-                            <span>DEMANDE EN ATTENTE DE VALIDATION</span>
+                            <span className="whitespace-nowrap">DEMANDE EN ATTENTE DE VALIDATION</span>
                           </button>
                         ) : isExpired ? (
                           <button
@@ -10306,12 +10322,12 @@ export function NexiumDashboard({
                   return (
                     <div className="rounded-2xl border border-cyan-900/60 bg-[#050e16] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-cyan-500/50 transition">
                       {/* Top Badges */}
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5">
                           <span className="px-2.5 py-0.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 text-cyan-400 font-mono text-[11px] font-bold">
                             EURUSD
                           </span>
-                          <span className="px-2 py-0.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-mono text-[10px] font-bold">
+                          <span className="px-2 py-0.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-mono text-[10px] font-bold whitespace-nowrap">
                             OBJECTIF +75% / TRADE · 5 MAX
                           </span>
                         </div>
@@ -10394,7 +10410,7 @@ export function NexiumDashboard({
                             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-300 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
                           >
                             <Clock className="size-3 animate-spin text-cyan-400" />
-                            <span>DEMANDE EN ATTENTE DE VALIDATION</span>
+                            <span className="whitespace-nowrap">DEMANDE EN ATTENTE DE VALIDATION</span>
                           </button>
                         ) : isExpired ? (
                           <button
@@ -10450,12 +10466,12 @@ export function NexiumDashboard({
                   return (
                     <div className="rounded-2xl border border-purple-900/60 bg-[#0d0716] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-purple-500/50 transition">
                       {/* Top Badges */}
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5">
                           <span className="px-2.5 py-0.5 rounded-md border border-purple-500/40 bg-purple-500/10 text-purple-400 font-mono text-[11px] font-bold">
                             NAS100
                           </span>
-                          <span className="px-2 py-0.5 rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-300 font-mono text-[10px] font-bold">
+                          <span className="px-2 py-0.5 rounded-md border border-purple-500/30 bg-purple-500/10 text-purple-300 font-mono text-[10px] font-bold whitespace-nowrap">
                             OBJECTIF +98% / TRADE · ILLIMITÉ
                           </span>
                         </div>
@@ -10530,7 +10546,7 @@ export function NexiumDashboard({
                             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-950/40 text-purple-300 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
                           >
                             <Clock className="size-3 animate-spin text-purple-400" />
-                            <span>DEMANDE EN ATTENTE DE VALIDATION</span>
+                            <span className="whitespace-nowrap">DEMANDE EN ATTENTE DE VALIDATION</span>
                           </button>
                         ) : isApproved ? (
                           <button
@@ -10607,6 +10623,7 @@ export function NexiumDashboard({
               balance={balance}
               bonus={bonus}
               totalGains={totalPresetPnl}
+              totalOpenPnl={positions.reduce((acc, p) => acc + p.pnlNum, 0)}
               transactions={transactions}
               clientName={clientName}
               currentUserId={currentUserId}
@@ -10841,7 +10858,7 @@ export function NexiumDashboard({
                 />
               </div>
               {depositStep === "METHOD" && (
-                <div className="grid grid-cols-4 gap-2.5 mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3">
                   {["500", "1000", "2500", "5000"].map((amt) => (
                     <button
                       key={amt}
@@ -11148,7 +11165,7 @@ export function NexiumDashboard({
 
               {withdrawMethod === "CARD" && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1.5">4 DERNIERS CHIFFRES</label>
                       <input
