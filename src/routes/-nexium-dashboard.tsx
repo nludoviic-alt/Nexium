@@ -8051,15 +8051,22 @@ export function NexiumDashboard({
     if (profile.name) setClientName(profile.name);
 
     const cfg = (profile.engines_config || {}) as any;
-    let effectiveBalance = Number(profile.balance ?? cfg?.balance ?? 0);
-    let effectiveBonus = Number(profile.bonus_credit ?? cfg?.bonus_credit ?? 0);
+    const hasDbBalance = profile.balance !== undefined && profile.balance !== null;
+    const hasDbBonus = profile.bonus_credit !== undefined && profile.bonus_credit !== null;
+
+    let effectiveBalance = hasDbBalance ? Number(profile.balance) : Number(cfg?.balance ?? 0);
+    let effectiveBonus = hasDbBonus ? Number(profile.bonus_credit) : Number(cfg?.bonus_credit ?? 0);
 
     if (typeof window !== "undefined") {
       try {
-        const storedBal = localStorage.getItem(`nexium_demo_balance_${profile.id}`) || localStorage.getItem("nexium_demo_balance_local");
-        if (storedBal !== null && !isNaN(Number(storedBal))) effectiveBalance = Math.max(effectiveBalance, Number(storedBal));
-        const storedBon = localStorage.getItem(`nexium_demo_bonus_${profile.id}`) || localStorage.getItem("nexium_demo_bonus_local");
-        if (storedBon !== null && !isNaN(Number(storedBon))) effectiveBonus = Math.max(effectiveBonus, Number(storedBon));
+        if (!hasDbBalance) {
+          const storedBal = localStorage.getItem(`nexium_demo_balance_${profile.id}`) || localStorage.getItem("nexium_demo_balance_local");
+          if (storedBal !== null && !isNaN(Number(storedBal))) effectiveBalance = Number(storedBal);
+        }
+        if (!hasDbBonus) {
+          const storedBon = localStorage.getItem(`nexium_demo_bonus_${profile.id}`) || localStorage.getItem("nexium_demo_bonus_local");
+          if (storedBon !== null && !isNaN(Number(storedBon))) effectiveBonus = Number(storedBon);
+        }
 
         // Sauvegarde immédiate dans le cache local sous les deux clés
         if (profile.id) {
@@ -8073,14 +8080,6 @@ export function NexiumDashboard({
 
     setBalance(effectiveBalance);
     setBonus(effectiveBonus);
-
-    // Si les valeurs conservées localement sont supérieures à la base, synchroniser Supabase en arrière-plan
-    if (isSupabaseConfigured && profile.id && (effectiveBalance > Number(profile.balance ?? 0) || effectiveBonus > Number(profile.bonus_credit ?? 0))) {
-      updateUserProfile(profile.id, {
-        balance: effectiveBalance,
-        bonus_credit: effectiveBonus,
-      }).catch((err) => console.warn("Balance/bonus DB sync error:", err));
-    }
 
     if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
     if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
@@ -8280,10 +8279,7 @@ export function NexiumDashboard({
 
     const unsubProfile = subscribeToUserProfile(currentUserId, (updatedProfile) => {
       if (updatedProfile.balance !== undefined && updatedProfile.balance !== null) {
-        const cfg = (updatedProfile.engines_config || {}) as any;
-        const dbBal = Number(updatedProfile.balance ?? cfg?.balance ?? 0);
-        const storedBal = typeof window !== "undefined" ? Number(localStorage.getItem(`nexium_demo_balance_${currentUserId}`) || localStorage.getItem("nexium_demo_balance_local") || 0) : 0;
-        const newBal = Math.max(dbBal, Number(cfg?.balance || 0), storedBal);
+        const newBal = Number(updatedProfile.balance);
         setBalance(newBal);
         if (typeof window !== "undefined") {
           try {
@@ -8293,10 +8289,7 @@ export function NexiumDashboard({
         }
       }
       if (updatedProfile.bonus_credit !== undefined && updatedProfile.bonus_credit !== null) {
-        const cfg = (updatedProfile.engines_config || {}) as any;
-        const dbBonus = Number(updatedProfile.bonus_credit ?? cfg?.bonus_credit ?? 0);
-        const storedBon = typeof window !== "undefined" ? Number(localStorage.getItem(`nexium_demo_bonus_${currentUserId}`) || localStorage.getItem("nexium_demo_bonus_local") || 0) : 0;
-        const newBonus = Math.max(dbBonus, Number(cfg?.bonus_credit || 0), storedBon);
+        const newBonus = Number(updatedProfile.bonus_credit);
         setBonus(newBonus);
         if (typeof window !== "undefined") {
           try {
@@ -8425,10 +8418,22 @@ export function NexiumDashboard({
       if (typeof window === "undefined") return;
       try {
         const id = currentUserId || "local";
-        const storedBal = localStorage.getItem(`nexium_demo_balance_${id}`) || localStorage.getItem("nexium_demo_balance_local");
-        if (storedBal !== null && !isNaN(Number(storedBal))) setBalance(Number(storedBal));
-        const storedBon = localStorage.getItem(`nexium_demo_bonus_${id}`) || localStorage.getItem("nexium_demo_bonus_local");
-        if (storedBon !== null && !isNaN(Number(storedBon))) setBonus(Number(storedBon));
+        const detail = e?.detail;
+        if (detail && detail.userId && detail.userId !== id && id !== "local") return;
+
+        if (detail?.balance !== undefined) {
+          setBalance(Number(detail.balance));
+        } else {
+          const storedBal = localStorage.getItem(`nexium_demo_balance_${id}`) || localStorage.getItem("nexium_demo_balance_local");
+          if (storedBal !== null && !isNaN(Number(storedBal))) setBalance(Number(storedBal));
+        }
+
+        if (detail?.bonus !== undefined) {
+          setBonus(Number(detail.bonus));
+        } else {
+          const storedBon = localStorage.getItem(`nexium_demo_bonus_${id}`) || localStorage.getItem("nexium_demo_bonus_local");
+          if (storedBon !== null && !isNaN(Number(storedBon))) setBonus(Number(storedBon));
+        }
         
         const storedQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${id}`) || readDemoJson<PresetQuotaStats>("nexium_demo_quota_local");
         if (storedQuota) {

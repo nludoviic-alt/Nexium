@@ -3110,11 +3110,28 @@ function NexiumAdminDashboard({
       "WARNING",
       async () => {
         const signedAmount = pnlAdjustDirection === "PROFIT" ? amount : -amount;
-        const newBalance = activeClient.balance + signedAmount;
+        const newBalance = Math.max(0, +(activeClient.balance + signedAmount).toFixed(2));
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeClient.id);
 
         if (isSupabaseConfigured && isUUID) {
           try {
+            const existingEngines = (activeClient.engines || {}) as any;
+            const nextEnginesConfig = {
+              ...existingEngines,
+              balance: newBalance,
+            };
+
+            const updates: Partial<SupabaseUserProfile> = {
+              balance: newBalance,
+              engines_config: nextEnginesConfig,
+            };
+
+            if (signedAmount < 0) {
+              updates.gross_loss_total = +((activeClient.grossLossTotal || 0) + Math.abs(signedAmount)).toFixed(2);
+            } else {
+              updates.gross_profit_total = +((activeClient.grossProfitTotal || 0) + signedAmount).toFixed(2);
+            }
+
             await Promise.allSettled([
               recordTransaction({
                 user_id: activeClient.id,
@@ -3124,11 +3141,23 @@ function NexiumAdminDashboard({
                 method: signedAmount >= 0 ? "Ajustement Gain Desk" : "Ajustement Perte Desk",
                 ...(pnlAdjustReason ? { reference_tx: pnlAdjustReason } : {}),
               }),
-              updateClientBalance(activeClient.id, newBalance),
+              updateUserProfile(activeClient.id, updates),
             ]);
           } catch (err) {
             console.warn("Erreur ajustement P&L Supabase:", err);
           }
+        }
+
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(`nexium_demo_balance_${activeClient.id}`, String(newBalance));
+            localStorage.setItem("nexium_demo_balance_local", String(newBalance));
+            window.dispatchEvent(
+              new CustomEvent("nexium_financial_update", {
+                detail: { userId: activeClient.id, balance: newBalance },
+              })
+            );
+          } catch {}
         }
 
         setClients((prev) =>
