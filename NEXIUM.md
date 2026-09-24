@@ -1,0 +1,110 @@
+# NEXIUM MARKETS — Registre des Règles Métier & Résolutions Verrouillées
+
+> **IMPORTANT : DOCUMENT DE RÉFÉRENCE ABSOLUE**  
+> Ce fichier consigne l'ensemble des règles métier, des flux de validation et des corrections techniques validées sur Nexium Markets. Toute modification future doit impérativement respecter les règles énoncées ci-dessous afin d'éviter toute régression.
+
+---
+
+## 1. Cycle de Vie des Presets & Demandes de Validation
+
+### A. Règle du Statut "EN ATTENTE DE VALIDATION"
+Lorsqu'un client effectue une demande (activation initiale OU renouvellement/prolongation d'un preset arrivé à expiration) :
+1. **Changement d'état immédiat et synchrone** :
+   - Dès le clic sur le bouton ("Faire une nouvelle demande" ou "Demander l'activation"), le statut passe **instantanément** à `EN ATTENTE DE VALIDATION`.
+   - La condition de détection de l'état `isPending` doit toujours couvrir les deux cas :
+     ```ts
+     const isRequested = (requestedPresets || []).includes(PRESET_KEY);
+     const isPending = isRequested && (!isApproved || isExpired);
+     ```
+   - L'état `isPending` **doit être évalué avant** `isExpired` et `isApproved` pour l'affichage de l'interface.
+2. **Indicateurs visuels obligatoires** :
+   - **Badge d'en-tête** : Badge ambre clignotant `EN ATTENTE DE VALIDATION` avec icône spinner / point pulsant.
+   - **Bouton d'action principal** : Désactivé (`disabled`, `opacity-90`, `cursor-not-allowed`) avec le texte :  
+     `DEMANDE EN ATTENTE DE VALIDATION` (ou `EN COURS DE VALIDATION PAR LE DESK`).
+   - Aucune carte de preset ne doit rester bloquée sur `EXPIRÉ (2/2)` ou afficher à nouveau le bouton cliquable tant que l'administration n'a pas traité la demande.
+3. **Périmètre d'application** :
+   - Cette règle s'applique de manière symétrique sur :
+     - Les 3 cartes du **Terminal MT5 / Dashboard principal** (`src/routes/-nexium-dashboard.tsx`).
+     - Les 3 cartes de l'onglet **"Configuration des Mises"** (`StakeManagementTab`).
+4. **Persistance multi-niveaux (Résistance au rafraîchissement F5)** :
+   - La demande est envoyée en base de données Supabase via `requestPresetsActivation(userId, nextRequested)`.
+   - Elle est simultanément écrite dans le `localStorage` (`nexium_demo_requested_presets_${userId}`).
+   - Au rechargement de la page (`useEffect` initial), l'application réconcilie les demandes en attente pour garantir que le statut reste `"EN ATTENTE DE VALIDATION"` même avant la réponse du serveur.
+
+---
+
+## 2. Validation & Réinitialisation par le Desk Admin (`composition.tsx`)
+
+### A. Actions d'approbation et nouveau cycle
+Le Super Administrateur dispose de 4 méthodes d'approbation :
+1. `handleProlongSubscription` (Prolongation d'abonnement 1-clic pour tous les presets du client).
+2. `handleNewTradingCycle` (Nouveau cycle individuel pour un preset spécifique).
+3. `handleApproveSinglePreset` (Approbation et déverrouillage d'un preset individuel).
+4. `handleApproveClientPreset` (Approbation collective des presets demandés).
+
+### B. Effets verrouillés de toute approbation Admin
+Chaque validation par l'administration exécute obligatoirement les 4 étapes suivantes :
+1. **Remise à zéro des compteurs de quota** :
+   - `goldWins = 0`, `goldPnl = 0` (idem pour `fxWins` et `indexWins`).
+   - Génération d'un nouvel identifiant de cycle (`cycleId = new Date().toISOString()`).
+   - Déverrouillage de la mise initiale (`delete quota.goldInitialStake`).
+2. **Nettoyage de la liste des demandes** :
+   - Le preset validé est **immédiatement retiré de `requested_presets`** dans Supabase (`requested_presets: []` ou exclusion du preset).
+   - L'état local du Desk (`setClients`) est mis à jour pour refléter `requestedPresets` vidé.
+3. **Mise à jour en temps réel chez le client** :
+   - Grâce à Supabase Realtime (`subscribeToUserProfile`), le client reçoit la mise à jour en direct :
+     - `requestedPresets` devient vide pour ce preset.
+     - `quotaStats.goldWins` repasse à 0.
+     - Le badge de statut bascule instantanément de `EN ATTENTE DE VALIDATION` à `ACTIF` (ou `EN PAUSE` selon l'état du bot).
+4. **Envoi d'e-mail officiel** :
+   - Envoi automatique de confirmation au client via Resend (`sendCustomDeskEmail`).
+
+---
+
+## 3. Suppression des Mentions "Démo"
+
+1. **Preset 1 (Nexium AI Gold)** :
+   - Présenté comme l'algorithme officiel certifié (or XAUUSD).
+   - Aucune mention "DÉMO" n'apparaît sur le preset, ses cartes ou ses modales.
+2. **Notifications & Emails Transactionnels** :
+   - Les modèles d'emails de validation (`handleApproveClientPreset`, `handleProlongSubscription`, `handleNewTradingCycle`) confirment l'activation sur le **compte de trading**.
+   - Suppression définitive des mentions du type *"compte de DÉMONSTRATION (trades simulés, sans effet sur votre solde réel)"*.
+
+---
+
+## 4. Paramètres, Quotas et Hiérarchie des Presets
+
+| Preset | Sous-jacent | Plage de Mise | Gain par Trade | Quota par Cycle | Gain Max / Cycle |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Preset 1 : Nexium AI Gold** | XAUUSD | **$50 à $500** | **+50%** | **2 trades max** | **+100%** de la mise |
+| **Preset 2 : Nexium FX Trend** | EURUSD | **$500 à $2,000** | **+75%** | **5 trades max** | **+375%** de la mise |
+| **Preset 3 : Nexium Index Reversion** | NAS100 | **$2,000 à $10,000** | **+98%** | **Illimité (∞)** | Continu |
+
+### Règle de Hiérarchie des Mises
+- La mise du Preset 1 doit obligatoirement être inférieure à celle du Preset 2, elle-même inférieure à celle du Preset 3 :
+  $$\text{Mise P1} < \text{Mise P2} < \text{Mise P3}$$
+- La mise initiale choisie au départ du cycle est figée (`goldLockedStake`, etc.) pour le calcul des gains du cycle. Elle n'est modifiable qu'à l'ouverture du cycle suivant.
+
+---
+
+## 5. Intégrité des Données Financières (Solde, Bonus, P&L)
+
+1. **P&L et Balance** :
+   - Tous les gains de trades validés s'accumulent dans `totalPresetPnl`.
+   - La balance affichée (`SOLDE TOTAL`) et l'`EQUITY` intègrent en temps réel la somme de la balance de base, des bonus actifs et du P&L des presets.
+2. **Persistance du Bonus** :
+   - Le bonus de bienvenue ou bonus attribué par le Desk ne revient jamais à zéro après rechargement de page.
+   - Synchronisation bidirectionnelle : Supabase `profile.bonus` $\leftrightarrow$ `localStorage` fallback.
+3. **Protection contre les re-renders destructeurs** :
+   - Les écouteurs `useEffect` ne doivent **jamais écraser** les quotas ou compteurs avec un objet vide (`EMPTY_QUOTA_STATS`) tant que des données réelles existent en mémoire ou en cache local.
+
+---
+
+## 6. Checklist de Contrôle Avant Déploiement
+
+Avant chaque push ou mise en production, vérifier impérativement :
+- [ ] `npm run build` compile sans aucune erreur TypeScript ou Vite.
+- [ ] Une demande de prolongation pour un preset expiré affiche immédiatement `EN ATTENTE DE VALIDATION` avec le bouton bloqué en attente.
+- [ ] L'approbation côté Desk Admin remet le quota à 0 et efface la demande en attente.
+- [ ] Aucun libellé parasite "DÉMO" dans les notifications ou sur le Preset 1.
+- [ ] Les gains s'additionnent correctement sur le solde total du client.

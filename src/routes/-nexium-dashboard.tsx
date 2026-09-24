@@ -6731,18 +6731,21 @@ function StakeManagementTab({
 
   const isGoldApproved = activeList.includes("AI_GOLD");
   const isGoldExpired = isGoldApproved && (quotaStats?.goldWins ?? 0) >= 2;
-  const isGoldActive = isGoldApproved && !isGoldExpired;
-  const isGoldPending = (requestedPresets || []).includes("AI_GOLD") && !isGoldApproved;
+  const isGoldRequested = (requestedPresets || []).includes("AI_GOLD");
+  const isGoldPending = isGoldRequested && (!isGoldApproved || isGoldExpired);
+  const isGoldActive = isGoldApproved && !isGoldExpired && !isGoldPending;
 
   const isFxApproved = activeList.includes("FX_TREND");
   const isFxExpired = isFxApproved && (quotaStats?.fxWins ?? 0) >= 5;
-  const isFxActive = isFxApproved && !isFxExpired;
-  const isFxPending = (requestedPresets || []).includes("FX_TREND") && !isFxApproved;
+  const isFxRequested = (requestedPresets || []).includes("FX_TREND");
+  const isFxPending = isFxRequested && (!isFxApproved || isFxExpired);
+  const isFxActive = isFxApproved && !isFxExpired && !isFxPending;
 
   const isIndexApproved = activeList.includes("INDEX_REVERSION");
   const isIndexExpired = false;
-  const isIndexActive = isIndexApproved;
-  const isIndexPending = (requestedPresets || []).includes("INDEX_REVERSION") && !isIndexApproved;
+  const isIndexRequested = (requestedPresets || []).includes("INDEX_REVERSION");
+  const isIndexPending = isIndexRequested && !isIndexApproved;
+  const isIndexActive = isIndexApproved && !isIndexPending;
 
   // Mise initiale figée dès le lancement du bot : elle reste la base du gain
   // cible pour tout le cycle, même si le client modifie ensuite sa mise.
@@ -6886,7 +6889,12 @@ function StakeManagementTab({
                 </div>
 
                 {/* Status Badges */}
-                {isGoldExpired ? (
+                {isGoldPending ? (
+                  <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
+                    <Clock className="size-3 text-amber-400 animate-spin" />
+                    EN ATTENTE DE VALIDATION
+                  </span>
+                ) : isGoldExpired ? (
                   <span className="text-[11px] font-mono font-bold text-rose-300 bg-rose-500/15 px-3 py-1 rounded-full border border-rose-500/30 flex items-center gap-1.5">
                     <Lock className="size-3 text-rose-400" />
                     EXPIRÉ ({Math.min(2, quotaStats?.goldWins ?? 0)}/2)
@@ -6895,11 +6903,6 @@ function StakeManagementTab({
                   <span className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     ACTIF ({Math.min(2, quotaStats?.goldWins ?? 0)}/2)
-                  </span>
-                ) : isGoldPending ? (
-                  <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30 flex items-center gap-1.5">
-                    <Clock className="size-3 text-amber-400 animate-spin" />
-                    EN ATTENTE
                   </span>
                 ) : (
                   <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-800/70 px-3 py-1 rounded-full border border-slate-700/50 flex items-center gap-1.5">
@@ -6980,32 +6983,25 @@ function StakeManagementTab({
               </div>
 
               {/* Status / Activation Notice */}
-              {isGoldExpired ? (
+              {isGoldPending ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-center text-xs font-bold text-amber-300 flex items-center justify-center gap-2 animate-pulse">
+                  <Clock className="size-3.5 text-amber-400 animate-spin shrink-0" />
+                  <span>Demande en cours de validation par le Desk d'Administration</span>
+                </div>
+              ) : isGoldExpired ? (
                 <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 space-y-2.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
                     <Lock className="size-3.5 text-rose-400 shrink-0" />
                     <span>Abonnement expiré (2/2 trades) — Mises verrouillées</span>
                   </div>
-                  {isGoldPending ? (
-                    <div className="w-full py-2 px-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5">
-                      <Clock className="size-3.5 text-amber-400 animate-spin shrink-0" />
-                      <span>Demande en cours</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onRequestPreset?.("AI_GOLD", "Nexium AI Gold (Renouvellement)")}
-                      className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 active:scale-95"
-                    >
-                      <Sparkles className="size-3.5 shrink-0" />
-                      <span>Faire une nouvelle demande</span>
-                    </button>
-                  )}
-                </div>
-              ) : isGoldPending ? (
-                <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-center text-xs font-bold text-amber-300 flex items-center justify-center gap-2">
-                  <Clock className="size-3.5 text-amber-400 animate-spin shrink-0" />
-                  <span>Demande d'activation en cours de validation admin</span>
+                  <button
+                    type="button"
+                    onClick={() => onRequestPreset?.("AI_GOLD", "Nexium AI Gold (Renouvellement)")}
+                    className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <Sparkles className="size-3.5 shrink-0" />
+                    <span>Faire une nouvelle demande</span>
+                  </button>
                 </div>
               ) : !isGoldApproved ? (
                 <button
@@ -7084,7 +7080,12 @@ function StakeManagementTab({
                 </div>
 
                 {/* Status Badges */}
-                {isFxExpired ? (
+                {isFxPending ? (
+                  <span className="text-[11px] font-mono font-bold text-cyan-300 bg-cyan-500/15 px-3 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5 animate-pulse">
+                    <Clock className="size-3 text-cyan-400 animate-spin" />
+                    EN ATTENTE DE VALIDATION
+                  </span>
+                ) : isFxExpired ? (
                   <span className="text-[11px] font-mono font-bold text-rose-300 bg-rose-500/15 px-3 py-1 rounded-full border border-rose-500/30 flex items-center gap-1.5">
                     <Lock className="size-3 text-rose-400" />
                     EXPIRÉ ({Math.min(5, quotaStats?.fxWins ?? 0)}/5)
@@ -7093,11 +7094,6 @@ function StakeManagementTab({
                   <span className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     ACTIF ({Math.min(5, quotaStats?.fxWins ?? 0)}/5)
-                  </span>
-                ) : isFxPending ? (
-                  <span className="text-[11px] font-mono font-bold text-cyan-300 bg-cyan-500/15 px-3 py-1 rounded-full border border-cyan-500/30 flex items-center gap-1.5">
-                    <Clock className="size-3 text-cyan-400 animate-spin" />
-                    EN ATTENTE
                   </span>
                 ) : (
                   <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-800/70 px-3 py-1 rounded-full border border-slate-700/50 flex items-center gap-1.5">
@@ -7178,32 +7174,25 @@ function StakeManagementTab({
               </div>
 
               {/* Status / Activation Notice */}
-              {isFxExpired ? (
+              {isFxPending ? (
+                <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-3 text-center text-xs font-bold text-cyan-300 flex items-center justify-center gap-2 animate-pulse">
+                  <Clock className="size-3.5 text-cyan-400 animate-spin shrink-0" />
+                  <span>Demande en cours de validation par le Desk d'Administration</span>
+                </div>
+              ) : isFxExpired ? (
                 <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 space-y-2.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
                     <Lock className="size-3.5 text-rose-400 shrink-0" />
                     <span>Abonnement expiré (5/5 trades) — Mises verrouillées</span>
                   </div>
-                  {isFxPending ? (
-                    <div className="w-full py-2 px-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5">
-                      <Clock className="size-3.5 text-cyan-400 animate-spin shrink-0" />
-                      <span>Demande en cours</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onRequestPreset?.("FX_TREND", "Nexium FX Trend (Renouvellement)")}
-                      className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 active:scale-95"
-                    >
-                      <Sparkles className="size-3.5 shrink-0" />
-                      <span>Faire une nouvelle demande</span>
-                    </button>
-                  )}
-                </div>
-              ) : isFxPending ? (
-                <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-3 text-center text-xs font-bold text-cyan-300 flex items-center justify-center gap-2">
-                  <Clock className="size-3.5 text-cyan-400 animate-spin shrink-0" />
-                  <span>Demande d'activation en cours de validation admin</span>
+                  <button
+                    type="button"
+                    onClick={() => onRequestPreset?.("FX_TREND", "Nexium FX Trend (Renouvellement)")}
+                    className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <Sparkles className="size-3.5 shrink-0" />
+                    <span>Faire une nouvelle demande</span>
+                  </button>
                 </div>
               ) : !isFxApproved ? (
                 <button
@@ -7282,15 +7271,15 @@ function StakeManagementTab({
                 </div>
 
                 {/* Status Badges */}
-                {isIndexActive ? (
+                {isIndexPending ? (
+                  <span className="text-[11px] font-mono font-bold text-purple-300 bg-purple-500/15 px-3 py-1 rounded-full border border-purple-500/30 flex items-center gap-1.5 animate-pulse">
+                    <Clock className="size-3 text-purple-400 animate-spin" />
+                    EN ATTENTE DE VALIDATION
+                  </span>
+                ) : isIndexActive ? (
                   <span className="text-[11px] font-mono font-bold text-emerald-300 bg-emerald-500/15 px-3 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     ACTIF (Illimité ∞)
-                  </span>
-                ) : isIndexPending ? (
-                  <span className="text-[11px] font-mono font-bold text-purple-300 bg-purple-500/15 px-3 py-1 rounded-full border border-purple-500/30 flex items-center gap-1.5">
-                    <Clock className="size-3 text-purple-400 animate-spin" />
-                    EN ATTENTE
                   </span>
                 ) : (
                   <span className="text-[11px] font-mono font-bold text-slate-400 bg-slate-800/70 px-3 py-1 rounded-full border border-slate-700/50 flex items-center gap-1.5">
@@ -7372,9 +7361,9 @@ function StakeManagementTab({
 
               {/* Status / Activation Notice */}
               {isIndexPending ? (
-                <div className="rounded-2xl border border-purple-500/25 bg-purple-500/10 p-3 text-center text-xs font-bold text-purple-300 flex items-center justify-center gap-2">
+                <div className="rounded-2xl border border-purple-500/30 bg-purple-500/10 p-3 text-center text-xs font-bold text-purple-300 flex items-center justify-center gap-2 animate-pulse">
                   <Clock className="size-3.5 text-purple-400 animate-spin shrink-0" />
-                  <span>Demande d'activation en cours de validation admin</span>
+                  <span>Demande en cours de validation par le Desk d'Administration</span>
                 </div>
               ) : !isIndexApproved ? (
                 <button
@@ -8032,7 +8021,11 @@ export function NexiumDashboard({
     if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
     if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
     setLicenseStatus(profile.license_status || "NOT_REQUESTED");
-    setRequestedPresets(profile.requested_presets?.length ? profile.requested_presets : profile.requested_preset ? [profile.requested_preset] : []);
+    const localReq = readDemoJson<string[]>(demoStorageKey("requested_presets")) || [];
+    const dbReq = profile.requested_presets?.length ? profile.requested_presets : profile.requested_preset ? [profile.requested_preset] : [];
+    const effectiveRequested = profile.requested_presets !== undefined ? dbReq : localReq;
+    setRequestedPresets(effectiveRequested);
+    writeDemoJson(demoStorageKey("requested_presets"), effectiveRequested);
     setActivePreset(profile.active_preset || null);
 
     setEngineCycles(cyclesFromEnginesConfig(profile.engines_config));
@@ -8243,11 +8236,11 @@ export function NexiumDashboard({
       }
       isFirstRealtimeEvent = false;
       if (updatedProfile.requested_presets !== undefined) {
-        setRequestedPresets(
-          Array.isArray(updatedProfile.requested_presets)
-            ? updatedProfile.requested_presets
-            : (updatedProfile.requested_presets ? [updatedProfile.requested_presets] : [])
-        );
+        const nextReq = Array.isArray(updatedProfile.requested_presets)
+          ? updatedProfile.requested_presets
+          : (updatedProfile.requested_presets ? [updatedProfile.requested_presets] : []);
+        setRequestedPresets(nextReq);
+        writeDemoJson(demoStorageKey("requested_presets"), nextReq);
       }
       if (updatedProfile.assigned_advisor) setAssignedAdvisor(updatedProfile.assigned_advisor);
       if (updatedProfile.mt5_login) setMt5AccountNumber(updatedProfile.mt5_login.replace("#", ""));
@@ -8505,8 +8498,10 @@ export function NexiumDashboard({
   ) => {
     if (submittingPreset) return;
     setSubmittingPreset(true);
+    const nextRequested = Array.from(new Set([...requestedPresets, presetKey]));
+    setRequestedPresets(nextRequested);
+    writeDemoJson(demoStorageKey("requested_presets"), nextRequested);
     try {
-      const nextRequested = Array.from(new Set([...requestedPresets, presetKey]));
       if (isSupabaseConfigured && currentUserId) {
         const result = await requestPresetsActivation(currentUserId, nextRequested);
         if (result && (result as any).success === false) {
@@ -8525,7 +8520,6 @@ export function NexiumDashboard({
         }).catch((e) => console.warn("Notice audit log:", e));
       }
       setLicenseStatus("PENDING_PRESET_APPROVAL");
-      setRequestedPresets(nextRequested);
       toast.success(
         `Demande d'activation pour ${presetName} transmise à l'Administration ! Le Desk a été notifié.`
       );
@@ -10015,8 +10009,9 @@ export function NexiumDashboard({
                   const bot = visibleBotsWithLiveStats.find((b) => b.id === "nexium-ai-gold") || visibleBotsWithLiveStats[0] || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("AI_GOLD");
-                  const isPending = (requestedPresets || []).includes("AI_GOLD") && !isApproved;
                   const isExpired = isApproved && quotaStats.goldWins >= 2;
+                  const isRequested = (requestedPresets || []).includes("AI_GOLD");
+                  const isPending = isRequested && (!isApproved || isExpired);
                   const isRunning = isApproved && !isExpired && !isPending && bot?.statusBadge === "ACTIF";
 
                   return (
@@ -10034,7 +10029,7 @@ export function NexiumDashboard({
                         {isPending ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-[11px] font-bold font-mono animate-pulse">
                             <span className="size-1.5 rounded-full bg-amber-400" />
-                            EN ATTENTE
+                            EN ATTENTE DE VALIDATION
                           </span>
                         ) : isExpired ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-rose-500/50 bg-rose-950/40 text-rose-300 text-[11px] font-bold font-mono">
@@ -10104,32 +10099,22 @@ export function NexiumDashboard({
 
                       {/* Bottom Buttons */}
                       <div className="flex items-center gap-2 pt-1">
-                        {isExpired ? (
-                          isPending ? (
-                            <button
-                              disabled
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
-                            >
-                              <Clock className="size-3 animate-spin" />
-                              <span>EN ATTENTE VALIDATION ADMIN</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleRequestSinglePreset("AI_GOLD", "Nexium AI Gold (Renouvellement)")}
-                              disabled={submittingPreset}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/60 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.2)] active:scale-95"
-                            >
-                              <Sparkles className="size-3" />
-                              <span>FAIRE UNE NOUVELLE DEMANDE</span>
-                            </button>
-                          )
-                        ) : isPending ? (
+                        {isPending ? (
                           <button
                             disabled
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-950/40 text-amber-300 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
                           >
-                            <Clock className="size-3 animate-spin" />
-                            <span>EN ATTENTE ADMIN</span>
+                            <Clock className="size-3 animate-spin text-amber-400" />
+                            <span>DEMANDE EN ATTENTE DE VALIDATION</span>
+                          </button>
+                        ) : isExpired ? (
+                          <button
+                            onClick={() => handleRequestSinglePreset("AI_GOLD", "Nexium AI Gold (Renouvellement)")}
+                            disabled={submittingPreset}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-500/60 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.2)] active:scale-95"
+                          >
+                            <Sparkles className="size-3" />
+                            <span>FAIRE UNE NOUVELLE DEMANDE</span>
                           </button>
                         ) : isApproved ? (
                           <button
@@ -10169,8 +10154,9 @@ export function NexiumDashboard({
                   const bot = visibleBotsWithLiveStats.find((b) => b.id === "nexium-fx-trend") || visibleBotsWithLiveStats[1] || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("FX_TREND");
-                  const isPending = (requestedPresets || []).includes("FX_TREND") && !isApproved;
                   const isExpired = isApproved && quotaStats.fxWins >= 5;
+                  const isRequested = (requestedPresets || []).includes("FX_TREND");
+                  const isPending = isRequested && (!isApproved || isExpired);
                   const isRunning = isApproved && !isExpired && !isPending && bot?.statusBadge === "ACTIF";
 
                   return (
@@ -10188,7 +10174,7 @@ export function NexiumDashboard({
                         {isPending ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-cyan-500/50 bg-cyan-500/15 text-cyan-300 text-[11px] font-bold font-mono animate-pulse">
                             <span className="size-1.5 rounded-full bg-cyan-400" />
-                            EN ATTENTE
+                            EN ATTENTE DE VALIDATION
                           </span>
                         ) : isExpired ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-rose-500/50 bg-rose-950/40 text-rose-300 text-[11px] font-bold font-mono">
@@ -10258,32 +10244,22 @@ export function NexiumDashboard({
 
                       {/* Bottom Buttons */}
                       <div className="flex items-center gap-2 pt-1">
-                        {isExpired ? (
-                          isPending ? (
-                            <button
-                              disabled
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
-                            >
-                              <Clock className="size-3 animate-spin" />
-                              <span>EN ATTENTE VALIDATION ADMIN</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleRequestSinglePreset("FX_TREND", "Nexium FX Trend (Renouvellement)")}
-                              disabled={submittingPreset}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/60 bg-gradient-to-r from-cyan-500/20 to-cyan-600/20 hover:from-cyan-500/30 hover:to-cyan-600/30 text-cyan-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.2)] active:scale-95"
-                            >
-                              <Sparkles className="size-3" />
-                              <span>FAIRE UNE NOUVELLE DEMANDE</span>
-                            </button>
-                          )
-                        ) : isPending ? (
+                        {isPending ? (
                           <button
                             disabled
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-950/40 text-cyan-300 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
                           >
-                            <Clock className="size-3 animate-spin" />
-                            <span>EN ATTENTE ADMIN</span>
+                            <Clock className="size-3 animate-spin text-cyan-400" />
+                            <span>DEMANDE EN ATTENTE DE VALIDATION</span>
+                          </button>
+                        ) : isExpired ? (
+                          <button
+                            onClick={() => handleRequestSinglePreset("FX_TREND", "Nexium FX Trend (Renouvellement)")}
+                            disabled={submittingPreset}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-cyan-500/60 bg-gradient-to-r from-cyan-500/20 to-cyan-600/20 hover:from-cyan-500/30 hover:to-cyan-600/30 text-cyan-300 py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.2)] active:scale-95"
+                          >
+                            <Sparkles className="size-3" />
+                            <span>FAIRE UNE NOUVELLE DEMANDE</span>
                           </button>
                         ) : isApproved ? (
                           <button
@@ -10323,8 +10299,9 @@ export function NexiumDashboard({
                   const bot = visibleBotsWithLiveStats.find((b) => b.id === "nexium-index-reversion") || visibleBotsWithLiveStats[2] || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("INDEX_REVERSION");
-                  const isPending = requestedPresets.includes("INDEX_REVERSION") && !isApproved;
-                  const isRunning = isApproved && bot?.statusBadge === "ACTIF";
+                  const isRequested = (requestedPresets || []).includes("INDEX_REVERSION");
+                  const isPending = isRequested && !isApproved;
+                  const isRunning = isApproved && !isPending && bot?.statusBadge === "ACTIF";
 
                   return (
                     <div className="rounded-2xl border border-purple-900/60 bg-[#0d0716] p-3.5 sm:p-4 shadow-xl flex flex-col justify-between space-y-2.5 hover:border-purple-500/50 transition">
@@ -10338,7 +10315,12 @@ export function NexiumDashboard({
                             OBJECTIF +98% / TRADE · ILLIMITÉ
                           </span>
                         </div>
-                        {isApproved ? (
+                        {isPending ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-purple-500/50 bg-purple-500/15 text-purple-300 text-[11px] font-bold font-mono animate-pulse">
+                            <span className="size-1.5 rounded-full bg-purple-400" />
+                            EN ATTENTE DE VALIDATION
+                          </span>
+                        ) : isApproved ? (
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-bold font-mono ${
                               isRunning
@@ -10348,11 +10330,6 @@ export function NexiumDashboard({
                           >
                             <span className={`size-1.5 rounded-full ${isRunning ? "bg-emerald-400 animate-pulse" : "bg-rose-500"}`} />
                             {isRunning ? "ACTIF" : "EN PAUSE"}
-                          </span>
-                        ) : isPending ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-purple-500/50 bg-purple-500/15 text-purple-300 text-[11px] font-bold font-mono animate-pulse">
-                            <span className="size-1.5 rounded-full bg-purple-400" />
-                            EN ATTENTE
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-700/60 bg-slate-800/40 text-slate-400 text-[11px] font-bold font-mono">
@@ -10403,7 +10380,15 @@ export function NexiumDashboard({
 
                       {/* Bottom Buttons */}
                       <div className="flex items-center gap-2 pt-1">
-                        {isApproved ? (
+                        {isPending ? (
+                          <button
+                            disabled
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-950/40 text-purple-300 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
+                          >
+                            <Clock className="size-3 animate-spin text-purple-400" />
+                            <span>DEMANDE EN ATTENTE DE VALIDATION</span>
+                          </button>
+                        ) : isApproved ? (
                           <button
                             onClick={() => handleToggleBotPause("nexium-index-reversion")}
                             className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border py-1.5 px-3 text-[11px] font-bold transition cursor-pointer shadow-md ${
@@ -10414,14 +10399,6 @@ export function NexiumDashboard({
                           >
                             <span className={`size-1.5 rounded-full ${isRunning ? "bg-purple-400 animate-pulse" : "bg-emerald-400"}`} />
                             <span>{isRunning ? "METTRE EN PAUSE" : "LANCER LE BOT"}</span>
-                          </button>
-                        ) : isPending ? (
-                          <button
-                            disabled
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-950/40 text-purple-400 py-1.5 px-3 text-[11px] font-bold opacity-90 cursor-not-allowed"
-                          >
-                            <Clock className="size-3 animate-spin" />
-                            <span>EN ATTENTE ADMIN</span>
                           </button>
                         ) : (
                           <button

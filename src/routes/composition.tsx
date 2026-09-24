@@ -2058,6 +2058,7 @@ function NexiumAdminDashboard({
           return {
             ...c,
             licenseStatus: "ACTIVE",
+            requestedPresets: (c.requestedPresets || []).filter((p) => !activePresetKeys.includes(p.toUpperCase())),
             activePreset: presetsLabel,
             status: "ACTIVE",
             // Preset validé = nouveau cycle, bot déverrouillé
@@ -2078,7 +2079,7 @@ function NexiumAdminDashboard({
     sendCustomDeskEmail(
       client.email,
       `Activation de votre Stratégie Algorithmique (${presetsLabel})`,
-      `Bonjour ${client.name},\n\nVotre demande d'activation pour le${activePresetKeys.length > 1 ? "s" : ""} Preset${activePresetKeys.length > 1 ? "s" : ""} Algorithmique${activePresetKeys.length > 1 ? "s" : ""} [${presetsLabel}] a été validée par la Direction des Opérations.\n\nLe preset est désormais actif sur votre compte de DÉMONSTRATION : les trades y sont simulés et n'engagent pas votre solde réel. Définissez votre mise initiale puis lancez le bot depuis l'onglet MT5 quand vous le souhaitez.\n\nAccédez à votre espace : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+      `Bonjour ${client.name},\n\nVotre demande d'activation pour le${activePresetKeys.length > 1 ? "s" : ""} Preset${activePresetKeys.length > 1 ? "s" : ""} Algorithmique${activePresetKeys.length > 1 ? "s" : ""} [${presetsLabel}] a été validée par la Direction des Opérations.\n\nLe preset est désormais actif sur votre compte de trading. Définissez votre mise initiale puis lancez le bot depuis l'onglet MT5 quand vous le souhaitez.\n\nAccédez à votre espace : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
     ).catch((err) => console.warn("Resend email error:", err));
 
     addAuditLog(
@@ -2349,6 +2350,7 @@ function NexiumAdminDashboard({
       await updateUserProfile(client.id, {
         license_status: "ACTIVE",
         status: "ACTIVE",
+        requested_presets: [],
         active_preset: presetsLabel,
         engines_config: nextEngines,
       });
@@ -2362,6 +2364,7 @@ function NexiumAdminDashboard({
           return {
             ...c,
             licenseStatus: "ACTIVE",
+            requestedPresets: [],
             activePreset: presetsLabel,
             status: "ACTIVE",
             engines: nextEngines,
@@ -2374,7 +2377,7 @@ function NexiumAdminDashboard({
     sendCustomDeskEmail(
       client.email,
       "Prolongation de votre Abonnement & Quotas de Trading — Nexium Markets",
-      `Bonjour ${client.name},\n\nVotre abonnement aux algorithmes de trading Nexium Markets [${presetsLabel}] ainsi que vos quotas de trading ont été prolongés avec succès par la Direction.\n\nUn nouveau cycle démarre sur votre compte de DÉMONSTRATION (trades simulés, sans effet sur votre solde réel). Relancez le bot depuis l'onglet MT5 quand vous le souhaitez.\n\nAccédez à votre espace sécurisé : https://nexiummarkets.com/login\n\nBien cordialement,\nLa Direction des Opérations Nexium Markets`
+      `Bonjour ${client.name},\n\nVotre abonnement aux algorithmes de trading Nexium Markets [${presetsLabel}] ainsi que vos quotas de trading ont été prolongés avec succès par la Direction.\n\nUn nouveau cycle de trading démarre sur votre compte. Relancez le bot depuis l'onglet MT5 quand vous le souhaitez.\n\nAccédez à votre espace sécurisé : https://nexiummarkets.com/login\n\nBien cordialement,\nLa Direction des Opérations Nexium Markets`
     ).catch((err) => console.warn("Resend email error:", err));
 
     addAuditLog(
