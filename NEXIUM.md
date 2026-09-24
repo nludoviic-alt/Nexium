@@ -114,3 +114,10 @@ Avant chaque push ou mise en production, vérifier impérativement :
 - [ ] L'approbation côté Desk Admin remet le quota à 0 et efface la demande en attente.
 - [ ] Aucun libellé parasite "DÉMO" dans les notifications ou sur le Preset 1.
 - [ ] Les gains s'additionnent correctement sur le solde total du client.
+- [ ] **Préservation totale au rechargement (F5)** :
+  - [ ] Le **bonus de compte** est préservé et ne revient jamais à 0.
+  - [ ] Le **solde cash** (`balance`) est préservé et ne revient jamais à 0.
+  - [ ] Les **gains des presets** (`totalPresetPnl`, `goldTotalPnl`, `fxTotalPnl`, `indexTotalPnl`) sont conservés.
+  - [ ] Les **compteurs de trades/victoires** (`goldWins`, `fxWins`, `indexWins`) ne sont pas effacés.
+  - [ ] **Zéro flash** à 0 grâce aux initialisateurs paresseux `useState(() => ...)`.
+  - [ ] La clôture d'une position (`handleClosePosition`) persiste immédiatement le gain dans le `localStorage` et dans Supabase.
