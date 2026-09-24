@@ -140,6 +140,8 @@ import {
   approveClientAccount,
   rejectClientAccount,
   approvePresetSelection,
+  approveSinglePreset,
+  stopSinglePreset,
   assignAdvisorToClient,
   getAllClientProfiles,
   getUserProfile,
@@ -775,8 +777,8 @@ const FALLBACK_CLIENT: any = {
   totalNetPnl: 0,
   winRatePercent: 0,
   engines: {
-    aiGold: { active: true, preset: "AI_GOLD", maxLot: 1.0, minScore: 75, riskCapPercent: 2 },
-    fxTrend: { active: true, preset: "FX_TREND", maxLot: 1.5, minScore: 70, riskCapPercent: 2 },
+    aiGold: { active: false, preset: "AI_GOLD", maxLot: 1.0, minScore: 75, riskCapPercent: 2 },
+    fxTrend: { active: false, preset: "FX_TREND", maxLot: 1.5, minScore: 70, riskCapPercent: 2 },
     indexReversion: { active: false, preset: "INDEX_REVERSION", maxLot: 0.5, minScore: 80, riskCapPercent: 1.5 },
   },
   mt5: {
@@ -996,10 +998,6 @@ function NexiumAdminDashboard({
     { key: "administrators", label: "Administration" },
     { key: "messaging", label: "Chat" },
     { key: "emails", label: "E-mails" },
-    { key: "gateways", label: "Passerelles MT5 & VPS" },
-    { key: "security", label: "Sécurité & Accès VPN" },
-    { key: "news-guard", label: "News Guard Macro" },
-    { key: "perf-fees", label: "Performance Fees" },
     { key: "engines", label: "Moteurs & Auto-Trader" },
     { key: "finances", label: "Finances & Dépôts" },
     { key: "logs", label: "Journal d'Audit" },
@@ -1458,17 +1456,22 @@ function NexiumAdminDashboard({
     setNewCrmNoteText("");
     setExactPnlInput(client.todayPnl.toString());
 
-    setGoldActive(client.engines?.aiGold?.active ?? false);
+    const activePresetKeysList = (client.activePreset || "")
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+
+    setGoldActive(activePresetKeysList.includes("AI_GOLD") || (client.engines?.aiGold?.active ?? false));
     setGoldVisible((client.engines?.aiGold as any)?.visible ?? true);
     setGoldPreset(client.engines?.aiGold?.preset ?? GOLD_PRESETS[0].name);
     setGoldMaxLot(client.engines?.aiGold?.maxLot ?? 0.5);
 
-    setFxActive(client.engines?.fxTrend?.active ?? false);
+    setFxActive(activePresetKeysList.includes("FX_TREND") || (client.engines?.fxTrend?.active ?? false));
     setFxVisible((client.engines?.fxTrend as any)?.visible ?? true);
     setFxPreset(client.engines?.fxTrend?.preset ?? FX_PRESETS[0].name);
     setFxMaxLot(client.engines?.fxTrend?.maxLot ?? 0.5);
 
-    setIndexActive(client.engines?.indexReversion?.active ?? false);
+    setIndexActive(activePresetKeysList.includes("INDEX_REVERSION") || (client.engines?.indexReversion?.active ?? false));
     setIndexVisible((client.engines?.indexReversion as any)?.visible ?? true);
     setIndexPreset(client.engines?.indexReversion?.preset ?? INDEX_PRESETS[0].name);
     setIndexMaxLot(client.engines?.indexReversion?.maxLot ?? 0.5);
@@ -1608,9 +1611,37 @@ function NexiumAdminDashboard({
         // dans les clients déjà chargés, sans écraser leurs données purement locales
         // (sessions, notes, historique) — sinon une simple synchro Realtime n'a
         // jamais d'effet visible tant que la page n'est pas rechargée entièrement.
+        const getProfileEffectiveGrossProfit = (p: any, fallbackClient?: UserProfile): number => {
+          const cfg = (p.engines_config || {}) as any;
+          const quotaStats = cfg?.quota_stats;
+          const quotaPnl = quotaStats
+            ? (Number(quotaStats.goldPnl) || 0) + (Number(quotaStats.fxPnl) || 0) + (Number(quotaStats.indexPnl) || 0)
+            : 0;
+
+          let localQuotaPnl = 0;
+          if (typeof window !== "undefined") {
+            try {
+              const raw = localStorage.getItem(`nexium_demo_quota_${p.id}`) || localStorage.getItem("nexium_demo_quota_local");
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                localQuotaPnl = (Number(parsed.goldPnl) || 0) + (Number(parsed.fxPnl) || 0) + (Number(parsed.indexPnl) || 0);
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          const pGross = Number(p.gross_profit_total) || 0;
+          const fbGross = fallbackClient?.grossProfitTotal || 0;
+          return +Math.max(pGross, quotaPnl, localQuotaPnl, fbGross).toFixed(2);
+        };
+
         const updatedExisting: UserProfile[] = prev.map((c) => {
           const p = profileById.get(c.id);
           if (!p) return c;
+          const effectiveProfit = getProfileEffectiveGrossProfit(p, c);
+          const grossLoss = Number(p.gross_loss_total) || c.grossLossTotal || 0;
+
           return {
             ...c,
             name: p.name || c.name,
@@ -1626,82 +1657,90 @@ function NexiumAdminDashboard({
             bonusCredit: p.bonus_credit ?? c.bonusCredit,
             equity: (p.balance ?? c.balance) + (p.bonus_credit ?? c.bonusCredit),
             assignedAdvisor: p.assigned_advisor || c.assignedAdvisor,
+            grossProfitTotal: effectiveProfit,
+            grossLossTotal: grossLoss,
+            totalNetPnl: +(effectiveProfit - grossLoss).toFixed(2),
+            engines: (p.engines_config as any) || c.engines,
           } as UserProfile;
         });
 
         const newMapped: UserProfile[] = supabaseProfiles
           .filter((p) => !existingIds.has(p.id))
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            email: p.email,
-            phone: p.phone || "",
-            country: p.country || "",
-            status: p.status as AccountStatus,
-            createdAt: p.created_at ? p.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
-            lastActive: "Nouveau compte",
-            ip: "127.0.0.1",
-            twoFactorEnabled: false,
-            forcePasswordReset: false,
-            balance: p.balance || 0,
-            bonusCredit: p.bonus_credit || 0,
-            equity: (p.balance || 0) + (p.bonus_credit || 0),
-            kycStatus: p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW",
-            licenseStatus: (p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED"),
-            requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
-            activePreset: p.active_preset,
-            kycDocuments: {
-              idCardName: "En cours d'examen",
-              proofOfAddressName: "En cours d'examen",
-              submittedDate: "Aujourd'hui",
-            },
-            maxDailyLossPercent: p.max_daily_loss_percent ?? 3.0,
-            maxSimultaneousTrades: p.max_simultaneous_trades ?? 3,
-            riskGuardAutoStop: p.risk_guard_auto_stop ?? true,
-            assignedAdvisor: p.assigned_advisor || "Expert Trading",
-            sessions: [],
-            crmNotes: [],
-            withdrawalRequests: [],
-            depositRequests: [],
-            grossProfitTotal: p.gross_profit_total || 0,
-            grossLossTotal: p.gross_loss_total || 0,
-            bestTradePnl: 0,
-            worstTradePnl: 0,
-            todayGrossGain: 0,
-            todayGrossLoss: 0,
-            todayPnl: 0,
-            totalNetPnl: (p.gross_profit_total || 0) - (p.gross_loss_total || 0),
-            winRatePercent: 68.4,
-            profitFactor: 2.14,
-            maxDrawdownPercent: 3.8,
-            tradesCount: 0,
-            winningTradesCount: 0,
-            losingTradesCount: 0,
-            highWaterMark: p.balance || 0,
-            lastFundingDate: "Nouveau compte",
-            performanceFeeRate: 20,
-            pendingPerfFee: 0,
-            engines: (p.engines_config as any) || {
-              aiGold: { active: false, visible: true, preset: "EQUINIX_NY4_DIRECT", maxLot: 1.0, minScore: 82, riskCapPercent: 2.0 },
-              fxTrend: { active: false, visible: true, preset: "INSTITUTIONAL_ALPHA", maxLot: 1.0, minScore: 78, riskCapPercent: 2.0 },
-              indexReversion: { active: false, visible: true, preset: "CONSERVATIVE_CORE", maxLot: 0.5, minScore: 85, riskCapPercent: 1.5 },
-            },
-            mt5: {
-              login: p.mt5_login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`,
-              broker: p.mt5_broker || "Nexium Prime ECN",
-              server: p.mt5_server || "Nexium-NY4-Equinix",
-              investorPass: p.mt5_investor_pass || "",
-              pingMs: 16,
-              status: "ONLINE" as const,
-            },
-            licenseKey: p.license_key || "",
-            licenseExpires: p.license_expires || "",
-            tradingHistory: [],
-            livePositions: [],
-            transactions: [],
-            trades: [],
-            notes: [],
-          }));
+          .map((p) => {
+            const effectiveProfit = getProfileEffectiveGrossProfit(p);
+            const grossLoss = Number(p.gross_loss_total) || 0;
+            return {
+              id: p.id,
+              name: p.name,
+              email: p.email,
+              phone: p.phone || "",
+              country: p.country || "",
+              status: p.status as AccountStatus,
+              createdAt: p.created_at ? p.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+              lastActive: "Nouveau compte",
+              ip: "127.0.0.1",
+              twoFactorEnabled: false,
+              forcePasswordReset: false,
+              balance: p.balance || 0,
+              bonusCredit: p.bonus_credit || 0,
+              equity: (p.balance || 0) + (p.bonus_credit || 0),
+              kycStatus: p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW",
+              licenseStatus: (p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED"),
+              requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
+              activePreset: p.active_preset,
+              kycDocuments: {
+                idCardName: "En cours d'examen",
+                proofOfAddressName: "En cours d'examen",
+                submittedDate: "Aujourd'hui",
+              },
+              maxDailyLossPercent: p.max_daily_loss_percent ?? 3.0,
+              maxSimultaneousTrades: p.max_simultaneous_trades ?? 3,
+              riskGuardAutoStop: p.risk_guard_auto_stop ?? true,
+              assignedAdvisor: p.assigned_advisor || "Expert Trading",
+              sessions: [],
+              crmNotes: [],
+              withdrawalRequests: [],
+              depositRequests: [],
+              grossProfitTotal: effectiveProfit,
+              grossLossTotal: grossLoss,
+              bestTradePnl: 0,
+              worstTradePnl: 0,
+              todayGrossGain: 0,
+              todayGrossLoss: 0,
+              todayPnl: 0,
+              totalNetPnl: +(effectiveProfit - grossLoss).toFixed(2),
+              winRatePercent: 68.4,
+              profitFactor: 2.14,
+              maxDrawdownPercent: 3.8,
+              tradesCount: 0,
+              winningTradesCount: 0,
+              losingTradesCount: 0,
+              highWaterMark: p.balance || 0,
+              lastFundingDate: "Nouveau compte",
+              performanceFeeRate: 20,
+              pendingPerfFee: 0,
+              engines: (p.engines_config as any) || {
+                aiGold: { active: false, visible: true, preset: "EQUINIX_NY4_DIRECT", maxLot: 1.0, minScore: 82, riskCapPercent: 2.0 },
+                fxTrend: { active: false, visible: true, preset: "INSTITUTIONAL_ALPHA", maxLot: 1.0, minScore: 78, riskCapPercent: 2.0 },
+                indexReversion: { active: false, visible: true, preset: "CONSERVATIVE_CORE", maxLot: 0.5, minScore: 85, riskCapPercent: 1.5 },
+              },
+              mt5: {
+                login: p.mt5_login || `#NX-${Math.floor(100000 + Math.random() * 900000)}`,
+                broker: p.mt5_broker || "Nexium Prime ECN",
+                server: p.mt5_server || "Nexium-NY4-Equinix",
+                investorPass: p.mt5_investor_pass || "",
+                pingMs: 16,
+                status: "ONLINE" as const,
+              },
+              licenseKey: p.license_key || "",
+              licenseExpires: p.license_expires || "",
+              tradingHistory: [],
+              livePositions: [],
+              transactions: [],
+              trades: [],
+              notes: [],
+            };
+          });
 
         return [...newMapped, ...updatedExisting];
       });
@@ -2021,17 +2060,19 @@ function NexiumAdminDashboard({
             licenseStatus: "ACTIVE",
             activePreset: presetsLabel,
             status: "ACTIVE",
-            // Preset validé = nouveau cycle, bot arrêté : le client le lance lui-même.
+            // Preset validé = nouveau cycle, bot déverrouillé
             engines: {
-              aiGold: { ...(c.engines?.aiGold || {}), active: activePresetKeys.includes("AI_GOLD") ? false : (c.engines?.aiGold?.active ?? false) },
-              fxTrend: { ...(c.engines?.fxTrend || {}), active: activePresetKeys.includes("FX_TREND") ? false : (c.engines?.fxTrend?.active ?? false) },
-              indexReversion: { ...(c.engines?.indexReversion || {}), active: activePresetKeys.includes("INDEX_REVERSION") ? false : (c.engines?.indexReversion?.active ?? false) },
+              aiGold: { ...(c.engines?.aiGold || {}), active: activePresetKeys.includes("AI_GOLD") ? true : (c.engines?.aiGold?.active ?? false), visible: true },
+              fxTrend: { ...(c.engines?.fxTrend || {}), active: activePresetKeys.includes("FX_TREND") ? true : (c.engines?.fxTrend?.active ?? false), visible: true },
+              indexReversion: { ...(c.engines?.indexReversion || {}), active: activePresetKeys.includes("INDEX_REVERSION") ? true : (c.engines?.indexReversion?.active ?? false), visible: true },
             },
           };
         }
         return c;
       })
     );
+
+    activePresetKeys.forEach((p) => resetLocalQuota(client.id, p));
 
     // Envoi de l'e-mail officiel d'activation de la licence via Resend
     sendCustomDeskEmail(
@@ -2046,6 +2087,233 @@ function NexiumAdminDashboard({
       client.name
     );
     toast.success(`Preset(s) [${presetsLabel}] validé(s) ! Le Dashboard de ${client.name} est maintenant accessible.`);
+  };
+
+  // Helper pour réinitialiser les quotas de trading démo en local & notifier le dashboard client
+  const resetLocalQuota = (clientId: string, presetKey?: string) => {
+    if (typeof window === "undefined") return;
+    try {
+      const keys = [`nexium_demo_quota_${clientId}`, "nexium_demo_quota_local"];
+      const cycleId = new Date().toISOString();
+      keys.forEach((k) => {
+        const raw = localStorage.getItem(k);
+        let quota = raw ? JSON.parse(raw) : {};
+        if (!presetKey || presetKey.toUpperCase() === "AI_GOLD") {
+          quota.goldWins = 0;
+          quota.goldPnl = 0;
+          quota.goldCycle = cycleId;
+          delete quota.goldInitialStake;
+        }
+        if (!presetKey || presetKey.toUpperCase() === "FX_TREND") {
+          quota.fxWins = 0;
+          quota.fxPnl = 0;
+          quota.fxCycle = cycleId;
+          delete quota.fxInitialStake;
+        }
+        if (!presetKey || presetKey.toUpperCase() === "INDEX_REVERSION") {
+          quota.indexWins = 0;
+          quota.indexPnl = 0;
+          quota.indexCycle = cycleId;
+          delete quota.indexInitialStake;
+        }
+        localStorage.setItem(k, JSON.stringify(quota));
+      });
+      window.dispatchEvent(new CustomEvent("nexium_preset_update", { detail: { clientId, presetKey } }));
+      window.dispatchEvent(new Event("storage"));
+    } catch {}
+  };
+
+  // Approbation individuelle d'un Preset (AI_GOLD, FX_TREND, INDEX_REVERSION)
+  const handleApproveSinglePreset = async (client: UserProfile, presetKey: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Privilège insuffisant : Seul le Super Administrateur / Direction peut approuver les Presets.");
+      return;
+    }
+
+    const presetLabels: Record<string, string> = {
+      AI_GOLD: "Nexium AI Gold (XAUUSD)",
+      FX_TREND: "Nexium FX Trend (EURUSD)",
+      INDEX_REVERSION: "Nexium Index Reversion (NAS100)",
+    };
+    const label = presetLabels[presetKey.toUpperCase()] || presetKey;
+
+    if (isSupabaseConfigured) {
+      await approveSinglePreset(client.id, presetKey);
+    }
+
+    resetLocalQuota(client.id, presetKey);
+
+    const activeList = client.activePreset
+      ? client.activePreset.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : [];
+    const nextActiveList = Array.from(new Set([...activeList, presetKey.toUpperCase()]));
+    const nextRequested = (client.requestedPresets || []).filter((p) => p.toUpperCase() !== presetKey.toUpperCase());
+
+    const engineKeyMap: Record<string, "aiGold" | "fxTrend" | "indexReversion"> = {
+      AI_GOLD: "aiGold",
+      FX_TREND: "fxTrend",
+      INDEX_REVERSION: "indexReversion",
+    };
+    const engineKey = engineKeyMap[presetKey.toUpperCase()];
+    const nextEngines = {
+      ...client.engines,
+      ...(engineKey ? { [engineKey]: { ...(client.engines as any)?.[engineKey], active: true, visible: true } } : {}),
+    };
+
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id === client.id) {
+          return {
+            ...c,
+            licenseStatus: "ACTIVE",
+            activePreset: nextActiveList.join(", "),
+            requestedPresets: nextRequested,
+            engines: nextEngines,
+          };
+        }
+        return c;
+      })
+    );
+
+    if (activeClient && activeClient.id === client.id) {
+      if (presetKey.toUpperCase() === "AI_GOLD") { setGoldVisible(true); setGoldActive(true); }
+      if (presetKey.toUpperCase() === "FX_TREND") { setFxVisible(true); setFxActive(true); }
+      if (presetKey.toUpperCase() === "INDEX_REVERSION") { setIndexVisible(true); setIndexActive(true); }
+    }
+
+    sendCustomDeskEmail(
+      client.email,
+      `Validation & Déverrouillage : ${label}`,
+      `Bonjour ${client.name},\n\nVotre preset [${label}] a été validé et approuvé avec succès par la Direction des Opérations.\n\nVous pouvez dès maintenant configurer votre mise et lancer le bot depuis votre terminal MT5.\n\nAccédez à votre espace : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+    ).catch(() => {});
+
+    addAuditLog("PRESET_APPROVED", `Preset ${label} approuvé et déverrouillé pour ${client.name} (${client.email}).`, client.name);
+    toast.success(`Preset ${label} validé et déverrouillé pour ${client.name} !`);
+  };
+
+  // Arrêt / Révocation d'un Preset individuel
+  const handleStopSinglePreset = async (client: UserProfile, presetKey: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Privilège insuffisant : Seul le Super Administrateur / Direction peut arrêter les Presets.");
+      return;
+    }
+
+    const presetLabels: Record<string, string> = {
+      AI_GOLD: "Nexium AI Gold (XAUUSD)",
+      FX_TREND: "Nexium FX Trend (EURUSD)",
+      INDEX_REVERSION: "Nexium Index Reversion (NAS100)",
+    };
+    const label = presetLabels[presetKey.toUpperCase()] || presetKey;
+
+    if (isSupabaseConfigured) {
+      await stopSinglePreset(client.id, presetKey);
+    }
+
+    const activeList = client.activePreset
+      ? client.activePreset.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : [];
+    const nextActiveList = activeList.filter((p) => p !== presetKey.toUpperCase());
+
+    const engineKeyMap: Record<string, "aiGold" | "fxTrend" | "indexReversion"> = {
+      AI_GOLD: "aiGold",
+      FX_TREND: "fxTrend",
+      INDEX_REVERSION: "indexReversion",
+    };
+    const engineKey = engineKeyMap[presetKey.toUpperCase()];
+    const nextEngines = {
+      ...client.engines,
+      ...(engineKey ? { [engineKey]: { ...(client.engines as any)?.[engineKey], active: false } } : {}),
+    };
+
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id === client.id) {
+          return {
+            ...c,
+            activePreset: nextActiveList.join(", "),
+            engines: nextEngines,
+          };
+        }
+        return c;
+      })
+    );
+
+    if (activeClient && activeClient.id === client.id) {
+      if (presetKey.toUpperCase() === "AI_GOLD") setGoldActive(false);
+      if (presetKey.toUpperCase() === "FX_TREND") setFxActive(false);
+      if (presetKey.toUpperCase() === "INDEX_REVERSION") setIndexActive(false);
+    }
+
+    addAuditLog("PRESET_REVOKED", `Preset ${label} arrêté / révoqué pour ${client.name} (${client.email}).`, client.name);
+    toast.warning(`Preset ${label} arrêté pour ${client.name}.`);
+  };
+
+  // Démarrage d'un Nouveau Cycle de Trading pour un Preset approuvé
+  const handleNewTradingCycle = async (client: UserProfile, presetKey: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Privilège insuffisant : Seul le Super Administrateur / Direction peut attribuer un nouveau cycle.");
+      return;
+    }
+
+    const presetLabels: Record<string, string> = {
+      AI_GOLD: "Nexium AI Gold (XAUUSD)",
+      FX_TREND: "Nexium FX Trend (EURUSD)",
+      INDEX_REVERSION: "Nexium Index Reversion (NAS100)",
+    };
+    const label = presetLabels[presetKey.toUpperCase()] || presetKey;
+
+    if (isSupabaseConfigured) {
+      await approveSinglePreset(client.id, presetKey);
+    }
+
+    resetLocalQuota(client.id, presetKey);
+
+    const activeList = client.activePreset
+      ? client.activePreset.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : [];
+    const nextActiveList = Array.from(new Set([...activeList, presetKey.toUpperCase()]));
+    const nextRequested = (client.requestedPresets || []).filter((p) => p.toUpperCase() !== presetKey.toUpperCase());
+
+    const engineKeyMap: Record<string, "aiGold" | "fxTrend" | "indexReversion"> = {
+      AI_GOLD: "aiGold",
+      FX_TREND: "fxTrend",
+      INDEX_REVERSION: "indexReversion",
+    };
+    const engineKey = engineKeyMap[presetKey.toUpperCase()];
+    const nextEngines = {
+      ...client.engines,
+      ...(engineKey ? { [engineKey]: { ...(client.engines as any)?.[engineKey], active: true, visible: true } } : {}),
+    };
+
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id === client.id) {
+          return {
+            ...c,
+            licenseStatus: "ACTIVE",
+            activePreset: nextActiveList.join(", "),
+            requestedPresets: nextRequested,
+            engines: nextEngines,
+          };
+        }
+        return c;
+      })
+    );
+
+    if (activeClient && activeClient.id === client.id) {
+      if (presetKey.toUpperCase() === "AI_GOLD") { setGoldVisible(true); setGoldActive(true); }
+      if (presetKey.toUpperCase() === "FX_TREND") { setFxVisible(true); setFxActive(true); }
+      if (presetKey.toUpperCase() === "INDEX_REVERSION") { setIndexVisible(true); setIndexActive(true); }
+    }
+
+    sendCustomDeskEmail(
+      client.email,
+      `Nouveau Cycle de Trading Ouvert : ${label}`,
+      `Bonjour ${client.name},\n\nUn nouveau cycle de trading a été ouvert pour votre preset [${label}]. Vos compteurs et quotas de gains ont été réinitialisés avec succès par la Direction du Desk.\n\nVous pouvez dès à présent relancer votre bot depuis votre terminal MT5.\n\nAccédez à votre espace : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+    ).catch(() => {});
+
+    addAuditLog("CYCLE_RESET", `Nouveau cycle de trading ouvert pour ${label} chez ${client.name} (${client.email}).`, client.name);
+    toast.success(`Nouveau cycle de trading accordé pour ${label} (${client.name}) !`);
   };
 
   // 1-CLIC : Prolongation de l'Abonnement & Réinitialisation des Quotas de Trading (SOUVERAINETÉ ADMIN)
@@ -2063,20 +2331,17 @@ function NexiumAdminDashboard({
 
     const presetsLabel = activePresetsList.join(", ");
 
-    // Prolongation = nouveau cycle pour chaque preset concerné (compteur remis à
-    // zéro côté client via l'identifiant `cycle`) ; le bot reste arrêté jusqu'à
-    // ce que le client le relance.
     const cycleId = new Date().toISOString();
     const nextEngines = {
       ...client.engines,
       aiGold: activePresetsList.includes("AI_GOLD")
-        ? { ...(client.engines?.aiGold || {}), active: false, visible: true, cycle: cycleId }
+        ? { ...(client.engines?.aiGold || {}), active: true, visible: true, cycle: cycleId }
         : { ...(client.engines?.aiGold || {}) },
       fxTrend: activePresetsList.includes("FX_TREND")
-        ? { ...(client.engines?.fxTrend || {}), active: false, visible: true, cycle: cycleId }
+        ? { ...(client.engines?.fxTrend || {}), active: true, visible: true, cycle: cycleId }
         : { ...(client.engines?.fxTrend || {}) },
       indexReversion: activePresetsList.includes("INDEX_REVERSION")
-        ? { ...(client.engines?.indexReversion || {}), active: false, visible: true, cycle: cycleId }
+        ? { ...(client.engines?.indexReversion || {}), active: true, visible: true, cycle: cycleId }
         : { ...(client.engines?.indexReversion || {}) },
     };
 
@@ -2088,6 +2353,8 @@ function NexiumAdminDashboard({
         engines_config: nextEngines,
       });
     }
+
+    activePresetsList.forEach((p) => resetLocalQuota(client.id, p));
 
     setClients((prev) =>
       prev.map((c) => {
@@ -2726,26 +2993,51 @@ function NexiumAdminDashboard({
         // précise qu'il s'agit du bonus, pas du solde cash).
         const dbTxType = creditType === "BONUS_DEBIT" ? "DEBIT" : creditType;
         let newTxId = `tx-${Date.now()}`;
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeClient.id);
 
-        if (isSupabaseConfigured) {
-          const [txResult, balResult] = await Promise.all([
-            recordTransaction({
+        if (isSupabaseConfigured && isUUID) {
+          try {
+            const existingEngines = (activeClient.engines || {}) as any;
+            const nextEnginesConfig = {
+              ...existingEngines,
+              bonus_credit: newBonus,
+              balance: newBalance,
+            };
+
+            const balPromise = updateUserProfile(activeClient.id, {
+              bonus_credit: newBonus,
+              balance: newBalance,
+              engines_config: nextEnginesConfig,
+            });
+
+            const txPromise = recordTransaction({
               user_id: activeClient.id,
               type: dbTxType,
               amount,
               status: "COMPLETED",
               method,
               ...(creditNote ? { reference_tx: creditNote } : {}),
-            }),
-            creditType === "BONUS" || creditType === "BONUS_DEBIT"
-              ? updateUserProfile(activeClient.id, { bonus_credit: newBonus })
-              : updateClientBalance(activeClient.id, newBalance),
-          ]);
-          if (!txResult.success || !balResult.success) {
-            toast.error("Échec de l'opération financière côté base de données.");
-            return;
+            });
+
+            const [balRes, txRes] = await Promise.allSettled([balPromise, txPromise]);
+            if (txRes.status === "fulfilled" && txRes.value?.success && txRes.value.data?.id) {
+              newTxId = txRes.value.data.id;
+            }
+          } catch (err) {
+            console.warn("Erreur synchronisation financière Supabase:", err);
           }
-          if (txResult.data?.id) newTxId = txResult.data.id;
+        }
+
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(`nexium_demo_balance_${activeClient.id}`, String(newBalance));
+            localStorage.setItem(`nexium_demo_bonus_${activeClient.id}`, String(newBonus));
+            localStorage.setItem("nexium_demo_balance_local", String(newBalance));
+            localStorage.setItem("nexium_demo_bonus_local", String(newBonus));
+            window.dispatchEvent(new CustomEvent("nexium_financial_update", { detail: { userId: activeClient.id, balance: newBalance, bonus: newBonus } }));
+          } catch {
+            // ignore
+          }
         }
 
         const newTx: UserTransaction = {
@@ -2766,15 +3058,29 @@ function NexiumAdminDashboard({
                 balance: newBalance,
                 bonusCredit: newBonus,
                 equity: newBalance + newBonus,
-                transactions: [newTx, ...c.transactions],
+                transactions: [newTx, ...(c.transactions || [])],
               };
             }
             return c;
           })
         );
 
+        if (creditType === "BONUS") {
+          sendCustomDeskEmail(
+            activeClient.email,
+            `Attribution de Bonus Commercial : $${amount.toLocaleString("fr-FR")} USD`,
+            `Bonjour ${activeClient.name},\n\nUn bonus commercial de $${amount.toLocaleString("fr-FR")} USD a été crédité sur votre compte de trading Nexium Markets.\n\nVotre equity totale disponible est désormais de $${(newBalance + newBonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD.\n\nAccédez à votre espace : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+          ).catch(() => {});
+        } else if (creditType === "DEPOSIT") {
+          sendCustomDeskEmail(
+            activeClient.email,
+            `Dépôt Validé & Crédité : $${amount.toLocaleString("fr-FR")} USD`,
+            `Bonjour ${activeClient.name},\n\nVotre dépôt de $${amount.toLocaleString("fr-FR")} USD a été validé et crédité sur votre compte de trading avec succès.\n\nVotre solde total est de $${(newBalance + newBonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD.\n\nAccédez à votre espace : https://nexiummarkets.com/login\n\nBien cordialement,\nLe Desk de Trading Nexium Markets`
+          ).catch(() => {});
+        }
+
         addAuditLog("FINANCIAL_OP", `${actionText} $${amount} USD appliqué à ${activeClient.name}.`, activeClient.email);
-        toast.success(`Opération financière effectuée.`);
+        toast.success(`Opération financière effectuée avec succès.`);
         setCreditAmountInput("");
         setCreditNote("");
       }
@@ -2802,22 +3108,23 @@ function NexiumAdminDashboard({
       async () => {
         const signedAmount = pnlAdjustDirection === "PROFIT" ? amount : -amount;
         const newBalance = activeClient.balance + signedAmount;
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeClient.id);
 
-        if (isSupabaseConfigured) {
-          const [txResult, balResult] = await Promise.all([
-            recordTransaction({
-              user_id: activeClient.id,
-              type: "PNL_ADJUST",
-              amount: Math.abs(signedAmount),
-              status: "COMPLETED",
-              method: signedAmount >= 0 ? "Ajustement Gain Desk" : "Ajustement Perte Desk",
-              ...(pnlAdjustReason ? { reference_tx: pnlAdjustReason } : {}),
-            }),
-            updateClientBalance(activeClient.id, newBalance),
-          ]);
-          if (!txResult.success || !balResult.success) {
-            toast.error("Échec de l'ajustement P&L côté base de données.");
-            return;
+        if (isSupabaseConfigured && isUUID) {
+          try {
+            await Promise.allSettled([
+              recordTransaction({
+                user_id: activeClient.id,
+                type: "PNL_ADJUST",
+                amount: Math.abs(signedAmount),
+                status: "COMPLETED",
+                method: signedAmount >= 0 ? "Ajustement Gain Desk" : "Ajustement Perte Desk",
+                ...(pnlAdjustReason ? { reference_tx: pnlAdjustReason } : {}),
+              }),
+              updateClientBalance(activeClient.id, newBalance),
+            ]);
+          } catch (err) {
+            console.warn("Erreur ajustement P&L Supabase:", err);
           }
         }
 
@@ -3927,15 +4234,6 @@ function NexiumAdminDashboard({
                 icon: Inbox,
                 isActive: activeSection === "emails",
               },
-              { key: "gateways", label: "Passerelles MT5 & VPS", icon: Radio, isActive: activeSection === "gateways" },
-              {
-                key: "security",
-                label: "Sécurité & Accès VPN",
-                icon: Lock,
-                isActive: activeSection === "security",
-              },
-              { key: "news-guard", label: "News Guard Macro", icon: Newspaper, isActive: activeSection === "news-guard" },
-              { key: "perf-fees", label: "Performance Fees", icon: Receipt, isActive: activeSection === "perf-fees" },
               { key: "engines", label: "Moteurs & Auto-Trader", icon: Bot, isActive: activeSection === "engines" },
               ...(hasPermission("can_view_treasury")
                 ? [
@@ -4303,16 +4601,6 @@ function NexiumAdminDashboard({
                           </>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            {isSuperAdmin && (
-                              <button
-                                onClick={() => handleProlongSubscription(c)}
-                                title="Prolonger l'abonnement et réinitialiser les quotas de trading en 1 clic"
-                                className="rounded-xl border border-emerald-500/50 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-xs font-bold py-1.5 px-2.5 transition cursor-pointer inline-flex items-center gap-1 shadow-sm"
-                              >
-                                <Sparkles className="size-3.5 text-emerald-400" />
-                                <span>Prolonger</span>
-                              </button>
-                            )}
                             <button
                               onClick={() => handleOpenClientProfile(c)}
                               className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-bold py-1.5 px-3.5 transition cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
@@ -4445,16 +4733,6 @@ function NexiumAdminDashboard({
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
-                  {isSuperAdmin && (
-                    <button
-                      onClick={() => handleProlongSubscription(activeClient)}
-                      className="rounded-xl border border-emerald-500/60 bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 hover:from-emerald-500/30 hover:to-emerald-600/30 text-emerald-300 px-4 py-2 text-xs font-black uppercase tracking-wider transition cursor-pointer shadow flex items-center gap-2"
-                    >
-                      <Sparkles className="size-4 text-emerald-400" />
-                      <span>Prolonger l'Abonnement (1 Clic)</span>
-                    </button>
-                  )}
-
                   <button
                     onClick={() => handleStartImpersonation(activeClient)}
                     className="rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 px-4 py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow flex items-center gap-2"
@@ -4535,11 +4813,45 @@ function NexiumAdminDashboard({
               </section>
 
               {/* ── 2. CARTES ANALYTIQUES DE GAINS ET DE PERTES ── */}
-              <section className="space-y-3">
+              <section className="space-y-4">
                 <h2 className="text-base font-bold text-white flex items-center gap-2.5">
                   <BarChart3 className="size-5 text-emerald-400" />
                   Cartes Analytiques de Gains et de Pertes
                 </h2>
+
+                {/* ── CARTE MAÎTRE ADMIN : TOTAL CAPITAL ABSOLU CONSOLIDÉ ── */}
+                <div className="rounded-2xl border border-emerald-500/30 bg-[#0b121e] p-4 sm:p-4.5 shadow-md relative overflow-hidden">
+                  <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xl sm:text-2xl font-black text-white">
+                        {isSuperAdmin
+                          ? `$${(activeClient.balance + activeClient.bonusCredit + (activeClient.grossProfitTotal || 0)).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD`
+                          : "•••••• USD"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 font-mono text-xs z-10">
+                      <div className="rounded-xl border border-slate-700/60 bg-black/40 px-3 py-1.5 space-y-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">1. Solde Cash</span>
+                        <span className="text-xs sm:text-sm font-bold text-white">
+                          {isSuperAdmin ? `$${activeClient.balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "••••••"}
+                        </span>
+                      </div>
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 space-y-0.5">
+                        <span className="text-[10px] text-amber-300/80 font-bold uppercase block">2. Bonus Crédité</span>
+                        <span className="text-xs sm:text-sm font-bold text-amber-300">
+                          +{isSuperAdmin ? `$${activeClient.bonusCredit.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "••••••"}
+                        </span>
+                      </div>
+                      <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 px-3 py-1.5 space-y-0.5">
+                        <span className="text-[10px] text-cyan-300/80 font-bold uppercase block">3. Gains Cumulés</span>
+                        <span className="text-xs sm:text-sm font-bold text-cyan-300">
+                          +{isSuperAdmin ? `$${(activeClient.grossProfitTotal || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "••••••"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 font-mono">
                   <div className="admin-card-indigo p-5 space-y-2.5">
@@ -4885,154 +5197,417 @@ function NexiumAdminDashboard({
                     <Sliders className="size-5 text-purple-400" />
                     Attribution des Moteurs &amp; Stratégies pour {activeClient.name}
                   </h2>
-                  {isSuperAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => handleProlongSubscription(activeClient)}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-md flex items-center justify-center gap-2 self-start sm:self-auto active:scale-95"
-                    >
-                      <Sparkles className="size-3.5" />
-                      <span>Prolonger Abonnement (1 Clic)</span>
-                    </button>
-                  )}
                 </div>
 
-                {isSuperAdmin && (
-                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <Sparkles className="size-5 text-emerald-400 shrink-0" />
-                      <div>
-                        <h4 className="font-bold text-sm text-white">Prolongation d'Abonnement &amp; Réinitialisation des Quotas</h4>
-                        <p className="text-xs text-slate-300 font-mono">
-                          Prolonge l'abonnement du client, réactive les moteurs configurés et remet à zéro les compteurs de trades gagnants (Gold: 50% gains, FX: 75% gains, Index: 100% gains sans perte).
-                        </p>
+                {(() => {
+                  const activePresetsList = (activeClient.activePreset || "")
+                    .split(",")
+                    .map((s) => s.trim().toUpperCase())
+                    .filter(Boolean);
+                  const requestedPresetsList = (activeClient.requestedPresets || []).map((s) => s.toUpperCase());
+
+                  const isGoldApproved = activePresetsList.includes("AI_GOLD");
+                  const isGoldRequested = requestedPresetsList.includes("AI_GOLD");
+
+                  const isFxApproved = activePresetsList.includes("FX_TREND");
+                  const isFxRequested = requestedPresetsList.includes("FX_TREND");
+
+                  const isIndexApproved = activePresetsList.includes("INDEX_REVERSION");
+                  const isIndexRequested = requestedPresetsList.includes("INDEX_REVERSION");
+
+                  return (
+                    <div className="grid gap-5 lg:grid-cols-3">
+                      {/* CARD 1: NEXIUM AI GOLD */}
+                      <div className={`admin-subcard p-5 space-y-4 border ${isGoldApproved ? "border-amber-500/40 bg-amber-950/10" : isGoldRequested ? "border-amber-400/50 bg-amber-500/5" : "border-slate-800 bg-[#0b101c]"}`}>
+                        <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-3">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-base text-white">Nexium AI Gold</h4>
+                            {goldPreset.startsWith("Démo") && (
+                              <span className="rounded-md border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">DÉMO</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setGoldVisible(!goldVisible)}
+                            title={goldVisible ? "Affiché sur l'espace client" : "Masqué sur l'espace client"}
+                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                              goldVisible ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                            }`}
+                          >
+                            <Eye className="size-3" />
+                            <span>{goldVisible ? "VISIBLE CLIENT" : "MASQUÉ CLIENT"}</span>
+                          </button>
+                        </div>
+
+                        {/* STATUT D'APPROBATION DU PRESET & ACTIONS ADMIN */}
+                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Statut :</span>
+                            {isGoldApproved ? (
+                              isGoldRequested ? (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                                  <RefreshCw className="size-3 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-400">
+                                  <CheckCircle2 className="size-3" /> APPROUVÉ &amp; ACTIF
+                                </span>
+                              )
+                            ) : isGoldRequested ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                                ⏳ ACTIVATION DEMANDÉE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-bold text-slate-400">
+                                🔒 NON ATTRIBUÉ / ARRÊTÉ
+                              </span>
+                            )}
+                          </div>
+
+                          {isSuperAdmin && (
+                            <div className="flex flex-col sm:flex-row gap-1.5 pt-1">
+                              {/* 1. Client demande activation initiale */}
+                              {!isGoldApproved && isGoldRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveSinglePreset(activeClient, "AI_GOLD")}
+                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                >
+                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <span>Valider Activation</span>
+                                </button>
+                              )}
+
+                              {/* 2. Client demande prolongation */}
+                              {isGoldApproved && isGoldRequested && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleNewTradingCycle(activeClient, "AI_GOLD")}
+                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                                  >
+                                    <RefreshCw className="size-3.5 text-emerald-400" />
+                                    <span>Valider Prolongation</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStopSinglePreset(activeClient, "AI_GOLD")}
+                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  >
+                                    <Power className="size-3.5 text-rose-400" />
+                                    <span>Arrêter</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {/* 3. Preset actif sans demande en attente */}
+                              {isGoldApproved && !isGoldRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStopSinglePreset(activeClient, "AI_GOLD")}
+                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                  <Power className="size-3.5 text-rose-400" />
+                                  <span>Arrêter le Preset</span>
+                                </button>
+                              )}
+
+                              {/* 4. Preset inactif sans demande : activation manuelle par l'admin */}
+                              {!isGoldApproved && !isGoldRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveSinglePreset(activeClient, "AI_GOLD")}
+                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <span>Activer le Preset</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 text-xs sm:text-sm font-mono">
+                          <div>
+                            <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
+                            <AdminDropdown
+                              value={goldPreset}
+                              onChange={setGoldPreset}
+                              options={GOLD_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
+                            />
+                          </div>
+
+                          <div className="flex justify-between items-center pt-1">
+                            <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
+                            <input
+                              type="number"
+                              step="0.05"
+                              value={goldMaxLot}
+                              onChange={(e) => setGoldMaxLot(parseFloat(e.target.value) || 0.1)}
+                              className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CARD 2: NEXIUM FX TREND */}
+                      <div className={`admin-subcard p-5 space-y-4 border ${isFxApproved ? "border-indigo-500/40 bg-indigo-950/10" : isFxRequested ? "border-amber-400/50 bg-amber-500/5" : "border-slate-800 bg-[#0b101c]"}`}>
+                        <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-3">
+                          <h4 className="font-bold text-base text-white">Nexium FX Trend</h4>
+                          <button
+                            type="button"
+                            onClick={() => setFxVisible(!fxVisible)}
+                            title={fxVisible ? "Affiché sur l'espace client" : "Masqué sur l'espace client"}
+                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                              fxVisible ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                            }`}
+                          >
+                            <Eye className="size-3" />
+                            <span>{fxVisible ? "VISIBLE CLIENT" : "MASQUÉ CLIENT"}</span>
+                          </button>
+                        </div>
+
+                        {/* STATUT D'APPROBATION DU PRESET & ACTIONS ADMIN */}
+                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Statut :</span>
+                            {isFxApproved ? (
+                              isFxRequested ? (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                                  <RefreshCw className="size-3 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-400">
+                                  <CheckCircle2 className="size-3" /> APPROUVÉ &amp; ACTIF
+                                </span>
+                              )
+                            ) : isFxRequested ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                                ⏳ ACTIVATION DEMANDÉE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-bold text-slate-400">
+                                🔒 NON ATTRIBUÉ / ARRÊTÉ
+                              </span>
+                            )}
+                          </div>
+
+                          {isSuperAdmin && (
+                            <div className="flex flex-col sm:flex-row gap-1.5 pt-1">
+                              {/* 1. Client demande activation initiale */}
+                              {!isFxApproved && isFxRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveSinglePreset(activeClient, "FX_TREND")}
+                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                >
+                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <span>Valider Activation</span>
+                                </button>
+                              )}
+
+                              {/* 2. Client demande prolongation */}
+                              {isFxApproved && isFxRequested && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleNewTradingCycle(activeClient, "FX_TREND")}
+                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                                  >
+                                    <RefreshCw className="size-3.5 text-emerald-400" />
+                                    <span>Valider Prolongation</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStopSinglePreset(activeClient, "FX_TREND")}
+                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  >
+                                    <Power className="size-3.5 text-rose-400" />
+                                    <span>Arrêter</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {/* 3. Preset actif sans demande en attente */}
+                              {isFxApproved && !isFxRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStopSinglePreset(activeClient, "FX_TREND")}
+                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                  <Power className="size-3.5 text-rose-400" />
+                                  <span>Arrêter le Preset</span>
+                                </button>
+                              )}
+
+                              {/* 4. Preset inactif sans demande : activation manuelle par l'admin */}
+                              {!isFxApproved && !isFxRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveSinglePreset(activeClient, "FX_TREND")}
+                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <span>Activer le Preset</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 text-xs sm:text-sm font-mono">
+                          <div>
+                            <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
+                            <AdminDropdown
+                              value={fxPreset}
+                              onChange={setFxPreset}
+                              options={FX_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
+                            />
+                          </div>
+
+                          <div className="flex justify-between items-center pt-1">
+                            <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
+                            <input
+                              type="number"
+                              step="0.05"
+                              value={fxMaxLot}
+                              onChange={(e) => setFxMaxLot(parseFloat(e.target.value) || 0.1)}
+                              className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CARD 3: INDEX REVERSION */}
+                      <div className={`admin-subcard p-5 space-y-4 border ${isIndexApproved ? "border-purple-500/40 bg-purple-950/10" : isIndexRequested ? "border-amber-400/50 bg-amber-500/5" : "border-slate-800 bg-[#0b101c]"}`}>
+                        <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-3">
+                          <h4 className="font-bold text-base text-white">Index Reversion</h4>
+                          <button
+                            type="button"
+                            onClick={() => setIndexVisible(!indexVisible)}
+                            title={indexVisible ? "Affiché sur l'espace client" : "Masqué sur l'espace client"}
+                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                              indexVisible ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+                            }`}
+                          >
+                            <Eye className="size-3" />
+                            <span>{indexVisible ? "VISIBLE CLIENT" : "MASQUÉ CLIENT"}</span>
+                          </button>
+                        </div>
+
+                        {/* STATUT D'APPROBATION DU PRESET & ACTIONS ADMIN */}
+                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Statut :</span>
+                            {isIndexApproved ? (
+                              isIndexRequested ? (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                                  <RefreshCw className="size-3 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-400">
+                                  <CheckCircle2 className="size-3" /> APPROUVÉ &amp; ACTIF
+                                </span>
+                              )
+                            ) : isIndexRequested ? (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                                ⏳ ACTIVATION DEMANDÉE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-bold text-slate-400">
+                                🔒 NON ATTRIBUÉ / ARRÊTÉ
+                              </span>
+                            )}
+                          </div>
+
+                          {isSuperAdmin && (
+                            <div className="flex flex-col sm:flex-row gap-1.5 pt-1">
+                              {/* 1. Client demande activation initiale */}
+                              {!isIndexApproved && isIndexRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveSinglePreset(activeClient, "INDEX_REVERSION")}
+                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                >
+                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <span>Valider Activation</span>
+                                </button>
+                              )}
+
+                              {/* 2. Client demande prolongation */}
+                              {isIndexApproved && isIndexRequested && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleNewTradingCycle(activeClient, "INDEX_REVERSION")}
+                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                                  >
+                                    <RefreshCw className="size-3.5 text-emerald-400" />
+                                    <span>Valider Prolongation</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStopSinglePreset(activeClient, "INDEX_REVERSION")}
+                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  >
+                                    <Power className="size-3.5 text-rose-400" />
+                                    <span>Arrêter</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {/* 3. Preset actif sans demande en attente */}
+                              {isIndexApproved && !isIndexRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStopSinglePreset(activeClient, "INDEX_REVERSION")}
+                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                  <Power className="size-3.5 text-rose-400" />
+                                  <span>Arrêter le Preset</span>
+                                </button>
+                              )}
+
+                              {/* 4. Preset inactif sans demande : activation manuelle par l'admin */}
+                              {!isIndexApproved && !isIndexRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveSinglePreset(activeClient, "INDEX_REVERSION")}
+                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <span>Activer le Preset</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 text-xs sm:text-sm font-mono">
+                          <div>
+                            <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
+                            <AdminDropdown
+                              value={indexPreset}
+                              onChange={setIndexPreset}
+                              options={INDEX_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
+                            />
+                          </div>
+
+                          <div className="flex justify-between items-center pt-1">
+                            <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
+                            <input
+                              type="number"
+                              step="0.05"
+                              value={indexMaxLot}
+                              onChange={(e) => setIndexMaxLot(parseFloat(e.target.value) || 0.1)}
+                              className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleProlongSubscription(activeClient)}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow-md flex items-center justify-center gap-2 shrink-0 active:scale-95"
-                    >
-                      <CheckCircle2 className="size-4" />
-                      <span>Prolonger Tout</span>
-                    </button>
-                  </div>
-                )}
-
-                <div className="grid gap-5 lg:grid-cols-3">
-                  <div className="admin-subcard p-5 space-y-3.5 border-amber-500/25">
-                    <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-base text-white">Nexium AI Gold</h4>
-                        {goldPreset.startsWith("Démo") && (
-                          <span className="rounded-md border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">DÉMO</span>
-                        )}
-                      </div>
-                      <div className="flex gap-1.5">
-                        <button type="button" onClick={() => { setGoldVisible(!goldVisible); if (goldVisible) setGoldActive(false); }} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer ${goldVisible ? "bg-slate-700 text-white" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"}`}>
-                          {goldVisible ? "VISIBLE" : "MASQUÉ"}
-                        </button>
-                        <button type="button" onClick={() => setGoldActive(!goldActive)} disabled={!goldVisible} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer disabled:opacity-40 ${goldActive ? "bg-amber-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"}`}>
-                          {goldActive ? "ACTIF" : "INACTIF"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 text-xs sm:text-sm font-mono">
-                      <div>
-                        <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
-                        <AdminDropdown
-                          value={goldPreset}
-                          onChange={setGoldPreset}
-                          options={GOLD_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
-                        />
-                      </div>
-
-                      <div className="flex justify-between items-center pt-1">
-                        <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
-                        <input
-                          type="number"
-                          step="0.05"
-                          value={goldMaxLot}
-                          onChange={(e) => setGoldMaxLot(parseFloat(e.target.value) || 0.1)}
-                          className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="admin-subcard p-5 space-y-3.5 border-indigo-500/25">
-                    <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-2.5">
-                      <h4 className="font-bold text-base text-white">Nexium FX Trend</h4>
-                      <div className="flex gap-1.5">
-                        <button type="button" onClick={() => { setFxVisible(!fxVisible); if (fxVisible) setFxActive(false); }} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer ${fxVisible ? "bg-slate-700 text-white" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"}`}>
-                          {fxVisible ? "VISIBLE" : "MASQUÉ"}
-                        </button>
-                        <button type="button" onClick={() => setFxActive(!fxActive)} disabled={!fxVisible} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer disabled:opacity-40 ${fxActive ? "bg-indigo-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"}`}>
-                          {fxActive ? "ACTIF" : "INACTIF"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 text-xs sm:text-sm font-mono">
-                      <div>
-                        <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
-                        <AdminDropdown
-                          value={fxPreset}
-                          onChange={setFxPreset}
-                          options={FX_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
-                        />
-                      </div>
-
-                      <div className="flex justify-between items-center pt-1">
-                        <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
-                        <input
-                          type="number"
-                          step="0.05"
-                          value={fxMaxLot}
-                          onChange={(e) => setFxMaxLot(parseFloat(e.target.value) || 0.1)}
-                          className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="admin-subcard p-5 space-y-3.5 border-purple-500/25">
-                    <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-2.5">
-                      <h4 className="font-bold text-base text-white">Index Reversion</h4>
-                      <div className="flex gap-1.5">
-                        <button type="button" onClick={() => { setIndexVisible(!indexVisible); if (indexVisible) setIndexActive(false); }} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer ${indexVisible ? "bg-slate-700 text-white" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"}`}>
-                          {indexVisible ? "VISIBLE" : "MASQUÉ"}
-                        </button>
-                        <button type="button" onClick={() => setIndexActive(!indexActive)} disabled={!indexVisible} className={`rounded-lg px-2 py-1.5 text-[11px] font-bold transition cursor-pointer disabled:opacity-40 ${indexActive ? "bg-purple-400 text-slate-950 shadow-sm font-extrabold" : "bg-slate-800 text-slate-400 border border-slate-700/50"}`}>
-                          {indexActive ? "ACTIF" : "INACTIF"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 text-xs sm:text-sm font-mono">
-                      <div>
-                        <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
-                        <AdminDropdown
-                          value={indexPreset}
-                          onChange={setIndexPreset}
-                          options={INDEX_PRESETS.map((p) => ({ value: p.name, label: p.name }))}
-                        />
-                      </div>
-
-                      <div className="flex justify-between items-center pt-1">
-                        <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
-                        <input
-                          type="number"
-                          step="0.05"
-                          value={indexMaxLot}
-                          onChange={(e) => setIndexMaxLot(parseFloat(e.target.value) || 0.1)}
-                          className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </section>
 
               {/* ── 7. COMPTE MT5 DU CLIENT ── */}

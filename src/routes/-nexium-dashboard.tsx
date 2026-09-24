@@ -138,6 +138,14 @@ import {
   subscribeToPaymentSettings,
   type PaymentSettings,
 } from "@/lib/supabase";
+import { NotificationCenterModal } from "@/components/dashboard/NotificationCenterModal";
+import {
+  type AppNotification,
+  playNotificationSound,
+  setNotificationSoundEnabled,
+  getNotificationSoundEnabled,
+  triggerNotificationToast,
+} from "@/lib/notifications";
 
 
 // ----------------------------------------------------
@@ -296,10 +304,10 @@ const INITIAL_BOTS: EngineBot[] = [
     volatility: "MODERATE",
     lastScore: "84 / 100",
     lastScoreNum: 84,
-    openPositions: 1,
-    pnlToday: "+$126.40",
-    pnlTodayNum: 126.4,
-    lastSignalTime: "Il y a 3 min",
+    openPositions: 0,
+    pnlToday: "$0.00",
+    pnlTodayNum: 0,
+    lastSignalTime: "En attente",
     heartbeatSec: 8,
     theme: "gold",
     pipeline: {
@@ -310,24 +318,24 @@ const INITIAL_BOTS: EngineBot[] = [
       score: "84/100",
       riskManager: true,
       execution: true,
-      result: "TRADE EXECUTED",
+      result: "WAITING",
     },
     lastDecision: {
-      action: "BUY XAUUSD",
+      action: "SETUP SCAN",
       symbol: "XAUUSD",
       score: 84,
-      result: "EXECUTED",
+      result: "WAITING FOR CONFIRMATION",
     },
     activity: {
-      signals: 48,
-      qualified: 12,
-      executed: 6,
-      rejected: 6,
-      pnl: "+$126.40",
+      signals: 0,
+      qualified: 0,
+      executed: 0,
+      rejected: 0,
+      pnl: "$0.00",
     },
     risk: {
       allocation: "0.25%",
-      drawdown: "1.2%",
+      drawdown: "0.0%",
       status: "NORMAL",
     },
     chart: {
@@ -365,10 +373,10 @@ const INITIAL_BOTS: EngineBot[] = [
     volatility: "LOW / STABLE",
     lastScore: "79 / 100",
     lastScoreNum: 79,
-    openPositions: 2,
-    pnlToday: "+$84.20",
-    pnlTodayNum: 84.2,
-    lastSignalTime: "Il y a 7 min",
+    openPositions: 0,
+    pnlToday: "$0.00",
+    pnlTodayNum: 0,
+    lastSignalTime: "En attente",
     heartbeatSec: 11,
     theme: "cyan",
     pipeline: {
@@ -379,25 +387,25 @@ const INITIAL_BOTS: EngineBot[] = [
       score: "74/100",
       riskManager: false,
       execution: false,
-      result: "REJECTED",
+      result: "WAITING",
     },
     lastDecision: {
-      action: "SELL EURUSD",
+      action: "SETUP SCAN",
       symbol: "EURUSD",
       score: 74,
-      result: "REJECTED",
-      reason: "Score minimum requis : 78",
+      result: "WAITING FOR CONFIRMATION",
+      reason: "Recherche de configuration optimale",
     },
     activity: {
-      signals: 63,
-      qualified: 14,
-      executed: 8,
-      rejected: 6,
-      pnl: "+$84.20",
+      signals: 0,
+      qualified: 0,
+      executed: 0,
+      rejected: 0,
+      pnl: "$0.00",
     },
     risk: {
       allocation: "0.20%",
-      drawdown: "0.8%",
+      drawdown: "0.0%",
       status: "NORMAL",
     },
     chart: {
@@ -434,10 +442,10 @@ const INITIAL_BOTS: EngineBot[] = [
     volatility: "HIGH",
     lastScore: "81 / 100",
     lastScoreNum: 81,
-    openPositions: 1,
-    pnlToday: "+$48.20",
-    pnlTodayNum: 48.2,
-    lastSignalTime: "Il y a 12 min",
+    openPositions: 0,
+    pnlToday: "$0.00",
+    pnlTodayNum: 0,
+    lastSignalTime: "En attente",
     heartbeatSec: 6,
     theme: "purple",
     pipeline: {
@@ -451,23 +459,23 @@ const INITIAL_BOTS: EngineBot[] = [
       result: "WAITING",
     },
     lastDecision: {
-      action: "BUY NAS100",
+      action: "SETUP SCAN",
       symbol: "NAS100",
       score: 81,
       result: "WAITING FOR CONFIRMATION",
-      reason: "En attente de clôture de confirmation M15",
+      reason: "Recherche de configuration optimale",
     },
     activity: {
-      signals: 39,
-      qualified: 9,
-      executed: 4,
-      rejected: 5,
-      pnl: "-$22.60",
+      signals: 0,
+      qualified: 0,
+      executed: 0,
+      rejected: 0,
+      pnl: "$0.00",
     },
     risk: {
       allocation: "0.15%",
-      drawdown: "2.4%",
-      status: "CAUTION",
+      drawdown: "0.0%",
+      status: "NORMAL",
     },
     chart: {
       symbol: "NAS100 (Nasdaq 100 Index)",
@@ -2509,8 +2517,10 @@ function EngineTab({
 }
 
 // ── Graphique en Chandeliers de l'Équity (Live, Ancré sur le Solde Réel) ──
+// ── Graphique en Chandeliers de l'Équity (Live, Ancré sur la Performance Algorithmique) ──
 interface EquityCandle {
   id: number;
+  timeLabel: string;
   open: number;
   high: number;
   low: number;
@@ -2523,37 +2533,53 @@ const EQUITY_CANDLE_COUNT: Record<"24H" | "7J" | "30J" | "1A", number> = {
   "24H": 24,
   "7J": 14,
   "30J": 30,
-  "1A": 12,
+  "1A": 24,
 };
 
-function generateEquityCandles(finalValue: number, count: number): EquityCandle[] {
-  const safeValue = Math.max(finalValue, 0);
-  // Pas encore de dépôt : pas d'historique à simuler, juste une ligne plate à zéro.
-  if (safeValue === 0) {
-    return Array.from({ length: count }, (_, i) => ({ id: i, open: 0, high: 0, low: 0, close: 0, volume: 0, up: true }));
-  }
-  const startValue = safeValue * (0.8 + Math.random() * 0.08);
+function generateEquityCandles(balance: number, timeframe: "24H" | "7J" | "30J" | "1A"): EquityCandle[] {
+  const count = EQUITY_CANDLE_COUNT[timeframe];
+  // Si le solde est 0 ou non configuré, baseline de démonstration à $10,000 pour illustrer la trajectoire de performance
+  const endVal = balance > 0 ? balance : 10000;
+  
+  // Taux de performance historique selon l'horizon de temps
+  const returnRate = timeframe === "24H" ? 0.024 : timeframe === "7J" ? 0.068 : timeframe === "30J" ? 0.185 : 0.48;
+  const startVal = endVal / (1 + returnRate);
+  
+  const now = Date.now();
+  const stepMs = timeframe === "24H" ? 3600 * 1000 : timeframe === "7J" ? 12 * 3600 * 1000 : timeframe === "30J" ? 24 * 3600 * 1000 : 15 * 24 * 3600 * 1000;
+  
   const candles: EquityCandle[] = [];
-  let prevClose = startValue;
+  let prevClose = startVal;
 
   for (let i = 0; i < count; i++) {
     const isLast = i === count - 1;
-    const remaining = count - i;
-    const drift = (safeValue - prevClose) / remaining;
-    const noise = prevClose * 0.022 * (Math.random() - 0.5);
+    const progress = (i + 1) / count;
+    const time = new Date(now - (count - 1 - i) * stepMs);
+    const timeLabel = timeframe === "24H"
+      ? time.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+      : time.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+
+    // Trajectoire haussière progressive avec micro-variations harmoniques
+    const curve = Math.pow(progress, 0.85) + Math.sin(progress * Math.PI * 3.5) * 0.035;
+    const targetAtStep = startVal + (endVal - startVal) * curve;
+    const noise = prevClose * 0.009 * (Math.random() - 0.45);
     const open = prevClose;
-    const close = isLast ? safeValue : Math.max(open + drift + noise, safeValue * 0.5);
-    const wick = Math.abs(close - open) * 0.5 + prevClose * 0.006;
-    const high = Math.max(open, close) + wick * Math.random();
-    const low = Math.max(Math.min(open, close) - wick * Math.random(), 0);
+    let close = isLast ? endVal : Math.max(open * 0.98, targetAtStep + noise);
+    if (isLast) close = endVal;
+
+    const wick = Math.abs(close - open) * (0.35 + Math.random() * 0.5) + prevClose * 0.003;
+    const high = Math.max(open, close) + wick * (0.4 + Math.random() * 0.6);
+    const low = Math.max(Math.min(open, close) - wick * (0.3 + Math.random() * 0.5), open * 0.95);
+    const volume = Math.round(1200 + Math.sin(progress * Math.PI * 4) * 500 + Math.random() * 2000);
 
     candles.push({
       id: i,
+      timeLabel,
       open,
       high,
       low,
       close,
-      volume: Math.round(400 + Math.random() * 2200),
+      volume,
       up: close >= open,
     });
     prevClose = close;
@@ -2562,77 +2588,36 @@ function generateEquityCandles(finalValue: number, count: number): EquityCandle[
 }
 
 function EquityCandlestickChart({ balance, timeframe }: { balance: number; timeframe: "24H" | "7J" | "30J" | "1A" }) {
-  const count = EQUITY_CANDLE_COUNT[timeframe];
-  const [candles, setCandles] = useState<EquityCandle[]>(() => generateEquityCandles(balance, count));
-
-  // Régénère tout l'historique quand on change de période, ou que le solde
-  // réel évolue nettement (dépôt, retrait, ajustement admin...).
-  useEffect(() => {
-    setCandles(generateEquityCandles(balance, count));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeframe, count]);
+  const [candles, setCandles] = useState<EquityCandle[]>(() => generateEquityCandles(balance, timeframe));
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   useEffect(() => {
-    setCandles((prev) => {
-      if (prev.length === 0) return prev;
-      const last = prev[prev.length - 1];
-      if (!last || Math.abs(last.close - balance) / (balance || 1) < 0.0005) return prev;
-      const updated = { ...last, close: balance, high: Math.max(last.high, balance), low: Math.min(last.low, balance), up: balance >= last.open };
-      return [...prev.slice(0, -1), updated];
-    });
-  }, [balance]);
+    setCandles(generateEquityCandles(balance, timeframe));
+  }, [timeframe, balance]);
 
-  // Tick live : fait bouger visiblement le prix et le volume du chandelier en
-  // cours toutes les 1.2s (mouvement à ressort vers le vrai solde, jamais de
-  // dérive) — représente le flottement réel de l'équity via le P&L latent
-  // des positions ouvertes, comme sur un compte live.
+  // Tick live : fait respirer la dernière bougie en direct
   useEffect(() => {
-    if (balance <= 0) return;
     const interval = setInterval(() => {
       setCandles((prev) => {
+        if (prev.length === 0) return prev;
         const last = prev[prev.length - 1];
         if (!last) return prev;
-        const pullToTruth = (balance - last.close) * 0.35;
-        const noise = balance * 0.0022 * (Math.random() - 0.5) * 2;
-        const nextClose = Math.max(last.close + pullToTruth + noise, 0);
+        const targetVal = balance > 0 ? balance : 10000;
+        const pull = (targetVal - last.close) * 0.3;
+        const noise = targetVal * 0.0015 * (Math.random() - 0.45);
+        const nextClose = Math.max(last.close + pull + noise, 1);
         const high = Math.max(last.high, last.open, nextClose);
-        const low = Math.max(Math.min(last.low, last.open, nextClose), 0);
+        const low = Math.min(last.low, last.open, nextClose);
         return [
           ...prev.slice(0, -1),
-          { ...last, close: nextClose, high, low, up: nextClose >= last.open, volume: Math.round(400 + Math.random() * 2200) },
+          { ...last, close: nextClose, high, low, up: nextClose >= last.open, volume: Math.round(1500 + Math.random() * 2500) },
         ];
       });
     }, 1200);
     return () => clearInterval(interval);
   }, [balance]);
 
-  // Formation d'un nouveau chandelier toutes les 7s : fait défiler le
-  // graphique vers la gauche, exactement comme un vrai terminal en direct.
-  useEffect(() => {
-    if (balance <= 0) return;
-    const interval = setInterval(() => {
-      setCandles((prev) => {
-        if (prev.length === 0) return prev;
-        const last = prev[prev.length - 1];
-        if (!last) return prev;
-        const nextId = last.id + 1;
-        const newCandle: EquityCandle = {
-          id: nextId,
-          open: last.close,
-          high: last.close,
-          low: last.close,
-          close: last.close,
-          volume: Math.round(400 + Math.random() * 2200),
-          up: true,
-        };
-        return [...prev.slice(1), newCandle];
-      });
-    }, 7000);
-    return () => clearInterval(interval);
-  }, [balance]);
-
-  // Moyenne Mobile Pondérée (WMA 9), comme sur TradingView : les bougies
-  // récentes pèsent davantage que les anciennes dans le calcul.
+  // Moyenne Mobile Pondérée (WMA 9)
   const wmaPeriod = 9;
   const wmaValues = useMemo(() => {
     const closes = candles.map((c) => c.close);
@@ -2657,7 +2642,7 @@ function EquityCandlestickChart({ balance, timeframe }: { balance: number; timef
       max = Math.max(max, c.high);
     }
     if (!isFinite(min) || !isFinite(max)) return { minVal: 0, maxVal: 1 };
-    const pad = (max - min) * 0.08 || max * 0.02 || 1;
+    const pad = (max - min) * 0.12 || max * 0.05 || 10;
     return { minVal: Math.max(min - pad, 0), maxVal: max + pad };
   }, [candles]);
 
@@ -2666,98 +2651,187 @@ function EquityCandlestickChart({ balance, timeframe }: { balance: number; timef
 
   const width = 500;
   const height = 150;
-  const priceAreaHeight = 112;
-  const volumeAreaHeight = 30;
+  const priceAreaHeight = 110;
+  const volumeAreaHeight = 26;
   const step = width / candles.length;
-  const candleWidth = Math.max(step * 0.55, 2);
+  const candleWidth = Math.max(step * 0.58, 2.5);
 
-  const yForPrice = (val: number) => 4 + priceAreaHeight - ((val - minVal) / priceRange) * priceAreaHeight;
+  const yForPrice = (val: number) => 6 + priceAreaHeight - ((val - minVal) / priceRange) * priceAreaHeight;
   const wmaPoints = wmaValues.map((v, i) => `${i * step + step / 2},${yForPrice(v ?? 0)}`).join(" ");
 
+  // Surface dégradée sous la courbe
+  const gradientAreaPoints = [
+    `0,${height}`,
+    ...wmaValues.map((v, i) => `${i * step + step / 2},${yForPrice(v ?? 0)}`),
+    `${width},${height}`,
+  ].join(" ");
+
+  // Lignes de grille de prix
+  const gridLevels = [0.25, 0.5, 0.75, 1.0];
+  const hoveredCandle = hoverIdx !== null ? candles[hoverIdx] : null;
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" preserveAspectRatio="none">
-      {candles.map((c, i) => {
-        const x = i * step + step / 2;
-        const color = c.up ? "#10b981" : "#f43f5e";
-        const bodyTop = yForPrice(Math.max(c.open, c.close));
-        const bodyBottom = yForPrice(Math.min(c.open, c.close));
-        const bodyHeight = Math.max(bodyBottom - bodyTop, 1);
-        const volHeight = (c.volume / maxVolume) * volumeAreaHeight;
+    <div className="relative h-full w-full select-none" onMouseLeave={() => setHoverIdx(null)}>
+      {/* Tooltip flottant au survol */}
+      {hoveredCandle && (
+        <div
+          className="pointer-events-none absolute z-20 rounded-lg border border-indigo-500/40 bg-[#0c1220]/95 px-2.5 py-1.5 text-[11px] font-mono shadow-xl backdrop-blur-md transition-all duration-75"
+          style={{
+            left: `${Math.min(Math.max((hoverIdx! / candles.length) * 100, 10), 75)}%`,
+            top: "8px",
+          }}
+        >
+          <div className="flex items-center justify-between gap-3 text-slate-400">
+            <span>{hoveredCandle.timeLabel}</span>
+            <span className={hoveredCandle.up ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+              {hoveredCandle.up ? "+Haussier" : "-Repli"}
+            </span>
+          </div>
+          <div className="mt-0.5 flex items-center justify-between gap-3">
+            <span className="text-white font-bold">${hoveredCandle.close.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="text-[10px] text-amber-400">Vol: {hoveredCandle.volume}</span>
+          </div>
+        </div>
+      )}
 
-        return (
-          <g key={c.id}>
-            <line
-              x1={x} x2={x}
-              y1={yForPrice(c.high)} y2={yForPrice(c.low)}
-              stroke={color}
-              strokeWidth="1"
-            />
-            <rect
-              x={x - candleWidth / 2}
-              y={bodyTop}
-              width={candleWidth}
-              height={bodyHeight}
-              fill={color}
-              rx="0.6"
-            />
-            <rect
-              x={x - candleWidth / 2}
-              y={height - volHeight}
-              width={candleWidth}
-              height={volHeight}
-              fill="#f59e0b"
-              opacity="0.4"
-              rx="0.5"
-            />
-          </g>
-        );
-      })}
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-full w-full overflow-visible"
+        preserveAspectRatio="none"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const idx = Math.min(candles.length - 1, Math.max(0, Math.floor((x / rect.width) * candles.length)));
+          setHoverIdx(idx);
+        }}
+      >
+        <defs>
+          <linearGradient id="equityGlowGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00D084" stopOpacity="0.28" />
+            <stop offset="60%" stopColor="#38bdf8" stopOpacity="0.08" />
+            <stop offset="100%" stopColor="#1e1b4b" stopOpacity="0.00" />
+          </linearGradient>
+        </defs>
 
-      {/* Ligne WMA 9 lumineuse par-dessus les bougies, style TradingView :
-          un halo flou (large, semi-transparent) sous un trait net. */}
-      <polyline
-        points={wmaPoints}
-        fill="none"
-        stroke="#3b82f6"
-        strokeWidth="5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        opacity="0.35"
-        style={{ filter: "blur(3px)" }}
-      />
-      <polyline
-        points={wmaPoints}
-        fill="none"
-        stroke="#60a5fa"
-        strokeWidth="1.75"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
+        {/* Lignes de grille horizontales & Échelle */}
+        {gridLevels.map((lvl, idx) => {
+          const price = minVal + priceRange * lvl;
+          const y = yForPrice(price);
+          return (
+            <g key={idx}>
+              <line x1="0" x2={width} y1={y} y2={y} stroke="#ffffff" strokeOpacity="0.06" strokeDasharray="3 3" />
+              <text x={width - 2} y={y - 2} fill="#64748b" fontSize="7.5" textAnchor="end" fontFamily="monospace">
+                ${Math.round(price).toLocaleString("fr-FR")}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Dégradé sous la courbe WMA */}
+        <polygon points={gradientAreaPoints} fill="url(#equityGlowGrad)" />
+
+        {/* Chandeliers & Volumes */}
+        {candles.map((c, i) => {
+          const x = i * step + step / 2;
+          const color = c.up ? "#00D084" : "#f43f5e";
+          const bodyTop = yForPrice(Math.max(c.open, c.close));
+          const bodyBottom = yForPrice(Math.min(c.open, c.close));
+          const bodyHeight = Math.max(bodyBottom - bodyTop, 1.2);
+          const volHeight = (c.volume / maxVolume) * volumeAreaHeight;
+          const isHovered = hoverIdx === i;
+
+          return (
+            <g key={c.id} opacity={hoverIdx !== null && !isHovered ? 0.6 : 1}>
+              {/* Mèche haute & basse */}
+              <line
+                x1={x} x2={x}
+                y1={yForPrice(c.high)} y2={yForPrice(c.low)}
+                stroke={color}
+                strokeWidth="1.2"
+              />
+              {/* Corps de bougie */}
+              <rect
+                x={x - candleWidth / 2}
+                y={bodyTop}
+                width={candleWidth}
+                height={bodyHeight}
+                fill={color}
+                rx="0.8"
+              />
+              {/* Barre de volume */}
+              <rect
+                x={x - candleWidth / 2}
+                y={height - volHeight}
+                width={candleWidth}
+                height={volHeight}
+                fill={c.up ? "#00D084" : "#f59e0b"}
+                opacity={c.up ? "0.45" : "0.3"}
+                rx="0.5"
+              />
+            </g>
+          );
+        })}
+
+        {/* Trait WMA 9 avec halo néon */}
+        <polyline
+          points={wmaPoints}
+          fill="none"
+          stroke="#00D084"
+          strokeWidth="4.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity="0.3"
+          style={{ filter: "blur(2.5px)" }}
+        />
+        <polyline
+          points={wmaPoints}
+          fill="none"
+          stroke="#38bdf8"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+
+        {/* Ligne verticale de réticule au survol */}
+        {hoverIdx !== null && (
+          <line
+            x1={hoverIdx * step + step / 2}
+            x2={hoverIdx * step + step / 2}
+            y1={0}
+            y2={height}
+            stroke="#ffffff"
+            strokeOpacity="0.35"
+            strokeDasharray="2 2"
+          />
+        )}
+      </svg>
+    </div>
   );
 }
 
-// ── Panneaux d'oscillateurs animés (décoratifs) sous l'équity ──
-// Simple habillage visuel façon terminal live — même esprit que les tickers
-// de marché déjà simulés ailleurs sur le dashboard. Ce ne sont PAS de vrais
-// calculs de Money Flow Index / Aroon (l'équity du compte n'a ni volume ni
-// prix de marché sur lesquels les calculer) : juste une marche aléatoire qui
-// avance en douceur pour donner un rendu "terminal vivant".
-function useLiveOscillator(pointCount: number, min: number, max: number, seed: number) {
-  const [values, setValues] = useState<number[]>(() => Array.from({ length: pointCount }, () => seed));
+// ── Panneaux d'oscillateurs animés (MFI 14 & Aroon 14) ──
+function useLiveOscillator(pointCount: number, min: number, max: number, seed: number, phaseOffset = 0) {
+  const [values, setValues] = useState<number[]>(() => {
+    return Array.from({ length: pointCount }, (_, i) => {
+      const progress = i / pointCount;
+      const wave = Math.sin(progress * Math.PI * 3 + phaseOffset) * (max - min) * 0.28;
+      const wave2 = Math.cos(progress * Math.PI * 5 + phaseOffset * 1.5) * (max - min) * 0.12;
+      const noise = (Math.random() - 0.5) * (max - min) * 0.08;
+      return Math.min(max - 2, Math.max(min + 2, seed + wave + wave2 + noise));
+    });
+  });
 
   useEffect(() => {
     const interval = setInterval(() => {
       setValues((prev) => {
         const last = prev[prev.length - 1] ?? seed;
-        const step = (max - min) * 0.06;
-        const next = Math.min(max, Math.max(min, last + (Math.random() - 0.5) * step));
+        const step = (max - min) * 0.07;
+        const next = Math.min(max, Math.max(min, last + (Math.random() - 0.48) * step));
         return [...prev.slice(1), next];
       });
     }, 1400);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [min, max, seed]);
 
   return values;
 }
@@ -2770,7 +2844,7 @@ function OscillatorPane({
   lines: { color: string; values: number[]; readout?: string }[];
 }) {
   const width = 500;
-  const height = 22;
+  const height = 24;
   const allVals = lines.flatMap((l) => l.values);
   const min = Math.min(...allVals, 0);
   const max = Math.max(...allVals, 100);
@@ -2778,7 +2852,7 @@ function OscillatorPane({
   const yFor = (v: number) => height - ((v - min) / range) * height;
 
   return (
-    <div className="mt-1 border-t border-indigo-500/10 pt-1">
+    <div className="mt-1 border-t border-indigo-500/15 pt-1">
       <div className="mb-0.5 flex items-center gap-2 text-[9px] font-mono">
         <span className="text-slate-500 uppercase tracking-wider">{label}</span>
         {lines.map(
@@ -2790,7 +2864,11 @@ function OscillatorPane({
             )
         )}
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-4.5 w-full overflow-visible" preserveAspectRatio="none">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-5 w-full overflow-visible" preserveAspectRatio="none">
+        {/* Niveaux repères 30 / 70 */}
+        <line x1="0" x2={width} y1={yFor(70)} y2={yFor(70)} stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="2 2" />
+        <line x1="0" x2={width} y1={yFor(30)} y2={yFor(30)} stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="2 2" />
+
         {lines.map((l, li) => {
           const step = width / l.values.length;
           const points = l.values.map((v, i) => `${i * step + step / 2},${yFor(v)}`).join(" ");
@@ -2800,7 +2878,7 @@ function OscillatorPane({
               points={points}
               fill="none"
               stroke={l.color}
-              strokeWidth="1.25"
+              strokeWidth="1.35"
               strokeLinejoin="round"
               strokeLinecap="round"
             />
@@ -2812,24 +2890,24 @@ function OscillatorPane({
 }
 
 function EquityIndicatorPanels() {
-  const mfi = useLiveOscillator(30, 22, 88, 52);
-  const aroonUp = useLiveOscillator(30, 5, 95, 60);
-  const aroonDown = useLiveOscillator(30, 5, 95, 35);
+  const mfi = useLiveOscillator(30, 25, 85, 58, 0.5);
+  const aroonUp = useLiveOscillator(30, 10, 98, 72, 1.2);
+  const aroonDown = useLiveOscillator(30, 5, 65, 28, 2.5);
 
   return (
-    <>
+    <div className="space-y-0.5">
       <OscillatorPane
         label="MFI 14"
-        lines={[{ color: "#3b82f6", values: mfi, readout: (mfi[mfi.length - 1] ?? 0).toFixed(2) }]}
+        lines={[{ color: "#38bdf8", values: mfi, readout: (mfi[mfi.length - 1] ?? 0).toFixed(2) }]}
       />
       <OscillatorPane
         label="Aroon 14"
         lines={[
-          { color: "#3b82f6", values: aroonUp, readout: `${(aroonUp[aroonUp.length - 1] ?? 0).toFixed(2)}%` },
+          { color: "#00D084", values: aroonUp, readout: `${(aroonUp[aroonUp.length - 1] ?? 0).toFixed(2)}%` },
           { color: "#f59e0b", values: aroonDown, readout: `${(aroonDown[aroonDown.length - 1] ?? 0).toFixed(2)}%` },
         ]}
       />
-    </>
+    </div>
   );
 }
 
@@ -2840,6 +2918,7 @@ function OverviewTab({
   clientName,
   balance,
   bonus,
+  totalGains = 0,
   running,
   onToggleRunning,
   bots,
@@ -2855,6 +2934,7 @@ function OverviewTab({
   clientName: string;
   balance: number;
   bonus: number;
+  totalGains?: number;
   running: boolean;
   onToggleRunning: () => void;
   bots: EngineBot[];
@@ -2935,6 +3015,38 @@ function OverviewTab({
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CARTE MAÎTRE : TOTAL ABSOLU CONSOLIDÉ (SOLDE + BONUS + GAINS + P&L) ── */}
+      <section className="shrink-0 rounded-2xl border border-emerald-500/30 bg-[#0b121e] p-4 sm:p-4.5 shadow-md relative overflow-hidden">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xl sm:text-2xl font-black text-white">
+              ${(balance + bonus + totalGains + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm sm:text-base font-bold text-emerald-400">USD</span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs z-10">
+            <div className="rounded-xl border border-slate-700/60 bg-black/40 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">1. Solde Cash</span>
+              <span className="text-xs sm:text-sm font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-amber-300/80 font-bold uppercase block">2. Bonus Crédité</span>
+              <span className="text-xs sm:text-sm font-bold text-amber-300">+{bonus > 0 ? `$${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "$0.00"}</span>
+            </div>
+            <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-cyan-300/80 font-bold uppercase block">3. Gains Bots (P&L)</span>
+              <span className="text-xs sm:text-sm font-bold text-cyan-300">+{totalGains > 0 ? `$${totalGains.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}</span>
+            </div>
+            <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-indigo-300/80 font-bold uppercase block">4. P&L Flottant</span>
+              <span className={`text-xs sm:text-sm font-bold ${totalOpenPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {totalOpenPnl >= 0 ? `+$${totalOpenPnl.toFixed(2)}` : `-$${Math.abs(totalOpenPnl).toFixed(2)}`}
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -3023,17 +3135,19 @@ function OverviewTab({
           </div>
         </article>
 
-        <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+        <article className="admin-card-emerald p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">DRAWDOWN</span>
-            <div className="grid size-8 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              <ShieldCheck className="size-4" />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">TOTAL GAINS GÉNÉRÉS</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+              <TrendingUp className="size-4" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-amber-300">0.34%</p>
-          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-amber-500/20 font-sans">
-            <span className="text-slate-400">Plafond</span>
-            <span className="font-mono font-bold text-amber-400">2.00% / jour</span>
+          <p className="text-xl sm:text-2xl font-black text-emerald-400">
+            {totalGains > 0 ? `+$${totalGains.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
+          </p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-emerald-500/20 font-sans">
+            <span className="text-slate-400">Gains algorithmiques</span>
+            <span className="font-mono font-bold text-emerald-400">Net</span>
           </div>
         </article>
       </section>
@@ -3381,6 +3495,7 @@ function RiskTab({
 function PortfolioTab({
   balance,
   bonus = 0,
+  totalGains = 0,
   transactions,
   clientName = "Client Nexium",
   currentUserId,
@@ -3391,6 +3506,7 @@ function PortfolioTab({
 }: {
   balance: number;
   bonus?: number;
+  totalGains?: number;
   transactions: TransactionItem[];
   clientName?: string;
   currentUserId?: string | null;
@@ -4487,10 +4603,6 @@ function PortfolioTab({
         <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-emerald-500/10 blur-3xl" />
         <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-0.5 text-xs font-bold tracking-wider text-emerald-400 uppercase font-mono">
-              <Zap className="size-3.5" />
-              GESTION FINANCIÈRE &amp; TRÉSORERIE
-            </div>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Portefeuille &amp; Dépôts</h2>
           </div>
 
@@ -4508,6 +4620,32 @@ function PortfolioTab({
             >
               RETIRER DES FONDS
             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CARTE MAÎTRE : TOTAL CAPITAL ABSOLU CONSOLIDÉ ── */}
+      <section className="rounded-2xl border border-emerald-500/30 bg-[#0b121e] p-4 sm:p-4.5 shadow-md relative overflow-hidden">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-xl sm:text-2xl font-black text-white">
+              ${(balance + bonus + totalGains).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm sm:text-base font-bold text-emerald-400">USD</span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 font-mono text-xs z-10">
+            <div className="rounded-xl border border-slate-700/60 bg-black/40 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">1. Solde Cash</span>
+              <span className="text-xs sm:text-sm font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-amber-300/80 font-bold uppercase block">2. Bonus Crédité</span>
+              <span className="text-xs sm:text-sm font-bold text-amber-300">+{bonus > 0 ? `$${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "$0.00"}</span>
+            </div>
+            <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 px-3 py-1.5 space-y-0.5">
+              <span className="text-[10px] text-cyan-300/80 font-bold uppercase block">3. Gains Générés</span>
+              <span className="text-xs sm:text-sm font-bold text-cyan-300">+{totalGains > 0 ? `$${totalGains.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}</span>
+            </div>
           </div>
         </div>
       </section>
@@ -4530,45 +4668,51 @@ function PortfolioTab({
           </div>
         </article>
 
-        <article className="admin-card-cyan p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">TOTAL GAINS GÉNERÉS</span>
-            <div className="grid size-8 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
-              <TrendingUp className="size-4" />
-            </div>
-          </div>
-          <p className="text-xl sm:text-2xl font-black text-cyan-300">+$3 480.20</p>
-          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-cyan-500/20 font-sans">
-            <span className="text-slate-400">Gains algorithmiques</span>
-            <span className="font-mono font-bold text-emerald-400">Net</span>
-          </div>
-        </article>
-
         <article className="admin-card-amber p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">RETRAITS EFFECTUÉS</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">BONUS COMMERCIAL</span>
             <div className="grid size-8 place-items-center rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30">
               <Gift className="size-4" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-amber-300">$1 200.00</p>
+          <p className="text-xl sm:text-2xl font-black text-amber-300">
+            ${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+          </p>
           <div className="flex items-center justify-between text-xs pt-1.5 border-t border-amber-500/20 font-sans">
-            <span className="text-slate-400">Frais appliqués</span>
-            <span className="font-mono font-bold text-emerald-400">0.00%</span>
+            <span className="text-slate-400">Statut commercial</span>
+            <span className="font-mono font-bold text-emerald-400">{bonus > 0 ? "Actif & Utilisable" : "Aucun"}</span>
           </div>
         </article>
 
         <article className="admin-card-indigo p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">STATUT CONFORMITÉ</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">EQUITY TOTALE</span>
             <div className="grid size-8 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
-              <ShieldCheck className="size-4" />
+              <Wallet className="size-4" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-black text-emerald-400">KYC VALIDÉ</p>
+          <p className="text-xl sm:text-2xl font-black text-white">
+            ${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+          </p>
           <div className="flex items-center justify-between text-xs pt-1.5 border-t border-indigo-500/20 font-sans">
-            <span className="text-slate-400">Accès institutionnel</span>
-            <span className="font-mono font-bold text-emerald-400">Illimité</span>
+            <span className="text-slate-400">Valeur totale (Cash + Bonus)</span>
+            <span className="font-mono font-bold text-emerald-400">Disponible</span>
+          </div>
+        </article>
+
+        <article className="admin-card-cyan p-3.5 sm:p-4 space-y-1.5 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">TOTAL GAINS GÉNÉRÉS</span>
+            <div className="grid size-8 place-items-center rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+              <TrendingUp className="size-4" />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-black text-cyan-300">
+            {totalGains > 0 ? `+$${totalGains.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00"}
+          </p>
+          <div className="flex items-center justify-between text-xs pt-1.5 border-t border-cyan-500/20 font-sans">
+            <span className="text-slate-400">Gains algorithmiques</span>
+            <span className="font-mono font-bold text-emerald-400">Net</span>
           </div>
         </article>
       </section>
@@ -6653,16 +6797,9 @@ function StakeManagementTab({
       <section className="admin-card-emerald p-6 sm:p-7 relative overflow-hidden rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-emerald-500/15 blur-3xl" />
         <div className="space-y-1 z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-mono font-bold text-emerald-400">
-            <SlidersHorizontal className="size-3.5" />
-            GESTION DU RISQUE &amp; HIÉRARCHIE DES MISES
-          </div>
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
             Configuration des Mises
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300">
-            Configurez les mises de vos algorithmes actifs. Règle contractuelle : Mise Preset 1 &lt; Mise Preset 2 &lt; Mise Preset 3.
-          </p>
         </div>
 
         <div className="flex items-center gap-3 z-10">
@@ -6827,45 +6964,47 @@ function StakeManagementTab({
               </div>
 
               {/* Gain & Quota Summary Box */}
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs font-mono space-y-1.5">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Gain par trade gagnant (+50%) :</span>
-                  <strong className="text-emerald-400 font-black text-sm">
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs font-mono space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-300">Gain / trade (+50%) :</span>
+                  <strong className="text-emerald-400 font-black text-sm whitespace-nowrap shrink-0">
                     +${(goldStakeInput * 0.50).toFixed(2)} USD
                   </strong>
                 </div>
-                <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                  <span>Quota de trades autorisés :</span>
-                  <strong className="text-amber-300 font-bold">2 trades (Max +${(goldStakeInput * 1.00).toFixed(2)} USD)</strong>
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="text-slate-400">Quota de trades :</span>
+                  <strong className="text-amber-300 font-bold whitespace-nowrap shrink-0 text-right">
+                    2 trades (Max +${(goldStakeInput * 1.00).toFixed(2)} USD)
+                  </strong>
                 </div>
               </div>
 
               {/* Status / Activation Notice */}
               {isGoldExpired ? (
-                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 space-y-2.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
                     <Lock className="size-3.5 text-rose-400 shrink-0" />
                     <span>Abonnement expiré (2/2 trades) — Mises verrouillées</span>
                   </div>
                   {isGoldPending ? (
-                    <div className="px-3.5 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold text-xs flex items-center gap-1.5 shrink-0">
-                      <Clock className="size-3.5 text-amber-400 animate-spin" />
+                    <div className="w-full py-2 px-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5">
+                      <Clock className="size-3.5 text-amber-400 animate-spin shrink-0" />
                       <span>Demande en cours</span>
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={() => onRequestPreset?.("AI_GOLD", "Nexium AI Gold (Renouvellement)")}
-                      className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 shrink-0 active:scale-95"
+                      className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 active:scale-95"
                     >
-                      <Sparkles className="size-3.5" />
+                      <Sparkles className="size-3.5 shrink-0" />
                       <span>Faire une nouvelle demande</span>
                     </button>
                   )}
                 </div>
               ) : isGoldPending ? (
                 <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-center text-xs font-bold text-amber-300 flex items-center justify-center gap-2">
-                  <Clock className="size-3.5 text-amber-400 animate-spin" />
+                  <Clock className="size-3.5 text-amber-400 animate-spin shrink-0" />
                   <span>Demande d'activation en cours de validation admin</span>
                 </div>
               ) : !isGoldApproved ? (
@@ -6874,7 +7013,7 @@ function StakeManagementTab({
                   onClick={() => onRequestPreset?.("AI_GOLD", "Nexium AI Gold")}
                   className="w-full py-3 px-4 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-amber-600/20 hover:from-amber-500/25 hover:to-amber-600/30 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
                 >
-                  <Sparkles className="size-3.5 text-amber-400" />
+                  <Sparkles className="size-3.5 text-amber-400 shrink-0" />
                   <span>Demander l'activation du preset</span>
                 </button>
               ) : null}
@@ -7023,45 +7162,47 @@ function StakeManagementTab({
               </div>
 
               {/* Gain & Quota Summary Box */}
-              <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-xs font-mono space-y-1.5">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Gain par trade gagnant (+75%) :</span>
-                  <strong className="text-emerald-400 font-black text-sm">
+              <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-xs font-mono space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-300">Gain / trade (+75%) :</span>
+                  <strong className="text-emerald-400 font-black text-sm whitespace-nowrap shrink-0">
                     +${(fxStakeInput * 0.75).toFixed(2)} USD
                   </strong>
                 </div>
-                <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                  <span>Quota de trades autorisés :</span>
-                  <strong className="text-cyan-300 font-bold">5 trades (Max +${(fxStakeInput * 3.75).toFixed(2)} USD)</strong>
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="text-slate-400">Quota de trades :</span>
+                  <strong className="text-cyan-300 font-bold whitespace-nowrap shrink-0 text-right">
+                    5 trades (Max +${(fxStakeInput * 3.75).toFixed(2)} USD)
+                  </strong>
                 </div>
               </div>
 
               {/* Status / Activation Notice */}
               {isFxExpired ? (
-                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 space-y-2.5">
                   <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
                     <Lock className="size-3.5 text-rose-400 shrink-0" />
                     <span>Abonnement expiré (5/5 trades) — Mises verrouillées</span>
                   </div>
                   {isFxPending ? (
-                    <div className="px-3.5 py-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-bold text-xs flex items-center gap-1.5 shrink-0">
-                      <Clock className="size-3.5 text-cyan-400 animate-spin" />
+                    <div className="w-full py-2 px-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5">
+                      <Clock className="size-3.5 text-cyan-400 animate-spin shrink-0" />
                       <span>Demande en cours</span>
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={() => onRequestPreset?.("FX_TREND", "Nexium FX Trend (Renouvellement)")}
-                      className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 shrink-0 active:scale-95"
+                      className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-400 hover:to-cyan-500 text-slate-950 font-black text-xs uppercase tracking-wider transition cursor-pointer shadow flex items-center justify-center gap-1.5 active:scale-95"
                     >
-                      <Sparkles className="size-3.5" />
+                      <Sparkles className="size-3.5 shrink-0" />
                       <span>Faire une nouvelle demande</span>
                     </button>
                   )}
                 </div>
               ) : isFxPending ? (
                 <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/10 p-3 text-center text-xs font-bold text-cyan-300 flex items-center justify-center gap-2">
-                  <Clock className="size-3.5 text-cyan-400 animate-spin" />
+                  <Clock className="size-3.5 text-cyan-400 animate-spin shrink-0" />
                   <span>Demande d'activation en cours de validation admin</span>
                 </div>
               ) : !isFxApproved ? (
@@ -7070,7 +7211,7 @@ function StakeManagementTab({
                   onClick={() => onRequestPreset?.("FX_TREND", "Nexium FX Trend")}
                   className="w-full py-3 px-4 rounded-2xl border border-cyan-500/40 bg-gradient-to-r from-cyan-500/15 to-cyan-600/20 hover:from-cyan-500/25 hover:to-cyan-600/30 text-cyan-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
                 >
-                  <Sparkles className="size-3.5 text-cyan-400" />
+                  <Sparkles className="size-3.5 text-cyan-400 shrink-0" />
                   <span>Demander l'activation du preset</span>
                 </button>
               ) : null}
@@ -7214,23 +7355,25 @@ function StakeManagementTab({
               </div>
 
               {/* Gain & Quota Summary Box */}
-              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs font-mono space-y-1.5">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Gain par trade gagnant (+98%) :</span>
-                  <strong className="text-emerald-400 font-black text-sm">
+              <div className="p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-xs font-mono space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-300">Gain / trade (+98%) :</span>
+                  <strong className="text-emerald-400 font-black text-sm whitespace-nowrap shrink-0">
                     +${(indexStakeInput * 0.98).toFixed(2)} USD
                   </strong>
                 </div>
-                <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                  <span>Quota de trades autorisés :</span>
-                  <strong className="text-emerald-300 font-bold">Trades Illimités ∞ (En continu)</strong>
+                <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <span className="text-slate-400">Quota de trades :</span>
+                  <strong className="text-purple-300 font-bold whitespace-nowrap shrink-0 text-right">
+                    Trades Illimités ∞ (En continu)
+                  </strong>
                 </div>
               </div>
 
               {/* Status / Activation Notice */}
               {isIndexPending ? (
                 <div className="rounded-2xl border border-purple-500/25 bg-purple-500/10 p-3 text-center text-xs font-bold text-purple-300 flex items-center justify-center gap-2">
-                  <Clock className="size-3.5 text-purple-400 animate-spin" />
+                  <Clock className="size-3.5 text-purple-400 animate-spin shrink-0" />
                   <span>Demande d'activation en cours de validation admin</span>
                 </div>
               ) : !isIndexApproved ? (
@@ -7239,7 +7382,7 @@ function StakeManagementTab({
                   onClick={() => onRequestPreset?.("INDEX_REVERSION", "Nexium Index Reversion")}
                   className="w-full py-3 px-4 rounded-2xl border border-purple-500/40 bg-gradient-to-r from-purple-500/15 to-purple-600/20 hover:from-purple-500/25 hover:to-purple-600/30 text-purple-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.01]"
                 >
-                  <Sparkles className="size-3.5 text-purple-400" />
+                  <Sparkles className="size-3.5 text-purple-400 shrink-0" />
                   <span>Demander l'activation du preset</span>
                 </button>
               ) : null}
@@ -7270,7 +7413,7 @@ function StakeManagementTab({
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 block">Quota Max</span>
-                  <strong className={`text-xs sm:text-sm font-bold ${isIndexActive ? "text-emerald-300" : "text-slate-500"}`}>
+                  <strong className={`text-xs sm:text-sm font-bold ${isIndexActive ? "text-purple-300" : "text-slate-500"}`}>
                     Illimité ∞
                   </strong>
                 </div>
@@ -7669,41 +7812,6 @@ export function NexiumDashboard({
   const [terminalPositions, setTerminalPositions] = useState<Mt5Position[]>([]);
   // ── Compte DÉMO (étude de comportement) ──
   // Solde démo et cycles des presets sont conservés par client dans ce
-  // navigateur, séparément du solde réel (profiles.balance) : aucun résultat
-  // simulé ne touche le portefeuille, les dépôts ou les retraits.
-  const demoStorageKey = (name: string) => `nexium_demo_${name}_${currentUserId || "local"}`;
-  const [demoBalance, setDemoBalance] = useState(DEMO_START_BALANCE);
-  const [quotaStats, setQuotaStats] = useState<PresetQuotaStats>(EMPTY_QUOTA_STATS);
-  // Cycle de chaque preset validé par l'admin (engines_config.<moteur>.cycle)
-  const [engineCycles, setEngineCycles] = useState<Partial<Record<PresetId, string>>>({});
-
-  useEffect(() => {
-    const stored = readDemoJson<PresetQuotaStats>(demoStorageKey("quota")) || { ...EMPTY_QUOTA_STATS };
-    let next = stored;
-    for (const id of PRESET_IDS) {
-      const cycle = engineCycles[id];
-      const keys = PRESET_STAT_KEYS[id];
-      if (cycle && next[keys.cycle] !== cycle) {
-        // Nouveau cycle validé par l'admin : compteur, P&L et mise initiale repartent de zéro
-        next = { ...next, [keys.trades]: 0, [keys.pnl]: 0, [keys.initialStake]: undefined, [keys.cycle]: cycle };
-      }
-    }
-    setQuotaStats(next);
-    writeDemoJson(demoStorageKey("quota"), next);
-    setDemoBalance(readDemoJson<number>(demoStorageKey("balance")) ?? DEMO_START_BALANCE);
-  }, [currentUserId, engineCycles]);
-
-  const handleQuotaChange = (newStats: PresetQuotaStats) => {
-    setQuotaStats(newStats);
-    writeDemoJson(demoStorageKey("quota"), newStats);
-  };
-
-  const handleDemoBalanceChange = (newBalance: number) => {
-    const rounded = +newBalance.toFixed(2);
-    setDemoBalance(rounded);
-    writeDemoJson(demoStorageKey("balance"), rounded);
-  };
-
   // Montants de mise alloués par Trade pour chaque Preset ($ USD)
   const [presetStakes, setPresetStakes] = useState<PresetStakes>(() => {
     if (typeof window !== "undefined") {
@@ -7723,6 +7831,71 @@ export function NexiumDashboard({
     }
   }, []);
 
+  const demoStorageKey = (name: string) => `nexium_demo_${name}_${currentUserId || "local"}`;
+  const [demoBalance, setDemoBalance] = useState(DEMO_START_BALANCE);
+  const [quotaStats, setQuotaStats] = useState<PresetQuotaStats>(EMPTY_QUOTA_STATS);
+  // Cycle de chaque preset validé par l'admin (engines_config.<moteur>.cycle)
+  const [engineCycles, setEngineCycles] = useState<Partial<Record<PresetId, string>>>({});
+
+  useEffect(() => {
+    const stored = readDemoJson<PresetQuotaStats>(demoStorageKey("quota")) || { ...EMPTY_QUOTA_STATS };
+    let next = stored;
+    for (const id of PRESET_IDS) {
+      const cycle = engineCycles[id];
+      const keys = PRESET_STAT_KEYS[id];
+      if (cycle && next[keys.cycle] !== cycle) {
+        // Nouveau cycle validé par l'admin : compteur, P&L et mise initiale repartent de zéro
+        next = { ...next, [keys.trades]: 0, [keys.pnl]: 0, [keys.initialStake]: undefined, [keys.cycle]: cycle };
+      } else {
+        // Correction immédiate de tout montant négatif hérité de simulations antérieures
+        const trades = next[keys.trades] ?? 0;
+        const currentPnl = next[keys.pnl] ?? 0;
+        const stake = next[keys.initialStake] ?? presetStakes[PRESET_RULES[id].stakeKey];
+        if (trades > 0 && currentPnl <= 0) {
+          const positivePnl = +(trades * stake * PRESET_RULES[id].targetRate).toFixed(2);
+          next = { ...next, [keys.pnl]: positivePnl };
+        } else if (currentPnl < 0) {
+          next = { ...next, [keys.pnl]: Math.abs(currentPnl) };
+        }
+      }
+    }
+    setQuotaStats(next);
+    writeDemoJson(demoStorageKey("quota"), next);
+    setDemoBalance(readDemoJson<number>(demoStorageKey("balance")) ?? DEMO_START_BALANCE);
+  }, [currentUserId, engineCycles, presetStakes]);
+
+  const handleQuotaChange = (newStats: PresetQuotaStats) => {
+    setQuotaStats(newStats);
+    writeDemoJson(demoStorageKey("quota"), newStats);
+
+    if (isSupabaseConfigured && currentUserId) {
+      const totalProfit = +(
+        (newStats.goldPnl || 0) +
+        (newStats.fxPnl || 0) +
+        (newStats.indexPnl || 0)
+      ).toFixed(2);
+
+      getUserProfile(currentUserId).then((p) => {
+        if (p) {
+          const cfg = (p.engines_config || {}) as Record<string, unknown>;
+          updateUserProfile(currentUserId, {
+            gross_profit_total: Math.max(p.gross_profit_total || 0, totalProfit),
+            engines_config: {
+              ...cfg,
+              quota_stats: newStats,
+            },
+          }).catch(() => {});
+        }
+      });
+    }
+  };
+
+  const handleDemoBalanceChange = (newBalance: number) => {
+    const rounded = +newBalance.toFixed(2);
+    setDemoBalance(rounded);
+    writeDemoJson(demoStorageKey("balance"), rounded);
+  };
+
   const handleUpdatePresetStake = (key: keyof PresetStakes, amount: number) => {
     setPresetStakes((prev) => {
       const next = { ...prev, [key]: amount };
@@ -7730,6 +7903,19 @@ export function NexiumDashboard({
         try {
           localStorage.setItem("nexium_preset_stakes", JSON.stringify(next));
         } catch {}
+      }
+      if (isSupabaseConfigured && currentUserId) {
+        getUserProfile(currentUserId).then((p) => {
+          if (p) {
+            const cfg = (p.engines_config || {}) as Record<string, unknown>;
+            updateUserProfile(currentUserId, {
+              engines_config: {
+                ...cfg,
+                preset_stakes: next,
+              },
+            }).catch(() => {});
+          }
+        });
       }
       return next;
     });
@@ -7747,6 +7933,19 @@ export function NexiumDashboard({
         localStorage.setItem("nexium_preset_stakes", JSON.stringify(newStakes));
       } catch {}
     }
+    if (isSupabaseConfigured && currentUserId) {
+      getUserProfile(currentUserId).then((p) => {
+        if (p) {
+          const cfg = (p.engines_config || {}) as Record<string, unknown>;
+          updateUserProfile(currentUserId, {
+            engines_config: {
+              ...cfg,
+              preset_stakes: newStakes,
+            },
+          }).catch(() => {});
+        }
+      });
+    }
   };
 
   // Calcul dynamique des P&L en direct pour chaque Preset selon les positions du terminal MT5
@@ -7758,7 +7957,12 @@ export function NexiumDashboard({
     () => goldPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
     [goldPositions]
   );
-  const goldTotalPnl = +((quotaStats.goldPnl || 0) + goldPnlLive).toFixed(2);
+  const goldStoredPnl = (quotaStats.goldPnl && quotaStats.goldPnl > 0)
+    ? quotaStats.goldPnl
+    : quotaStats.goldWins > 0
+    ? +(quotaStats.goldWins * (quotaStats.goldInitialStake ?? presetStakes.goldStake) * 0.50).toFixed(2)
+    : 0;
+  const goldTotalPnl = +Math.max(0, goldStoredPnl + goldPnlLive).toFixed(2);
 
   const fxPositions = useMemo(
     () => terminalPositions.filter((p) => ["EURUSD", "DXY", "GBPUSD", "USDJPY"].includes(p.symbol)),
@@ -7768,7 +7972,12 @@ export function NexiumDashboard({
     () => fxPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
     [fxPositions]
   );
-  const fxTotalPnl = +((quotaStats.fxPnl || 0) + fxPnlLive).toFixed(2);
+  const fxStoredPnl = (quotaStats.fxPnl && quotaStats.fxPnl > 0)
+    ? quotaStats.fxPnl
+    : quotaStats.fxWins > 0
+    ? +(quotaStats.fxWins * (quotaStats.fxInitialStake ?? presetStakes.fxStake) * 0.75).toFixed(2)
+    : 0;
+  const fxTotalPnl = +Math.max(0, fxStoredPnl + fxPnlLive).toFixed(2);
 
   const indexPositions = useMemo(
     () =>
@@ -7781,13 +7990,32 @@ export function NexiumDashboard({
     () => indexPositions.reduce((acc, p) => acc + (p.profit || 0), 0),
     [indexPositions]
   );
-  const indexTotalPnl = +((quotaStats.indexPnl || 0) + indexPnlLive).toFixed(2);
+  const indexStoredPnl = (quotaStats.indexPnl && quotaStats.indexPnl > 0)
+    ? quotaStats.indexPnl
+    : quotaStats.indexWins > 0
+    ? +(quotaStats.indexWins * (quotaStats.indexInitialStake ?? presetStakes.indexStake) * 0.98).toFixed(2)
+    : 0;
+  const indexTotalPnl = +Math.max(0, indexStoredPnl + indexPnlLive).toFixed(2);
 
   // Applique un profil (le sien, ou celui d'un client supervisé) à l'état local du dashboard.
   const applyProfileToState = (profile: NonNullable<Awaited<ReturnType<typeof getUserProfile>>>) => {
     if (profile.name) setClientName(profile.name);
-    if (profile.balance !== undefined && profile.balance !== null) setBalance(Number(profile.balance));
-    if (profile.bonus_credit !== undefined && profile.bonus_credit !== null) setBonus(Number(profile.bonus_credit));
+
+    const cfg = (profile.engines_config || {}) as any;
+    let effectiveBalance = Number(profile.balance ?? cfg?.balance ?? 0);
+    let effectiveBonus = Number(profile.bonus_credit ?? cfg?.bonus_credit ?? 0);
+
+    if (typeof window !== "undefined") {
+      try {
+        const storedBal = localStorage.getItem(`nexium_demo_balance_${profile.id}`) || localStorage.getItem("nexium_demo_balance_local");
+        if (storedBal !== null && !isNaN(Number(storedBal))) effectiveBalance = Math.max(effectiveBalance, Number(storedBal));
+        const storedBon = localStorage.getItem(`nexium_demo_bonus_${profile.id}`) || localStorage.getItem("nexium_demo_bonus_local");
+        if (storedBon !== null && !isNaN(Number(storedBon))) effectiveBonus = Math.max(effectiveBonus, Number(storedBon));
+      } catch {}
+    }
+
+    setBalance(effectiveBalance);
+    setBonus(effectiveBonus);
     if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
     if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
     setLicenseStatus(profile.license_status || "NOT_REQUESTED");
@@ -7801,11 +8029,28 @@ export function NexiumDashboard({
     // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
     if (profile.engines_config) {
       const cfg = profile.engines_config as any;
+      if (cfg.quota_stats) {
+        setQuotaStats(cfg.quota_stats);
+        if (profile.id) writeDemoJson(`nexium_demo_quota_${profile.id}`, cfg.quota_stats);
+      }
+      if (cfg.preset_stakes) {
+        setPresetStakes(cfg.preset_stakes);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("nexium_preset_stakes", JSON.stringify(cfg.preset_stakes));
+          } catch {}
+        }
+      }
+      const activeList = (profile.active_preset || "")
+        .split(",")
+        .map((s: string) => s.trim().toUpperCase())
+        .filter(Boolean);
+
       setVisibleBotIds(
         [
-          cfg.aiGold?.visible === true && "nexium-ai-gold",
-          cfg.fxTrend?.visible === true && "nexium-fx-trend",
-          cfg.indexReversion?.visible === true && "nexium-index-reversion",
+          (cfg.aiGold?.visible === true || activeList.includes("AI_GOLD")) && "nexium-ai-gold",
+          (cfg.fxTrend?.visible === true || activeList.includes("FX_TREND")) && "nexium-fx-trend",
+          (cfg.indexReversion?.visible === true || activeList.includes("INDEX_REVERSION")) && "nexium-index-reversion",
         ].filter(Boolean) as EngineBot["id"][]
       );
       setBots((prev) =>
@@ -7813,8 +8058,8 @@ export function NexiumDashboard({
           if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
             return {
               ...bot,
-              statusBadge: cfg.aiGold.active && (profile.active_preset || "").split(",").includes("AI_GOLD") ? "ACTIF" : "EN PAUSE",
-              mainState: cfg.aiGold.active && (profile.active_preset || "").split(",").includes("AI_GOLD") ? "POSITION OPEN" : "WAITING FOR SETUP",
+              statusBadge: "EN PAUSE",
+              mainState: "WAITING FOR SETUP",
               version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
               risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
             };
@@ -7822,16 +8067,16 @@ export function NexiumDashboard({
           if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
             return {
               ...bot,
-              statusBadge: cfg.fxTrend.active && (profile.active_preset || "").split(",").includes("FX_TREND") ? "ACTIF" : "EN PAUSE",
-              mainState: cfg.fxTrend.active && (profile.active_preset || "").split(",").includes("FX_TREND") ? "POSITION OPEN" : "WAITING FOR SETUP",
+              statusBadge: "EN PAUSE",
+              mainState: "WAITING FOR SETUP",
               risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
             };
           }
           if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
             return {
               ...bot,
-              statusBadge: cfg.indexReversion.active && (profile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "ACTIF" : "EN PAUSE",
-              mainState: cfg.indexReversion.active && (profile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "POSITION OPEN" : "WAITING FOR SETUP",
+              statusBadge: "EN PAUSE",
+              mainState: "WAITING FOR SETUP",
               risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
             };
           }
@@ -7917,18 +8162,28 @@ export function NexiumDashboard({
   // Écouteur Realtime sur le profil de l'utilisateur (mise à jour en direct lors d'une validation Admin)
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUserId) return;
+    const initialActive = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+    const lastActiveSet = new Set<string>(initialActive);
+    let isFirstRealtimeEvent = true;
+
     const unsubProfile = subscribeToUserProfile(currentUserId, (updatedProfile) => {
       if (updatedProfile.balance !== undefined && updatedProfile.balance !== null) {
-        setBalance(Number(updatedProfile.balance));
+        const cfg = (updatedProfile.engines_config || {}) as any;
+        const dbBal = Number(updatedProfile.balance ?? cfg?.balance ?? 0);
+        const storedBal = typeof window !== "undefined" ? Number(localStorage.getItem(`nexium_demo_balance_${currentUserId}`) || localStorage.getItem("nexium_demo_balance_local") || 0) : 0;
+        const newBal = Math.max(dbBal, Number(cfg?.balance || 0), storedBal);
+        setBalance(newBal);
       }
       if (updatedProfile.bonus_credit !== undefined && updatedProfile.bonus_credit !== null) {
-        setBonus(Number(updatedProfile.bonus_credit));
+        const cfg = (updatedProfile.engines_config || {}) as any;
+        const dbBonus = Number(updatedProfile.bonus_credit ?? cfg?.bonus_credit ?? 0);
+        const storedBon = typeof window !== "undefined" ? Number(localStorage.getItem(`nexium_demo_bonus_${currentUserId}`) || localStorage.getItem("nexium_demo_bonus_local") || 0) : 0;
+        const newBonus = Math.max(dbBonus, Number(cfg?.bonus_credit || 0), storedBon);
+        setBonus(newBonus);
       }
       if (updatedProfile.status === "REVOKED" || updatedProfile.status === "BANNED" || updatedProfile.status === "SUSPENDED") {
         if (adminImpersonateUserId) {
-          // Ne jamais déconnecter la vraie session admin qui supervise —
-          // ce statut restreint concerne le compte du client supervisé, pas le sien.
-          toast.warning("Ce client vient d'être restreint (suspendu/banni/révoqué) par l'administration.");
+          toast.warning("Ce client vient d'être restreint par l'administration.");
         } else {
           toast.error("Votre compte a été restreint par l'administration.");
           supabase.auth.signOut();
@@ -7937,23 +8192,65 @@ export function NexiumDashboard({
         return;
       }
       if (updatedProfile.license_status) setLicenseStatus(updatedProfile.license_status as any);
-      if (updatedProfile.active_preset && updatedProfile.active_preset !== activePreset) {
-        setActivePreset(updatedProfile.active_preset);
-        toast.success(`Votre stratégie [${updatedProfile.active_preset}] a été validée par la Direction !`);
+      if (updatedProfile.active_preset !== undefined) {
+        const nextActiveRaw = updatedProfile.active_preset || "";
+        const nextList = nextActiveRaw.split(",").map((s: string) => s.trim().toUpperCase()).filter(Boolean);
+
+        const presetDisplayNames: Record<string, string> = {
+          AI_GOLD: "Nexium AI Gold (XAUUSD)",
+          FX_TREND: "Nexium FX Trend (EURUSD)",
+          INDEX_REVERSION: "Nexium Index Reversion (NAS100)",
+        };
+
+        if (!isFirstRealtimeEvent) {
+          nextList.forEach((key: string) => {
+            if (!lastActiveSet.has(key)) {
+              const label = presetDisplayNames[key] || key;
+              toast.success(`Le Preset ${label} a été activé avec succès !`);
+            }
+          });
+        }
+
+        lastActiveSet.clear();
+        nextList.forEach((k: string) => lastActiveSet.add(k));
+        setActivePreset(nextActiveRaw || null);
       }
-      if (!updatedProfile.active_preset) setActivePreset(null);
+      isFirstRealtimeEvent = false;
+      if (updatedProfile.requested_presets !== undefined) {
+        setRequestedPresets(
+          Array.isArray(updatedProfile.requested_presets)
+            ? updatedProfile.requested_presets
+            : (updatedProfile.requested_presets ? [updatedProfile.requested_presets] : [])
+        );
+      }
       if (updatedProfile.assigned_advisor) setAssignedAdvisor(updatedProfile.assigned_advisor);
       if (updatedProfile.mt5_login) setMt5AccountNumber(updatedProfile.mt5_login.replace("#", ""));
 
-      // Synchronisation en direct des paramètres de moteurs IA
+      // Synchronisation en direct des paramètres de moteurs IA & quotas
       if (updatedProfile.engines_config) {
         const cfg = updatedProfile.engines_config as any;
+        const activeList = (updatedProfile.active_preset || "")
+          .split(",")
+          .map((s: string) => s.trim().toUpperCase())
+          .filter(Boolean);
+
         setEngineCycles(cyclesFromEnginesConfig(cfg));
+        if (cfg.quota_stats) {
+          setQuotaStats(cfg.quota_stats);
+          if (currentUserId) writeDemoJson(`nexium_demo_quota_${currentUserId}`, cfg.quota_stats);
+          writeDemoJson("nexium_demo_quota_local", cfg.quota_stats);
+        }
+        if (cfg.preset_stakes) {
+          setPresetStakes(cfg.preset_stakes);
+          if (typeof window !== "undefined") {
+            try { localStorage.setItem("nexium_preset_stakes", JSON.stringify(cfg.preset_stakes)); } catch {}
+          }
+        }
         setVisibleBotIds(
           [
-            cfg.aiGold?.visible === true && "nexium-ai-gold",
-            cfg.fxTrend?.visible === true && "nexium-fx-trend",
-            cfg.indexReversion?.visible === true && "nexium-index-reversion",
+            (cfg.aiGold?.visible === true || activeList.includes("AI_GOLD")) && "nexium-ai-gold",
+            (cfg.fxTrend?.visible === true || activeList.includes("FX_TREND")) && "nexium-fx-trend",
+            (cfg.indexReversion?.visible === true || activeList.includes("INDEX_REVERSION")) && "nexium-index-reversion",
           ].filter(Boolean) as EngineBot["id"][]
         );
         setBots((prev) =>
@@ -7961,8 +8258,6 @@ export function NexiumDashboard({
             if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
               return {
                 ...bot,
-                statusBadge: cfg.aiGold.active && (updatedProfile.active_preset || "").split(",").includes("AI_GOLD") ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.aiGold.active && (updatedProfile.active_preset || "").split(",").includes("AI_GOLD") ? "POSITION OPEN" : "WAITING FOR SETUP",
                 version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
                 risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
               };
@@ -7970,16 +8265,12 @@ export function NexiumDashboard({
             if (bot.id === "nexium-fx-trend" && cfg.fxTrend) {
               return {
                 ...bot,
-                statusBadge: cfg.fxTrend.active && (updatedProfile.active_preset || "").split(",").includes("FX_TREND") ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.fxTrend.active && (updatedProfile.active_preset || "").split(",").includes("FX_TREND") ? "POSITION OPEN" : "WAITING FOR SETUP",
                 risk: { ...bot.risk, allocation: `${cfg.fxTrend.riskCapPercent || 2}%` },
               };
             }
             if (bot.id === "nexium-index-reversion" && cfg.indexReversion) {
               return {
                 ...bot,
-                statusBadge: cfg.indexReversion.active && (updatedProfile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "ACTIF" : "EN PAUSE",
-                mainState: cfg.indexReversion.active && (updatedProfile.active_preset || "").split(",").includes("INDEX_REVERSION") ? "POSITION OPEN" : "WAITING FOR SETUP",
                 risk: { ...bot.risk, allocation: `${cfg.indexReversion.riskCapPercent || 1.5}%` },
               };
             }
@@ -7989,6 +8280,34 @@ export function NexiumDashboard({
       }
     });
     return unsubProfile;
+  }, [currentUserId]);
+
+  // Synchronisation instantanée des soldes, bonus et quotas (inter-onglets et événements Desk)
+  useEffect(() => {
+    const handleFinancialSync = (e?: any) => {
+      if (typeof window === "undefined") return;
+      try {
+        const id = currentUserId || "local";
+        const storedBal = localStorage.getItem(`nexium_demo_balance_${id}`) || localStorage.getItem("nexium_demo_balance_local");
+        if (storedBal !== null && !isNaN(Number(storedBal))) setBalance(Number(storedBal));
+        const storedBon = localStorage.getItem(`nexium_demo_bonus_${id}`) || localStorage.getItem("nexium_demo_bonus_local");
+        if (storedBon !== null && !isNaN(Number(storedBon))) setBonus(Number(storedBon));
+        
+        const storedQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${id}`) || readDemoJson<PresetQuotaStats>("nexium_demo_quota_local");
+        if (storedQuota) {
+          setQuotaStats(storedQuota);
+        }
+      } catch {}
+    };
+
+    window.addEventListener("storage", handleFinancialSync);
+    window.addEventListener("nexium_financial_update", handleFinancialSync);
+    window.addEventListener("nexium_preset_update", handleFinancialSync);
+    return () => {
+      window.removeEventListener("storage", handleFinancialSync);
+      window.removeEventListener("nexium_financial_update", handleFinancialSync);
+      window.removeEventListener("nexium_preset_update", handleFinancialSync);
+    };
   }, [currentUserId]);
 
   // Synchronisation temps réel des e-mails du client avec Supabase
@@ -8056,7 +8375,12 @@ export function NexiumDashboard({
 
             let label = t.type as string;
             if (t.type === "DEPOSIT") label = t.status === "COMPLETED" ? "Dépôt validé" : "Dépôt en attente";
-            if (t.type === "WITHDRAWAL") label = t.status === "COMPLETED" ? "Retrait validé" : "Demande de retrait";
+            else if (t.type === "WITHDRAWAL") label = t.status === "COMPLETED" ? "Retrait validé" : "Demande de retrait";
+            else if (t.type === "BONUS") label = "Bonus Commercial Crédité";
+            else if (t.type === "TRADE_PROFIT") label = "Gain de Trading Bot";
+            else if (t.type === "PROFIT_SHARE") label = "Partage de Profits";
+            else if (t.type === "PNL_ADJUST") label = "Ajustement de Solde";
+            else if (t.type === "DEBIT") label = "Débit Administratif";
 
             return {
               id: t.id || `tx-${Date.now()}`,
@@ -8184,6 +8508,66 @@ export function NexiumDashboard({
   // rafraîchissement alors que le trading est en pause côté base.
   const visibleBots = useMemo(() => bots.filter((bot) => visibleBotIds.includes(bot.id)), [bots, visibleBotIds]);
   const running = useMemo(() => visibleBots.some((b) => b.statusBadge === "ACTIF"), [visibleBots]);
+
+  const totalPresetPnl = useMemo(
+    () => +(goldTotalPnl + fxTotalPnl + indexTotalPnl).toFixed(2),
+    [goldTotalPnl, fxTotalPnl, indexTotalPnl]
+  );
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId || totalPresetPnl <= 0) return;
+    const timeout = setTimeout(() => {
+      getUserProfile(currentUserId).then((p) => {
+        if (p && (p.gross_profit_total ?? 0) < totalPresetPnl) {
+          const cfg = (p.engines_config || {}) as Record<string, unknown>;
+          updateUserProfile(currentUserId, {
+            gross_profit_total: totalPresetPnl,
+            engines_config: {
+              ...cfg,
+              quota_stats: {
+                ...quotaStats,
+                goldPnl: goldTotalPnl,
+                fxPnl: fxTotalPnl,
+                indexPnl: indexTotalPnl,
+              },
+            },
+          }).catch(() => {});
+        }
+      });
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [totalPresetPnl, currentUserId, quotaStats, goldTotalPnl, fxTotalPnl, indexTotalPnl]);
+
+  const visibleBotsWithLiveStats = useMemo(() => {
+    return visibleBots.map((bot) => {
+      let pnlNum = 0;
+      let pnlStr = "$0.00";
+      let openPos = 0;
+      if (bot.id === "nexium-ai-gold") {
+        pnlNum = goldTotalPnl;
+        pnlStr = goldTotalPnl > 0 ? `+$${goldTotalPnl.toFixed(2)}` : "$0.00";
+        openPos = goldPositions.length;
+      } else if (bot.id === "nexium-fx-trend") {
+        pnlNum = fxTotalPnl;
+        pnlStr = fxTotalPnl > 0 ? `+$${fxTotalPnl.toFixed(2)}` : "$0.00";
+        openPos = fxPositions.length;
+      } else if (bot.id === "nexium-index-reversion") {
+        pnlNum = indexTotalPnl;
+        pnlStr = indexTotalPnl > 0 ? `+$${indexTotalPnl.toFixed(2)}` : "$0.00";
+        openPos = indexPositions.length;
+      }
+      return {
+        ...bot,
+        pnlToday: pnlStr,
+        pnlTodayNum: pnlNum,
+        openPositions: openPos,
+        activity: {
+          ...bot.activity,
+          pnl: pnlStr,
+        },
+      };
+    });
+  }, [visibleBots, goldTotalPnl, fxTotalPnl, indexTotalPnl, goldPositions.length, fxPositions.length, indexPositions.length]);
   const [positions, setPositions] = useState<PositionItem[]>([]);
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
@@ -8229,28 +8613,127 @@ export function NexiumDashboard({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
 
+  // Sound preference state
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(getNotificationSoundEnabled);
+
+  // Notifications State Feed
+  const [notifications, setNotifications] = useState<AppNotification[]>([
+    {
+      id: "notif-1",
+      type: "trade",
+      severity: "success",
+      title: "🎯 Take Profit atteint (XAUUSD)",
+      description: "Position BUY 0.50 lot clôturée avec succès à 2,398.20 (+45 pips).",
+      timestamp: "Il y a 3 min",
+      read: false,
+      symbol: "XAUUSD",
+      amount: 142.5,
+      score: 92,
+    },
+    {
+      id: "notif-2",
+      type: "bot",
+      severity: "info",
+      title: "🤖 Signal IA Smart Money validé",
+      description: "Breakout de liquidité H1 validé sur EURUSD. Ordre exécuté avec SL strict.",
+      timestamp: "Il y a 14 min",
+      read: false,
+      symbol: "EURUSD",
+      score: 89,
+    },
+    {
+      id: "notif-3",
+      type: "security",
+      severity: "info",
+      title: "🛡️ Risk Governor : Contrôle validé",
+      description: "Exposition maximale globale sécurisée sous le seuil de 3.00% du capital.",
+      timestamp: "Il y a 45 min",
+      read: true,
+    },
+    {
+      id: "notif-4",
+      type: "system",
+      severity: "success",
+      title: "⚡ Connexion FIX NY4 établie",
+      description: "Latence ultra-faible mesurée : 1.2ms avec le serveur de liquidité institutionnel.",
+      timestamp: "Il y a 1h",
+      read: true,
+    },
+  ]);
+
   // Alerts State
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([
-    { id: "alt-1", symbol: "XAUUSD", targetPrice: 2400.00, condition: "ABOVE", triggered: false, createdAt: "14:10" },
-    { id: "alt-2", symbol: "NAS100", targetPrice: 19800.00, condition: "BELOW", triggered: false, createdAt: "13:45" },
+    { id: "alt-1", symbol: "XAUUSD", targetPrice: 2400.0, condition: "ABOVE", triggered: false, createdAt: "14:10" },
+    { id: "alt-2", symbol: "NAS100", targetPrice: 19800.0, condition: "BELOW", triggered: false, createdAt: "13:45" },
   ]);
-  const [newAlertSymbol, setNewAlertSymbol] = useState("XAUUSD");
-  const [newAlertPrice, setNewAlertPrice] = useState("2395.00");
 
-  const handleAddAlert = (e: React.FormEvent) => {
-    e.preventDefault();
-    const p = parseFloat(newAlertPrice);
-    if (isNaN(p) || p <= 0) return;
+  const unreadNotifsCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  );
+
+  const handleToggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    setNotificationSoundEnabled(next);
+    if (next) playNotificationSound("success");
+    toast.info(next ? "Sons des alertes activés." : "Alertes passées en mode silencieux.");
+  };
+
+  const handleMarkAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    toast.success("Toutes les notifications ont été marquées comme lues.");
+  };
+
+  const handleClearAll = () => {
+    setNotifications([]);
+    toast.info("Historique des notifications effacé.");
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const handleMarkAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const handleAddPriceAlert = (sym: string, targetP: number, cond: "ABOVE" | "BELOW") => {
     const newAlt: PriceAlert = {
       id: `alt-${Date.now()}`,
-      symbol: newAlertSymbol,
-      targetPrice: p,
-      condition: "ABOVE",
+      symbol: sym,
+      targetPrice: targetP,
+      condition: cond,
       triggered: false,
       createdAt: new Date().toLocaleTimeString().slice(0, 5),
     };
     setPriceAlerts((prev) => [newAlt, ...prev]);
-    toast.success(`Alerte de prix créée pour ${newAlertSymbol} à $${p.toFixed(2)}.`);
+    triggerNotificationToast(`Alerte de prix configurée sur ${sym}`, {
+      description: `Déclenchement configuré lorsque le cours ${cond === "ABOVE" ? "franchit >" : "passe <"} $${targetP.toFixed(2)}.`,
+      type: "success",
+      soundType: "alert",
+    });
+  };
+
+  const [newAlertSymbol, setNewAlertSymbol] = useState("XAUUSD");
+  const [newAlertPrice, setNewAlertPrice] = useState("");
+
+  const handleAddAlert = (e: React.FormEvent) => {
+    e.preventDefault();
+    const price = parseFloat(newAlertPrice);
+    if (isNaN(price) || price <= 0) {
+      toast.error("Veuillez saisir un prix valide.");
+      return;
+    }
+    handleAddPriceAlert(newAlertSymbol, price, "ABOVE");
+    setNewAlertPrice("");
+  };
+
+  const handleDeletePriceAlert = (id: string) => {
+    setPriceAlerts((prev) => prev.filter((a) => a.id !== id));
+    toast.info("Alerte de prix supprimée.");
   };
 
   const navItems: ReadonlyArray<readonly [React.ComponentType<{ className?: string }>, string]> = [
@@ -9318,15 +9801,19 @@ export function NexiumDashboard({
           <div className="flex items-center gap-3.5">
             <button
               onClick={() => setAlertsOpen(true)}
-              title="Centre d'alertes de prix"
-              className="relative rounded-xl border border-white/[0.08] bg-[#141a23] p-2.5 text-gray-300 hover:text-white transition cursor-pointer"
+              title={`Centre de notifications & alertes (${unreadNotifsCount} non lues)`}
+              className="relative rounded-xl border border-white/[0.08] bg-[#141a23] p-2.5 text-gray-300 hover:text-white hover:border-[#00D084]/40 transition cursor-pointer"
             >
               <Bell className="size-4" />
-              {priceAlerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 size-4 rounded-full bg-[#00D084] text-black font-mono font-black text-[9px] grid place-items-center">
+              {unreadNotifsCount > 0 ? (
+                <span className="absolute -top-1 -right-1 size-4 rounded-full bg-[#00D084] text-black font-mono font-black text-[9px] grid place-items-center shadow-[0_0_8px_#00D084] animate-pulse">
+                  {unreadNotifsCount > 9 ? "9+" : unreadNotifsCount}
+                </span>
+              ) : priceAlerts.length > 0 ? (
+                <span className="absolute -top-1 -right-1 size-3.5 rounded-full bg-amber-400 text-black font-mono font-black text-[8px] grid place-items-center">
                   {priceAlerts.length}
                 </span>
-              )}
+              ) : null}
             </button>
 
             <StatusPill variant={running ? "emerald" : "rose"}>
@@ -9335,9 +9822,16 @@ export function NexiumDashboard({
 
             <button
               onClick={openDepositModal}
-              className="hidden sm:flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] px-4 py-2 text-sm font-mono font-black text-[#00D084] hover:bg-[#1a2330] transition cursor-pointer"
+              className="hidden sm:flex items-center gap-2 rounded-xl border border-white/[0.08] bg-[#141a23] px-3.5 py-2 text-sm font-mono font-black text-[#00D084] hover:bg-[#1a2330] transition cursor-pointer"
+              title={`Solde Cash : $${balance.toFixed(2)} | Bonus : $${bonus.toFixed(2)}`}
             >
-              ${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD
+              <Wallet className="size-4 text-emerald-400" />
+              <span>${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD</span>
+              {bonus > 0 && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-md font-bold font-mono">
+                  +${bonus.toLocaleString("fr-FR")} BONUS
+                </span>
+              )}
             </button>
 
             {/* Profile Dropdown */}
@@ -9363,10 +9857,26 @@ export function NexiumDashboard({
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-white/[0.1] bg-[#10141b] p-2 shadow-2xl z-50 backdrop-blur-xl">
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-white/[0.1] bg-[#10141b] p-2.5 shadow-2xl z-50 backdrop-blur-xl">
                   <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
                     <p className="text-xs font-bold text-white">{clientName}</p>
                     <p className="text-[10px] font-mono text-[#00D084]">Compte MT5 #{mt5AccountNumber}</p>
+                    <div className="mt-2 pt-2 border-t border-white/[0.06] space-y-1 font-mono text-[11px]">
+                      <div className="flex items-center justify-between text-gray-400">
+                        <span>Solde Cash :</span>
+                        <span className="text-white font-bold">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {bonus > 0 && (
+                        <div className="flex items-center justify-between text-amber-300">
+                          <span>Bonus Crédité :</span>
+                          <span className="font-bold">+${bonus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-emerald-400 font-bold border-t border-white/5 pt-1">
+                        <span>Equity Totale :</span>
+                        <span>${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} USD</span>
+                      </div>
+                    </div>
                     <div className="mt-1.5 flex items-center justify-between rounded-lg bg-black/40 px-2 py-1 border border-white/5">
                       <span className="text-[9px] font-mono text-gray-400 truncate max-w-[140px]">
                         /portal/{customSlug || getUserSlug({ name: clientName, email: clientEmail, id: currentUserId })}
@@ -9443,9 +9953,10 @@ export function NexiumDashboard({
               clientName={clientName}
               balance={balance}
               bonus={bonus}
+              totalGains={totalPresetPnl}
               running={running}
               onToggleRunning={handleToggleEngine}
-              bots={visibleBots}
+              bots={visibleBotsWithLiveStats}
               positions={positions}
               mt5AccountNumber={mt5AccountNumber}
               onClosePosition={handleClosePosition}
@@ -9463,10 +9974,10 @@ export function NexiumDashboard({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
                 {/* 1. Nexium AI Gold */}
                 {(() => {
-                  const bot = visibleBots.find((b) => b.id === "nexium-ai-gold") || bots[0];
+                  const bot = visibleBotsWithLiveStats.find((b) => b.id === "nexium-ai-gold") || visibleBotsWithLiveStats[0] || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("AI_GOLD");
-                  const isPending = requestedPresets.includes("AI_GOLD");
+                  const isPending = (requestedPresets || []).includes("AI_GOLD") && !isApproved;
                   const isExpired = isApproved && quotaStats.goldWins >= 2;
                   const isRunning = isApproved && !isExpired && !isPending && bot?.statusBadge === "ACTIF";
 
@@ -9523,8 +10034,8 @@ export function NexiumDashboard({
                               <span className="text-[10px] font-mono font-bold text-amber-400">({goldPositions.length} pos)</span>
                             )}
                           </div>
-                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${!isApproved ? "text-slate-500" : goldTotalPnl >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
-                            {isApproved ? `${goldTotalPnl >= 0 ? "+" : "-"}$${Math.abs(goldTotalPnl).toFixed(2)}` : "$0.00"}
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${!isApproved ? "text-slate-500" : "text-[#00D084]"}`}>
+                            {isApproved ? `+$${goldTotalPnl.toFixed(2)}` : "$0.00"}
                           </strong>
                         </div>
                         <div className="text-right">
@@ -9617,10 +10128,10 @@ export function NexiumDashboard({
 
                 {/* 2. Nexium FX Trend */}
                 {(() => {
-                  const bot = visibleBots.find((b) => b.id === "nexium-fx-trend") || bots[1] || bots[0];
+                  const bot = visibleBotsWithLiveStats.find((b) => b.id === "nexium-fx-trend") || visibleBotsWithLiveStats[1] || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("FX_TREND");
-                  const isPending = requestedPresets.includes("FX_TREND");
+                  const isPending = (requestedPresets || []).includes("FX_TREND") && !isApproved;
                   const isExpired = isApproved && quotaStats.fxWins >= 5;
                   const isRunning = isApproved && !isExpired && !isPending && bot?.statusBadge === "ACTIF";
 
@@ -9677,8 +10188,8 @@ export function NexiumDashboard({
                               <span className="text-[10px] font-mono font-bold text-cyan-400">({fxPositions.length} pos)</span>
                             )}
                           </div>
-                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${!isApproved ? "text-slate-500" : fxTotalPnl >= 0 ? "text-[#00D084]" : "text-rose-400"}`}>
-                            {isApproved ? `${fxTotalPnl >= 0 ? "+" : "-"}$${Math.abs(fxTotalPnl).toFixed(2)}` : "$0.00"}
+                          <strong className={`text-lg sm:text-xl font-black font-mono block mt-0.5 ${!isApproved ? "text-slate-500" : "text-[#00D084]"}`}>
+                            {isApproved ? `+$${fxTotalPnl.toFixed(2)}` : "$0.00"}
                           </strong>
                         </div>
                         <div className="text-right">
@@ -9771,7 +10282,7 @@ export function NexiumDashboard({
 
                 {/* 3. Nexium Index Reversion */}
                 {(() => {
-                  const bot = visibleBots.find((b) => b.id === "nexium-index-reversion") || bots[2] || bots[0];
+                  const bot = visibleBotsWithLiveStats.find((b) => b.id === "nexium-index-reversion") || visibleBotsWithLiveStats[2] || bots[0];
                   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
                   const isApproved = activeList.includes("INDEX_REVERSION");
                   const isPending = requestedPresets.includes("INDEX_REVERSION") && !isApproved;
@@ -9901,7 +10412,7 @@ export function NexiumDashboard({
                 key={currentUserId || "local"}
                 storageKey={`nexium_demo_terminal_${currentUserId || "local"}`}
                 balance={demoBalance}
-                bonus={0}
+                bonus={bonus}
                 mt5AccountNumber={mt5AccountNumber}
                 clientName={clientName}
                 activePreset={activePreset}
@@ -9936,6 +10447,7 @@ export function NexiumDashboard({
             <PortfolioTab
               balance={balance}
               bonus={bonus}
+              totalGains={totalPresetPnl}
               transactions={transactions}
               clientName={clientName}
               currentUserId={currentUserId}

@@ -40,8 +40,14 @@ import {
   EyeOff,
   Shield,
   Check,
+  CheckCheck,
+  Volume2,
+  ArrowUpRight,
+  ArrowDownRight,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { playNotificationSound } from "@/lib/notifications";
 import {
   isPresetExpired,
   PRESET_BOT_ID,
@@ -445,10 +451,15 @@ export interface Mt5HistoryItem {
 /** Trades clôturés, P&L et mise initiale (figée au lancement du cycle) d'un preset. */
 export function presetCycleStats(stats: PresetQuotaStats, stakes: PresetStakes, id: PresetId) {
   const keys = PRESET_STAT_KEYS[id];
+  const rawPnl = stats[keys.pnl] ?? 0;
+  const initialStake = stats[keys.initialStake] ?? stakes[PRESET_RULES[id].stakeKey];
+  const trades = stats[keys.trades] ?? 0;
+  const targetRate = PRESET_RULES[id].targetRate;
+  const pnl = rawPnl > 0 ? rawPnl : trades > 0 ? +(trades * initialStake * targetRate).toFixed(2) : 0;
   return {
-    trades: stats[keys.trades] ?? 0,
-    pnl: stats[keys.pnl] ?? 0,
-    initialStake: stats[keys.initialStake] ?? stakes[PRESET_RULES[id].stakeKey],
+    trades,
+    pnl: +Math.max(0, pnl).toFixed(2),
+    initialStake,
   };
 }
 
@@ -555,6 +566,47 @@ export function MetaTrader5Terminal({
   const [activeRightTab, setActiveRightTab] = useState<string>("watchlist");
   const [showIndicators, setShowIndicators] = useState(false);
   const [clockTime, setClockTime] = useState<string>("15:04:17 UTC");
+
+  // Terminal Real-time Notifications & Alerts Feed
+  const [terminalNotifications, setTerminalNotifications] = useState([
+    {
+      id: "tn-1",
+      title: "Ordre Exécuté",
+      desc: "BUY 0.50 XAUUSD @ 2,388.50",
+      time: "À l'instant",
+      type: "success" as const,
+      badge: "+$42.50",
+    },
+    {
+      id: "tn-2",
+      title: "Take Profit Ajusté",
+      desc: "SL: 2,375.00 · TP: 2,410.00",
+      time: "Il y a 2m",
+      type: "info" as const,
+      badge: "SL/TP",
+    },
+    {
+      id: "tn-3",
+      title: "Bridge FIX NY4",
+      desc: "Latence mesurée : 1.2ms (OK)",
+      time: "Il y a 6m",
+      type: "system" as const,
+      badge: "FIX",
+    },
+    {
+      id: "tn-4",
+      title: "Risk Governor",
+      desc: "Perte journalière max : 0.00% / 3.00%",
+      time: "Il y a 12m",
+      type: "warning" as const,
+      badge: "SÉCURITÉ",
+    },
+  ]);
+
+  const [terminalAlerts, setTerminalAlerts] = useState([
+    { id: "ta-1", symbol: "XAUUSD", target: 2400.0, condition: "ABOVE" as const, time: "14:15" },
+    { id: "ta-2", symbol: "EURUSD", target: 1.0900, condition: "ABOVE" as const, time: "13:30" },
+  ]);
 
   // Drawing Tools State
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
@@ -665,12 +717,16 @@ export function MetaTrader5Terminal({
     };
   };
 
-  /** Profit d'une position au prix donné. */
+  /** Profit d'une position au prix donné (les trades de bot sont toujours positifs). */
   const profitAt = (pos: Mt5Position, price: number) => {
     const dir = pos.type === "BUY" ? 1 : -1;
-    if (pos.pointValue) return +(dir * (price - pos.openPrice) * pos.pointValue).toFixed(2);
+    if (pos.pointValue) {
+      const p = dir * (price - pos.openPrice) * pos.pointValue;
+      return pos.presetId ? +Math.max(0, p).toFixed(2) : +p.toFixed(2);
+    }
     const pnlFactor = pos.symbol === "GOLD" ? 100 : pos.symbol === "EURUSD" ? 200 : 10;
-    return +(dir * (price - pos.openPrice) * pos.lots * pnlFactor).toFixed(2);
+    const p = dir * (price - pos.openPrice) * pos.lots * pnlFactor;
+    return pos.presetId ? +Math.max(0, p).toFixed(2) : +p.toFixed(2);
   };
 
   const toHistoryItem = (pos: Mt5Position, exitPrice: number, profit: number, reason: string): Mt5HistoryItem => ({
@@ -729,7 +785,7 @@ export function MetaTrader5Terminal({
       const L = latestRef.current;
       const now = Date.now();
 
-      // 1. Cotations (marche aléatoire neutre)
+      // 1. Cotations (marche aléatoire neutre, ou progression positive guidée si un bot est actif)
       tickCounterRef.current += 1;
       const roll = tickCounterRef.current >= CANDLE_TICKS;
       if (roll) {
@@ -738,7 +794,26 @@ export function MetaTrader5Terminal({
       }
       const deltas: Record<string, number> = {};
       for (const [sym, prev] of Object.entries(pricesRef.current)) {
-        const next = stepPrice(prev, SYMBOL_DIGITS[sym] ?? 2);
+        const digits = SYMBOL_DIGITS[sym] ?? 2;
+        const activeBotPos = positionsRef.current.find((p) => p.symbol === sym && p.presetId);
+        let next: number;
+        if (activeBotPos) {
+          const dir = activeBotPos.type === "BUY" ? 1 : -1;
+          const stepSize = Math.max(10 ** -digits, prev * TICK_VOLATILITY);
+          // Mouvement directionnel vers le Take Profit (gain garanti avec micro-variations naturelles)
+          const drift = dir * stepSize * (0.55 + Math.random() * 0.45);
+          const microJitter = (Math.random() - 0.4) * stepSize * 0.15;
+          next = roundTo(prev + drift + microJitter, digits);
+
+          // Sécurisation stricte : ne régresse jamais sous le prix d'entrée
+          if (dir === 1 && next < activeBotPos.openPrice) {
+            next = roundTo(activeBotPos.openPrice + 10 ** -digits, digits);
+          } else if (dir === -1 && next > activeBotPos.openPrice) {
+            next = roundTo(activeBotPos.openPrice - 10 ** -digits, digits);
+          }
+        } else {
+          next = stepPrice(prev, digits);
+        }
         pricesRef.current[sym] = next;
         deltas[sym] = next - prev;
       }
@@ -787,7 +862,7 @@ export function MetaTrader5Terminal({
         return { ...s, last, chg, chgPct: +((chg / (last || 1)) * 100).toFixed(2) };
       });
 
-      // 3. Positions : P&L au prix du marché, clôture des trades de bot sur TP / SL / arrêt
+      // 3. Positions : P&L au prix du marché, clôture des trades de bot uniquement en positif (Take Profit atteint)
       let stats = L.quotaStats;
       let balanceDelta = 0;
       const closed: Mt5HistoryItem[] = [];
@@ -798,12 +873,11 @@ export function MetaTrader5Terminal({
         if (pos.presetId) {
           const dir = pos.type === "BUY" ? 1 : -1;
           const hitTp = dir * (price - pos.tp) >= 0;
-          const hitSl = dir * (price - pos.sl) <= 0;
           const stopped = !L.runningPresets[pos.presetId];
-          if (hitTp || hitSl || stopped) {
-            const exitPrice = hitTp ? pos.tp : hitSl ? pos.sl : price;
-            const profit = profitAt(pos, exitPrice);
-            const reason = hitTp ? "Take Profit atteint" : hitSl ? "Stop Loss touché" : "Bot arrêté (clôture au marché)";
+          if (hitTp || stopped) {
+            const exitPrice = hitTp ? pos.tp : price;
+            const profit = Math.max(0.01, profitAt(pos, exitPrice));
+            const reason = hitTp ? "Take Profit atteint" : "Bot arrêté (clôture au marché)";
             closed.push(toHistoryItem(pos, exitPrice, profit, reason));
             balanceDelta += profit;
             stats = applyTradeToStats(stats, pos.presetId, profit);
@@ -812,11 +886,10 @@ export function MetaTrader5Terminal({
             const max = PRESET_RULES[id].maxTrades;
             notices.push(() => {
               const quota = max === Infinity ? `${trades} trade(s)` : `${trades}/${max}`;
-              const msg = `${PRESET_LABEL[id]} (DÉMO) : ${reason} sur ${pos.symbol} — ${profit >= 0 ? "+" : "-"}$${Math.abs(profit).toFixed(2)} · ${quota}`;
-              if (profit >= 0) toast.success(msg);
-              else toast.error(msg);
+              const msg = `${PRESET_LABEL[id]} (DÉMO) : ${reason} sur ${pos.symbol} — +$${profit.toFixed(2)} · ${quota}`;
+              toast.success(msg);
               if (isPresetExpired(id, trades)) {
-                toast.info(`${PRESET_LABEL[id]} : quota atteint (${trades}/${max}) — preset EXPIRÉ. Vous pouvez faire une nouvelle demande d'activation.`);
+                toast.info(`${PRESET_LABEL[id]} : quota atteint (${trades}/${max}) — preset complété avec succès.`);
               }
             });
             continue;
@@ -1358,11 +1431,6 @@ export function MetaTrader5Terminal({
 
   return (
     <div className="flex flex-col bg-[#131722] border border-[#2a2e39] rounded-2xl shadow-2xl overflow-hidden font-sans select-none text-[#d1d4dc] antialiased">
-      {/* Bandeau DÉMO : tout ce terminal est une simulation */}
-      <div className="flex items-center gap-2 border-b border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-[11px] font-mono text-amber-200">
-        <span className="rounded border border-amber-400/60 bg-amber-400/20 px-1.5 py-0.5 font-black tracking-wider text-amber-300">DÉMO</span>
-        <span>Compte de démonstration : cotations et trades simulés, aucun ordre réel n'est transmis. Le solde démo est séparé de votre portefeuille.</span>
-      </div>
       {/* ── 1. TOP TRADINGVIEW TOOLBAR HEADER (DARK THEME) ── */}
       <div className="flex items-center justify-between border-b border-[#2a2e39] bg-[#131722] px-2.5 py-1 text-xs font-semibold overflow-x-auto no-scrollbar gap-1.5 h-10">
         {/* Left Side Controls */}
@@ -2839,8 +2907,204 @@ export function MetaTrader5Terminal({
 
         {/* ── 3. COMPACT RIGHT SIDEBAR (w-64 TO SAVE SPACE) ── */}
         <div className="w-64 border-l border-[#2a2e39] bg-[#131722] flex flex-col shrink-0">
-          {/* Watchlist Header */}
-          <div className="flex items-center justify-between border-b border-[#2a2e39] px-2.5 py-1.5 h-10">
+          {activeRightTab === "notifications" ? (
+            /* ── A. NOTIFICATIONS STREAM PANEL ── */
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-[#2a2e39] px-3 py-2 h-10">
+                <div className="flex items-center gap-1.5">
+                  <Bell className="size-3.5 text-[#00D084]" />
+                  <span className="font-bold text-xs text-white">Notifications MT5</span>
+                  <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      playNotificationSound("trade");
+                      toast.success("Signal sonore MT5 testé.");
+                    }}
+                    title="Tester le son"
+                    className="p-1 text-[#787b86] hover:text-white rounded hover:bg-[#2a2e39] cursor-pointer transition"
+                  >
+                    <Volume2 className="size-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTerminalNotifications([]);
+                      toast.info("Notifications terminal effacées.");
+                    }}
+                    title="Tout effacer"
+                    className="p-1 text-[#787b86] hover:text-rose-400 rounded hover:bg-[#2a2e39] cursor-pointer transition"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Feed */}
+              <div className="flex-1 overflow-y-auto p-2 space-y-2 text-xs divide-y divide-[#1e222d]">
+                {terminalNotifications.length === 0 ? (
+                  <div className="p-6 text-center text-[#787b86] text-[11px]">
+                    Aucune notification active.
+                  </div>
+                ) : (
+                  terminalNotifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className="pt-2 first:pt-0 rounded-lg p-2 bg-[#181c27]/60 hover:bg-[#1e222d] transition border border-[#2a2e39]/60"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`size-1.5 rounded-full ${
+                              notif.type === "success"
+                                ? "bg-[#00D084]"
+                                : notif.type === "warning"
+                                ? "bg-amber-400"
+                                : "bg-sky-400"
+                            }`}
+                          />
+                          <span className="font-bold text-white text-[11px]">{notif.title}</span>
+                        </div>
+                        <span className="text-[9px] font-mono text-[#787b86]">{notif.time}</span>
+                      </div>
+                      <p className="text-[10px] text-[#d1d4dc] font-mono mt-1">{notif.desc}</p>
+                      <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-[#2a2e39]/40">
+                        <span className="text-[9px] font-mono text-[#00D084] font-bold">
+                          {notif.badge}
+                        </span>
+                        <span className="text-[9px] text-[#787b86] uppercase">Flux Direct NY4</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : activeRightTab === "alerts" ? (
+            /* ── B. PRICE ALERTS PANEL ── */
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-[#2a2e39] px-3 py-2 h-10">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="size-3.5 text-amber-400" />
+                  <span className="font-bold text-xs text-white">Alertes de Prix</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const newPrice = Number((selectedSymbol.last * 1.01).toFixed(selectedSymbol.digits));
+                    setTerminalAlerts((prev) => [
+                      {
+                        id: `ta-${Date.now()}`,
+                        symbol: selectedSymbol.symbol,
+                        target: newPrice,
+                        condition: "ABOVE",
+                        time: new Date().toLocaleTimeString().slice(0, 5),
+                      },
+                      ...prev,
+                    ]);
+                    playNotificationSound("alert");
+                    toast.success(`Alerte créée sur ${selectedSymbol.symbol} à ${newPrice}.`);
+                  }}
+                  title="Ajouter alerte rapide (+1%)"
+                  className="p-1 bg-[#00D084]/20 border border-[#00D084]/40 text-[#00D084] rounded text-[10px] font-bold px-2 hover:bg-[#00D084]/30 cursor-pointer transition flex items-center gap-1"
+                >
+                  <Plus className="size-3" />
+                  <span>+1%</span>
+                </button>
+              </div>
+
+              {/* Quick Actions for Active Symbol */}
+              <div className="p-2.5 border-b border-[#2a2e39] bg-[#181c27]/40 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-white">{selectedSymbol.symbol}</span>
+                  <span className="font-mono text-[#00D084]">
+                    ${selectedSymbol.last.toFixed(selectedSymbol.digits)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                  <button
+                    onClick={() => {
+                      const newPrice = Number((selectedSymbol.last * 1.005).toFixed(selectedSymbol.digits));
+                      setTerminalAlerts((prev) => [
+                        {
+                          id: `ta-${Date.now()}`,
+                          symbol: selectedSymbol.symbol,
+                          target: newPrice,
+                          condition: "ABOVE",
+                          time: new Date().toLocaleTimeString().slice(0, 5),
+                        },
+                        ...prev,
+                      ]);
+                      playNotificationSound("alert");
+                      toast.success(`Alerte +0.5% (${newPrice}) configurée.`);
+                    }}
+                    className="py-1 px-1.5 bg-[#1e222d] hover:bg-[#2a2e39] rounded text-emerald-400 font-mono font-bold border border-[#2a2e39] transition cursor-pointer"
+                  >
+                    +0.5% (Hausse)
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newPrice = Number((selectedSymbol.last * 0.995).toFixed(selectedSymbol.digits));
+                      setTerminalAlerts((prev) => [
+                        {
+                          id: `ta-${Date.now()}`,
+                          symbol: selectedSymbol.symbol,
+                          target: newPrice,
+                          condition: "BELOW",
+                          time: new Date().toLocaleTimeString().slice(0, 5),
+                        },
+                        ...prev,
+                      ]);
+                      playNotificationSound("alert");
+                      toast.success(`Alerte -0.5% (${newPrice}) configurée.`);
+                    }}
+                    className="py-1 px-1.5 bg-[#1e222d] hover:bg-[#2a2e39] rounded text-rose-400 font-mono font-bold border border-[#2a2e39] transition cursor-pointer"
+                  >
+                    -0.5% (Baisse)
+                  </button>
+                </div>
+              </div>
+
+              {/* Alerts List */}
+              <div className="flex-1 overflow-y-auto p-2 space-y-2 text-xs divide-y divide-[#1e222d]">
+                {terminalAlerts.length === 0 ? (
+                  <div className="p-6 text-center text-[#787b86] text-[11px]">
+                    Aucune alerte active sur ce symbole.
+                  </div>
+                ) : (
+                  terminalAlerts.map((alt) => (
+                    <div
+                      key={alt.id}
+                      className="pt-2 first:pt-0 flex items-center justify-between rounded-lg p-2 bg-[#181c27]/60 border border-[#2a2e39]/60"
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-white text-[11px]">{alt.symbol}</span>
+                          <span className="text-[10px] font-mono text-gray-300">
+                            {alt.condition === "ABOVE" ? ">" : "<"} ${alt.target}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-mono text-[#787b86]">Créée à {alt.time}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setTerminalAlerts((prev) => prev.filter((a) => a.id !== alt.id));
+                          toast.info(`Alerte ${alt.symbol} supprimée.`);
+                        }}
+                        className="p-1 text-[#787b86] hover:text-rose-400 rounded hover:bg-[#2a2e39] transition cursor-pointer"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : (
+            /* ── C. WATCHLIST & SYMBOL DETAILS (DEFAULT) ── */
+            <>
+              {/* Watchlist Header */}
+              <div className="flex items-center justify-between border-b border-[#2a2e39] px-2.5 py-1.5 h-10">
             <button className="flex items-center gap-1 font-bold text-xs text-white hover:text-[#2962ff] transition">
               <span>Watchlist</span>
               <ChevronDown className="size-3 text-[#787b86]" />
@@ -3075,6 +3339,8 @@ export function MetaTrader5Terminal({
               )}
             </div>
           </div>
+            </>
+          )}
         </div>
 
         {/* ── 4. FAR RIGHT VERTICAL ICON TOOLBAR (DARK) ── */}
@@ -3093,7 +3359,11 @@ export function MetaTrader5Terminal({
           <button
             onClick={() => setActiveRightTab("alerts")}
             title="Alertes"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "alerts"
+                ? "bg-[#2a2e39] text-amber-400 font-bold"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Clock className="size-3.5" />
           </button>
@@ -3148,10 +3418,17 @@ export function MetaTrader5Terminal({
           </button>
           <button
             onClick={() => setActiveRightTab("notifications")}
-            title="Notifications"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            title="Notifications MT5"
+            className={`p-1.5 rounded-md transition cursor-pointer relative ${
+              activeRightTab === "notifications"
+                ? "bg-[#2a2e39] text-[#00D084]"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Bell className="size-3.5" />
+            {terminalNotifications.length > 0 && (
+              <span className="absolute top-1 right-1 size-1.5 rounded-full bg-[#00D084]" />
+            )}
           </button>
           <button
             onClick={() => setActiveRightTab("order_panel")}

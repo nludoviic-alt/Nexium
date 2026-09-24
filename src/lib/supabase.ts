@@ -232,19 +232,40 @@ export async function approvePresetSelection(userId: string, activePresetKeys: s
     .filter(Boolean);
   const combinedActive = Array.from(new Set([...existingActive, ...activePresetKeys]));
 
-  // Valider un preset ouvre un NOUVEAU CYCLE (identifiant `cycle`) mais ne
-  // démarre jamais le bot : c'est au client de le lancer lui-même. Les presets
-  // déjà actifs et non concernés par cette validation restent inchangés.
   const cycleId = new Date().toISOString();
   const nextConfig = { ...currentConfig };
   for (const [presetId, engineKey] of Object.entries(PRESET_TO_ENGINE_KEY)) {
     const engine = currentConfig[engineKey] || {};
     if (activePresetKeys.includes(presetId)) {
-      nextConfig[engineKey] = { ...engine, active: false, visible: true, cycle: cycleId };
+      nextConfig[engineKey] = { ...engine, active: true, visible: true, cycle: cycleId };
     } else if (!combinedActive.includes(presetId)) {
       nextConfig[engineKey] = { ...engine, active: false, visible: engine.visible ?? true };
     }
   }
+
+  // Réinitialisation des quotas pour les presets approuvés
+  const currentQuota = currentConfig.quota_stats || {};
+  const nextQuota = { ...currentQuota };
+  for (const presetId of activePresetKeys) {
+    const pUpper = presetId.toUpperCase();
+    if (pUpper === "AI_GOLD") {
+      nextQuota.goldWins = 0;
+      nextQuota.goldPnl = 0;
+      nextQuota.goldCycle = cycleId;
+      delete nextQuota.goldInitialStake;
+    } else if (pUpper === "FX_TREND") {
+      nextQuota.fxWins = 0;
+      nextQuota.fxPnl = 0;
+      nextQuota.fxCycle = cycleId;
+      delete nextQuota.fxInitialStake;
+    } else if (pUpper === "INDEX_REVERSION") {
+      nextQuota.indexWins = 0;
+      nextQuota.indexPnl = 0;
+      nextQuota.indexCycle = cycleId;
+      delete nextQuota.indexInitialStake;
+    }
+  }
+  nextConfig.quota_stats = nextQuota;
 
   const remainingRequested = ((profile?.requested_presets as string[]) || []).filter(
     (p) => !combinedActive.includes(p)
@@ -254,6 +275,90 @@ export async function approvePresetSelection(userId: string, activePresetKeys: s
     license_status: "ACTIVE",
     requested_presets: remainingRequested,
     active_preset: combinedActive.join(","),
+    engines_config: nextConfig,
+  });
+}
+
+/**
+ * Approuve un preset individuel (AI_GOLD, FX_TREND, INDEX_REVERSION) pour un client :
+ * Déverrouille le preset, l'ajoute à active_preset, ouvre un nouveau cycle, remet à zéro les compteurs/quotas et le retire de requested_presets.
+ */
+export async function approveSinglePreset(userId: string, presetKey: string) {
+  const profile = await getUserProfile(userId);
+  const currentConfig = (profile?.engines_config as any) || {};
+
+  const keyUpper = presetKey.toUpperCase();
+  const existingActive = (profile?.active_preset || "")
+    .split(",")
+    .map((s: string) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const nextActive = Array.from(new Set([...existingActive, keyUpper]));
+
+  const cycleId = new Date().toISOString();
+  const engineKey = PRESET_TO_ENGINE_KEY[keyUpper];
+  const nextConfig = { ...currentConfig };
+  if (engineKey) {
+    const engine = currentConfig[engineKey] || {};
+    nextConfig[engineKey] = { ...engine, active: true, visible: true, cycle: cycleId };
+  }
+
+  // Réinitialisation des quotas du preset validé
+  const currentQuota = currentConfig.quota_stats || {};
+  const nextQuota = { ...currentQuota };
+  if (keyUpper === "AI_GOLD") {
+    nextQuota.goldWins = 0;
+    nextQuota.goldPnl = 0;
+    nextQuota.goldCycle = cycleId;
+    delete nextQuota.goldInitialStake;
+  } else if (keyUpper === "FX_TREND") {
+    nextQuota.fxWins = 0;
+    nextQuota.fxPnl = 0;
+    nextQuota.fxCycle = cycleId;
+    delete nextQuota.fxInitialStake;
+  } else if (keyUpper === "INDEX_REVERSION") {
+    nextQuota.indexWins = 0;
+    nextQuota.indexPnl = 0;
+    nextQuota.indexCycle = cycleId;
+    delete nextQuota.indexInitialStake;
+  }
+  nextConfig.quota_stats = nextQuota;
+
+  const remainingRequested = ((profile?.requested_presets as string[]) || []).filter(
+    (p) => p.toUpperCase() !== keyUpper
+  );
+
+  return updateUserProfile(userId, {
+    license_status: "ACTIVE",
+    requested_presets: remainingRequested,
+    active_preset: nextActive.join(","),
+    engines_config: nextConfig,
+  });
+}
+
+/**
+ * Arrête / Révoque un preset individuel (AI_GOLD, FX_TREND, INDEX_REVERSION) pour un client :
+ * Retire le preset de active_preset et désactive le moteur.
+ */
+export async function stopSinglePreset(userId: string, presetKey: string) {
+  const profile = await getUserProfile(userId);
+  const currentConfig = (profile?.engines_config as any) || {};
+
+  const keyUpper = presetKey.toUpperCase();
+  const existingActive = (profile?.active_preset || "")
+    .split(",")
+    .map((s: string) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const nextActive = existingActive.filter((p) => p !== keyUpper);
+
+  const engineKey = PRESET_TO_ENGINE_KEY[keyUpper];
+  const nextConfig = { ...currentConfig };
+  if (engineKey) {
+    const engine = currentConfig[engineKey] || {};
+    nextConfig[engineKey] = { ...engine, active: false };
+  }
+
+  return updateUserProfile(userId, {
+    active_preset: nextActive.join(","),
     engines_config: nextConfig,
   });
 }
