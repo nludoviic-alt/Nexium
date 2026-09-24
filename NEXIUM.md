@@ -132,3 +132,43 @@ Avant chaque push ou mise en production, vérifier impérativement :
   - [ ] Les **compteurs de trades/victoires** (`goldWins`, `fxWins`, `indexWins`) ne sont pas effacés.
   - [ ] **Zéro flash** à 0 grâce aux initialisateurs paresseux `useState(() => ...)`.
   - [ ] La clôture d'une position (`handleClosePosition`) persiste immédiatement le gain dans le `localStorage` et dans Supabase.
+
+---
+
+## 7. Architecture du Bonus Commercial (`bonus_credit`) — Règles Verrouillées
+
+### A. Source de vérité et priorité de lecture (client dashboard)
+
+Le bonus est résolu dans cet ordre de priorité dans `applyProfileToState` et le listener Realtime :
+1. `profile.bonus_credit > 0` (colonne dédiée en base — source de vérité principale)
+2. `(profile.engines_config as any)?.bonus_credit > 0` (fallback si colonne absente)
+3. `(profile.engines_config as any)?.bonus > 0` (fallback bis)
+4. `localStorage.getItem('nexium_demo_bonus_${userId}')` (cache local — dernier recours)
+
+> **NE JAMAIS** simplifier cette logique en `profile.bonus_credit ?? 0`. Si la colonne vaut `null` ou `0`, les fallbacks doivent s'appliquer.
+
+### B. Écriture du bonus par le Desk (`handleCreditOrDebit` dans `composition.tsx`)
+
+Lors d'un crédit BONUS ou BONUS_DEBIT, les 3 écritures suivantes sont **obligatoires et simultanées** :
+1. `updateUserProfile(userId, { bonus_credit: newBonus, balance: newBalance, engines_config: { ...existing, bonus_credit: newBonus, bonus: newBonus, balance: newBalance } })`
+2. `localStorage.setItem('nexium_demo_bonus_${userId}', newBonus)`
+3. `window.dispatchEvent(new CustomEvent('nexium_financial_update', { detail: { userId, balance, bonus: newBonus } }))`
+
+### C. Bug critique résolu — Trigger PostgreSQL `protect_privileged_profile_fields` ⚠️
+
+**PROBLÈME IDENTIFIÉ ET RÉSOLU le 2026-09-24** :
+
+Le trigger `protect_privileged_profile_fields` (table `profiles`) forçait `NEW.bonus_credit := OLD.bonus_credit` pour tout rôle absent de la whitelist. Résultat : l'appel `updateUserProfile` retournait HTTP 200 (succès apparent) mais la base de données annulait silencieusement l'écriture du bonus.
+
+**Règle verrouillée** : La whitelist du trigger ET la policy RLS `profiles_update` doivent toujours inclure :
+```sql
+'OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'FINANCE', 'SUPPORT'
+```
+
+**Ne jamais retirer `FINANCE` ou `SUPPORT` de cette liste** — ils ont besoin de modifier `balance`, `bonus_credit`, `gross_profit_total` et `gross_loss_total` pour leur travail opérationnel.
+
+Migration appliquée : `supabase/migrations/20260924_fix_bonus_trigger_rls.sql`
+
+### D. Protection du Super Owner (inchangée)
+
+Si `OLD.is_primary_owner = TRUE`, **aucun** acteur extérieur (même OWNER) ne peut modifier ses champs financiers. Ce bloc est distinct et prioritaire sur la whitelist ci-dessus.
