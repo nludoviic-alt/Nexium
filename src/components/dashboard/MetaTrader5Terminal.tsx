@@ -895,8 +895,7 @@ export function MetaTrader5Terminal({
             const max = PRESET_RULES[id].maxTrades;
             notices.push(() => {
               const quota = max === Infinity ? `${trades} trade(s)` : `${trades}/${max}`;
-              const tag = id === "AI_GOLD" ? "" : " (DÉMO)";
-              const msg = `${PRESET_LABEL[id]}${tag} : ${reason} sur ${pos.symbol} — +$${profit.toFixed(2)} · ${quota}`;
+              const msg = `${PRESET_LABEL[id]} : ${reason} sur ${pos.symbol} — +$${profit.toFixed(2)} · ${quota}`;
               toast.success(msg);
               if (isPresetExpired(id, trades)) {
                 toast.info(`${PRESET_LABEL[id]} : quota atteint (${trades}/${max}) — preset complété avec succès.`);
@@ -927,9 +926,8 @@ export function MetaTrader5Terminal({
         nextPositions.unshift(pos);
         notices.push(() => {
           playTradeAudio();
-          const tag = id === "AI_GOLD" ? "" : " (DÉMO)";
           toast.info(
-            `${PRESET_LABEL[id]}${tag} : ${pos.type} ${pos.symbol} @ ${pos.openPrice} · TP ${pos.tp} · SL ${pos.sl}`
+            `${PRESET_LABEL[id]} : ${pos.type} ${pos.symbol} @ ${pos.openPrice} · TP ${pos.tp} · SL ${pos.sl}`
           );
         });
       }
@@ -1320,7 +1318,7 @@ export function MetaTrader5Terminal({
       }
     }
 
-    toast.info(`Position #${ticket} clôturée avec un P&L de ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)} USD (DÉMO).`);
+    toast.info(`Position #${ticket} clôturée avec un P&L de ${profit >= 0 ? "+" : ""}$${profit.toFixed(2)} USD.`);
   };
 
   // Dynamic Chart Dimensions & Scale based on active candles
@@ -3508,7 +3506,7 @@ export function MetaTrader5Terminal({
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-3 text-xs font-mono">
-              <span className="text-[#787b86]">Solde démo: <strong className="text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong></span>
+              <span className="text-[#787b86]">Solde: <strong className="text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</strong></span>
               <span className="text-[#787b86]">P&amp;L Flottant: <strong className={totalOpenProfit >= 0 ? "text-[#089981]" : "text-[#f23645]"}>
                 {totalOpenProfit >= 0 ? "+" : ""}${totalOpenProfit.toFixed(2)} USD
               </strong></span>

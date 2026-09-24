@@ -8871,9 +8871,9 @@ export function NexiumDashboard({
     const next = !running;
     if (!(await handleSetAllBotsActive(next))) return;
     if (next) {
-      toast.success("Bots lancés (DÉMO) : les presets validés recherchent leurs setups.");
+      toast.success("Stratégie de trading lancée : les algorithmes recherchent leurs opportunités de marché.");
     } else {
-      toast.warning("Bots arrêtés. Les trades et le P&L des cycles sont conservés.");
+      toast.warning("Stratégie de trading mise en pause. Les trades et le P&L des cycles sont conservés.");
     }
   };
 
@@ -8902,8 +8902,8 @@ export function NexiumDashboard({
     );
     toast.info(
       nextActive
-        ? `Bot ${bot.name} lancé (DÉMO) : recherche de setup en cours.`
-        : `Bot ${bot.name} arrêté. Trades, P&L et compteur du cycle sont conservés.`
+        ? `Algorithme ${bot.name} activé : recherche de setup en cours.`
+        : `Algorithme ${bot.name} mis en pause. Compteur et P&L du cycle conservés.`
     );
 
     if (isSupabaseConfigured && currentUserId) {
@@ -10221,7 +10221,7 @@ export function NexiumDashboard({
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L CYCLE · DÉMO</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L DU CYCLE</span>
                             {isApproved && fxPositions.length > 0 && (
                               <span className="text-[10px] font-mono font-bold text-cyan-400">({fxPositions.length} pos)</span>
                             )}
@@ -10369,7 +10369,7 @@ export function NexiumDashboard({
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L CYCLE · DÉMO</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L DU CYCLE</span>
                             {isApproved && indexPositions.length > 0 && (
                               <span className="text-[10px] font-mono font-bold text-purple-400">({indexPositions.length} pos)</span>
                             )}
