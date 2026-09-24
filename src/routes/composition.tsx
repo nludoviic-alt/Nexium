@@ -1642,33 +1642,44 @@ function NexiumAdminDashboard({
           const effectiveProfit = getProfileEffectiveGrossProfit(p, c);
           const grossLoss = Number(p.gross_loss_total) || c.grossLossTotal || 0;
 
+          const pCfg = (p.engines_config || {}) as any;
+          const colBonus = Number(p.bonus_credit ?? 0);
+          const cfgBonus = Number(pCfg?.bonus_credit ?? pCfg?.bonus ?? 0);
+          const effectiveBonus = colBonus > 0 ? colBonus : (cfgBonus > 0 ? cfgBonus : (p.bonus_credit !== undefined ? colBonus : (c.bonusCredit ?? 0)));
+          const effectiveBalance = p.balance ?? c.balance;
+
           return {
             ...c,
             name: p.name || c.name,
             email: p.email || c.email,
             phone: p.phone || c.phone,
             country: p.country || c.country,
-            status: (p.status as AccountStatus) ?? c.status,
-            kycStatus: (p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW") as UserProfile["kycStatus"],
-            licenseStatus: ((p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED")) as UserProfile["licenseStatus"],
-            requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
-            activePreset: p.active_preset,
-            balance: p.balance ?? c.balance,
-            bonusCredit: p.bonus_credit ?? c.bonusCredit,
-            equity: (p.balance ?? c.balance) + (p.bonus_credit ?? c.bonusCredit),
-            assignedAdvisor: p.assigned_advisor || c.assignedAdvisor,
-            grossProfitTotal: effectiveProfit,
-            grossLossTotal: grossLoss,
-            totalNetPnl: +(effectiveProfit - grossLoss).toFixed(2),
-            engines: (p.engines_config as any) || c.engines,
-          } as UserProfile;
-        });
+              status: (p.status as AccountStatus) ?? c.status,
+              kycStatus: (p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW") as UserProfile["kycStatus"],
+              licenseStatus: ((p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED")) as UserProfile["licenseStatus"],
+              requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
+              activePreset: p.active_preset,
+              balance: effectiveBalance,
+              bonusCredit: effectiveBonus,
+              equity: effectiveBalance + effectiveBonus,
+              assignedAdvisor: p.assigned_advisor || c.assignedAdvisor,
+              grossProfitTotal: effectiveProfit,
+              grossLossTotal: grossLoss,
+              totalNetPnl: +(effectiveProfit - grossLoss).toFixed(2),
+              engines: (p.engines_config as any) || c.engines,
+            } as UserProfile;
+          });
 
         const newMapped: UserProfile[] = supabaseProfiles
           .filter((p) => !existingIds.has(p.id))
           .map((p) => {
             const effectiveProfit = getProfileEffectiveGrossProfit(p);
             const grossLoss = Number(p.gross_loss_total) || 0;
+            const pCfg = (p.engines_config || {}) as any;
+            const colBonus = Number(p.bonus_credit ?? 0);
+            const cfgBonus = Number(pCfg?.bonus_credit ?? pCfg?.bonus ?? 0);
+            const effectiveBonus = colBonus > 0 ? colBonus : cfgBonus;
+            const b = p.balance || 0;
             return {
               id: p.id,
               name: p.name,
@@ -1681,9 +1692,9 @@ function NexiumAdminDashboard({
               ip: "127.0.0.1",
               twoFactorEnabled: false,
               forcePasswordReset: false,
-              balance: p.balance || 0,
-              bonusCredit: p.bonus_credit || 0,
-              equity: (p.balance || 0) + (p.bonus_credit || 0),
+              balance: b,
+              bonusCredit: effectiveBonus,
+              equity: b + effectiveBonus,
               kycStatus: p.kyc_status === "VERIFIED" ? "VERIFIED" : "PENDING_REVIEW",
               licenseStatus: (p.license_status as any) || (p.status === "ACTIVE" && p.active_preset ? "ACTIVE" : "NOT_REQUESTED"),
               requestedPresets: p.requested_presets && p.requested_presets.length > 0 ? p.requested_presets : (p.requested_preset ? [p.requested_preset] : []),
@@ -3004,6 +3015,7 @@ function NexiumAdminDashboard({
             const nextEnginesConfig = {
               ...existingEngines,
               bonus_credit: newBonus,
+              bonus: newBonus,
               balance: newBalance,
             };
 

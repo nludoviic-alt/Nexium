@@ -8052,20 +8052,38 @@ export function NexiumDashboard({
 
     const cfg = (profile.engines_config || {}) as any;
     const hasDbBalance = profile.balance !== undefined && profile.balance !== null;
-    const hasDbBonus = profile.bonus_credit !== undefined && profile.bonus_credit !== null;
 
     let effectiveBalance = hasDbBalance ? Number(profile.balance) : Number(cfg?.balance ?? 0);
-    let effectiveBonus = hasDbBonus ? Number(profile.bonus_credit) : Number(cfg?.bonus_credit ?? 0);
+
+    // Détermination robuste du bonus (base de données colonne, engines_config, ou cache local)
+    const colBonus = Number(profile.bonus_credit ?? 0);
+    const cfgBonus = Number(cfg?.bonus_credit ?? cfg?.bonus ?? 0);
+    let storedBonus = 0;
+    if (typeof window !== "undefined") {
+      try {
+        const s = localStorage.getItem(`nexium_demo_bonus_${profile.id}`) || localStorage.getItem("nexium_demo_bonus_local");
+        if (s !== null && !isNaN(Number(s))) storedBonus = Number(s);
+      } catch {}
+    }
+
+    let effectiveBonus = 0;
+    if (colBonus > 0) {
+      effectiveBonus = colBonus;
+    } else if (cfgBonus > 0) {
+      effectiveBonus = cfgBonus;
+    } else if (storedBonus > 0) {
+      effectiveBonus = storedBonus;
+    } else if (profile.bonus_credit !== undefined && profile.bonus_credit !== null) {
+      effectiveBonus = colBonus;
+    } else if (cfg?.bonus_credit !== undefined || cfg?.bonus !== undefined) {
+      effectiveBonus = cfgBonus;
+    }
 
     if (typeof window !== "undefined") {
       try {
         if (!hasDbBalance) {
           const storedBal = localStorage.getItem(`nexium_demo_balance_${profile.id}`) || localStorage.getItem("nexium_demo_balance_local");
           if (storedBal !== null && !isNaN(Number(storedBal))) effectiveBalance = Number(storedBal);
-        }
-        if (!hasDbBonus) {
-          const storedBon = localStorage.getItem(`nexium_demo_bonus_${profile.id}`) || localStorage.getItem("nexium_demo_bonus_local");
-          if (storedBon !== null && !isNaN(Number(storedBon))) effectiveBonus = Number(storedBon);
         }
 
         // Sauvegarde immédiate dans le cache local sous les deux clés
@@ -8288,13 +8306,21 @@ export function NexiumDashboard({
           } catch {}
         }
       }
-      if (updatedProfile.bonus_credit !== undefined && updatedProfile.bonus_credit !== null) {
-        const newBonus = Number(updatedProfile.bonus_credit);
-        setBonus(newBonus);
+      const cfg = (updatedProfile.engines_config || {}) as any;
+      const colBonus = Number(updatedProfile.bonus_credit ?? 0);
+      const cfgBonus = Number(cfg?.bonus_credit ?? cfg?.bonus ?? 0);
+      const hasBonusField =
+        (updatedProfile.bonus_credit !== undefined && updatedProfile.bonus_credit !== null) ||
+        cfg?.bonus_credit !== undefined ||
+        cfg?.bonus !== undefined;
+
+      if (hasBonusField) {
+        const liveBonus = colBonus > 0 ? colBonus : (cfgBonus > 0 ? cfgBonus : (colBonus === 0 && cfgBonus === 0 ? 0 : colBonus));
+        setBonus(liveBonus);
         if (typeof window !== "undefined") {
           try {
-            if (currentUserId) localStorage.setItem(`nexium_demo_bonus_${currentUserId}`, String(newBonus));
-            localStorage.setItem("nexium_demo_bonus_local", String(newBonus));
+            if (currentUserId) localStorage.setItem(`nexium_demo_bonus_${currentUserId}`, String(liveBonus));
+            localStorage.setItem("nexium_demo_bonus_local", String(liveBonus));
           } catch {}
         }
       }

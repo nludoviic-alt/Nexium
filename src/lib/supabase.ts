@@ -153,6 +153,36 @@ export async function updateUserProfile(userId: string, updates: Partial<Supabas
 
   if (error) {
     console.error("Erreur lors de la mise à jour du profil Supabase:", error);
+    // Si l'erreur est liée à la colonne bonus_credit absente dans la table profiles
+    if (
+      updates.bonus_credit !== undefined &&
+      (error.message?.includes("bonus_credit") ||
+        (error as any).details?.includes("bonus_credit") ||
+        (error as any).code === "42703" ||
+        error.message?.includes("schema cache"))
+    ) {
+      console.warn("Colonne bonus_credit absente, repli sécurisé sur engines_config...");
+      const fallbackUpdates: any = { ...updates };
+      const bonusVal = fallbackUpdates.bonus_credit;
+      delete fallbackUpdates.bonus_credit;
+      const existingCfg = (fallbackUpdates.engines_config || {}) as any;
+      fallbackUpdates.engines_config = {
+        ...existingCfg,
+        bonus_credit: bonusVal,
+        bonus: bonusVal,
+      };
+
+      const { data: retryData, error: retryError } = await supabase
+        .from("profiles")
+        .update(fallbackUpdates)
+        .eq("id", userId)
+        .select()
+        .single();
+
+      if (!retryError) {
+        return { success: true, data: { ...retryData, bonus_credit: bonusVal } };
+      }
+    }
     return { success: false, error };
   }
   return { success: true, data };
