@@ -3035,11 +3035,31 @@ function NexiumAdminDashboard({
             });
 
             const [balRes, txRes] = await Promise.allSettled([balPromise, txPromise]);
+
+            // DEBUG — affiche le résultat exact de l'update profil
+            if (balRes.status === "fulfilled") {
+              const r = balRes.value as any;
+              if (r?.success) {
+                const savedBonus = r?.data?.bonus_credit;
+                console.info("[BONUS DEBUG] Supabase update OK — bonus_credit en base:", savedBonus, "| attendu:", newBonus);
+                if (savedBonus !== undefined && Number(savedBonus) !== newBonus) {
+                  toast.warning(`⚠️ DEBUG: bonus envoyé ${newBonus} mais base retourne ${savedBonus} — trigger bloque peut-être encore`);
+                }
+              } else {
+                console.error("[BONUS DEBUG] Supabase update FAILED:", r?.error);
+                toast.error(`❌ Erreur Supabase: ${r?.error?.message || r?.error?.code || JSON.stringify(r?.error)}`);
+              }
+            } else {
+              console.error("[BONUS DEBUG] Promise rejetée:", balRes.reason);
+              toast.error(`❌ Exception: ${balRes.reason}`);
+            }
+
             if (txRes.status === "fulfilled" && txRes.value?.success && txRes.value.data?.id) {
               newTxId = txRes.value.data.id;
             }
           } catch (err) {
             console.warn("Erreur synchronisation financière Supabase:", err);
+            toast.error(`❌ Exception catch: ${err}`);
           }
         }
 
