@@ -458,7 +458,7 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF public.get_my_role() NOT IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER') THEN
+  IF public.get_my_role() NOT IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'FINANCE', 'SUPPORT') THEN
     NEW.role := OLD.role;
     NEW.status := OLD.status;
     NEW.kyc_status := OLD.kyc_status;
@@ -565,8 +565,8 @@ CREATE POLICY "profiles_insert" ON public.profiles
     );
 
 CREATE POLICY "profiles_update" ON public.profiles
-    FOR UPDATE USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'))
-    WITH CHECK (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
+    FOR UPDATE USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'FINANCE', 'SUPPORT'))
+    WITH CHECK (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'FINANCE', 'SUPPORT'));
 
 -- Suppression : hiérarchie à 3 paliers, jamais le Super Owner.
 --   Palier 0 (Super Owner)            : peut supprimer tout le monde.
