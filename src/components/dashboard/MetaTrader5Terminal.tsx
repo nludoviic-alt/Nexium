@@ -895,7 +895,8 @@ export function MetaTrader5Terminal({
             const max = PRESET_RULES[id].maxTrades;
             notices.push(() => {
               const quota = max === Infinity ? `${trades} trade(s)` : `${trades}/${max}`;
-              const msg = `${PRESET_LABEL[id]} (DÉMO) : ${reason} sur ${pos.symbol} — +$${profit.toFixed(2)} · ${quota}`;
+              const tag = id === "AI_GOLD" ? "" : " (DÉMO)";
+              const msg = `${PRESET_LABEL[id]}${tag} : ${reason} sur ${pos.symbol} — +$${profit.toFixed(2)} · ${quota}`;
               toast.success(msg);
               if (isPresetExpired(id, trades)) {
                 toast.info(`${PRESET_LABEL[id]} : quota atteint (${trades}/${max}) — preset complété avec succès.`);
@@ -926,8 +927,9 @@ export function MetaTrader5Terminal({
         nextPositions.unshift(pos);
         notices.push(() => {
           playTradeAudio();
+          const tag = id === "AI_GOLD" ? "" : " (DÉMO)";
           toast.info(
-            `${PRESET_LABEL[id]} (DÉMO) : ${pos.type} ${pos.symbol} @ ${pos.openPrice} · TP ${pos.tp} · SL ${pos.sl}`
+            `${PRESET_LABEL[id]}${tag} : ${pos.type} ${pos.symbol} @ ${pos.openPrice} · TP ${pos.tp} · SL ${pos.sl}`
           );
         });
       }

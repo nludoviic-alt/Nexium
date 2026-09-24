@@ -4484,7 +4484,7 @@ function NexiumAdminDashboard({
                         </span>
                         {c.engines?.aiGold?.mode === "DEMO" && (
                           <span className="mt-1 inline-flex rounded-md border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">
-                            AI GOLD · DÉMO
+                            AI GOLD
                           </span>
                         )}
                       </div>
@@ -5222,9 +5222,6 @@ function NexiumAdminDashboard({
                         <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-3">
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-base text-white">Nexium AI Gold</h4>
-                            {goldPreset.startsWith("Démo") && (
-                              <span className="rounded-md border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">DÉMO</span>
-                            )}
                           </div>
                           <button
                             type="button"

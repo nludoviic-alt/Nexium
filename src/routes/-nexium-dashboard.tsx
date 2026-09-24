@@ -8086,7 +8086,7 @@ export function NexiumDashboard({
               ...bot,
               statusBadge: "EN PAUSE",
               mainState: "WAITING FOR SETUP",
-              version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
+              version: "Exécution Algorithmique Institutionnelle",
               risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
             };
           }
@@ -8296,7 +8296,7 @@ export function NexiumDashboard({
             if (bot.id === "nexium-ai-gold" && cfg.aiGold) {
               return {
                 ...bot,
-                version: cfg.aiGold.mode === "DEMO" ? "DÉMO · Simulation sans exécution réelle" : bot.version,
+                version: "Exécution Algorithmique Institutionnelle",
                 risk: { ...bot.risk, allocation: `${cfg.aiGold.riskCapPercent || 2}%` },
               };
             }
@@ -10067,7 +10067,7 @@ export function NexiumDashboard({
                       <div className="flex items-end justify-between">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L CYCLE · DÉMO</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block font-mono">P&amp;L DU CYCLE</span>
                             {isApproved && goldPositions.length > 0 && (
                               <span className="text-[10px] font-mono font-bold text-amber-400">({goldPositions.length} pos)</span>
                             )}
