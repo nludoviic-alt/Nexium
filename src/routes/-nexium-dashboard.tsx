@@ -7783,8 +7783,24 @@ export function NexiumDashboard({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("Vue d’ensemble");
-  const [balance, setBalance] = useState(0);
-  const [bonus, setBonus] = useState(0);
+  const [balance, setBalance] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("nexium_demo_balance_local");
+        if (stored !== null && !isNaN(Number(stored))) return Number(stored);
+      } catch {}
+    }
+    return 0;
+  });
+  const [bonus, setBonus] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("nexium_demo_bonus_local");
+        if (stored !== null && !isNaN(Number(stored))) return Number(stored);
+      } catch {}
+    }
+    return 0;
+  });
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -7821,14 +7837,32 @@ export function NexiumDashboard({
   }, []);
 
   const demoStorageKey = (name: string) => `nexium_demo_${name}_${currentUserId || "local"}`;
-  const [demoBalance, setDemoBalance] = useState(DEMO_START_BALANCE);
-  const [quotaStats, setQuotaStats] = useState<PresetQuotaStats>(EMPTY_QUOTA_STATS);
+  const [demoBalance, setDemoBalance] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = readDemoJson<number>("nexium_demo_terminal_balance_local");
+        if (stored !== null && !isNaN(Number(stored))) return Number(stored);
+      } catch {}
+    }
+    return DEMO_START_BALANCE;
+  });
+  const [quotaStats, setQuotaStats] = useState<PresetQuotaStats>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = readDemoJson<PresetQuotaStats>("nexium_demo_quota_local");
+        if (stored) return stored;
+      } catch {}
+    }
+    return EMPTY_QUOTA_STATS;
+  });
   // Cycle de chaque preset validé par l'admin (engines_config.<moteur>.cycle)
   const [engineCycles, setEngineCycles] = useState<Partial<Record<PresetId, string>>>({});
 
   useEffect(() => {
-    const stored = readDemoJson<PresetQuotaStats>(demoStorageKey("quota")) || { ...EMPTY_QUOTA_STATS };
-    let next = { ...stored };
+    const userStored = readDemoJson<PresetQuotaStats>(demoStorageKey("quota"));
+    const localStored = readDemoJson<PresetQuotaStats>("nexium_demo_quota_local");
+    const stored = userStored || localStored || { ...EMPTY_QUOTA_STATS };
+    let next: PresetQuotaStats = { ...stored };
     for (const id of PRESET_IDS) {
       const cycle = engineCycles[id];
       const keys = PRESET_STAT_KEYS[id];
@@ -7840,21 +7874,32 @@ export function NexiumDashboard({
       } else if (cycle && !prevCycle) {
         next = { ...next, [keys.cycle]: cycle };
       } else {
+        // Fusion protectrice : ne jamais régresser les trades/pnl déjà accumulés en mémoire
+        const trades = Math.max(next[keys.trades] ?? 0, quotaStats[keys.trades] ?? 0);
+        const currentPnl = Math.max(next[keys.pnl] ?? 0, quotaStats[keys.pnl] ?? 0);
+        const stake = next[keys.initialStake] ?? quotaStats[keys.initialStake] ?? presetStakes[PRESET_RULES[id].stakeKey];
+        next = {
+          ...next,
+          [keys.trades]: trades,
+          [keys.pnl]: currentPnl,
+          [keys.initialStake]: stake,
+        };
         // Correction immédiate de tout montant négatif hérité de simulations antérieures
-        const trades = next[keys.trades] ?? 0;
-        const currentPnl = next[keys.pnl] ?? 0;
-        const stake = next[keys.initialStake] ?? presetStakes[PRESET_RULES[id].stakeKey];
         if (trades > 0 && currentPnl <= 0) {
           const positivePnl = +(trades * stake * PRESET_RULES[id].targetRate).toFixed(2);
-          next = { ...next, [keys.pnl]: positivePnl };
+          next[keys.pnl] = positivePnl;
         } else if (currentPnl < 0) {
-          next = { ...next, [keys.pnl]: Math.abs(currentPnl) };
+          next[keys.pnl] = Math.abs(currentPnl);
         }
       }
     }
     setQuotaStats(next);
     writeDemoJson(demoStorageKey("quota"), next);
-    setDemoBalance(readDemoJson<number>(demoStorageKey("balance")) ?? DEMO_START_BALANCE);
+    writeDemoJson("nexium_demo_quota_local", next);
+    const storedTerminalBal = readDemoJson<number>(demoStorageKey("terminal_balance")) ??
+                              readDemoJson<number>("nexium_demo_terminal_balance_local") ??
+                              DEMO_START_BALANCE;
+    setDemoBalance(storedTerminalBal);
   }, [currentUserId, engineCycles, presetStakes]);
 
   const handleQuotaChange = (newStats: PresetQuotaStats) => {
@@ -7869,6 +7914,7 @@ export function NexiumDashboard({
     }
     setQuotaStats(statsWithCycles);
     writeDemoJson(demoStorageKey("quota"), statsWithCycles);
+    writeDemoJson("nexium_demo_quota_local", statsWithCycles);
 
     if (isSupabaseConfigured && currentUserId) {
       const totalProfit = +(
@@ -7895,7 +7941,8 @@ export function NexiumDashboard({
   const handleDemoBalanceChange = (newBalance: number) => {
     const rounded = +newBalance.toFixed(2);
     setDemoBalance(rounded);
-    writeDemoJson(demoStorageKey("balance"), rounded);
+    writeDemoJson(demoStorageKey("terminal_balance"), rounded);
+    writeDemoJson("nexium_demo_terminal_balance_local", rounded);
   };
 
   const handleUpdatePresetStake = (key: keyof PresetStakes, amount: number) => {
@@ -8013,11 +8060,28 @@ export function NexiumDashboard({
         if (storedBal !== null && !isNaN(Number(storedBal))) effectiveBalance = Math.max(effectiveBalance, Number(storedBal));
         const storedBon = localStorage.getItem(`nexium_demo_bonus_${profile.id}`) || localStorage.getItem("nexium_demo_bonus_local");
         if (storedBon !== null && !isNaN(Number(storedBon))) effectiveBonus = Math.max(effectiveBonus, Number(storedBon));
+
+        // Sauvegarde immédiate dans le cache local sous les deux clés
+        if (profile.id) {
+          localStorage.setItem(`nexium_demo_balance_${profile.id}`, String(effectiveBalance));
+          localStorage.setItem(`nexium_demo_bonus_${profile.id}`, String(effectiveBonus));
+        }
+        localStorage.setItem("nexium_demo_balance_local", String(effectiveBalance));
+        localStorage.setItem("nexium_demo_bonus_local", String(effectiveBonus));
       } catch {}
     }
 
     setBalance(effectiveBalance);
     setBonus(effectiveBonus);
+
+    // Si les valeurs conservées localement sont supérieures à la base, synchroniser Supabase en arrière-plan
+    if (isSupabaseConfigured && profile.id && (effectiveBalance > Number(profile.balance ?? 0) || effectiveBonus > Number(profile.bonus_credit ?? 0))) {
+      updateUserProfile(profile.id, {
+        balance: effectiveBalance,
+        bonus_credit: effectiveBonus,
+      }).catch((err) => console.warn("Balance/bonus DB sync error:", err));
+    }
+
     if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
     if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
     setLicenseStatus(profile.license_status || "NOT_REQUESTED");
@@ -8030,36 +8094,52 @@ export function NexiumDashboard({
 
     setEngineCycles(cyclesFromEnginesConfig(profile.engines_config));
 
-    // Synchronisation initiale des moteurs (AI Gold / FX Trend / Index Reversion)
-    // avec l'état réel enregistré côté admin — sinon chaque carte reste figée sur
-    // son état de démo par défaut tant qu'aucun événement Realtime ne survient.
     if (profile.engines_config) {
-      const cfg = profile.engines_config as any;
-      if (cfg.quota_stats) {
-        const localQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${profile.id}`) || {};
-        const mergedQuota: PresetQuotaStats = { ...cfg.quota_stats };
-        for (const id of PRESET_IDS) {
-          const keys = PRESET_STAT_KEYS[id];
-          const dbCycle = cfg.quota_stats[keys.cycle];
-          const locCycle = localQuota[keys.cycle];
-          if (!locCycle || locCycle === dbCycle) {
-            mergedQuota[keys.trades] = Math.max(cfg.quota_stats[keys.trades] ?? 0, localQuota[keys.trades] ?? 0);
-            mergedQuota[keys.pnl] = Math.max(cfg.quota_stats[keys.pnl] ?? 0, localQuota[keys.pnl] ?? 0);
-            mergedQuota[keys.initialStake] = cfg.quota_stats[keys.initialStake] ?? localQuota[keys.initialStake];
-          }
-        }
-        setQuotaStats(mergedQuota);
-        if (profile.id) writeDemoJson(`nexium_demo_quota_${profile.id}`, mergedQuota);
-        writeDemoJson("nexium_demo_quota_local", mergedQuota);
+      // Synchronisation initiale des quotas et moteurs
+      const localQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${profile.id}`) ||
+                         readDemoJson<PresetQuotaStats>("nexium_demo_quota_local") ||
+                         { ...EMPTY_QUOTA_STATS };
+    const dbQuota = (cfg?.quota_stats || {}) as PresetQuotaStats;
+    const mergedQuota: PresetQuotaStats = { ...EMPTY_QUOTA_STATS, ...dbQuota, ...localQuota };
+    for (const id of PRESET_IDS) {
+      const keys = PRESET_STAT_KEYS[id];
+      const dbCycle = dbQuota[keys.cycle];
+      const locCycle = localQuota[keys.cycle];
+      if (!locCycle || !dbCycle || locCycle === dbCycle) {
+        mergedQuota[keys.trades] = Math.max(dbQuota[keys.trades] ?? 0, localQuota[keys.trades] ?? 0);
+        mergedQuota[keys.pnl] = Math.max(dbQuota[keys.pnl] ?? 0, localQuota[keys.pnl] ?? 0);
+        mergedQuota[keys.initialStake] = dbQuota[keys.initialStake] ?? localQuota[keys.initialStake];
       }
-      if (cfg.preset_stakes) {
-        setPresetStakes(cfg.preset_stakes);
-        if (typeof window !== "undefined") {
-          try {
-            localStorage.setItem("nexium_preset_stakes", JSON.stringify(cfg.preset_stakes));
-          } catch {}
-        }
+    }
+    setQuotaStats(mergedQuota);
+    if (profile.id) writeDemoJson(`nexium_demo_quota_${profile.id}`, mergedQuota);
+    writeDemoJson("nexium_demo_quota_local", mergedQuota);
+
+    if (profile.id && isSupabaseConfigured) {
+      const totalProfit = +(
+        (mergedQuota.goldPnl || 0) +
+        (mergedQuota.fxPnl || 0) +
+        (mergedQuota.indexPnl || 0)
+      ).toFixed(2);
+      if (totalProfit > (profile.gross_profit_total ?? 0)) {
+        updateUserProfile(profile.id, {
+          gross_profit_total: totalProfit,
+          engines_config: {
+            ...cfg,
+            quota_stats: mergedQuota,
+          },
+        }).catch(() => {});
       }
+    }
+
+    if (cfg?.preset_stakes) {
+      setPresetStakes(cfg.preset_stakes);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("nexium_preset_stakes", JSON.stringify(cfg.preset_stakes));
+        } catch {}
+      }
+    }
       const activeList = (profile.active_preset || "")
         .split(",")
         .map((s: string) => s.trim().toUpperCase())
@@ -8136,6 +8216,19 @@ export function NexiumDashboard({
 
       setCurrentUserId(user.id);
       setClientEmail(user.email || "investisseur@nexiummarkets.com");
+
+      // Pré-chargement instantané depuis le cache local spécifique à cet utilisateur
+      if (typeof window !== "undefined") {
+        try {
+          const userBal = localStorage.getItem(`nexium_demo_balance_${user.id}`);
+          if (userBal !== null && !isNaN(Number(userBal))) setBalance(Number(userBal));
+          const userBon = localStorage.getItem(`nexium_demo_bonus_${user.id}`);
+          if (userBon !== null && !isNaN(Number(userBon))) setBonus(Number(userBon));
+          const userQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${user.id}`);
+          if (userQuota) setQuotaStats((prev) => ({ ...prev, ...userQuota }));
+        } catch {}
+      }
+
       const profile = await getUserProfile(user.id);
 
       const isAdmin = profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
@@ -8192,6 +8285,12 @@ export function NexiumDashboard({
         const storedBal = typeof window !== "undefined" ? Number(localStorage.getItem(`nexium_demo_balance_${currentUserId}`) || localStorage.getItem("nexium_demo_balance_local") || 0) : 0;
         const newBal = Math.max(dbBal, Number(cfg?.balance || 0), storedBal);
         setBalance(newBal);
+        if (typeof window !== "undefined") {
+          try {
+            if (currentUserId) localStorage.setItem(`nexium_demo_balance_${currentUserId}`, String(newBal));
+            localStorage.setItem("nexium_demo_balance_local", String(newBal));
+          } catch {}
+        }
       }
       if (updatedProfile.bonus_credit !== undefined && updatedProfile.bonus_credit !== null) {
         const cfg = (updatedProfile.engines_config || {}) as any;
@@ -8199,6 +8298,12 @@ export function NexiumDashboard({
         const storedBon = typeof window !== "undefined" ? Number(localStorage.getItem(`nexium_demo_bonus_${currentUserId}`) || localStorage.getItem("nexium_demo_bonus_local") || 0) : 0;
         const newBonus = Math.max(dbBonus, Number(cfg?.bonus_credit || 0), storedBon);
         setBonus(newBonus);
+        if (typeof window !== "undefined") {
+          try {
+            if (currentUserId) localStorage.setItem(`nexium_demo_bonus_${currentUserId}`, String(newBonus));
+            localStorage.setItem("nexium_demo_bonus_local", String(newBonus));
+          } catch {}
+        }
       }
       if (updatedProfile.status === "REVOKED" || updatedProfile.status === "BANNED" || updatedProfile.status === "SUSPENDED") {
         if (adminImpersonateUserId) {
@@ -8255,7 +8360,8 @@ export function NexiumDashboard({
 
         setEngineCycles(cyclesFromEnginesConfig(cfg));
         if (cfg.quota_stats) {
-          const localQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${currentUserId}`) || {};
+          const localQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${currentUserId}`) ||
+                             readDemoJson<PresetQuotaStats>("nexium_demo_quota_local") || {};
           const mergedQuota: PresetQuotaStats = { ...cfg.quota_stats };
           for (const id of PRESET_IDS) {
             const keys = PRESET_STAT_KEYS[id];
@@ -8919,7 +9025,8 @@ export function NexiumDashboard({
 
   const handleClosePosition = (pos: PositionItem) => {
     setPositions((prev) => prev.filter((p) => p.id !== pos.id));
-    setBalance((prev) => prev + pos.pnlNum);
+    const nextBal = +(balance + pos.pnlNum).toFixed(2);
+    handleLiveBalanceChange(nextBal);
 
     const now = new Date().toLocaleTimeString();
     const newTx: TransactionItem = {
@@ -8952,6 +9059,12 @@ export function NexiumDashboard({
   const handleLiveBalanceChange = (newBal: number) => {
     const rounded = +(newBal.toFixed(2));
     setBalance(rounded);
+    if (typeof window !== "undefined") {
+      try {
+        if (currentUserId) localStorage.setItem(`nexium_demo_balance_${currentUserId}`, String(rounded));
+        localStorage.setItem("nexium_demo_balance_local", String(rounded));
+      } catch {}
+    }
     if (isSupabaseConfigured && currentUserId) {
       updateUserProfile(currentUserId, { balance: rounded }).catch((err) =>
         console.warn("Notice balance sync:", err)

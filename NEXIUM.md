@@ -87,16 +87,22 @@ Chaque validation par l'administration exécute obligatoirement les 4 étapes su
 
 ---
 
-## 5. Intégrité des Données Financières (Solde, Bonus, P&L)
+## 5. Intégrité & Persistance Absolue des Données Financières (Solde, Bonus, Gains & Quotas)
 
-1. **P&L et Balance** :
-   - Tous les gains de trades validés s'accumulent dans `totalPresetPnl`.
-   - La balance affichée (`SOLDE TOTAL`) et l'`EQUITY` intègrent en temps réel la somme de la balance de base, des bonus actifs et du P&L des presets.
-2. **Persistance du Bonus** :
-   - Le bonus de bienvenue ou bonus attribué par le Desk ne revient jamais à zéro après rechargement de page.
-   - Synchronisation bidirectionnelle : Supabase `profile.bonus` $\leftrightarrow$ `localStorage` fallback.
-3. **Protection contre les re-renders destructeurs** :
-   - Les écouteurs `useEffect` ne doivent **jamais écraser** les quotas ou compteurs avec un objet vide (`EMPTY_QUOTA_STATS`) tant que des données réelles existent en mémoire ou en cache local.
+1. **Règle de Persistance Intégrale lors des Rechargements (F5)** :
+   - **Solde Cash (`balance`)** : Ne revient jamais à 0 lors d'un rechargement. Initialisé immédiatement via `localStorage` (`nexium_demo_balance_local` / `nexium_demo_balance_{userId}`) puis réconcilié avec Supabase via `Math.max(dbBalance, storedBalance)`.
+   - **Bonus Crédité (`bonus`, `bonus_credit`)** : Préservé à 100% lors des rafraîchissements. Synchronisé bidirectionnellement entre Supabase et `localStorage`.
+   - **Gains des Presets (`goldTotalPnl`, `fxTotalPnl`, `indexTotalPnl`, `totalPresetPnl`)** : Conservés rigoureusement dans `quotaStats` (`goldPnl`, `fxPnl`, `indexPnl`). Tout gain de trade est sauvegardé en cache local et dans `engines_config.quota_stats` ainsi que `gross_profit_total`.
+   - **Compteurs de Quota (`goldWins`, `fxWins`, `indexWins`)** : Conservés à travers les recharges. Ne sont réinitialisés **QUE** si l'administration a explicitement émis un nouveau `cycleId` différent du cycle précédent.
+   - **Solde Terminal MT5 (`demoBalance`)** : Utilise une clé dédiée distincte (`nexium_demo_terminal_balance_{userId}`) pour éviter tout conflit ou écrasement croisé avec le solde cash réel du client.
+
+2. **Élimination du Flash à Zéro (Lazy State Initialization)** :
+   - Tous les hooks `useState` financiers (`balance`, `bonus`, `demoBalance`, `quotaStats`) utilisent une fonction d'initialisation fainéante (`useState(() => ...)`) lisant le cache local synchrone au premier rendu. Aucun affichage temporaire de `$0.00` ou de quota vide lors du chargement.
+
+3. **Sauvegarde Immédiate sur Événements Métier** :
+   - **Clôture de position (`handleClosePosition`)** : Met à jour immédiatement le solde via `handleLiveBalanceChange`, écrivant simultanément dans `localStorage` et dans la base Supabase.
+   - **Écouteurs Realtime & Synchro Inter-onglets** : Tout changement de solde ou bonus reçu via Supabase Realtime ou l'événement `nexium_financial_update` est immédiatement répercuté dans le `localStorage` pour les rechargements futurs.
+   - **Fusion protectrice anti-écrasement** : Aucun re-render de `useEffect` ne peut remplacer des quotas contenant des trades par un état vide (`EMPTY_QUOTA_STATS`). Les statistiques en mémoire et en cache sont fusionnées (`Math.max`).
 
 ---
 
