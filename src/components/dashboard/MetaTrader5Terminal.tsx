@@ -563,9 +563,25 @@ export function MetaTrader5Terminal({
 
   // Active Tool state
   const [activeDrawTool, setActiveDrawTool] = useState<string>("crosshair");
-  const [activeRightTab, setActiveRightTab] = useState<string>("watchlist");
+  const [activeRightTab, setActiveRightTab] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 1024 ? null : "watchlist";
+    }
+    return "watchlist";
+  });
   const [showIndicators, setShowIndicators] = useState(false);
   const [clockTime, setClockTime] = useState<string>("15:04:17 UTC");
+
+  // Fermeture du panneau latéral droit avec la touche Échap
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && activeRightTab) {
+        setActiveRightTab(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeRightTab]);
 
   // Terminal Real-time Notifications & Alerts Feed
   const [terminalNotifications, setTerminalNotifications] = useState([
@@ -2914,41 +2930,57 @@ export function MetaTrader5Terminal({
           </div>
         </div>
 
-        {/* ── 3. COMPACT RIGHT SIDEBAR (w-64 TO SAVE SPACE) ── */}
-        <div className="w-64 border-l border-[#2a2e39] bg-[#131722] flex flex-col shrink-0">
-          {activeRightTab === "notifications" ? (
-            /* ── A. NOTIFICATIONS STREAM PANEL ── */
-            <div className="flex flex-col h-full">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-[#2a2e39] px-3 py-2 h-10">
-                <div className="flex items-center gap-1.5">
-                  <Bell className="size-3.5 text-[#00D084]" />
-                  <span className="font-bold text-xs text-white">Notifications MT5</span>
-                  <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      playNotificationSound("trade");
-                      toast.success("Signal sonore MT5 testé.");
-                    }}
-                    title="Tester le son"
-                    className="p-1 text-[#787b86] hover:text-white rounded hover:bg-[#2a2e39] cursor-pointer transition"
-                  >
-                    <Volume2 className="size-3" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setTerminalNotifications([]);
-                      toast.info("Notifications terminal effacées.");
-                    }}
-                    title="Tout effacer"
-                    className="p-1 text-[#787b86] hover:text-rose-400 rounded hover:bg-[#2a2e39] cursor-pointer transition"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                </div>
-              </div>
+        {/* ── 3. COMPACT RIGHT SIDEBAR (COLLAPSIBLE & RESPONSIVE) ── */}
+        {activeRightTab && (
+          <>
+            {/* Backdrop sur mobile (<md) pour fermer le panneau en cliquant à côté */}
+            <div
+              onClick={() => setActiveRightTab(null)}
+              className="fixed inset-0 z-20 md:hidden bg-black/40 backdrop-blur-xs cursor-pointer"
+              title="Cliquer pour fermer"
+            />
+
+            <div className="absolute right-9 inset-y-0 z-30 w-72 md:relative md:right-auto md:inset-auto md:w-64 border-l border-[#2a2e39] bg-[#131722] flex flex-col shrink-0 shadow-2xl md:shadow-none animate-in fade-in duration-150">
+              {activeRightTab === "notifications" ? (
+                /* ── A. NOTIFICATIONS STREAM PANEL ── */
+                <div className="flex flex-col h-full">
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-[#2a2e39] px-3 py-2 h-10">
+                    <div className="flex items-center gap-1.5">
+                      <Bell className="size-3.5 text-[#00D084]" />
+                      <span className="font-bold text-xs text-white">Notifications MT5</span>
+                      <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          playNotificationSound("trade");
+                          toast.success("Signal sonore MT5 testé.");
+                        }}
+                        title="Tester le son"
+                        className="p-1 text-[#787b86] hover:text-white rounded hover:bg-[#2a2e39] cursor-pointer transition"
+                      >
+                        <Volume2 className="size-3" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTerminalNotifications([]);
+                          toast.info("Notifications terminal effacées.");
+                        }}
+                        title="Tout effacer"
+                        className="p-1 text-[#787b86] hover:text-rose-400 rounded hover:bg-[#2a2e39] cursor-pointer transition"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                      <button
+                        onClick={() => setActiveRightTab(null)}
+                        title="Fermer le panneau (Échap)"
+                        className="p-1 text-[#787b86] hover:text-white rounded hover:bg-[#2a2e39] cursor-pointer transition ml-1"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
 
               {/* Feed */}
               <div className="flex-1 overflow-y-auto p-2 space-y-2 text-xs divide-y divide-[#1e222d]">
@@ -2998,28 +3030,37 @@ export function MetaTrader5Terminal({
                   <Clock className="size-3.5 text-amber-400" />
                   <span className="font-bold text-xs text-white">Alertes de Prix</span>
                 </div>
-                <button
-                  onClick={() => {
-                    const newPrice = Number((selectedSymbol.last * 1.01).toFixed(selectedSymbol.digits));
-                    setTerminalAlerts((prev) => [
-                      {
-                        id: `ta-${Date.now()}`,
-                        symbol: selectedSymbol.symbol,
-                        target: newPrice,
-                        condition: "ABOVE",
-                        time: new Date().toLocaleTimeString().slice(0, 5),
-                      },
-                      ...prev,
-                    ]);
-                    playNotificationSound("alert");
-                    toast.success(`Alerte créée sur ${selectedSymbol.symbol} à ${newPrice}.`);
-                  }}
-                  title="Ajouter alerte rapide (+1%)"
-                  className="p-1 bg-[#00D084]/20 border border-[#00D084]/40 text-[#00D084] rounded text-[10px] font-bold px-2 hover:bg-[#00D084]/30 cursor-pointer transition flex items-center gap-1"
-                >
-                  <Plus className="size-3" />
-                  <span>+1%</span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      const newPrice = Number((selectedSymbol.last * 1.01).toFixed(selectedSymbol.digits));
+                      setTerminalAlerts((prev) => [
+                        {
+                          id: `ta-${Date.now()}`,
+                          symbol: selectedSymbol.symbol,
+                          target: newPrice,
+                          condition: "ABOVE",
+                          time: new Date().toLocaleTimeString().slice(0, 5),
+                        },
+                        ...prev,
+                      ]);
+                      playNotificationSound("alert");
+                      toast.success(`Alerte créée sur ${selectedSymbol.symbol} à ${newPrice}.`);
+                    }}
+                    title="Ajouter alerte rapide (+1%)"
+                    className="p-1 bg-[#00D084]/20 border border-[#00D084]/40 text-[#00D084] rounded text-[10px] font-bold px-2 hover:bg-[#00D084]/30 cursor-pointer transition flex items-center gap-1"
+                  >
+                    <Plus className="size-3" />
+                    <span>+1%</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveRightTab(null)}
+                    title="Fermer le panneau (Échap)"
+                    className="p-1 text-[#787b86] hover:text-white rounded hover:bg-[#2a2e39] cursor-pointer transition ml-1"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Quick Actions for Active Symbol */}
@@ -3118,7 +3159,7 @@ export function MetaTrader5Terminal({
               <span>Watchlist</span>
               <ChevronDown className="size-3 text-[#787b86]" />
             </button>
-            <div className="flex items-center gap-1.5 text-[#787b86]">
+            <div className="flex items-center gap-1 text-[#787b86]">
               <button
                 title="Ajouter un symbole"
                 className="p-1 hover:bg-[#2a2e39] rounded hover:text-white cursor-pointer"
@@ -3136,6 +3177,13 @@ export function MetaTrader5Terminal({
                 className="p-1 hover:bg-[#2a2e39] rounded hover:text-white cursor-pointer"
               >
                 <MoreHorizontal className="size-3.5" />
+              </button>
+              <button
+                onClick={() => setActiveRightTab(null)}
+                title="Fermer la Watchlist (Échap)"
+                className="p-1 hover:bg-[#2a2e39] rounded hover:text-rose-400 text-[#787b86] cursor-pointer transition ml-0.5"
+              >
+                <X className="size-3.5" />
               </button>
             </div>
           </div>
@@ -3350,24 +3398,26 @@ export function MetaTrader5Terminal({
           </div>
             </>
           )}
-        </div>
+            </div>
+          </>
+        )}
 
         {/* ── 4. FAR RIGHT VERTICAL ICON TOOLBAR (DARK) ── */}
-        <div className="w-9 border-l border-[#2a2e39] bg-[#131722] flex flex-col items-center py-2 gap-2 text-[#787b86] shrink-0">
+        <div className="w-9 border-l border-[#2a2e39] bg-[#131722] flex flex-col items-center py-2 gap-2 text-[#787b86] shrink-0 z-40">
           <button
-            onClick={() => setActiveRightTab("watchlist")}
-            title="Watchlist & Détails"
+            onClick={() => setActiveRightTab((prev) => (prev === "watchlist" ? null : "watchlist"))}
+            title={activeRightTab === "watchlist" ? "Fermer la Watchlist (ou cliquer sur l'icône)" : "Watchlist & Détails"}
             className={`p-1.5 rounded-md transition cursor-pointer ${
               activeRightTab === "watchlist"
-                ? "bg-[#2a2e39] text-white"
+                ? "bg-[#2962ff] text-white shadow-sm"
                 : "hover:bg-[#2a2e39] hover:text-white"
             }`}
           >
             <Bookmark className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("alerts")}
-            title="Alertes"
+            onClick={() => setActiveRightTab((prev) => (prev === "alerts" ? null : "alerts"))}
+            title={activeRightTab === "alerts" ? "Fermer les Alertes" : "Alertes"}
             className={`p-1.5 rounded-md transition cursor-pointer ${
               activeRightTab === "alerts"
                 ? "bg-[#2a2e39] text-amber-400 font-bold"
@@ -3377,57 +3427,85 @@ export function MetaTrader5Terminal({
             <Clock className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("news")}
-            title="Actualités & Flux d'informations"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "news" ? null : "news"))}
+            title={activeRightTab === "news" ? "Fermer les Actualités" : "Actualités & Flux d'informations"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "news"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Layers className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("data")}
-            title="Fenêtre de données"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "data" ? null : "data"))}
+            title={activeRightTab === "data" ? "Fermer la Fenêtre de données" : "Fenêtre de données"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "data"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Crosshair className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("hotlists")}
-            title="Listes d'intérêts"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "hotlists" ? null : "hotlists"))}
+            title={activeRightTab === "hotlists" ? "Fermer les Listes d'intérêts" : "Listes d'intérêts"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "hotlists"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Flame className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("calendar")}
-            title="Calendrier économique"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "calendar" ? null : "calendar"))}
+            title={activeRightTab === "calendar" ? "Fermer le Calendrier" : "Calendrier économique"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "calendar"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Calendar className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("ideas")}
-            title="Mes idées de trading"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "ideas" ? null : "ideas"))}
+            title={activeRightTab === "ideas" ? "Fermer les Idées" : "Mes idées de trading"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "ideas"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Sparkles className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("chats")}
-            title="Chats publics et privés"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "chats" ? null : "chats"))}
+            title={activeRightTab === "chats" ? "Fermer les Chats" : "Chats publics et privés"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "chats"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <MessageSquare className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("stream")}
-            title="Flux d'idées en direct"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "stream" ? null : "stream"))}
+            title={activeRightTab === "stream" ? "Fermer le Flux en direct" : "Flux d'idées en direct"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "stream"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <Radio className="size-3.5" />
           </button>
           <button
-            onClick={() => setActiveRightTab("notifications")}
-            title="Notifications MT5"
+            onClick={() => setActiveRightTab((prev) => (prev === "notifications" ? null : "notifications"))}
+            title={activeRightTab === "notifications" ? "Fermer les Notifications" : "Notifications MT5"}
             className={`p-1.5 rounded-md transition cursor-pointer relative ${
               activeRightTab === "notifications"
                 ? "bg-[#2a2e39] text-[#00D084]"
@@ -3440,9 +3518,13 @@ export function MetaTrader5Terminal({
             )}
           </button>
           <button
-            onClick={() => setActiveRightTab("order_panel")}
-            title="Passation d'ordres"
-            className="p-1.5 rounded-md hover:bg-[#2a2e39] hover:text-white transition cursor-pointer"
+            onClick={() => setActiveRightTab((prev) => (prev === "order_panel" ? null : "order_panel"))}
+            title={activeRightTab === "order_panel" ? "Fermer la Passation d'ordres" : "Passation d'ordres"}
+            className={`p-1.5 rounded-md transition cursor-pointer ${
+              activeRightTab === "order_panel"
+                ? "bg-[#2a2e39] text-white"
+                : "hover:bg-[#2a2e39] hover:text-white"
+            }`}
           >
             <FileText className="size-3.5" />
           </button>
