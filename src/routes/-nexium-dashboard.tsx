@@ -3061,7 +3061,7 @@ function OverviewTab({
             </div>
           </div>
           <p className="text-xl sm:text-2xl font-black text-white">
-            ${(balance + bonus).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+            ${(balance + bonus + totalGains).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
           <div className="flex items-center justify-between text-xs pt-1.5 border-t border-indigo-500/20 font-sans">
             <span className="text-slate-400">Cash</span>
@@ -3093,11 +3093,11 @@ function OverviewTab({
             </div>
           </div>
           <p className="text-xl sm:text-2xl font-black text-emerald-400">
-            ${(balance + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+            ${(balance + bonus + totalGains + totalOpenPnl).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
           </p>
           <div className="flex items-center justify-between text-xs pt-1.5 border-t border-emerald-500/20 font-sans">
-            <span className="text-slate-400">Cash</span>
-            <span className="font-mono font-bold text-white">${balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
+            <span className="text-slate-400">Total Disponible</span>
+            <span className="font-mono font-bold text-white">${(balance + bonus + totalGains).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</span>
           </div>
         </article>
 
@@ -7839,13 +7839,17 @@ export function NexiumDashboard({
 
   useEffect(() => {
     const stored = readDemoJson<PresetQuotaStats>(demoStorageKey("quota")) || { ...EMPTY_QUOTA_STATS };
-    let next = stored;
+    let next = { ...stored };
     for (const id of PRESET_IDS) {
       const cycle = engineCycles[id];
       const keys = PRESET_STAT_KEYS[id];
-      if (cycle && next[keys.cycle] !== cycle) {
-        // Nouveau cycle validé par l'admin : compteur, P&L et mise initiale repartent de zéro
+      const prevCycle = next[keys.cycle];
+
+      // Réinitialisation UNIQUEMENT si un cycle précédent était enregistré ET qu'il est différent du nouveau cycle
+      if (cycle && prevCycle && prevCycle !== cycle) {
         next = { ...next, [keys.trades]: 0, [keys.pnl]: 0, [keys.initialStake]: undefined, [keys.cycle]: cycle };
+      } else if (cycle && !prevCycle) {
+        next = { ...next, [keys.cycle]: cycle };
       } else {
         // Correction immédiate de tout montant négatif hérité de simulations antérieures
         const trades = next[keys.trades] ?? 0;
@@ -7865,14 +7869,23 @@ export function NexiumDashboard({
   }, [currentUserId, engineCycles, presetStakes]);
 
   const handleQuotaChange = (newStats: PresetQuotaStats) => {
-    setQuotaStats(newStats);
-    writeDemoJson(demoStorageKey("quota"), newStats);
+    // S'assurer que les identifiants de cycles actuels sont bien conservés
+    const statsWithCycles: PresetQuotaStats = { ...newStats };
+    for (const id of PRESET_IDS) {
+      const keys = PRESET_STAT_KEYS[id];
+      const cycle = engineCycles[id];
+      if (cycle && !statsWithCycles[keys.cycle]) {
+        statsWithCycles[keys.cycle] = cycle;
+      }
+    }
+    setQuotaStats(statsWithCycles);
+    writeDemoJson(demoStorageKey("quota"), statsWithCycles);
 
     if (isSupabaseConfigured && currentUserId) {
       const totalProfit = +(
-        (newStats.goldPnl || 0) +
-        (newStats.fxPnl || 0) +
-        (newStats.indexPnl || 0)
+        (statsWithCycles.goldPnl || 0) +
+        (statsWithCycles.fxPnl || 0) +
+        (statsWithCycles.indexPnl || 0)
       ).toFixed(2);
 
       getUserProfile(currentUserId).then((p) => {
@@ -7882,7 +7895,7 @@ export function NexiumDashboard({
             gross_profit_total: Math.max(p.gross_profit_total || 0, totalProfit),
             engines_config: {
               ...cfg,
-              quota_stats: newStats,
+              quota_stats: statsWithCycles,
             },
           }).catch(() => {});
         }
@@ -8030,8 +8043,21 @@ export function NexiumDashboard({
     if (profile.engines_config) {
       const cfg = profile.engines_config as any;
       if (cfg.quota_stats) {
-        setQuotaStats(cfg.quota_stats);
-        if (profile.id) writeDemoJson(`nexium_demo_quota_${profile.id}`, cfg.quota_stats);
+        const localQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${profile.id}`) || {};
+        const mergedQuota: PresetQuotaStats = { ...cfg.quota_stats };
+        for (const id of PRESET_IDS) {
+          const keys = PRESET_STAT_KEYS[id];
+          const dbCycle = cfg.quota_stats[keys.cycle];
+          const locCycle = localQuota[keys.cycle];
+          if (!locCycle || locCycle === dbCycle) {
+            mergedQuota[keys.trades] = Math.max(cfg.quota_stats[keys.trades] ?? 0, localQuota[keys.trades] ?? 0);
+            mergedQuota[keys.pnl] = Math.max(cfg.quota_stats[keys.pnl] ?? 0, localQuota[keys.pnl] ?? 0);
+            mergedQuota[keys.initialStake] = cfg.quota_stats[keys.initialStake] ?? localQuota[keys.initialStake];
+          }
+        }
+        setQuotaStats(mergedQuota);
+        if (profile.id) writeDemoJson(`nexium_demo_quota_${profile.id}`, mergedQuota);
+        writeDemoJson("nexium_demo_quota_local", mergedQuota);
       }
       if (cfg.preset_stakes) {
         setPresetStakes(cfg.preset_stakes);
@@ -8236,9 +8262,21 @@ export function NexiumDashboard({
 
         setEngineCycles(cyclesFromEnginesConfig(cfg));
         if (cfg.quota_stats) {
-          setQuotaStats(cfg.quota_stats);
-          if (currentUserId) writeDemoJson(`nexium_demo_quota_${currentUserId}`, cfg.quota_stats);
-          writeDemoJson("nexium_demo_quota_local", cfg.quota_stats);
+          const localQuota = readDemoJson<PresetQuotaStats>(`nexium_demo_quota_${currentUserId}`) || {};
+          const mergedQuota: PresetQuotaStats = { ...cfg.quota_stats };
+          for (const id of PRESET_IDS) {
+            const keys = PRESET_STAT_KEYS[id];
+            const dbCycle = cfg.quota_stats[keys.cycle];
+            const locCycle = localQuota[keys.cycle];
+            if (!locCycle || locCycle === dbCycle) {
+              mergedQuota[keys.trades] = Math.max(cfg.quota_stats[keys.trades] ?? 0, localQuota[keys.trades] ?? 0);
+              mergedQuota[keys.pnl] = Math.max(cfg.quota_stats[keys.pnl] ?? 0, localQuota[keys.pnl] ?? 0);
+              mergedQuota[keys.initialStake] = cfg.quota_stats[keys.initialStake] ?? localQuota[keys.initialStake];
+            }
+          }
+          setQuotaStats(mergedQuota);
+          if (currentUserId) writeDemoJson(`nexium_demo_quota_${currentUserId}`, mergedQuota);
+          writeDemoJson("nexium_demo_quota_local", mergedQuota);
         }
         if (cfg.preset_stakes) {
           setPresetStakes(cfg.preset_stakes);

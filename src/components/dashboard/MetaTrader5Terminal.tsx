@@ -678,10 +678,15 @@ export function MetaTrader5Terminal({
   // Un bot ne trade que si : preset validé par l'admin + bot lancé par le
   // client + quota du cycle non atteint. Rien ne démarre tout seul.
   const activeList = (activePreset || "").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const currentQuotaStatsRef = useRef<PresetQuotaStats>(quotaStats);
+  useEffect(() => {
+    currentQuotaStatsRef.current = quotaStats;
+  }, [quotaStats]);
+
   const isPresetRunning = (id: PresetId) =>
     activeList.includes(id) &&
     bots.find((b) => b.id === PRESET_BOT_ID[id])?.statusBadge === "ACTIF" &&
-    !isPresetExpired(id, presetCycleStats(quotaStats, presetStakes, id).trades);
+    !isPresetExpired(id, presetCycleStats(currentQuotaStatsRef.current, presetStakes, id).trades);
   const runningPresets: Record<PresetId, boolean> = {
     AI_GOLD: isPresetRunning("AI_GOLD"),
     FX_TREND: isPresetRunning("FX_TREND"),
@@ -690,7 +695,7 @@ export function MetaTrader5Terminal({
 
   // Valeurs courantes lues par le moteur (évite de recréer l'intervalle à chaque rendu)
   const latestRef = useRef({ balance, quotaStats, presetStakes, runningPresets, onBalanceChange, onQuotaChange });
-  latestRef.current = { balance, quotaStats, presetStakes, runningPresets, onBalanceChange, onQuotaChange };
+  latestRef.current = { balance, quotaStats: currentQuotaStatsRef.current, presetStakes, runningPresets, onBalanceChange, onQuotaChange };
   const selectedSymbolRef = useRef(selectedSymbol.symbol);
   selectedSymbolRef.current = selectedSymbol.symbol;
   const nextSetupAtRef = useRef<Partial<Record<PresetId, number>>>({});
@@ -709,12 +714,16 @@ export function MetaTrader5Terminal({
   const applyTradeToStats = (stats: PresetQuotaStats, id: PresetId, profit: number): PresetQuotaStats => {
     const keys = PRESET_STAT_KEYS[id];
     const current = presetCycleStats(stats, latestRef.current.presetStakes, id);
-    return {
+    const updated: PresetQuotaStats = {
       ...stats,
       [keys.trades]: current.trades + 1,
       [keys.pnl]: +(current.pnl + profit).toFixed(2),
       [keys.initialStake]: current.initialStake,
+      [keys.cycle]: stats[keys.cycle] || new Date().toISOString(),
     };
+    currentQuotaStatsRef.current = updated;
+    latestRef.current.quotaStats = updated;
+    return updated;
   };
 
   /** Profit d'une position au prix donné (les trades de bot sont toujours positifs). */
@@ -863,7 +872,7 @@ export function MetaTrader5Terminal({
       });
 
       // 3. Positions : P&L au prix du marché, clôture des trades de bot uniquement en positif (Take Profit atteint)
-      let stats = L.quotaStats;
+      let stats = { ...currentQuotaStatsRef.current };
       let balanceDelta = 0;
       const closed: Mt5HistoryItem[] = [];
       const notices: Array<() => void> = [];
