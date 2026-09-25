@@ -789,13 +789,40 @@ async function callAdminApi(path: string, body: unknown): Promise<{ success: boo
     return { success: false, error: "Supabase n'est pas configuré." };
   }
 
-  const {
+  let {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session) {
-    return { success: false, error: "Session administrateur expirée, reconnectez-vous." };
+
+  // Si le token de session est expiré ou manquant, tenter un rafraîchissement
+  if (!session || (session.expires_at && session.expires_at * 1000 < Date.now() + 10_000)) {
+    const { data: refreshed } = await supabase.auth.refreshSession().catch(() => ({ data: { session: null } }));
+    if (refreshed?.session) {
+      session = refreshed.session;
+    }
   }
 
+  if (!session || !session.access_token) {
+    return { success: false, error: "Session administrateur expirée ou jeton de connexion invalide. Veuillez vous reconnecter." };
+  }
+
+  const actionName = path.replace(/^\/api\/admin\//, "");
+
+  // 1. Tenter d'abord l'Edge Function Supabase admin-actions (si déployée)
+  try {
+    const { data: edgeData, error: edgeError } = await supabase.functions.invoke("admin-actions", {
+      body: { action: actionName, ...(typeof body === "object" && body !== null ? body : {}) },
+    });
+    if (!edgeError && edgeData && (edgeData.ok || edgeData.success)) {
+      return { success: true };
+    }
+    if (edgeData?.error) {
+      return { success: false, error: edgeData.error };
+    }
+  } catch {
+    // Si l'Edge Function n'est pas configurée, on continue vers le fallback HTTP
+  }
+
+  // 2. Fallback vers le service HTTP backend /api/admin/*
   try {
     const res = await fetch(path, {
       method: "POST",
@@ -805,13 +832,34 @@ async function callAdminApi(path: string, body: unknown): Promise<{ success: boo
       },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
+
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const errorMsg = data?.error || data?.msg || data?.message;
+        if (errorMsg === "Invalid token" || errorMsg === "invalid_token") {
+          return { success: false, error: "Session administrateur invalide ou expirée. Veuillez vous reconnecter." };
+        }
+        return { success: false, error: errorMsg || "Échec de l'opération administrative." };
+      }
+      return { success: true };
+    }
+
+    // Si le serveur a renvoyé du HTML (ex: 404 Vite dev ou SPA fallback), ne pas tenter JSON.parse
     if (!res.ok) {
-      return { success: false, error: data?.error || "Échec de l'opération." };
+      return {
+        success: false,
+        error: "Le service d'administration backend n'est pas joignable (erreur serveur). Si la personne a déjà un compte sur la plateforme, vous pouvez la promouvoir directement.",
+      };
     }
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err.message || "Service d'administration injoignable." };
+    const msg = err?.message || "";
+    if (msg.includes("token") || msg.includes("Unexpected token")) {
+      return { success: false, error: "Jeton de session non valide ou service backend injoignable. Veuillez vous reconnecter." };
+    }
+    return { success: false, error: msg || "Service d'administration injoignable." };
   }
 }
 

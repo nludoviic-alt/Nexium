@@ -27,6 +27,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as PerformanceRouteImport } from './routes/performance'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as RecouvrementRouteImport } from './routes/recouvrement'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RiskDisclosureRouteImport } from './routes/risk-disclosure'
@@ -130,6 +131,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecouvrementRoute = RecouvrementRouteImport.update({
+  id: '/recouvrement',
+  path: '/recouvrement',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
@@ -210,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/performance': typeof PerformanceRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/recouvrement': typeof RecouvrementRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByTo {
   '/performance': typeof PerformanceRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/recouvrement': typeof RecouvrementRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
@@ -275,6 +283,7 @@ export interface FileRoutesById {
   '/performance': typeof PerformanceRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/recouvrement': typeof RecouvrementRoute
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/risk-disclosure': typeof RiskDisclosureRoute
@@ -309,6 +318,7 @@ export interface FileRouteTypes {
     | '/performance'
     | '/pricing'
     | '/privacy'
+    | '/recouvrement'
     | '/register'
     | '/reset-password'
     | '/risk-disclosure'
@@ -341,6 +351,7 @@ export interface FileRouteTypes {
     | '/performance'
     | '/pricing'
     | '/privacy'
+    | '/recouvrement'
     | '/register'
     | '/reset-password'
     | '/risk-disclosure'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/performance'
     | '/pricing'
     | '/privacy'
+    | '/recouvrement'
     | '/register'
     | '/reset-password'
     | '/risk-disclosure'
@@ -406,6 +418,7 @@ export interface RootRouteChildren {
   PerformanceRoute: typeof PerformanceRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
+  RecouvrementRoute: typeof RecouvrementRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   RiskDisclosureRoute: typeof RiskDisclosureRoute
@@ -548,6 +561,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recouvrement': {
+      id: '/recouvrement'
+      path: '/recouvrement'
+      fullPath: '/recouvrement'
+      preLoaderRoute: typeof RecouvrementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
@@ -654,6 +674,7 @@ const rootRouteChildren: RootRouteChildren = {
   PerformanceRoute: PerformanceRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
+  RecouvrementRoute: RecouvrementRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   RiskDisclosureRoute: RiskDisclosureRoute,

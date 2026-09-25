@@ -102,6 +102,9 @@ export function SiteFooter() {
                 <Link to="/performance" className="hover:text-[#00D084] py-1 transition-colors">
                   {t.nav.performance}
                 </Link>
+                <Link to="/recouvrement" className="hover:text-[#00D084] py-1 transition-colors text-emerald-400 font-semibold">
+                  {language === "fr" ? "Recouvrement de Fonds" : "Funds Recovery"}
+                </Link>
                 <Link to="/login" className="hover:text-[#00D084] py-1 transition-colors">
                   {language === "fr" ? "Portail Client" : "Client Portal"}
                 </Link>
@@ -279,6 +282,13 @@ export function SiteFooter() {
                 className="hover:text-[#00D084] transition-colors font-semibold text-gray-300"
               >
                 {t.nav.performance}
+              </Link>
+              <Link
+                to="/recouvrement"
+                className="hover:text-[#00D084] transition-colors font-semibold text-emerald-400 flex items-center gap-1.5"
+              >
+                <span>{language === "fr" ? "Recouvrement de Fonds" : "Funds Recovery"}</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">VIP</span>
               </Link>
               <Link
                 to="/login"

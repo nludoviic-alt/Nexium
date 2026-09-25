@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart({
       server: { entry: "server" },
-      pages: [{ path: "/composition" }, { path: "/reset-password" }],
+      pages: [{ path: "/composition" }, { path: "/reset-password" }, { path: "/recouvrement" }],
       prerender: {
         enabled: true,
         crawlLinks: true,
@@ -45,5 +45,12 @@ export default defineConfig({
     port: 8080,
     strictPort: false,
     allowedHosts: true,
+    proxy: {
+      "/api/admin": {
+        target: "http://127.0.0.1:4000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });

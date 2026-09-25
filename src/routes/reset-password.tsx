@@ -26,6 +26,7 @@ function ResetPasswordPage() {
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [linkState, setLinkState] = useState<"checking" | "ready" | "invalid" | "done">("checking");
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -33,23 +34,63 @@ function ResetPasswordPage() {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
+      setErrorMessage("Configuration de la base de données introuvable.");
       setLinkState("invalid");
       return;
     }
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setLinkState("ready");
+    if (typeof window !== "undefined") {
+      // 1. Détection des erreurs retournées par Supabase dans l'URL hash ou search
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const searchParams = new URLSearchParams(window.location.search);
+      const errorDesc = hashParams.get("error_description") || searchParams.get("error_description");
+      const error = hashParams.get("error") || searchParams.get("error");
+      if (errorDesc || error) {
+        const decoded = errorDesc ? decodeURIComponent(errorDesc.replace(/\+/g, " ")) : (error || "");
+        setErrorMessage(decoded);
+        setLinkState("invalid");
+        return;
+      }
+
+      // 2. Échange de code PKCE si présent (?code=...)
+      const code = searchParams.get("code");
+      if (code) {
+        supabase.auth.exchangeCodeForSession(code).then(({ data, error: exchangeErr }) => {
+          if (exchangeErr) {
+            console.error("Erreur exchangeCodeForSession:", exchangeErr);
+            setErrorMessage(exchangeErr.message);
+            setLinkState("invalid");
+          } else if (data?.session) {
+            setLinkState("ready");
+          }
+        });
+      }
+    }
+
+    // 3. Écouteur des changements d'état d'authentification (couvre PASSWORD_RECOVERY, SIGNED_IN pour invitations, etc.)
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        event === "PASSWORD_RECOVERY" ||
+        event === "SIGNED_IN" ||
+        event === "INITIAL_SESSION" ||
+        event === "USER_UPDATED"
+      ) {
+        if (session) {
+          setLinkState("ready");
+        }
       }
     });
 
+    // 4. Vérification de la session active existante
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setLinkState((current) => (current === "checking" ? "ready" : current));
+      if (data.session) {
+        setLinkState((current) => (current === "checking" ? "ready" : current));
+      }
     });
 
     const timeout = window.setTimeout(() => {
       setLinkState((current) => (current === "checking" ? "invalid" : current));
-    }, 4000);
+    }, 8000);
 
     return () => {
       subscription.subscription.unsubscribe();
@@ -146,9 +187,11 @@ function ResetPasswordPage() {
                     {language === "fr" ? "Lien invalide ou expiré" : "Invalid or Expired Token"}
                   </h1>
                   <p className="text-sm text-gray-600 leading-relaxed font-medium">
-                    {language === "fr"
-                      ? "Ce lien de réinitialisation n'est plus valide. Demandez-en un nouveau depuis la page mot de passe oublié."
-                      : "This password recovery link is no longer valid. Please request a new recovery link."}
+                    {errorMessage
+                      ? errorMessage
+                      : language === "fr"
+                        ? "Ce lien d'invitation ou de réinitialisation n'est plus valide ou a expiré. Demandez-en un nouveau depuis la page mot de passe oublié ou auprès d'un administrateur."
+                        : "This invitation or password recovery link is no longer valid or has expired. Please request a new link."}
                   </p>
                   <Link
                     to="/forgot-password"

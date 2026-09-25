@@ -41,6 +41,7 @@ import {
   Globe2,
   Grid,
   Headphones,
+  Headset,
   History,
   Image as ImageIcon,
   Inbox,
@@ -283,6 +284,14 @@ interface PriceAlert {
   condition: "ABOVE" | "BELOW";
   triggered: boolean;
   createdAt: string;
+}
+
+export interface RecoveryAssistanceInfo {
+  status: "PENDING" | "CONTACTED" | "RESOLVED";
+  requestedAt: string;
+  phone?: string | undefined;
+  estimatedAmount?: string | undefined;
+  note?: string | undefined;
 }
 
 // ----------------------------------------------------
@@ -2930,6 +2939,8 @@ function OverviewTab({
   onOpenEngine,
   onOpenRisk,
   onBalanceChange,
+  recoveryAssistance,
+  onOpenRecoveryModal,
 }: {
   clientName: string;
   balance: number;
@@ -2946,6 +2957,8 @@ function OverviewTab({
   onOpenEngine: () => void;
   onOpenRisk: () => void;
   onBalanceChange?: (newBalance: number) => void;
+  recoveryAssistance?: RecoveryAssistanceInfo | null;
+  onOpenRecoveryModal: () => void;
 }) {
   const [chartTimeframe, setChartTimeframe] = useState<"24H" | "7J" | "30J" | "1A">("30J");
   const [tickerTick, setTickerTick] = useState(0);
@@ -3047,6 +3060,126 @@ function OverviewTab({
                 {totalOpenPnl >= 0 ? `+$${totalOpenPnl.toFixed(2)}` : `-$${Math.abs(totalOpenPnl).toFixed(2)}`}
               </span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CARTE DÉDIÉE : ACCOMPAGNEMENT PERSONNALISÉ POUR RÉCUPÉRER VOS FONDS ── */}
+      <section className="shrink-0 rounded-2xl border border-blue-500/40 bg-gradient-to-r from-[#07132b]/95 via-[#0b1c3d]/90 to-[#060f22]/95 p-4 sm:p-5 shadow-lg relative overflow-hidden hover:border-blue-400/60 transition-all">
+        {/* Glows ambiants */}
+        <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-blue-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 -bottom-16 size-48 rounded-full bg-indigo-500/10 blur-3xl" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Colonne gauche : Badges + Titre + Description + Engagements */}
+          <div className="space-y-2 max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border border-blue-400/40 bg-blue-500/15 text-blue-300 font-mono text-[11px] font-bold tracking-wider uppercase">
+                <ShieldAlert className="size-3.5 text-blue-400" />
+                PÔLE AUDIT &amp; RECOUVREMENT
+              </span>
+              <span className="px-2 py-0.5 rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 font-mono text-[10px] font-bold">
+                CONCIERGERIE PRIVÉE DÉDIÉE
+              </span>
+              {recoveryAssistance?.status === "PENDING" ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-[11px] font-bold font-mono animate-pulse">
+                  <span className="size-1.5 rounded-full bg-amber-400" />
+                  DEMANDE EN ATTENTE DE PRISE EN CHARGE
+                </span>
+              ) : recoveryAssistance?.status === "CONTACTED" ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 text-[11px] font-bold font-mono">
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
+                  DOSSIER EN COURS DE TRAITEMENT
+                </span>
+              ) : recoveryAssistance?.status === "RESOLVED" ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-600/50 bg-slate-800/40 text-slate-300 text-[11px] font-bold font-mono">
+                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                  DOSSIER CLÔTURÉ
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-blue-500/40 bg-blue-500/10 text-blue-300 text-[11px] font-bold font-mono">
+                  <span className="size-1.5 rounded-full bg-blue-400" />
+                  DISPONIBLE · PRIORITÉ VIP
+                </span>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                Accompagnement personnalisé pour récupérer vos fonds
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
+                Assistance confidentielle et prioritaire par notre Desk Spécialisé pour l'audit, le déblocage et la récupération de vos capitaux auprès d'opérateurs ou plateformes tiers.
+              </p>
+            </div>
+
+            {/* Détails / Engagements du service */}
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-mono text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Clock className="size-3.5 text-blue-400" />
+                Rappel sous 2h ouvrées
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="flex items-center gap-1.5">
+                <Headset className="size-3.5 text-indigo-400" />
+                Desk Juridique &amp; Litiges
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className="flex items-center gap-1.5">
+                <Lock className="size-3.5 text-emerald-400" />
+                Confidentialité 100% garantie
+              </span>
+            </div>
+
+            {recoveryAssistance?.status === "PENDING" && recoveryAssistance.estimatedAmount && (
+              <div className="pt-1.5 flex items-center gap-2 text-xs font-mono text-amber-300/90">
+                <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                  Montant estimé indiqué : <strong>{recoveryAssistance.estimatedAmount}</strong>
+                </span>
+                {recoveryAssistance.requestedAt && (
+                  <span className="text-slate-400">
+                    (transmis le {new Date(recoveryAssistance.requestedAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Colonne droite : Bouton d'action & état */}
+          <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end justify-center gap-2 shrink-0">
+            {recoveryAssistance?.status === "PENDING" ? (
+              <button
+                disabled
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-950/40 text-amber-300 px-5 py-2.5 text-xs sm:text-sm font-bold opacity-90 cursor-not-allowed shadow-inner"
+              >
+                <Clock className="size-4 animate-spin text-amber-400" />
+                <span>DOSSIER DÉPOSÉ · EN ATTENTE</span>
+              </button>
+            ) : recoveryAssistance?.status === "CONTACTED" ? (
+              <button
+                disabled
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 px-5 py-2.5 text-xs sm:text-sm font-bold opacity-90 cursor-not-allowed shadow-inner"
+              >
+                <CheckCircle2 className="size-4 text-emerald-400" />
+                <span>PRISE EN CHARGE EN COURS</span>
+              </button>
+            ) : (
+              <button
+                onClick={onOpenRecoveryModal}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-400/50 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-5 py-2.5 text-xs sm:text-sm font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] active:scale-95 cursor-pointer"
+              >
+                <Headset className="size-4" />
+                <span>DEMANDER UNE ASSISTANCE</span>
+              </button>
+            )}
+
+            <span className="text-[11px] font-mono text-slate-400 text-right">
+              {recoveryAssistance?.status === "PENDING"
+                ? "Votre conseiller étudie votre dossier"
+                : recoveryAssistance?.status === "CONTACTED"
+                ? "Ligne directe ouverte avec votre conseiller"
+                : "100% Gratuit · Sans engagement"}
+            </span>
           </div>
         </div>
       </section>
@@ -7823,6 +7956,21 @@ export function NexiumDashboard({
   const [showPresetConfirmModal, setShowPresetConfirmModal] = useState(false);
   const [submittingPreset, setSubmittingPreset] = useState(false);
   const [terminalPositions, setTerminalPositions] = useState<Mt5Position[]>([]);
+  const [clientPhone, setClientPhone] = useState("");
+  const [recoveryAssistance, setRecoveryAssistance] = useState<RecoveryAssistanceInfo | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("nexium_recovery_assistance_local");
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return null;
+  });
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryPhone, setRecoveryPhone] = useState("");
+  const [recoveryAmount, setRecoveryAmount] = useState("");
+  const [recoveryNote, setRecoveryNote] = useState("");
+  const [submittingRecovery, setSubmittingRecovery] = useState(false);
   // ── Compte DÉMO (étude de comportement) ──
   // Solde démo et cycles des presets sont conservés par client dans ce
   // Montants de mise alloués par Trade pour chaque Preset ($ USD)
@@ -8109,6 +8257,21 @@ export function NexiumDashboard({
 
     if (profile.mt5_login) setMt5AccountNumber(profile.mt5_login.replace("#", ""));
     if (profile.assigned_advisor) setAssignedAdvisor(profile.assigned_advisor);
+    if (profile.phone) {
+      setClientPhone(profile.phone);
+      setRecoveryPhone((prev) => prev || profile.phone || "");
+    }
+    const recAssistance = (cfg?.recovery_assistance as RecoveryAssistanceInfo) || null;
+    if (recAssistance) {
+      setRecoveryAssistance(recAssistance);
+      if (profile.id) localStorage.setItem(`nexium_recovery_assistance_${profile.id}`, JSON.stringify(recAssistance));
+      localStorage.setItem("nexium_recovery_assistance_local", JSON.stringify(recAssistance));
+    } else if (typeof window !== "undefined" && profile.id) {
+      try {
+        const stored = localStorage.getItem(`nexium_recovery_assistance_${profile.id}`) || localStorage.getItem("nexium_recovery_assistance_local");
+        if (stored) setRecoveryAssistance(JSON.parse(stored));
+      } catch {}
+    }
     setLicenseStatus(profile.license_status || "NOT_REQUESTED");
     const localReq = readDemoJson<string[]>(demoStorageKey("requested_presets")) || [];
     const dbReq = profile.requested_presets?.length ? profile.requested_presets : profile.requested_preset ? [profile.requested_preset] : [];
@@ -8376,6 +8539,17 @@ export function NexiumDashboard({
       }
       if (updatedProfile.assigned_advisor) setAssignedAdvisor(updatedProfile.assigned_advisor);
       if (updatedProfile.mt5_login) setMt5AccountNumber(updatedProfile.mt5_login.replace("#", ""));
+      if (updatedProfile.phone) setClientPhone(updatedProfile.phone);
+      if (cfg?.recovery_assistance !== undefined) {
+        const nextRec = (cfg.recovery_assistance as RecoveryAssistanceInfo) || null;
+        setRecoveryAssistance(nextRec);
+        if (typeof window !== "undefined") {
+          try {
+            if (currentUserId) localStorage.setItem(`nexium_recovery_assistance_${currentUserId}`, JSON.stringify(nextRec));
+            localStorage.setItem("nexium_recovery_assistance_local", JSON.stringify(nextRec));
+          } catch {}
+        }
+      }
 
       // Synchronisation en direct des paramètres de moteurs IA & quotas
       if (updatedProfile.engines_config) {
@@ -8672,6 +8846,66 @@ export function NexiumDashboard({
       toast.error(err.message || "Erreur lors de la transmission de la demande.");
     } finally {
       setSubmittingPreset(false);
+    }
+  };
+
+  const handleSubmitRecoveryAssistance = async () => {
+    if (submittingRecovery) return;
+    if (!recoveryPhone.trim()) {
+      toast.warning("Veuillez renseigner un numéro de téléphone pour que votre conseiller puisse vous rappeler.");
+      return;
+    }
+    setSubmittingRecovery(true);
+    const newRecovery: RecoveryAssistanceInfo = {
+      status: "PENDING",
+      requestedAt: new Date().toISOString(),
+      phone: recoveryPhone.trim(),
+      estimatedAmount: recoveryAmount.trim() || undefined,
+      note: recoveryNote.trim() || undefined,
+    };
+
+    // 1. Mise à jour synchrone de l'état
+    setRecoveryAssistance(newRecovery);
+
+    // 2. Persistance locale F5
+    if (typeof window !== "undefined") {
+      try {
+        if (currentUserId) localStorage.setItem(`nexium_recovery_assistance_${currentUserId}`, JSON.stringify(newRecovery));
+        localStorage.setItem("nexium_recovery_assistance_local", JSON.stringify(newRecovery));
+      } catch {}
+    }
+
+    // 3. Sauvegarde Supabase
+    try {
+      if (currentUserId && isSupabaseConfigured) {
+        const currentProfile = await getUserProfile(currentUserId);
+        const currentConfig = (currentProfile?.engines_config as Record<string, unknown>) || {};
+        await updateUserProfile(currentUserId, {
+          engines_config: {
+            ...currentConfig,
+            recovery_assistance: newRecovery,
+          },
+          ...(recoveryPhone.trim() ? { phone: recoveryPhone.trim() } : {}),
+        });
+
+        await recordAuditLog({
+          admin_id: currentUserId,
+          admin_name: clientName || "Client",
+          action: "RECOVERY_ASSISTANCE_REQUESTED",
+          target_user_id: currentUserId,
+          ...(clientEmail ? { target_user_email: clientEmail } : {}),
+          details: `Demande d'assistance / récupération de fonds soumise par ${clientName} (${clientEmail}). Tél: ${recoveryPhone.trim()}${recoveryAmount.trim() ? ` · Montant: ${recoveryAmount.trim()}` : ""}`,
+          ip_address: "web-portal",
+        }).catch((e) => console.warn("Notice audit log:", e));
+      }
+
+      toast.success("Votre demande d'accompagnement a été transmise au Desk avec succès. Un conseiller va vous contacter sous 2h.");
+      setShowRecoveryModal(false);
+    } catch (err: any) {
+      console.error("Erreur transmission demande d'assistance:", err);
+      toast.error(err.message || "Erreur lors de la transmission de la demande.");
+    } finally {
+      setSubmittingRecovery(false);
     }
   };
 
@@ -10139,7 +10373,7 @@ export function NexiumDashboard({
         </header>
 
         {/* Tab Body */}
-        <main className={`flex-1 p-3 sm:p-4 max-w-[1650px] w-full mx-auto ${activeNav === "Vue d’ensemble" ? "flex flex-col h-[calc(100vh-5rem)] overflow-hidden" : ""}`}>
+        <main className={`flex-1 p-3 sm:p-4 max-w-[1650px] w-full mx-auto ${activeNav === "Vue d’ensemble" ? "flex flex-col min-h-0" : ""}`}>
           {activeNav === "Vue d’ensemble" && (
             <OverviewTab
               clientName={clientName}
@@ -10157,6 +10391,11 @@ export function NexiumDashboard({
               onOpenEngine={() => setActiveNav("MT5")}
               onOpenRisk={() => setActiveNav("Risque")}
               onBalanceChange={handleLiveBalanceChange}
+              recoveryAssistance={recoveryAssistance}
+              onOpenRecoveryModal={() => {
+                if (clientPhone && !recoveryPhone) setRecoveryPhone(clientPhone);
+                setShowRecoveryModal(true);
+              }}
             />
           )}
 
@@ -11244,6 +11483,133 @@ export function NexiumDashboard({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modale Express : Accompagnement Personnalisé pour Récupérer vos Fonds */}
+      {showRecoveryModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md grid place-items-center p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl border border-blue-500/30 bg-[#0a1220] p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-11 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 grid place-items-center">
+                  <ShieldAlert className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white tracking-tight">
+                    Demande d'Assistance &amp; Recouvrement
+                  </h3>
+                  <p className="text-xs text-blue-300 font-mono">
+                    Pôle Audit &amp; Déblocage de Fonds Nexium
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRecoveryModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              {/* Récapitulatif du compte client */}
+              <div className="bg-[#060a12]/80 p-3.5 rounded-2xl border border-white/[0.06] space-y-2">
+                <div className="flex items-center justify-between text-slate-400 font-mono">
+                  <span>Titulaire du compte :</span>
+                  <strong className="text-white font-sans">{clientName || "Client Nexium"}</strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-400 font-mono">
+                  <span>Compte Nexium :</span>
+                  <strong className="text-emerald-400 font-mono">#{mt5AccountNumber}</strong>
+                </div>
+                <div className="flex items-center justify-between text-slate-400 font-mono">
+                  <span>E-mail de notification :</span>
+                  <strong className="text-white font-mono">{clientEmail || "—"}</strong>
+                </div>
+              </div>
+
+              {/* Formulaire Express */}
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 font-mono mb-1.5">
+                    Téléphone de rappel prioritaire <span className="text-blue-400">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={recoveryPhone}
+                    onChange={(e) => setRecoveryPhone(e.target.value)}
+                    placeholder="Ex: +33 6 12 34 56 78 ou +1 (555) 000-0000"
+                    className="w-full rounded-2xl border border-slate-700/80 bg-black/40 px-4 py-3 text-sm text-white font-mono outline-none focus:border-blue-400 transition"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Votre conseiller vous joindra directement sur ce numéro.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 font-mono mb-1.5">
+                    Montant estimé des capitaux à récupérer (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={recoveryAmount}
+                    onChange={(e) => setRecoveryAmount(e.target.value)}
+                    placeholder="Ex: 15 000 USD ou 10 000 €"
+                    className="w-full rounded-2xl border border-slate-700/80 bg-black/40 px-4 py-3 text-sm text-white font-mono outline-none focus:border-blue-400 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 font-mono mb-1.5">
+                    Précisions / Plateforme ou courtier concerné (optionnel)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={recoveryNote}
+                    onChange={(e) => setRecoveryNote(e.target.value)}
+                    placeholder="Ex: Retrait bloqué sur courtier tiers, litige sur compte, fonds en attente..."
+                    className="w-full rounded-2xl border border-slate-700/80 bg-black/40 p-3 text-xs text-white outline-none focus:border-blue-400 transition resize-none placeholder:text-slate-500"
+                  />
+                </div>
+              </div>
+
+              {/* Mention de confidentialité */}
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200">
+                <Lock className="size-4 shrink-0 text-blue-400" />
+                <span>Prise en charge strictement confidentielle et protégée par le secret bancaire.</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowRecoveryModal(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={submittingRecovery}
+                onClick={handleSubmitRecoveryAssistance}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition shadow-lg shadow-blue-500/20 cursor-pointer disabled:opacity-50"
+              >
+                {submittingRecovery ? (
+                  <>
+                    <Clock className="size-3.5 animate-spin" />
+                    <span>Transmission en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <Headset className="size-3.5" />
+                    <span>Confirmer ma demande de rappel</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

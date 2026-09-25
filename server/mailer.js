@@ -1,9 +1,14 @@
 import http from "node:http";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Nexium Markets <support@nexiummarkets.com>";
+if (typeof process.loadEnvFile === "function") {
+  try { process.loadEnvFile(".env.local"); } catch {}
+  try { process.loadEnvFile(".env"); } catch {}
+}
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || "";
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.VITE_RESEND_FROM_EMAIL || "Nexium Markets <support@nexiummarkets.com>";
+
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const INVITE_REDIRECT_URL = process.env.INVITE_REDIRECT_URL || "https://nexiummarkets.com/reset-password";
 

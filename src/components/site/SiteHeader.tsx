@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Menu } from "lucide-react";
+import { Menu, UserPlus, LogIn } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { LanguageSelector } from "@/components/site/LanguageSelector";
@@ -47,6 +47,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
     { to: "/how-it-works", label: t.nav.howItWorks },
     { to: "/robots", label: t.nav.robots },
     { to: "/performance", label: t.nav.performance },
+    { to: "/recouvrement", label: t.nav.recovery },
   ] as const;
 
   return (
@@ -132,24 +133,56 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
             </div>
           )}
 
-          <Button
-            asChild
-            className="neon-btn rounded-full px-7 py-2.5 text-xs font-extrabold tracking-wider uppercase"
+          {/* Bouton Inscription (Icône Circulaire Haute Finance) */}
+          <Link
+            to="/register"
+            aria-label={t.nav.openAccount}
+            title={t.nav.openAccount}
+            className="group relative flex size-10 items-center justify-center rounded-full bg-[#00D084] text-black shadow-[0_0_16px_rgba(0,208,132,0.35)] transition-all duration-300 hover:scale-110 hover:shadow-[0_0_24px_rgba(0,208,132,0.6)] cursor-pointer"
           >
-            <Link to="/register">{t.nav.openAccount}</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="rounded-full border-gray-600 bg-transparent px-6 py-2.5 text-xs font-extrabold tracking-wider text-white uppercase hover:border-[#00D084]/50 hover:bg-gray-800 hover:text-[#00D084]"
+            <UserPlus className="size-4.5 transition-transform duration-300 group-hover:rotate-6" />
+            <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#0a0f18] border border-[#00D084]/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300 opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100 z-50">
+              {t.nav.openAccount}
+            </span>
+          </Link>
+
+          {/* Bouton Connexion (Icône Circulaire Minimaliste) */}
+          <Link
+            to="/login"
+            aria-label={t.nav.login}
+            title={t.nav.login}
+            className="group relative flex size-10 items-center justify-center rounded-full border border-gray-700 bg-slate-900/80 text-gray-200 shadow-md transition-all duration-300 hover:border-[#00D084]/60 hover:bg-slate-800 hover:text-[#00D084] hover:scale-105 cursor-pointer"
           >
-            <Link to="/login">{t.nav.login}</Link>
-          </Button>
+            <LogIn className="size-4.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+            <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#0a0f18] border border-gray-700 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-200 opacity-0 shadow-lg transition-opacity duration-200 group-hover:opacity-100 z-50">
+              {t.nav.login}
+            </span>
+          </Link>
         </div>
 
         <div className="flex items-center gap-2 lg:hidden">
           {/* Mobile direct quick switcher */}
           <LanguageSelector variant="compact" showIcon={false} className="bg-slate-900/90 border-slate-800 text-[11px] px-2.5 py-1" />
+
+          {/* Quick Register Icon Mobile */}
+          <Link
+            to="/register"
+            aria-label={t.nav.openAccount}
+            title={t.nav.openAccount}
+            className="flex size-9 items-center justify-center rounded-full bg-[#00D084] text-black shadow-sm"
+          >
+            <UserPlus className="size-4" />
+          </Link>
+
+          {/* Quick Login Icon Mobile */}
+          <Link
+            to="/login"
+            aria-label={t.nav.login}
+            title={t.nav.login}
+            className="flex size-9 items-center justify-center rounded-full border border-gray-700 bg-slate-900 text-gray-200"
+          >
+            <LogIn className="size-4" />
+          </Link>
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
@@ -188,8 +221,9 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
                     asChild
                     className="neon-btn rounded-full py-3 text-xs font-extrabold uppercase"
                   >
-                    <Link to="/register" onClick={() => setOpen(false)}>
-                      {t.nav.openAccount}
+                    <Link to="/register" onClick={() => setOpen(false)} className="flex items-center justify-center gap-2">
+                      <UserPlus className="size-4" />
+                      <span>{t.nav.openAccount}</span>
                     </Link>
                   </Button>
                   <Button
@@ -197,8 +231,9 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
                     variant="outline"
                     className="rounded-full border-gray-500 bg-transparent py-3 text-xs font-extrabold text-white hover:text-[#00D084]"
                   >
-                    <Link to="/login" onClick={() => setOpen(false)}>
-                      {t.nav.login}
+                    <Link to="/login" onClick={() => setOpen(false)} className="flex items-center justify-center gap-2">
+                      <LogIn className="size-4" />
+                      <span>{t.nav.login}</span>
                     </Link>
                   </Button>
                 </div>

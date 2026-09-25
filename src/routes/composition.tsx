@@ -504,6 +504,13 @@ interface UserProfile {
   transactions: UserTransaction[];
   trades: ClientTrade[];
   notes: string[];
+  recoveryAssistance?: {
+    status: "PENDING" | "CONTACTED" | "RESOLVED";
+    requestedAt: string;
+    phone?: string | undefined;
+    estimatedAmount?: string | undefined;
+    note?: string | undefined;
+  } | undefined;
 }
 
 interface StaffAdministrator {
@@ -911,6 +918,7 @@ function NexiumAdminDashboard({
   const [newStaffIpWhitelist, setNewStaffIpWhitelist] = useState("");
   const [newStaffHours, setNewStaffHours] = useState("");
   const [newStaffSignature, setNewStaffSignature] = useState("");
+  const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
 
   // Édition & Gestion Approfondie d'un Membre du Staff / Conseiller / Super Admin
   const [editingStaffMember, setEditingStaffMember] = useState<StaffAdministrator | null>(null);
@@ -1667,6 +1675,7 @@ function NexiumAdminDashboard({
               grossLossTotal: grossLoss,
               totalNetPnl: +(effectiveProfit - grossLoss).toFixed(2),
               engines: (p.engines_config as any) || c.engines,
+              recoveryAssistance: (pCfg?.recovery_assistance as any) || c.recoveryAssistance,
             } as UserProfile;
           });
 
@@ -1750,6 +1759,7 @@ function NexiumAdminDashboard({
               transactions: [],
               trades: [],
               notes: [],
+              recoveryAssistance: (pCfg?.recovery_assistance as any) || undefined,
             };
           });
 
@@ -2546,7 +2556,11 @@ function NexiumAdminDashboard({
       toast.error("Privilège insuffisant : votre rôle ne peut pas créer de collaborateurs.");
       return;
     }
-    if (!newStaffName || !newStaffEmail) {
+    const cleanName = newStaffName.trim();
+    const cleanEmail = newStaffEmail.trim().toLowerCase();
+    const cleanPhone = newStaffPhone.trim();
+
+    if (!cleanName || !cleanEmail) {
       toast.error("Veuillez renseigner au minimum le nom et l'e-mail.");
       return;
     }
@@ -2556,26 +2570,81 @@ function NexiumAdminDashboard({
       return;
     }
 
-    const result = await inviteUser({
-      name: newStaffName,
-      email: newStaffEmail,
-      ...(newStaffPhone ? { phone: newStaffPhone } : {}),
-      role: newStaffRole,
-    });
+    setIsSubmittingStaff(true);
+    try {
+      // 1. Vérifier si un profil existe déjà avec cet e-mail sur la plateforme
+      const existing = await findProfileByEmail(cleanEmail);
+      if (existing) {
+        // Promotion directe du compte existant sans blocage
+        const updateRes = await updateUserProfile(existing.id, {
+          role: newStaffRole,
+          name: cleanName || existing.name,
+          phone: cleanPhone || existing.phone,
+          status: "ACTIVE",
+        });
 
-    if (!result.success) {
-      toast.error(result.error || "Échec de l'invitation du membre du staff.");
-      return;
+        if (updateRes.success) {
+          addAuditLog(
+            "STAFF_PROMOTED",
+            `Compte existant ${cleanEmail} configuré avec le rôle ${newStaffRole} par ${currentAdminRole}.`,
+            cleanEmail
+          );
+          toast.success(`Le compte de ${cleanName} (${cleanEmail}) a été configuré avec succès avec le rôle ${newStaffRole}.`);
+          refreshStaffList();
+          setNewStaffName("");
+          setNewStaffEmail("");
+          setNewStaffPhone("");
+          setNewStaffIpWhitelist("");
+          setNewStaffSignature("");
+          return;
+        } else {
+          toast.error(updateRes.error || "Impossible de mettre à jour le rôle du compte existant.");
+          return;
+        }
+      }
+
+      // 2. Si le compte n'existe pas encore, envoyer une invitation sécurisée
+      const result = await inviteUser({
+        name: cleanName,
+        email: cleanEmail,
+        ...(cleanPhone ? { phone: cleanPhone } : {}),
+        role: newStaffRole,
+      });
+
+      if (!result.success) {
+        // En cas d'erreur indiquant que l'utilisateur est déjà inscrit, retenter la recherche de profil
+        if (result.error && (result.error.toLowerCase().includes("already") || result.error.toLowerCase().includes("existe") || result.error.toLowerCase().includes("registered"))) {
+          const retryProfile = await findProfileByEmail(cleanEmail);
+          if (retryProfile) {
+            await updateUserProfile(retryProfile.id, {
+              role: newStaffRole,
+              name: cleanName || retryProfile.name,
+              status: "ACTIVE",
+            });
+            addAuditLog("STAFF_PROMOTED", `Compte existant ${cleanEmail} promu au rôle ${newStaffRole}.`, cleanEmail);
+            toast.success(`Compte ${cleanEmail} configuré avec le rôle ${newStaffRole}.`);
+            refreshStaffList();
+            setNewStaffName("");
+            setNewStaffEmail("");
+            setNewStaffPhone("");
+            return;
+          }
+        }
+        toast.error(result.error || "Échec de l'invitation du membre du staff.");
+        return;
+      }
+
+      addAuditLog("STAFF_INVITED", `Invitation envoyée à ${cleanName} (${cleanEmail}) — rôle ${newStaffRole}.`, cleanEmail);
+      toast.success(`Invitation envoyée à ${cleanName}. Il/elle pourra définir son mot de passe via l'e-mail reçu.`);
+      refreshStaffList();
+      setNewStaffName("");
+      setNewStaffEmail("");
+      setNewStaffPhone("");
+      setNewStaffIpWhitelist("");
+      setNewStaffSignature("");
+    } finally {
+      setIsSubmittingStaff(false);
     }
-
-    addAuditLog("STAFF_INVITED", `Invitation envoyée à ${newStaffName} (${newStaffEmail}) — rôle ${newStaffRole}.`, newStaffEmail);
-    toast.success(`Invitation envoyée à ${newStaffName}. Il/elle pourra définir son mot de passe via l'e-mail reçu.`);
-    refreshStaffList();
-    setNewStaffName("");
-    setNewStaffEmail("");
-    setNewStaffPhone("");
-    setNewStaffIpWhitelist("");
-    setNewStaffSignature("");
   };
 
   // Édition d'un Membre du Staff
@@ -4531,6 +4600,11 @@ function NexiumAdminDashboard({
                             AI GOLD
                           </span>
                         )}
+                        {c.recoveryAssistance?.status === "PENDING" && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-md border border-blue-400/40 bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-bold text-blue-300 animate-pulse">
+                            🛡️ RECOUVREMENT DEMANDÉ
+                          </span>
+                        )}
                       </div>
                     ),
                   },
@@ -5233,6 +5307,143 @@ function NexiumAdminDashboard({
                   </div>
                 </div>
               </section>
+
+              {/* ── DEMANDE D'ACCOMPAGNEMENT & RECOUVREMENT DE FONDS ── */}
+              {activeClient.recoveryAssistance && (
+                <section className="rounded-2xl border border-blue-500/40 bg-gradient-to-br from-[#0a152e] to-[#060c1c] p-6 sm:p-7 space-y-4 shadow-xl">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-blue-500/20 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-400 grid place-items-center">
+                        <ShieldAlert className="size-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                          Demande d'Accompagnement &amp; Recouvrement
+                        </h2>
+                        <p className="text-xs text-blue-300 font-mono">
+                          Dossier soumis depuis l'espace client
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      {activeClient.recoveryAssistance.status === "PENDING" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-xs font-bold font-mono animate-pulse">
+                          <span className="size-2 rounded-full bg-amber-400" />
+                          EN ATTENTE DE PRISE EN CHARGE
+                        </span>
+                      ) : activeClient.recoveryAssistance.status === "CONTACTED" ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 text-xs font-bold font-mono">
+                          <span className="size-2 rounded-full bg-emerald-400" />
+                          DOSSIER EN COURS / CLIENT CONTACTÉ
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-600/50 bg-slate-800/40 text-slate-300 text-xs font-bold font-mono">
+                          <CheckCircle2 className="size-4 text-emerald-400" />
+                          DOSSIER CLÔTURÉ (RÉSOLU)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-3 text-xs font-mono">
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Téléphone de rappel</span>
+                      <strong className="text-white text-sm block mt-0.5">
+                        {activeClient.recoveryAssistance.phone || activeClient.phone || "Non renseigné"}
+                      </strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Montant estimé</span>
+                      <strong className="text-amber-300 text-sm block mt-0.5">
+                        {activeClient.recoveryAssistance.estimatedAmount || "Non spécifié"}
+                      </strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Date de transmission</span>
+                      <strong className="text-blue-300 text-xs block mt-0.5">
+                        {new Date(activeClient.recoveryAssistance.requestedAt).toLocaleString("fr-FR")}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {activeClient.recoveryAssistance.note && (
+                    <div className="p-3.5 rounded-xl bg-black/50 border border-blue-500/20 text-xs">
+                      <span className="text-slate-400 text-[10px] uppercase font-bold font-mono block mb-1">
+                        Note / Précisions du client :
+                      </span>
+                      <p className="text-slate-200 leading-relaxed italic">
+                        « {activeClient.recoveryAssistance.note} »
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Actions Desk Admin */}
+                  <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-blue-500/20">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const updatedRec = { ...activeClient.recoveryAssistance!, status: "CONTACTED" as const };
+                        setClients((prev) =>
+                          prev.map((c) => (c.id === activeClient.id ? { ...c, recoveryAssistance: updatedRec } : c))
+                        );
+                        if (isSupabaseConfigured) {
+                          const prof = await getUserProfile(activeClient.id);
+                          const cfg = (prof?.engines_config as any) || {};
+                          await updateUserProfile(activeClient.id, {
+                            engines_config: { ...cfg, recovery_assistance: updatedRec },
+                          });
+                        }
+                        toast.success("Dossier marqué comme Contacté / En cours.");
+                      }}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer"
+                    >
+                      Marquer comme Contacté
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const updatedRec = { ...activeClient.recoveryAssistance!, status: "RESOLVED" as const };
+                        setClients((prev) =>
+                          prev.map((c) => (c.id === activeClient.id ? { ...c, recoveryAssistance: updatedRec } : c))
+                        );
+                        if (isSupabaseConfigured) {
+                          const prof = await getUserProfile(activeClient.id);
+                          const cfg = (prof?.engines_config as any) || {};
+                          await updateUserProfile(activeClient.id, {
+                            engines_config: { ...cfg, recovery_assistance: updatedRec },
+                          });
+                        }
+                        toast.success("Dossier marqué comme Clôturé (Résolu).");
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer"
+                    >
+                      Clôturer (Résolu)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setClients((prev) =>
+                          prev.map((c) => (c.id === activeClient.id ? { ...c, recoveryAssistance: undefined } : c))
+                        );
+                        if (isSupabaseConfigured) {
+                          const prof = await getUserProfile(activeClient.id);
+                          const cfg = (prof?.engines_config as any) || {};
+                          const nextCfg = { ...cfg };
+                          delete nextCfg.recovery_assistance;
+                          await updateUserProfile(activeClient.id, {
+                            engines_config: nextCfg,
+                          });
+                        }
+                        toast.info("Demande d'assistance réinitialisée.");
+                      }}
+                      className="px-4 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer"
+                    >
+                      Réinitialiser la demande
+                    </button>
+                  </div>
+                </section>
+              )}
 
               {/* ── 6. ATTRIBUTION DES 3 MOTEURS & PRESETS ── */}
               <section className="admin-card-purple p-6 sm:p-7 space-y-5">
@@ -6333,9 +6544,17 @@ function NexiumAdminDashboard({
 
                       <button
                         type="submit"
-                        className="admin-btn-primary py-3 text-sm font-bold"
+                        disabled={isSubmittingStaff}
+                        className="admin-btn-primary py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       >
-                        Envoyer l'Invitation
+                        {isSubmittingStaff ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin text-white" />
+                            <span>Traitement de l'invitation…</span>
+                          </>
+                        ) : (
+                          <span>Envoyer l'Invitation</span>
+                        )}
                       </button>
                     </form>
                   </section>
