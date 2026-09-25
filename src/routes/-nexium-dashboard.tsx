@@ -3064,69 +3064,66 @@ function OverviewTab({
         </div>
       </section>
 
-      {/* ── CARTE DÉDIÉE : ACCOMPAGNEMENT PERSONNALISÉ POUR RÉCUPÉRER VOS FONDS ── */}
-      <section className="shrink-0 rounded-2xl border border-blue-500/40 bg-gradient-to-r from-[#07132b]/95 via-[#0b1c3d]/90 to-[#060f22]/95 p-4 sm:p-5 shadow-lg relative overflow-hidden hover:border-blue-400/60 transition-all">
-        {/* Glows ambiants */}
-        <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-blue-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute -left-16 -bottom-16 size-48 rounded-full bg-indigo-500/10 blur-3xl" />
+      {/* ── CARTE DÉDIÉE : CONCIERGERIE PRIVÉE / CARTE NOIRE RECOUVREMENT ── */}
+      <section className="shrink-0 rounded-2xl border border-amber-500/25 bg-gradient-to-br from-[#0c0f17] via-[#080b12] to-[#04060a] p-4 sm:p-5 shadow-2xl relative overflow-hidden transition-all duration-300 hover:border-amber-400/40">
+        {/* Glows d'ambiance feutrés doré / ardoise */}
+        <div className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-amber-500/[0.07] blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 -bottom-20 size-56 rounded-full bg-slate-700/10 blur-3xl" />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           {/* Colonne gauche : Badges + Titre + Description + Engagements */}
           <div className="space-y-2 max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border border-blue-400/40 bg-blue-500/15 text-blue-300 font-mono text-[11px] font-bold tracking-wider uppercase">
-                <ShieldAlert className="size-3.5 text-blue-400" />
-                PÔLE AUDIT &amp; RECOUVREMENT
-              </span>
-              <span className="px-2 py-0.5 rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 font-mono text-[10px] font-bold">
-                CONCIERGERIE PRIVÉE DÉDIÉE
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/35 bg-amber-500/10 text-amber-300 font-mono text-[10.5px] font-bold tracking-wider uppercase">
+                <ShieldCheck className="size-3 text-amber-400" />
+                CONCIERGERIE PRIVÉE · AUDIT &amp; RECOUVREMENT
               </span>
               {recoveryAssistance?.status === "PENDING" ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-[11px] font-bold font-mono animate-pulse">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/15 text-amber-300 text-[10.5px] font-bold font-mono animate-pulse">
                   <span className="size-1.5 rounded-full bg-amber-400" />
-                  DEMANDE EN ATTENTE DE PRISE EN CHARGE
+                  DOSSIER EN ATTENTE
                 </span>
               ) : recoveryAssistance?.status === "CONTACTED" ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 text-[11px] font-bold font-mono">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 text-[10.5px] font-bold font-mono">
                   <span className="size-1.5 rounded-full bg-emerald-400" />
-                  DOSSIER EN COURS DE TRAITEMENT
+                  PRISE EN CHARGE EN COURS
                 </span>
               ) : recoveryAssistance?.status === "RESOLVED" ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-600/50 bg-slate-800/40 text-slate-300 text-[11px] font-bold font-mono">
-                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-slate-700 bg-slate-800/60 text-slate-300 text-[10.5px] font-bold font-mono">
+                  <CheckCircle2 className="size-3 text-emerald-400" />
                   DOSSIER CLÔTURÉ
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-blue-500/40 bg-blue-500/10 text-blue-300 text-[11px] font-bold font-mono">
-                  <span className="size-1.5 rounded-full bg-blue-400" />
-                  DISPONIBLE · PRIORITÉ VIP
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-slate-800 bg-slate-900/80 text-slate-300 text-[10px] font-mono font-medium">
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
+                  LIGNE DIRECTE VIP
                 </span>
               )}
             </div>
 
             <div>
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
                 Accompagnement personnalisé pour récupérer vos fonds
               </h3>
-              <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
-                Assistance confidentielle et prioritaire par notre Desk Spécialisé pour l'audit, le déblocage et la récupération de vos capitaux auprès d'opérateurs ou plateformes tiers.
+              <p className="text-xs sm:text-sm text-slate-300/85 mt-1 leading-relaxed max-w-2xl font-normal">
+                Audit confidentiel, analyse on-chain et médiation par notre Desk Juridique dédié pour débloquer vos capitaux auprès d'opérateurs tiers.
               </p>
             </div>
 
             {/* Détails / Engagements du service */}
-            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs font-mono text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <Clock className="size-3.5 text-blue-400" />
+            <div className="flex flex-wrap items-center gap-3 pt-0.5 text-xs font-mono text-slate-400">
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <Clock className="size-3 text-amber-400/80" />
                 Rappel sous 2h ouvrées
               </span>
-              <span className="text-slate-600">·</span>
-              <span className="flex items-center gap-1.5">
-                <Headset className="size-3.5 text-indigo-400" />
-                Desk Juridique &amp; Litiges
+              <span className="text-slate-700">·</span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <Headset className="size-3 text-slate-400" />
+                Desk Juridique Dédié
               </span>
-              <span className="text-slate-600">·</span>
-              <span className="flex items-center gap-1.5">
-                <Lock className="size-3.5 text-emerald-400" />
+              <span className="text-slate-700">·</span>
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <Lock className="size-3 text-emerald-400/80" />
                 Confidentialité 100% garantie
               </span>
             </div>
@@ -3166,9 +3163,9 @@ function OverviewTab({
             ) : (
               <button
                 onClick={onOpenRecoveryModal}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-400/50 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-5 py-2.5 text-xs sm:text-sm font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] active:scale-95 cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/20 via-slate-900 to-amber-500/10 hover:from-amber-500/30 hover:to-slate-800 text-amber-200 hover:text-white px-5 py-2.5 text-xs sm:text-sm font-bold tracking-wide transition-all shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:shadow-[0_0_25px_rgba(245,158,11,0.3)] active:scale-95 cursor-pointer"
               >
-                <Headset className="size-4" />
+                <Headset className="size-4 text-amber-400" />
                 <span>DEMANDER UNE ASSISTANCE</span>
               </button>
             )}
