@@ -31,23 +31,23 @@ export function PageHeader({
   description?: string;
 }) {
   return (
-    <section className="relative w-full bg-[#05080e] py-16 sm:py-24 border-b border-gray-800 text-white overflow-hidden">
+    <section className="relative w-full bg-[#05080e] py-12 sm:py-16 md:py-18 border-b border-gray-800 text-white overflow-hidden">
       {/* Background Decorative Lines */}
       <div className="absolute top-0 bottom-0 left-[12%] w-px bg-gradient-to-b from-transparent via-[#00ff66]/20 to-transparent pointer-events-none hidden md:block" />
       <div className="absolute top-0 bottom-0 right-[12%] w-px bg-gradient-to-b from-transparent via-[#00ff66]/20 to-transparent pointer-events-none hidden md:block" />
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 md:px-8">
         {eyebrow ? (
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#00ff66]/40 bg-[#00ff66]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#00ff66] backdrop-blur-md shadow-[0_0_20px_rgba(0,255,102,0.2)]">
-            <span className="size-2 rounded-full bg-[#00ff66] animate-pulse" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#00ff66]/40 bg-[#00ff66]/10 px-3.5 py-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#00ff66] backdrop-blur-md shadow-[0_0_15px_rgba(0,255,102,0.15)]">
+            <span className="size-1.5 rounded-full bg-[#00ff66] animate-pulse" />
             {eyebrow}
           </span>
         ) : null}
-        <h1 className="mt-5 max-w-4xl text-4xl font-black tracking-tight text-white sm:text-5xl md:text-6xl leading-tight">
+        <h1 className="mt-4 max-w-4xl text-2xl font-black tracking-tight text-white sm:text-3xl md:text-4xl lg:text-[42px] leading-tight">
           {title}
         </h1>
         {description ? (
-          <p className="mt-5 max-w-2xl text-base sm:text-lg leading-relaxed text-gray-300 font-medium">
+          <p className="mt-3.5 max-w-2xl text-sm sm:text-base leading-relaxed text-gray-300 font-normal">
             {description}
           </p>
         ) : null}
