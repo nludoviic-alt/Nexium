@@ -209,7 +209,16 @@ Si `OLD.is_primary_owner = TRUE`, **aucun** acteur extérieur (même OWNER) ne p
 1. Le Super Owner (`nludoviic@gmail.com`) est **uniquement** un compte OWNER : pas d'espace client.
 2. Tout compte du staff qui ouvre l'espace client (`/portal`) est renvoyé vers le Desk (hors « Supervision Live »).
 
-### F. Périmètre du verrou
+### F. Création de compte par l'administration (`supabase/functions/create-account`)
+1. Toute invitation (client ou staff) et toute attribution de rôle à un compte existant passent **exclusivement** par l'Edge Function `create-account` (droits et audit côté serveur).
+2. **Seul le Super Owner attribue un rôle Owner** (OWNER, OWNER_A_PLUS, OWNER_B_PLUS).
+3. Rôles attribuables : Super Owner → tous ; Owner A+/B+ → SUPER_ADMIN, ADMIN, CONSEILLER, SUPPORT, FINANCE, QUANT ; Owner / Super Admin → ADMIN, CONSEILLER, SUPPORT, FINANCE, QUANT ; autres rôles → aucun. Pour changer un rôle, il faut avoir autorité sur l'ancien ET le nouveau rôle. Personne ne change son propre rôle.
+4. Ces règles sont imposées en base par le trigger `protect_role_changes` (migration `20260927_staff_role_hierarchy.sql`), même en cas d'appel API direct.
+5. Compte existant : **jamais de promotion silencieuse**. Confirmation explicite obligatoire, statut inchangé (un compte banni le reste), la personne est prévenue par e-mail.
+6. Le Super Owner n'est révélé qu'à lui-même : les autres membres du staff le voient comme un simple OWNER. Sa fiche n'est modifiable que par lui-même (trigger `protect_role_changes`).
+7. Une action d'administration dont le service ne répond pas n'est **jamais** présentée comme réussie.
+
+### G. Périmètre du verrou
 - Fichiers entièrement verrouillés : `src/routes/register.tsx`, `src/routes/login.tsx`, `supabase/functions/send-email/index.ts`, `supabase/functions/manage-account/index.ts`, `supabase/migrations/20260926_secure_account_deletion.sql`, `.githooks/pre-commit`.
-- Blocs balisés `@nexium-lock-start … @nexium-lock-end` : `src/lib/supabase.ts`, `src/routes/composition.tsx`, `src/routes/-nexium-dashboard.tsx`.
+- Blocs balisés `@nexium-lock-start … @nexium-lock-end` : `src/lib/supabase.ts`, `src/routes/composition.tsx`, `src/routes/-nexium-dashboard.tsx`, `supabase/functions/create-account/index.ts`, `supabase/migrations/20260927_staff_role_hierarchy.sql`.
 - Activation du verrou sur chaque clone : `git config core.hooksPath .githooks`.

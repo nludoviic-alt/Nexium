@@ -857,14 +857,13 @@ async function callAdminApi(path: string, body: unknown): Promise<{ success: boo
       return { success: true };
     }
 
-    // Si le serveur a renvoyé du HTML (ex: 404 Vite dev ou SPA fallback), ne pas tenter JSON.parse
-    if (!res.ok) {
-      return {
-        success: false,
-        error: "Le service d'administration backend n'est pas joignable (erreur serveur). Si la personne a déjà un compte sur la plateforme, vous pouvez la promouvoir directement.",
-      };
-    }
-    return { success: true };
+    // Réponse non JSON (ex. page HTML du site renvoyée en 200 par l'hébergeur
+    // quand aucun backend n'existe) : l'action n'a PAS été exécutée. Ne jamais
+    // la présenter comme un succès.
+    return {
+      success: false,
+      error: "Le service d'administration n'est pas disponible : l'action n'a pas été effectuée.",
+    };
   } catch (err: any) {
     const msg = err?.message || "";
     if (msg.includes("token") || msg.includes("Unexpected token")) {
@@ -874,19 +873,67 @@ async function callAdminApi(path: string, body: unknown): Promise<{ success: boo
   }
 }
 
+export type AccountRole =
+  | "OWNER"
+  | "OWNER_A_PLUS"
+  | "OWNER_B_PLUS"
+  | "SUPER_ADMIN"
+  | "ADMIN"
+  | "CONSEILLER"
+  | "SUPPORT"
+  | "FINANCE"
+  | "QUANT"
+  | "TRADER";
+
+export interface InviteUserResult {
+  success: boolean;
+  error?: string;
+  /** Vrai si le compte existe déjà : il faut une confirmation explicite. */
+  needsConfirmation?: boolean;
+  existing?: { name: string | null; role: string; status: string | null };
+  promoted?: boolean;
+  invited?: boolean;
+}
+
 /**
- * Invite une nouvelle personne (client ou staff) : crée son compte de connexion
- * Supabase Auth + son profil, et lui envoie un e-mail avec un lien pour choisir
- * son propre mot de passe.
+ * Invite une nouvelle personne (client ou staff) ou attribue un rôle staff à
+ * un compte existant, via l'Edge Function `create-account`. Les droits
+ * d'attribution des rôles sont vérifiés côté serveur (et par le trigger SQL
+ * protect_role_changes). Un compte existant n'est jamais promu sans
+ * `confirmPromote: true`.
  */
+// @nexium-lock-start invite-user-client — voir NEXIUM.md §8
 export async function inviteUser(params: {
   name: string;
   email: string;
   phone?: string;
-  role: "OWNER" | "OWNER_A_PLUS" | "OWNER_B_PLUS" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
-}): Promise<{ success: boolean; error?: string }> {
-  return callAdminApi("/api/admin/invite-user", params);
+  role: AccountRole;
+  confirmPromote?: boolean;
+}): Promise<InviteUserResult> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: "Supabase n'est pas configuré." };
+  }
+  try {
+    const { data, error } = await supabase.functions.invoke("create-account", { body: params });
+    if (data?.success) {
+      return { success: true, promoted: Boolean(data.promoted), invited: Boolean(data.invited) };
+    }
+    // En cas de réponse HTTP d'erreur, le JSON est dans error.context.
+    let payload = data;
+    if (!payload && error) {
+      const ctx = (error as { context?: Response }).context;
+      payload = ctx ? await ctx.json().catch(() => null) : null;
+    }
+    return {
+      success: false,
+      error: payload?.error || error?.message || "Échec de la création du compte.",
+      ...(payload?.needsConfirmation ? { needsConfirmation: true, existing: payload.existing } : {}),
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Service de création de compte injoignable." };
+  }
 }
+// @nexium-lock-end invite-user-client
 
 /**
  * Change l'e-mail de connexion d'un compte (client ou staff), confirmé

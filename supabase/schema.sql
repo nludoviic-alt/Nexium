@@ -558,6 +558,78 @@ CREATE TRIGGER trg_protect_archived_status
     FOR EACH ROW
     EXECUTE FUNCTION public.protect_archived_status();
 
+-- 10ter. HIÉRARCHIE D'ATTRIBUTION DES RÔLES + PROTECTION DE LA FICHE DU SUPER
+-- OWNER (voir supabase/migrations/20260927_staff_role_hierarchy.sql).
+CREATE OR REPLACE FUNCTION public.can_manage_role(target_role TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  caller_role TEXT;
+BEGIN
+  IF public.am_i_primary_owner() THEN
+    RETURN TRUE;
+  END IF;
+
+  caller_role := public.get_my_role();
+
+  IF caller_role IN ('OWNER_A_PLUS', 'OWNER_B_PLUS') THEN
+    RETURN target_role IN ('SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT', 'TRADER');
+  END IF;
+
+  IF caller_role IN ('OWNER', 'SUPER_ADMIN') THEN
+    RETURN target_role IN ('ADMIN', 'CONSEILLER', 'SUPPORT', 'FINANCE', 'QUANT', 'TRADER');
+  END IF;
+
+  RETURN FALSE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.protect_role_changes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.role IS DISTINCT FROM 'TRADER' AND NOT public.can_manage_role(NEW.role) THEN
+      RAISE EXCEPTION 'Votre rôle ne permet pas d''attribuer ce rôle.';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  -- Fiche du Super Owner : modifiable uniquement par lui-même.
+  IF OLD.is_primary_owner AND OLD.id <> auth.uid() THEN
+    RAISE EXCEPTION 'Modification non autorisée.';
+  END IF;
+
+  IF NEW.role IS DISTINCT FROM OLD.role THEN
+    IF OLD.id = auth.uid() THEN
+      RAISE EXCEPTION 'Vous ne pouvez pas modifier votre propre rôle.';
+    END IF;
+    IF NOT public.can_manage_role(OLD.role) OR NOT public.can_manage_role(NEW.role) THEN
+      RAISE EXCEPTION 'Votre rôle ne permet pas ce changement de rôle.';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_role_changes ON public.profiles;
+CREATE TRIGGER trg_protect_role_changes
+    BEFORE INSERT OR UPDATE ON public.profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION public.protect_role_changes();
+
 -- 11. SÉCURITÉ ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mt5_accounts ENABLE ROW LEVEL SECURITY;

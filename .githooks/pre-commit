@@ -36,8 +36,18 @@ fi
 
 git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0
 
-extract_blocks() {
-  awk '/@nexium-lock-start/{on=1} on{print} /@nexium-lock-end/{on=0}'
+# Noms des blocs verrouillés d'un contenu (balise suivie d'un identifiant).
+block_names() {
+  grep -oE '@nexium-lock-start [A-Za-z0-9_-]+' | awk '{print $2}' | sort -u
+}
+
+# Contenu d'un bloc précis, balises comprises.
+extract_block() {
+  awk -v n="$1" '
+    $0 ~ ("@nexium-lock-start " n "([^A-Za-z0-9_-]|$)") { on = 1 }
+    on { print }
+    on && $0 ~ ("@nexium-lock-end " n "([^A-Za-z0-9_-]|$)") { on = 0 }
+  '
 }
 
 violations=()
@@ -49,12 +59,18 @@ while IFS= read -r file; do
       continue 2
     fi
   done
-  before=$(git show "HEAD:$file" 2>/dev/null | extract_blocks)
-  [ -z "$before" ] && continue
-  after=$(git show ":$file" 2>/dev/null | extract_blocks)
-  if [ "$before" != "$after" ]; then
-    violations+=("$file (bloc @nexium-lock modifié)")
-  fi
+  head_content=$(git show "HEAD:$file" 2>/dev/null) || continue
+  index_content=$(git show ":$file" 2>/dev/null)
+  # Chaque bloc existant dans HEAD doit rester identique (ajouter un nouveau
+  # bloc est autorisé ; le modifier ou le supprimer ne l'est pas).
+  while IFS= read -r name; do
+    [ -z "$name" ] && continue
+    before=$(printf '%s\n' "$head_content" | extract_block "$name")
+    after=$(printf '%s\n' "$index_content" | extract_block "$name")
+    if [ "$before" != "$after" ]; then
+      violations+=("$file (bloc @nexium-lock « $name » modifié)")
+    fi
+  done < <(printf '%s\n' "$head_content" | block_names)
 done < <(git diff --cached --name-only --diff-filter=ACMRD)
 
 if [ ${#violations[@]} -gt 0 ]; then

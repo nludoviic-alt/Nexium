@@ -1838,7 +1838,10 @@ function NexiumAdminDashboard({
         email: p.email,
         phone: p.phone || "-",
         role: p.role as AdminSystemRole,
-        isPrimaryOwner: Boolean(p.is_primary_owner),
+        // Le Super Owner n'est révélé qu'à lui-même : pour tout autre membre
+        // du staff, il apparaît comme un simple OWNER. Sa fiche reste protégée
+        // côté base (trigger protect_role_changes).
+        isPrimaryOwner: isPrimaryOwner && Boolean(p.is_primary_owner),
         department: staffDepartmentForRole(p.role as AdminSystemRole),
         status: p.status as AccountStatus,
         twoFactorEnabled: false,
@@ -1852,7 +1855,7 @@ function NexiumAdminDashboard({
         assignedTraders: [],
       }))
     );
-  }, []);
+  }, [isPrimaryOwner]);
 
   useEffect(() => {
     refreshStaffList();
@@ -2597,12 +2600,83 @@ function NexiumAdminDashboard({
   // service backend dédié (clé service_role, jamais côté client) et lui envoie
   // un e-mail pour choisir son propre mot de passe. Il est actif immédiatement
   // après avoir cliqué le lien — aucune étape locale/fictive.
-  const handleCreateStaffMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hasPermission("can_manage_staff")) {
-      toast.error("Privilège insuffisant : votre rôle ne peut pas créer de collaborateurs.");
-      return;
+  // Rôles que la session courante peut attribuer (même règle que l'Edge
+  // Function create-account et le trigger SQL protect_role_changes).
+  // @nexium-lock-start staff-role-matrix — voir NEXIUM.md §8
+  const assignableStaffRoles: AdminSystemRole[] = isPrimaryOwner
+    ? ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"]
+    : currentSessionRole === "OWNER_A_PLUS" || currentSessionRole === "OWNER_B_PLUS"
+    ? ["SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"]
+    : currentSessionRole === "OWNER" || currentSessionRole === "SUPER_ADMIN"
+    ? ["ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"]
+    : [];
+  const assignableStaffRoleOptions = STAFF_ROLE_OPTIONS.filter((o) => assignableStaffRoles.includes(o.value));
+  // @nexium-lock-end staff-role-matrix
+
+  const resetNewStaffForm = () => {
+    setNewStaffName("");
+    setNewStaffEmail("");
+    setNewStaffPhone("");
+    setNewStaffIpWhitelist("");
+    setNewStaffSignature("");
+  };
+
+  // Création d'un membre du staff : tout passe par l'Edge Function
+  // create-account (droits vérifiés côté serveur, audit serveur). Un compte
+  // existant n'est jamais promu sans confirmation explicite.
+  // @nexium-lock-start staff-invitation — voir NEXIUM.md §8
+  const submitStaffInvitation = async (cleanName: string, cleanEmail: string, cleanPhone: string, role: AdminSystemRole, confirmPromote: boolean) => {
+    setIsSubmittingStaff(true);
+    try {
+      const result = await inviteUser({
+        name: cleanName,
+        email: cleanEmail,
+        ...(cleanPhone ? { phone: cleanPhone } : {}),
+        role,
+        ...(confirmPromote ? { confirmPromote: true } : {}),
+      });
+
+      if (result.needsConfirmation && result.existing) {
+        const existing = result.existing;
+        requestConfirmation(
+          `Attribuer le rôle ${roleLabel(role)} à un compte existant ?`,
+          `Un compte existe déjà pour ${cleanEmail}` +
+            `${existing.name ? ` (${existing.name})` : ""}.\n` +
+            `• Rôle actuel : ${roleLabel(existing.role as AdminSystemRole)}\n` +
+            `• Nouveau rôle : ${roleLabel(role)}\n` +
+            `• Statut du compte : ${existing.status || "—"} (inchangé)\n\n` +
+            `La personne sera prévenue par e-mail. Confirmez-vous ce changement ?`,
+          "Confirmer l'attribution",
+          "WARNING",
+          () => {
+            void submitStaffInvitation(cleanName, cleanEmail, cleanPhone, role, true);
+          }
+        );
+        return;
+      }
+
+      if (!result.success) {
+        toast.error(result.error || "Échec de l'invitation du membre du staff.");
+        return;
+      }
+
+      // Audit déjà écrit côté serveur par la fonction create-account
+      if (result.promoted) {
+        addAuditLog("STAFF_PROMOTED", `Rôle ${role} attribué au compte existant ${cleanEmail}.`, cleanEmail, false);
+        toast.success(`Rôle ${roleLabel(role)} attribué à ${cleanEmail}. La personne a été prévenue par e-mail.`);
+      } else {
+        addAuditLog("STAFF_INVITED", `Invitation envoyée à ${cleanName} (${cleanEmail}) — rôle ${role}.`, cleanEmail, false);
+        toast.success(`Invitation envoyée à ${cleanName}. Il/elle pourra définir son mot de passe via l'e-mail reçu.`);
+      }
+      refreshStaffList();
+      resetNewStaffForm();
+    } finally {
+      setIsSubmittingStaff(false);
     }
+  };
+
+  const handleCreateStaffMember = (e: React.FormEvent) => {
+    e.preventDefault();
     const cleanName = newStaffName.trim();
     const cleanEmail = newStaffEmail.trim().toLowerCase();
     const cleanPhone = newStaffPhone.trim();
@@ -2611,88 +2685,26 @@ function NexiumAdminDashboard({
       toast.error("Veuillez renseigner au minimum le nom et l'e-mail.");
       return;
     }
-
-    if (["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(newStaffRole) && !isPrimaryOwner) {
-      toast.error("Seul le Super Owner peut désigner ou créer ce rôle.");
+    if (!assignableStaffRoles.includes(newStaffRole)) {
+      toast.error(
+        ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(newStaffRole)
+          ? "Seul le Super Owner peut attribuer un rôle Owner."
+          : "Votre rôle ne permet pas d'attribuer ce rôle."
+      );
       return;
     }
 
-    setIsSubmittingStaff(true);
-    try {
-      // 1. Vérifier si un profil existe déjà avec cet e-mail sur la plateforme
-      const existing = await findProfileByEmail(cleanEmail);
-      if (existing) {
-        // Promotion directe du compte existant sans blocage
-        const updateRes = await updateUserProfile(existing.id, {
-          role: newStaffRole,
-          name: cleanName || existing.name,
-          phone: cleanPhone || existing.phone,
-          status: "ACTIVE",
-        });
-
-        if (updateRes.success) {
-          addAuditLog(
-            "STAFF_PROMOTED",
-            `Compte existant ${cleanEmail} configuré avec le rôle ${newStaffRole} par ${currentAdminRole}.`,
-            cleanEmail
-          );
-          toast.success(`Le compte de ${cleanName} (${cleanEmail}) a été configuré avec succès avec le rôle ${newStaffRole}.`);
-          refreshStaffList();
-          setNewStaffName("");
-          setNewStaffEmail("");
-          setNewStaffPhone("");
-          setNewStaffIpWhitelist("");
-          setNewStaffSignature("");
-          return;
-        } else {
-          toast.error(updateRes.error || "Impossible de mettre à jour le rôle du compte existant.");
-          return;
-        }
+    requestConfirmation(
+      `Inviter ${cleanName} comme ${roleLabel(newStaffRole)} ?`,
+      `Une invitation sera envoyée à ${cleanEmail} avec le rôle ${roleLabel(newStaffRole)}. La personne choisira son mot de passe via l'e-mail reçu.`,
+      "Envoyer l'invitation",
+      "INFO",
+      () => {
+        void submitStaffInvitation(cleanName, cleanEmail, cleanPhone, newStaffRole, false);
       }
-
-      // 2. Si le compte n'existe pas encore, envoyer une invitation sécurisée
-      const result = await inviteUser({
-        name: cleanName,
-        email: cleanEmail,
-        ...(cleanPhone ? { phone: cleanPhone } : {}),
-        role: newStaffRole,
-      });
-
-      if (!result.success) {
-        // En cas d'erreur indiquant que l'utilisateur est déjà inscrit, retenter la recherche de profil
-        if (result.error && (result.error.toLowerCase().includes("already") || result.error.toLowerCase().includes("existe") || result.error.toLowerCase().includes("registered"))) {
-          const retryProfile = await findProfileByEmail(cleanEmail);
-          if (retryProfile) {
-            await updateUserProfile(retryProfile.id, {
-              role: newStaffRole,
-              name: cleanName || retryProfile.name,
-              status: "ACTIVE",
-            });
-            addAuditLog("STAFF_PROMOTED", `Compte existant ${cleanEmail} promu au rôle ${newStaffRole}.`, cleanEmail);
-            toast.success(`Compte ${cleanEmail} configuré avec le rôle ${newStaffRole}.`);
-            refreshStaffList();
-            setNewStaffName("");
-            setNewStaffEmail("");
-            setNewStaffPhone("");
-            return;
-          }
-        }
-        toast.error(result.error || "Échec de l'invitation du membre du staff.");
-        return;
-      }
-
-      addAuditLog("STAFF_INVITED", `Invitation envoyée à ${cleanName} (${cleanEmail}) — rôle ${newStaffRole}.`, cleanEmail);
-      toast.success(`Invitation envoyée à ${cleanName}. Il/elle pourra définir son mot de passe via l'e-mail reçu.`);
-      refreshStaffList();
-      setNewStaffName("");
-      setNewStaffEmail("");
-      setNewStaffPhone("");
-      setNewStaffIpWhitelist("");
-      setNewStaffSignature("");
-    } finally {
-      setIsSubmittingStaff(false);
-    }
+    );
   };
+  // @nexium-lock-end staff-invitation
 
   // Édition d'un Membre du Staff
   const handleOpenEditStaff = (st: StaffAdministrator) => {
@@ -6668,7 +6680,7 @@ function NexiumAdminDashboard({
                         <AdminDropdown
                           value={newStaffRole}
                           onChange={(r) => setNewStaffRole(r)}
-                          options={STAFF_ROLE_OPTIONS}
+                          options={assignableStaffRoleOptions}
                         />
                       </div>
 
@@ -7006,10 +7018,13 @@ function NexiumAdminDashboard({
                                 value={editStaffRole}
                                 disabled={
                                   editingStaffMember.isPrimaryOwner ||
-                                  (editingStaffMember.role === "OWNER" && currentSessionRole !== "OWNER")
+                                  editingStaffMember.id === sessionUser.id ||
+                                  !assignableStaffRoles.includes(editingStaffMember.role)
                                 }
                                 onChange={(r) => setEditStaffRole(r)}
-                                options={STAFF_ROLE_OPTIONS}
+                                options={STAFF_ROLE_OPTIONS.filter(
+                                  (o) => assignableStaffRoles.includes(o.value) || o.value === editingStaffMember.role
+                                )}
                               />
                             </div>
 
