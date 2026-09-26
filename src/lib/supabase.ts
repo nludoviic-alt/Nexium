@@ -93,6 +93,7 @@ export async function getCurrentSession() {
  * Récupère le profil enrichi de l'utilisateur depuis la table `profiles`.
  * Renvoie null si le profil n'existe pas (compte supprimé).
  */
+// @nexium-lock-start profile-no-recreate — voir NEXIUM.md §8
 export async function getUserProfile(userId: string): Promise<SupabaseUserProfile | null> {
   if (!isSupabaseConfigured) return null;
   const { data, error } = await supabase
@@ -111,6 +112,7 @@ export async function getUserProfile(userId: string): Promise<SupabaseUserProfil
   // supprimé par l'administration.
   return (data as SupabaseUserProfile | null) ?? null;
 }
+// @nexium-lock-end profile-no-recreate
 
 /**
  * Met à jour les informations du profil utilisateur.
@@ -598,6 +600,7 @@ export async function findProfileByEmail(email: string): Promise<SupabaseUserPro
  * aussi le journal d'audit. Aucun repli sur une écriture directe dans
  * `profiles` : elle laisserait un compte de connexion orphelin.
  */
+// @nexium-lock-start manage-account-client — voir NEXIUM.md §8
 async function callManageAccount(
   action: "delete" | "archive" | "restore",
   userId: string
@@ -638,6 +641,7 @@ export async function archiveAccount(userId: string) {
 export async function restoreAccount(userId: string) {
   return callManageAccount("restore", userId);
 }
+// @nexium-lock-end manage-account-client
 
 /* ==========================================================================
    HELPERS LOGS D'AUDIT & SÉCURITÉ

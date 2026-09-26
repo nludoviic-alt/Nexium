@@ -8417,6 +8417,7 @@ export function NexiumDashboard({
 
       const isAdmin = profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
 
+      // @nexium-lock-start staff-portal-redirect — voir NEXIUM.md §8
       // L'espace client est réservé aux clients : un compte du staff (y compris
       // le Super Owner) est renvoyé vers le Desk. La supervision d'un client
       // passe par « Supervision Live » (adminImpersonateUserId, traité plus haut).
@@ -8424,6 +8425,7 @@ export function NexiumDashboard({
         navigate({ to: "/desk/$slug", params: { slug: getAdminSlug({ name: profile?.name, email: user.email, id: user.id }) } });
         return;
       }
+      // @nexium-lock-end staff-portal-redirect
 
       // Verrouillage formel : si le compte n'est pas actif et n'est pas admin, bloquer l'accès
       if (!isAdmin) {

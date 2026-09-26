@@ -1517,6 +1517,7 @@ function NexiumAdminDashboard({
 
   // Confirmation obligatoire avant toute modification d'une fiche client :
   // la fenêtre récapitule les champs modifiés pour valider le geste.
+  // @nexium-lock-start client-save-confirmation — voir NEXIUM.md §8
   const handleRequestSaveClientProfile = () => {
     if (!activeClient) return;
 
@@ -1557,6 +1558,7 @@ function NexiumAdminDashboard({
       handleSaveClientProfile
     );
   };
+  // @nexium-lock-end client-save-confirmation
 
   const handleSaveClientProfile = async () => {
     if (!activeClient) return;
@@ -3407,6 +3409,7 @@ function NexiumAdminDashboard({
 
   // Suppression et archivage d'un client : réservés au Super Owner (vérifié
   // aussi côté serveur par l'Edge Function manage-account).
+  // @nexium-lock-start client-archive-delete — voir NEXIUM.md §8
   const handleArchiveClient = () => {
     if (!isPrimaryOwner) {
       toast.error("Seul le Super Owner peut archiver un client.");
@@ -3484,6 +3487,7 @@ function NexiumAdminDashboard({
       }
     );
   };
+  // @nexium-lock-end client-archive-delete
 
   const handleStartImpersonation = (client: UserProfile) => {
     setImpersonatedClientId(client.id);
@@ -5022,6 +5026,7 @@ function NexiumAdminDashboard({
                     </button>
                   )}
 
+                  {/* @nexium-lock-start client-archive-delete-buttons — voir NEXIUM.md §8 */}
                   {isPrimaryOwner && activeClient.status === "ARCHIVED" && (
                     <button
                       onClick={handleRestoreClient}
@@ -5051,6 +5056,7 @@ function NexiumAdminDashboard({
                       <span>Supprimer</span>
                     </button>
                   )}
+                  {/* @nexium-lock-end client-archive-delete-buttons */}
                 </div>
               </section>
 

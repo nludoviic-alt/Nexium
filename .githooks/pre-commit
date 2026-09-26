@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Verrou des fonctionnalités de sécurité Nexium — voir NEXIUM.md §8.
+#
+# Refuse tout commit qui modifie :
+#   - un fichier entièrement verrouillé (LOCKED_FILES) ;
+#   - le contenu d'un bloc balisé @nexium-lock-start / @nexium-lock-end.
+# Déverrouillage ponctuel, par le propriétaire uniquement :
+#   NEXIUM_UNLOCK=<code> git commit ...
+# Seule l'empreinte SHA-256 du code est stockée ici.
+#
+# Activation (une fois par clone) : git config core.hooksPath .githooks
+
+UNLOCK_HASH="a0bd500821a86e562ff1a1ab1d85caca8f3ddd287a0a3267536f9a1b7335cfb3"
+
+LOCKED_FILES=(
+  ".githooks/pre-commit"
+  "src/routes/register.tsx"
+  "src/routes/login.tsx"
+  "supabase/functions/send-email/index.ts"
+  "supabase/functions/manage-account/index.ts"
+  "supabase/migrations/20260926_secure_account_deletion.sql"
+)
+
+sha256() {
+  if command -v shasum >/dev/null 2>&1; then shasum -a 256 | cut -d' ' -f1; else sha256sum | cut -d' ' -f1; fi
+}
+
+if [ -n "${NEXIUM_UNLOCK:-}" ]; then
+  if [ "$(printf %s "$NEXIUM_UNLOCK" | sha256)" = "$UNLOCK_HASH" ]; then
+    echo "🔓 Verrou Nexium levé pour ce commit (NEXIUM_UNLOCK valide)."
+    exit 0
+  fi
+  echo "❌ NEXIUM_UNLOCK invalide."
+  exit 1
+fi
+
+git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0
+
+extract_blocks() {
+  awk '/@nexium-lock-start/{on=1} on{print} /@nexium-lock-end/{on=0}'
+}
+
+violations=()
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  for locked in "${LOCKED_FILES[@]}"; do
+    if [ "$file" = "$locked" ]; then
+      violations+=("$file (fichier verrouillé)")
+      continue 2
+    fi
+  done
+  before=$(git show "HEAD:$file" 2>/dev/null | extract_blocks)
+  [ -z "$before" ] && continue
+  after=$(git show ":$file" 2>/dev/null | extract_blocks)
+  if [ "$before" != "$after" ]; then
+    violations+=("$file (bloc @nexium-lock modifié)")
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACMRD)
+
+if [ ${#violations[@]} -gt 0 ]; then
+  echo "🔒 Commit refusé : fonctionnalités de sécurité verrouillées (NEXIUM.md §8)."
+  for v in "${violations[@]}"; do echo "   - $v"; done
+  echo "   Déverrouillage réservé au propriétaire : NEXIUM_UNLOCK=<code> git commit ..."
+  exit 1
+fi
+exit 0

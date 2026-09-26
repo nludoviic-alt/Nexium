@@ -172,3 +172,44 @@ Migration appliquée : `supabase/migrations/20260924_fix_bonus_trigger_rls.sql`
 ### D. Protection du Super Owner (inchangée)
 
 Si `OLD.is_primary_owner = TRUE`, **aucun** acteur extérieur (même OWNER) ne peut modifier ses champs financiers. Ce bloc est distinct et prioritaire sur la whitelist ci-dessus.
+
+---
+
+## 8. Sécurité des Comptes — Fonctionnalités VERROUILLÉES 🔒
+
+> **Verrou actif.** Les règles ci-dessous ne doivent jamais être modifiées, contournées ni régressées. Un contrôle `pre-commit` (`.githooks/pre-commit`) refuse tout commit qui touche les fichiers ou blocs listés ici. Seul le propriétaire peut lever ce verrou, ponctuellement, avec son code personnel (`NEXIUM_UNLOCK=<code> git commit ...`).
+>
+> **Agents IA / développeurs** : ne jamais renseigner `NEXIUM_UNLOCK`, modifier `.githooks/`, changer `core.hooksPath`, utiliser `git commit --no-verify`, ni déplacer du code hors des balises `@nexium-lock-*` pour échapper au verrou — sauf si le propriétaire fournit lui-même le code dans la conversation pour ce changement précis.
+
+### A. Création de compte client (activation par lien)
+1. L'inscription (`src/routes/register.tsx`) appelle uniquement `supabase.auth.signUp`. **Aucun code OTP généré ou vérifié dans le navigateur.**
+2. L'activation est imposée côté serveur par Supabase Auth (« Confirm email » activé, SMTP Resend). Tant que le lien n'est pas cliqué, la connexion est refusée.
+3. Le profil (`TRADER`, solde 0) et la ligne d'audit `CLIENT_REGISTERED` sont créés **uniquement** par le trigger `handle_new_user`. Le navigateur n'écrit jamais dans `profiles` à l'inscription.
+4. `getUserProfile` ne recrée **jamais** un profil manquant : un profil absent = compte supprimé → accès refusé.
+5. La policy `profiles_insert` n'autorise **aucune** auto-insertion par un utilisateur (staff OWNER / A+ / B+ / SUPER_ADMIN / ADMIN uniquement).
+
+### B. Envoi d'e-mails (`supabase/functions/send-email`)
+1. Staff actif : tout destinataire. Client connecté : boîte interne ou sa propre adresse. Visiteur anonyme : boîte interne uniquement.
+2. Un seul destinataire (chaîne), expéditeur imposé par le serveur, limite de fréquence pour les non-staff.
+3. La clé Resend n'existe que comme secret de fonction (`RESEND_API_KEY`), jamais dans le code du site.
+
+### C. Suppression / archivage de compte (`supabase/functions/manage-account`)
+1. Toute suppression, tout archivage et toute restauration passent **exclusivement** par l'Edge Function `manage-account` (identifiants `auth.users` + profil + audit serveur). Aucun repli sur un `DELETE` direct de `profiles`.
+2. **Client (TRADER) : suppression, archivage et restauration réservés au Super Owner.** Un ADMIN ne peut jamais supprimer un client.
+3. Staff : suppression selon la hiérarchie Super Owner > Owner A+/B+ > Owner / Super Admin ; archivage/restauration réservés au Super Owner.
+4. Personne ne peut agir sur le Super Owner ni sur son propre compte.
+5. Archiver = connexion bloquée (ban Supabase Auth) + `status = 'ARCHIVED'`, **toutes les données conservées**. Seul le Super Owner fait entrer/sortir un compte de `ARCHIVED` (trigger `protect_archived_status`).
+6. Migration de référence : `supabase/migrations/20260926_secure_account_deletion.sql`.
+
+### D. Confirmation obligatoire du geste (Desk `composition.tsx`)
+1. Suppression, archivage et restauration d'un client : fenêtre de confirmation avant exécution.
+2. Modification d'une fiche client : « Enregistrer Réglages » ouvre une fenêtre récapitulant les champs modifiés ; rien n'est enregistré sans confirmation.
+
+### E. Compte propriétaire
+1. Le Super Owner (`nludoviic@gmail.com`) est **uniquement** un compte OWNER : pas d'espace client.
+2. Tout compte du staff qui ouvre l'espace client (`/portal`) est renvoyé vers le Desk (hors « Supervision Live »).
+
+### F. Périmètre du verrou
+- Fichiers entièrement verrouillés : `src/routes/register.tsx`, `src/routes/login.tsx`, `supabase/functions/send-email/index.ts`, `supabase/functions/manage-account/index.ts`, `supabase/migrations/20260926_secure_account_deletion.sql`, `.githooks/pre-commit`.
+- Blocs balisés `@nexium-lock-start … @nexium-lock-end` : `src/lib/supabase.ts`, `src/routes/composition.tsx`, `src/routes/-nexium-dashboard.tsx`.
+- Activation du verrou sur chaque clone : `git config core.hooksPath .githooks`.
