@@ -6,11 +6,9 @@
  * 3. Dossiers de recouvrement
  */
 
-const DEFAULT_BOT_TOKEN =
-  import.meta.env.VITE_TELEGRAM_BOT_TOKEN || "8875168873:AAGVKgiN4YYsAcGTpKobjFHuzGRzQAjYlVU";
+const DEFAULT_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || "";
 
-let configuredChatId =
-  import.meta.env.VITE_TELEGRAM_CHAT_ID || "-1004448381310";
+let configuredChatId = import.meta.env.VITE_TELEGRAM_CHAT_ID || "";
 
 export function setTelegramChatId(chatId: string) {
   configuredChatId = chatId;
