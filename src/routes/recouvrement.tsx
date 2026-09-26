@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
 import { createLiveChatThread } from "@/lib/chat-router";
 import { sendContactNotificationEmail } from "@/lib/resend";
+import { notifyTelegramRecoveryDossier } from "@/lib/telegram";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/recouvrement")({
@@ -255,6 +256,18 @@ function RecoveryAssistancePage() {
         email: email.trim(),
         subject: `[RECOUVREMENT] Dossier ${generatedDossierId} - ${fullName.trim()}`,
         message: `Montant: ${estimatedAmount} | Plateforme: ${brokerPlatform} | Litige: ${disputeLabel}\n\n${description}`,
+      }).catch(() => {});
+
+      // 5. Notification instantanée Telegram
+      notifyTelegramRecoveryDossier({
+        dossierId: generatedDossierId,
+        fullName: fullName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        brokerPlatform: brokerPlatform.trim() || undefined,
+        estimatedAmount: estimatedAmount.trim() || undefined,
+        disputeLabel,
+        description: description.trim() || undefined,
       }).catch(() => {});
 
       // Backup local

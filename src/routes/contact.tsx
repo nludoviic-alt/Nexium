@@ -18,6 +18,7 @@ import { PageHeader, PageShell, Section } from "@/components/site/PageShell";
 import { useLanguage } from "@/context/LanguageContext";
 import { createLiveChatThread } from "@/lib/chat-router";
 import { sendContactNotificationEmail } from "@/lib/resend";
+import { notifyTelegramContactMessage } from "@/lib/telegram";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/contact")({
@@ -239,6 +240,16 @@ function ContactPage() {
       }).catch((resendErr) => {
         console.warn("Notice Resend Contact alert:", resendErr);
       });
+
+      // D. Notification instantanée Telegram
+      notifyTelegramContactMessage({
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        subject: formData.subject || "Demande générale",
+        message: formData.message.trim(),
+        mt5Account: formData.mt5Account.trim() || undefined,
+        broker: formData.broker.trim() || undefined,
+      }).catch(() => {});
 
       // Enregistrer le timestamp pour le rate limiter
       try {

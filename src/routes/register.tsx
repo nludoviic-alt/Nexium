@@ -28,6 +28,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sendWelcomeEmail, sendAdminNewClientAlertEmail } from "@/lib/resend";
+import { notifyTelegramNewRegistration } from "@/lib/telegram";
 import { getUserSlug } from "@/lib/user-slug";
 import { passwordIssue } from "@/lib/password";
 import { LanguageSelector } from "@/components/site/LanguageSelector";
@@ -180,6 +181,14 @@ function RegisterPage() {
       } catch (mailErr) {
         console.warn("Notice envoi email Resend:", mailErr);
       }
+
+      // 5. Notification instantanée Telegram
+      notifyTelegramNewRegistration({
+        name: fullName,
+        email,
+        country,
+        phone: phone.trim(),
+      }).catch(() => {});
 
       const userSlug = getUserSlug({ name: fullName, email, id: createdUserId });
       toast.success(language === "fr" ? `Bienvenue sur votre compte, ${fullName} !` : `Welcome to your account, ${fullName}!`);
