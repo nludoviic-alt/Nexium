@@ -22,12 +22,12 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
 });
 
-import { Check, ChevronDown, Eye, EyeOff, Globe, Loader2, Clock, CheckCircle2, ShieldCheck, Mail, ArrowLeft, RefreshCw, KeyRound } from "lucide-react";
+import { Check, ChevronDown, Eye, EyeOff, Globe, Loader2, Clock, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { sendWelcomeEmail, sendAdminNewClientAlertEmail, sendEmailVerificationOtp } from "@/lib/resend";
+import { sendAdminNewClientAlertEmail } from "@/lib/resend";
 import { notifyTelegramNewRegistration } from "@/lib/telegram";
 import { getUserSlug } from "@/lib/user-slug";
 import { passwordIssue } from "@/lib/password";
@@ -47,17 +47,14 @@ function RegisterPage() {
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
 
-  // Multi-step: FORM (saisie infos) -> OTP (validation code à 6 chiffres)
-  const [step, setStep] = useState<"FORM" | "OTP">("FORM");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpExpiresAt, setOtpExpiresAt] = useState<number>(0);
-  const [otpAttempts, setOtpAttempts] = useState<number>(0);
-  const [otpInput, setOtpInput] = useState("");
+  // Multi-step: FORM (saisie infos) -> CHECK_EMAIL (lien d'activation envoyé)
+  // L'activation est imposée côté serveur par Supabase Auth (« Confirm email ») :
+  // tant que le lien n'a pas été cliqué, signInWithPassword est refusé.
+  const [step, setStep] = useState<"FORM" | "CHECK_EMAIL">("FORM");
   const [resendCooldown, setResendCooldown] = useState<number>(0);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
-  // Décompte de temporisation pour le renvoi d'un nouveau code
+  // Décompte de temporisation pour le renvoi du lien d'activation
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const timer = setInterval(() => {
@@ -66,8 +63,9 @@ function RegisterPage() {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
-  // Étape 1 : validation préliminaire et expédition du code OTP par e-mail
-  const handleInitiateRegistration = async (e: React.FormEvent) => {
+  const activationRedirectUrl = () => `${window.location.origin}/login?activated=1`;
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !firstName || !lastName || !phone) {
       toast.error(language === "fr" ? "Veuillez remplir tous les champs obligatoires." : "Please fill in all required fields.");
@@ -90,263 +88,124 @@ function RegisterPage() {
       return;
     }
 
+    if (!isSupabaseConfigured) {
+      toast.error(language === "fr" ? "Service d'inscription indisponible. Contactez le support." : "Registration service unavailable. Please contact support.");
+      return;
+    }
+
     setLoading(true);
     const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    const cleanEmail = email.trim();
 
     try {
-      // Génération d'un code OTP sécurisé à 6 chiffres
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setOtpCode(generatedOtp);
-      setOtpExpiresAt(Date.now() + 10 * 60 * 1000); // 10 minutes de validité
-      setOtpAttempts(0);
-      setOtpInput("");
-      setResendCooldown(60);
-
-      // Expédition de l'e-mail officiel avec le code via Resend
-      const sendRes = await sendEmailVerificationOtp({
-        email: email.trim(),
-        fullName,
-        code: generatedOtp,
-        lang: language as "fr" | "en",
+      // Création du compte Supabase Auth. Le profil (TRADER, solde 0) et la
+      // ligne d'audit CLIENT_REGISTERED sont créés côté base par le trigger
+      // handle_new_user — rien n'est écrit depuis le navigateur.
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            name: fullName,
+            country,
+            phone: phone.trim(),
+            lang: language,
+          },
+          emailRedirectTo: activationRedirectUrl(),
+        },
       });
 
-      if (!sendRes.success) {
-        console.warn("Notice envoi OTP Resend:", sendRes.error);
+      if (error) {
+        const msg = error.message?.toLowerCase() || "";
+        if (error.code === "user_already_exists" || msg.includes("already registered")) {
+          toast.error(
+            language === "fr"
+              ? "Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter."
+              : "An account already exists with this email. Please sign in."
+          );
+          navigate({ to: "/login" });
+          return;
+        }
+        if (error.status === 429 || error.code === "over_email_send_rate_limit" || msg.includes("rate limit")) {
+          toast.error(
+            language === "fr"
+              ? "Trop de demandes d'inscription. Veuillez réessayer dans quelques minutes."
+              : "Too many registration attempts. Please try again in a few minutes."
+          );
+          return;
+        }
+        toast.error(`${language === "fr" ? "Erreur d'inscription" : "Registration error"} : ${error.message}`);
+        return;
       }
 
-      setStep("OTP");
-      toast.success(
-        language === "fr"
-          ? `Code de sécurité envoyé à ${email.trim()}`
-          : `Security code sent to ${email.trim()}`
-      );
+      // Avec « Confirm email » actif, Supabase renvoie un utilisateur sans
+      // identité (et sans erreur) lorsque l'adresse est déjà enregistrée.
+      if (data.user && data.user.identities?.length === 0) {
+        toast.error(
+          language === "fr"
+            ? "Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter."
+            : "An account already exists with this email. Please sign in."
+        );
+        navigate({ to: "/login" });
+        return;
+      }
+
+      // Alertes internes (nouveau compte en attente d'activation)
+      sendAdminNewClientAlertEmail({
+        name: fullName,
+        email: cleanEmail,
+        country,
+        phone: phone.trim(),
+      }).catch((mailErr) => console.warn("Notice envoi email Resend:", mailErr));
+      notifyTelegramNewRegistration({
+        name: fullName,
+        email: cleanEmail,
+        country,
+        phone: phone.trim(),
+      }).catch(() => {});
+
+      if (data.session) {
+        // « Confirm email » est désactivé dans Supabase : le compte est ouvert
+        // sans activation. À corriger dans Authentication > Sign In / Providers.
+        console.error("Supabase « Confirm email » désactivé : compte ouvert sans activation par e-mail.");
+        const userSlug = getUserSlug({ name: fullName, email: cleanEmail, id: data.session.user.id });
+        navigate({ to: "/portal/$slug", params: { slug: userSlug } });
+        return;
+      }
+
+      setResendCooldown(60);
+      setStep("CHECK_EMAIL");
     } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'envoi du code de vérification.");
+      toast.error(err.message || (language === "fr" ? "Erreur lors de la création du compte." : "Error while creating the account."));
     } finally {
       setLoading(false);
     }
   };
 
-  // Renvoi d'un nouveau code OTP
-  const handleResendOtp = async () => {
+  // Renvoi du lien d'activation (limité côté serveur par Supabase Auth)
+  const handleResendActivation = async () => {
     if (resendCooldown > 0 || isResending) return;
     setIsResending(true);
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-
     try {
-      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setOtpCode(newOtp);
-      setOtpExpiresAt(Date.now() + 10 * 60 * 1000);
-      setOtpAttempts(0);
-      setOtpInput("");
-      setResendCooldown(60);
-
-      await sendEmailVerificationOtp({
+      const { error } = await supabase.auth.resend({
+        type: "signup",
         email: email.trim(),
-        fullName,
-        code: newOtp,
-        lang: language as "fr" | "en",
+        options: { emailRedirectTo: activationRedirectUrl() },
       });
-
+      if (error) {
+        toast.error(
+          language === "fr"
+            ? "Impossible de renvoyer le lien pour le moment. Réessayez dans quelques minutes."
+            : "Unable to resend the link right now. Please try again in a few minutes."
+        );
+        return;
+      }
+      setResendCooldown(60);
       toast.success(
-        language === "fr"
-          ? "Un nouveau code de sécurité vous a été envoyé."
-          : "A new security code has been sent."
+        language === "fr" ? "Un nouveau lien d'activation vous a été envoyé." : "A new activation link has been sent."
       );
-    } catch (err: any) {
-      toast.error(err.message || "Impossible de renvoyer le code.");
     } finally {
       setIsResending(false);
-    }
-  };
-
-  // Étape 2 : Vérification du code OTP et création définitive du compte
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanInput = otpInput.trim();
-
-    if (cleanInput.length !== 6) {
-      toast.error(
-        language === "fr"
-          ? "Veuillez saisir les 6 chiffres du code."
-          : "Please enter all 6 digits of the code."
-      );
-      return;
-    }
-
-    if (Date.now() > otpExpiresAt) {
-      toast.error(
-        language === "fr"
-          ? "Ce code a expiré. Veuillez cliquer sur Renvoyer."
-          : "This code has expired. Please click Resend."
-      );
-      return;
-    }
-
-    if (cleanInput !== otpCode) {
-      const nextAttempts = otpAttempts + 1;
-      setOtpAttempts(nextAttempts);
-      if (nextAttempts >= 5) {
-        toast.error(
-          language === "fr"
-            ? "Nombre maximal de tentatives atteint. Veuillez demander un nouveau code."
-            : "Max attempts reached. Please request a new code."
-        );
-        setOtpCode(""); // Invalide le code actuel
-      } else {
-        toast.error(
-          language === "fr"
-            ? `Code incorrect. Il vous reste ${5 - nextAttempts} tentative(s).`
-            : `Incorrect code. ${5 - nextAttempts} attempt(s) remaining.`
-        );
-      }
-      return;
-    }
-
-    // Le code OTP est validé avec succès : création définitive du compte
-    setIsVerifying(true);
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-
-    try {
-      let createdUserId = `usr-${Date.now()}`;
-      let hasSession = false;
-
-      if (isSupabaseConfigured) {
-        // 1. Création compte utilisateur Supabase Auth
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: {
-              name: fullName,
-              country,
-              phone: phone.trim(),
-              email_verified_via_otp: true,
-            },
-            emailRedirectTo: "https://nexiummarkets.com/login",
-          },
-        });
-
-        if (error) {
-          const isRateLimit =
-            error.message?.toLowerCase().includes("rate limit") ||
-            (error as any).status === 429 ||
-            (error as any).code === "over_email_send_rate_limit";
-
-          if (isRateLimit) {
-            console.warn("Notice: Limite SMTP Supabase atteinte. Prise en charge transparente par Resend.");
-          } else if (error.message?.toLowerCase().includes("already registered")) {
-            toast.error(
-              language === "fr"
-                ? "Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter."
-                : "An account already exists with this email. Please sign in."
-            );
-            navigate({ to: "/login" });
-            return;
-          } else {
-            toast.error(`Erreur d'inscription : ${error.message}`);
-            setIsVerifying(false);
-            return;
-          }
-        }
-
-        if (data?.user?.id) {
-          createdUserId = data.user.id;
-        }
-        hasSession = Boolean(data?.session);
-
-        if (!hasSession) {
-          try {
-            const { data: signInData } = await supabase.auth.signInWithPassword({
-              email: email.trim(),
-              password,
-            });
-            if (signInData?.session) {
-              hasSession = true;
-              if (signInData.user?.id) {
-                createdUserId = signInData.user.id;
-              }
-            }
-          } catch (signInErr) {
-            console.warn("Notice connexion automatique post-inscription:", signInErr);
-          }
-        }
-
-        // 2. Enregistrement systématique de la fiche profil dans la table `profiles`
-        const mt5RawLogin = Math.floor(100000 + Math.random() * 900000).toString();
-        try {
-          const { error: profileError } = await supabase.from("profiles").upsert({
-            id: createdUserId,
-            email: email.trim(),
-            name: fullName,
-            phone: phone.trim(),
-            country,
-            role: "TRADER",
-            status: "ACTIVE", // Compte actif après vérification OTP
-            license_status: "NOT_REQUESTED", // Presets inactifs par défaut, activation sur demande
-            active_preset: "",
-            requested_presets: [],
-            kyc_status: "PENDING",
-            balance: 0.0,
-            bonus_credit: 0.0,
-            mt5_login: `#${mt5RawLogin}`,
-            assigned_advisor: "Expert Trading",
-          });
-          if (profileError) {
-            console.error("Erreur enregistrement profil Supabase:", profileError);
-          }
-        } catch (profileErr) {
-          console.warn("Notice enregistrement profil Supabase:", profileErr);
-        }
-
-        // 3. Écriture immédiate dans le journal d'audit
-        try {
-          await supabase.from("audit_logs").insert({
-            admin_id: createdUserId,
-            admin_name: "Système Inscription",
-            action: "CLIENT_REGISTERED",
-            target_user_id: createdUserId,
-            target_user_email: email.trim(),
-            details: `Nouveau compte client vérifié par OTP ouvert pour ${fullName} (${email.trim()}) — Résidence : ${country}`,
-          });
-        } catch (logErr) {
-          console.warn("Notice audit log:", logErr);
-        }
-      }
-
-      // 4. Double flux d'envoi d'e-mails transactionnels via Resend
-      try {
-        await sendWelcomeEmail(email.trim(), fullName, undefined, language as "fr" | "en");
-        await sendAdminNewClientAlertEmail({
-          name: fullName,
-          email: email.trim(),
-          country,
-          phone: phone.trim(),
-        });
-      } catch (mailErr) {
-        console.warn("Notice envoi email Resend:", mailErr);
-      }
-
-      // 5. Notification instantanée Telegram
-      notifyTelegramNewRegistration({
-        name: fullName,
-        email: email.trim(),
-        country,
-        phone: phone.trim(),
-      }).catch(() => {});
-
-      const userSlug = getUserSlug({ name: fullName, email: email.trim(), id: createdUserId });
-      toast.success(
-        language === "fr"
-          ? `E-mail validé avec succès ! Bienvenue sur votre compte, ${fullName} !`
-          : `Email verified successfully! Welcome to your account, ${fullName}!`
-      );
-      navigate({ to: "/portal/$slug", params: { slug: userSlug } });
-      return;
-    } catch (err: any) {
-      toast.error(err.message || "Erreur lors de la création du compte.");
-    } finally {
-      setIsVerifying(false);
     }
   };
 
@@ -443,18 +302,18 @@ function RegisterPage() {
           {/* Right Column: White Clean Registration Form */}
           <div className="lg:col-span-7 bg-white p-8 lg:p-10 text-gray-900 flex flex-col justify-between">
             <div>
-              {step === "OTP" ? (
+              {step === "CHECK_EMAIL" ? (
                 <div className="space-y-6 py-2 animate-in fade-in duration-300">
                   <div className="flex items-center gap-3">
                     <div className="size-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
-                      <ShieldCheck className="size-6 text-[#00c853]" />
+                      <Mail className="size-6 text-[#00c853]" />
                     </div>
                     <div>
                       <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
-                        {language === "fr" ? "Vérification de votre e-mail" : "Verify Your Email"}
+                        {language === "fr" ? "Activez votre compte" : "Activate Your Account"}
                       </h2>
                       <p className="text-xs text-gray-500 font-semibold">
-                        {language === "fr" ? "Code de sécurité à 6 chiffres" : "6-digit security code"}
+                        {language === "fr" ? "Dernière étape avant l'accès à votre espace" : "Last step before accessing your account"}
                       </p>
                     </div>
                   </div>
@@ -462,117 +321,50 @@ function RegisterPage() {
                   <div className="rounded-2xl bg-gray-50 border border-gray-200/80 p-4 space-y-2">
                     <p className="text-xs text-gray-600 leading-relaxed font-medium">
                       {language === "fr"
-                        ? "Un e-mail officiel contenant un code à 6 chiffres a été envoyé à :"
-                        : "An official verification email with a 6-digit code has been sent to:"}
+                        ? "Un e-mail contenant votre lien d'activation a été envoyé à :"
+                        : "An email with your activation link has been sent to:"}
                     </p>
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="font-extrabold text-gray-900 text-sm font-mono bg-white px-2.5 py-1 rounded-lg border border-gray-200">
-                        {email}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setStep("FORM")}
-                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline cursor-pointer"
-                      >
-                        {language === "fr" ? "Modifier l'adresse" : "Change email"}
-                      </button>
-                    </div>
+                    <span className="inline-block font-extrabold text-gray-900 text-sm font-mono bg-white px-2.5 py-1 rounded-lg border border-gray-200 break-all">
+                      {email}
+                    </span>
+                    <p className="text-xs text-gray-600 leading-relaxed font-medium pt-1">
+                      {language === "fr"
+                        ? "Cliquez sur le bouton « Activer mon compte » dans cet e-mail pour ouvrir votre espace client. Pensez à vérifier vos courriers indésirables."
+                        : "Click the “Activate my account” button in that email to open your client area. Please also check your spam folder."}
+                    </p>
                   </div>
 
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div className="space-y-2">
-                      <label
-                        htmlFor="otp-input"
-                        className="block text-xs font-extrabold text-gray-800 uppercase tracking-wider"
-                      >
-                        {language === "fr" ? "Saisir le code à 6 chiffres" : "Enter 6-digit code"}
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="otp-input"
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          pattern="[0-9]*"
-                          maxLength={6}
-                          value={otpInput}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
-                            setOtpInput(val);
-                          }}
-                          placeholder="······"
-                          autoFocus
-                          className="w-full text-center font-mono text-3xl sm:text-4xl font-black tracking-[0.4em] py-4 bg-white border-2 border-gray-300 rounded-2xl text-gray-900 focus:border-[#00c853] focus:ring-4 focus:ring-[#00c853]/15 focus:outline-none transition-all placeholder:text-gray-300"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-xs font-semibold text-gray-500 pt-1">
-                        <span>
-                          {language === "fr" ? "⏱️ Expire dans 10 min" : "⏱️ Expires in 10 min"}
-                        </span>
-                        {otpAttempts > 0 && (
-                          <span className="text-amber-600 font-bold">
-                            {language === "fr"
-                              ? `${5 - otpAttempts} tentative(s) restante(s)`
-                              : `${5 - otpAttempts} attempt(s) remaining`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={isVerifying || otpInput.length < 6}
-                      className="w-full rounded-xl bg-black hover:bg-neutral-900 hover:text-[#00D084] text-white font-extrabold py-5 text-sm tracking-wide transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50"
-                    >
-                      {isVerifying ? (
-                        <Loader2 className="size-4 animate-spin text-emerald-400" />
-                      ) : (
-                        <CheckCircle2 className="size-4 text-[#00c853]" />
-                      )}
-                      <span>
-                        {isVerifying
-                          ? language === "fr"
-                            ? "Vérification en cours..."
-                            : "Verifying..."
-                          : language === "fr"
-                          ? "Confirmer & Ouvrir mon compte"
-                          : "Confirm & Open Account"}
+                  <div className="text-center">
+                    {resendCooldown > 0 ? (
+                      <span className="text-xs font-bold text-gray-400 flex items-center justify-center gap-1.5">
+                        <Clock className="size-3.5" />
+                        {language === "fr"
+                          ? `Renvoyer le lien dans ${resendCooldown}s`
+                          : `Resend link in ${resendCooldown}s`}
                       </span>
-                    </Button>
-
-                    <div className="pt-2 text-center">
-                      {resendCooldown > 0 ? (
-                        <span className="text-xs font-bold text-gray-400 flex items-center justify-center gap-1.5">
-                          <Clock className="size-3.5" />
-                          {language === "fr"
-                            ? `Renvoyer un code dans ${resendCooldown}s`
-                            : `Resend code in ${resendCooldown}s`}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={isResending}
-                          onClick={handleResendOtp}
-                          className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
-                        >
-                          {isResending && <Loader2 className="size-3 animate-spin text-emerald-600" />}
-                          <span>
-                            {language === "fr" ? "Vous n'avez pas reçu le code ? Renvoyer" : "Didn't receive the code? Resend"}
-                          </span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="pt-2 border-t border-gray-100 text-center">
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => setStep("FORM")}
-                        className="text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors cursor-pointer"
+                        disabled={isResending}
+                        onClick={handleResendActivation}
+                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
                       >
-                        {language === "fr" ? "← Revenir au formulaire d'inscription" : "← Back to registration form"}
+                        {isResending && <Loader2 className="size-3 animate-spin text-emerald-600" />}
+                        <span>
+                          {language === "fr" ? "Vous n'avez rien reçu ? Renvoyer le lien" : "Didn't receive it? Resend the link"}
+                        </span>
                       </button>
-                    </div>
-                  </form>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-100 text-center">
+                    <Link
+                      to="/login"
+                      className="text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors"
+                    >
+                      {language === "fr" ? "Aller à la page de connexion →" : "Go to sign in →"}
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -582,7 +374,7 @@ function RegisterPage() {
 
                   <form
                     className="mt-6 space-y-4"
-                    onSubmit={handleInitiateRegistration}
+                    onSubmit={handleRegister}
                   >
                     {/* Country of Residence */}
                     <div className="space-y-1.5">

@@ -22,10 +22,11 @@ export const Route = createFileRoute("/login")({
 });
 
 import { Eye, EyeOff, Globe, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
+import { sendWelcomeEmail } from "@/lib/resend";
 import { getUserSlug, getAdminSlug } from "@/lib/user-slug";
 import { isOwnerEmail } from "@/lib/owner";
 import { LanguageSelector } from "@/components/site/LanguageSelector";
@@ -38,6 +39,95 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { language, setLanguage } = useLanguage();
   const navigate = useNavigate();
+  // Adresse dont le compte n'est pas encore activé (lien d'e-mail non cliqué)
+  const [pendingActivationEmail, setPendingActivationEmail] = useState<string | null>(null);
+  const [isResendingActivation, setIsResendingActivation] = useState(false);
+
+  // Retour depuis le lien d'activation envoyé à l'inscription :
+  // /login?activated=1#access_token=...  (succès, session ouverte par supabase-js)
+  // /login?activated=1#error_code=otp_expired&...  (lien expiré ou déjà utilisé)
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const errorCode = hash.get("error_code") || search.get("error_code");
+    if (!search.has("activated") && !errorCode) return;
+
+    const isFr = language === "fr";
+    window.history.replaceState(null, "", window.location.pathname);
+
+    if (errorCode) {
+      toast.error(
+        isFr
+          ? "Ce lien d'activation a expiré ou a déjà été utilisé. Connectez-vous pour en recevoir un nouveau."
+          : "This activation link has expired or was already used. Sign in to receive a new one."
+      );
+      return;
+    }
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+      if (!user) {
+        toast.success(isFr ? "Compte activé. Vous pouvez maintenant vous connecter." : "Account activated. You can now sign in.");
+        return;
+      }
+
+      const profile = await getUserProfile(user.id);
+      if (!profile || ["REVOKED", "BANNED", "SUSPENDED"].includes(profile.status || "")) {
+        await supabase.auth.signOut();
+        toast.error(isFr ? "Accès refusé. Contactez support@nexiummarkets.com" : "Access denied. Contact support@nexiummarkets.com");
+        return;
+      }
+
+      const name = profile.name || user.email || "";
+      const welcomeKey = `nexium_welcome_sent_${user.id}`;
+      let alreadySent = false;
+      try {
+        alreadySent = localStorage.getItem(welcomeKey) === "1";
+        localStorage.setItem(welcomeKey, "1");
+      } catch {
+        // stockage indisponible : on envoie quand même
+      }
+      if (!alreadySent && user.email) {
+        const lang = user.user_metadata?.["lang"] === "en" ? "en" : "fr";
+        sendWelcomeEmail(user.email, name, profile.mt5_login || undefined, lang).catch((err) =>
+          console.warn("Notice envoi email de bienvenue:", err)
+        );
+      }
+
+      toast.success(isFr ? `Compte activé. Bienvenue, ${name} !` : `Account activated. Welcome, ${name}!`);
+      navigate({ to: "/portal/$slug", params: { slug: getUserSlug({ name: profile.name, email: user.email, id: user.id }) } });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleResendActivation = async () => {
+    if (!pendingActivationEmail || isResendingActivation) return;
+    setIsResendingActivation(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: pendingActivationEmail,
+        options: { emailRedirectTo: `${window.location.origin}/login?activated=1` },
+      });
+      if (error) {
+        toast.error(
+          language === "fr"
+            ? "Impossible de renvoyer le lien pour le moment. Réessayez dans quelques minutes."
+            : "Unable to resend the link right now. Please try again in a few minutes."
+        );
+        return;
+      }
+      toast.success(
+        language === "fr"
+          ? `Nouveau lien d'activation envoyé à ${pendingActivationEmail}.`
+          : `New activation link sent to ${pendingActivationEmail}.`
+      );
+    } finally {
+      setIsResendingActivation(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +147,16 @@ function LoginPage() {
         });
 
         if (error) {
+          if (error.code === "email_not_confirmed") {
+            setPendingActivationEmail(email.trim());
+            toast.error(
+              language === "fr"
+                ? "Votre compte n'est pas encore activé. Cliquez sur le lien reçu par e-mail."
+                : "Your account is not activated yet. Click the link sent to your email."
+            );
+            setLoading(false);
+            return;
+          }
           toast.error(`Erreur de connexion : ${error.message}`);
           setLoading(false);
           return;
@@ -275,6 +375,25 @@ function LoginPage() {
                       : "Sign in"}
                   </span>
                 </Button>
+
+                {pendingActivationEmail && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800 space-y-2">
+                    <p>
+                      {language === "fr"
+                        ? `Le compte ${pendingActivationEmail} n'est pas encore activé. Vérifiez votre boîte mail (et vos courriers indésirables).`
+                        : `The account ${pendingActivationEmail} is not activated yet. Check your inbox (and spam folder).`}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={isResendingActivation}
+                      onClick={handleResendActivation}
+                      className="font-bold text-emerald-700 hover:text-emerald-800 underline flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                    >
+                      {isResendingActivation && <Loader2 className="size-3 animate-spin" />}
+                      {language === "fr" ? "Renvoyer le lien d'activation" : "Resend activation link"}
+                    </button>
+                  </div>
+                )}
               </form>
             </div>
 
