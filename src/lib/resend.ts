@@ -19,7 +19,6 @@ export const isResendConfigured = Boolean(
 );
 
 export const ADMIN_NOTIFICATION_EMAILS = [
-  "nludoviic@gmail.com",
   "support@nexiummarkets.com",
 ];
 
