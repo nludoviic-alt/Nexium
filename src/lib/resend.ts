@@ -18,6 +18,11 @@ export const isResendConfigured = Boolean(
   !import.meta.env.VITE_SUPABASE_URL.includes("your-project-id")
 );
 
+export const ADMIN_NOTIFICATION_EMAILS = [
+  "nludoviic@gmail.com",
+  "support@nexiummarkets.com",
+];
+
 /* ==========================================================================
    WRAPPER HTML HYBRIDE INSTITUTIONNEL (680px CARD & MIDNIGHT BLUE)
    ========================================================================== */
@@ -729,7 +734,12 @@ export async function sendAdminNewClientAlertEmail(clientData: {
 }): Promise<SendEmailResult> {
   const subject = `🚨 [DESK] Nouveau client inscrit : ${clientData.name}`;
   const html = renderAdminNewClientAlertEmailHtml(clientData);
-  return sendViaResendHttp("nludoviic@gmail.com", subject, html);
+  const results = await Promise.all(
+    ADMIN_NOTIFICATION_EMAILS.map((recipient) =>
+      sendViaResendHttp(recipient, subject, html)
+    )
+  );
+  return results[0] || { success: true };
 }
 
 /**
@@ -805,7 +815,12 @@ export async function sendContactNotificationEmail(params: {
 }): Promise<SendEmailResult> {
   const subjectLine = `📨 [CONTACT DESK] ${params.subject} — ${params.fullName}`;
   const html = renderContactNotificationHtml(params);
-  return sendViaResendHttp("nludoviic@gmail.com", subjectLine, html);
+  const results = await Promise.all(
+    ADMIN_NOTIFICATION_EMAILS.map((recipient) =>
+      sendViaResendHttp(recipient, subjectLine, html)
+    )
+  );
+  return results[0] || { success: true };
 }
 
 /**
