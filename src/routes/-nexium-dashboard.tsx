@@ -7904,8 +7904,7 @@ function AccountSettingsTab({
 // ----------------------------------------------------
 // MAIN DASHBOARD COMPONENT
 // ----------------------------------------------------
-import { getUserSlug } from "@/lib/user-slug";
-import { isOwnerEmail } from "@/lib/owner";
+import { getAdminSlug, getUserSlug } from "@/lib/user-slug";
 
 export function NexiumDashboard({
   customSlug,
@@ -8417,6 +8416,14 @@ export function NexiumDashboard({
       const profile = await getUserProfile(user.id);
 
       const isAdmin = profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role);
+
+      // L'espace client est réservé aux clients : un compte du staff (y compris
+      // le Super Owner) est renvoyé vers le Desk. La supervision d'un client
+      // passe par « Supervision Live » (adminImpersonateUserId, traité plus haut).
+      if (isAdmin) {
+        navigate({ to: "/desk/$slug", params: { slug: getAdminSlug({ name: profile?.name, email: user.email, id: user.id }) } });
+        return;
+      }
 
       // Verrouillage formel : si le compte n'est pas actif et n'est pas admin, bloquer l'accès
       if (!isAdmin) {
@@ -10335,16 +10342,6 @@ export function NexiumDashboard({
                     <ExternalLink className="size-3.5" />
                     Site public
                   </Link>
-                  {!adminImpersonateUserId && isOwnerEmail(clientEmail) && (
-                    <Link
-                      to="/admin"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/10 hover:text-white transition cursor-pointer"
-                    >
-                      <ShieldCheck className="size-3.5" />
-                      Console admin
-                    </Link>
-                  )}
                   <div className="my-1 border-t border-white/[0.06]" />
                   <button
                     onClick={handleLogout}

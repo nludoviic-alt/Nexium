@@ -47,7 +47,7 @@ export interface SupabaseUserProfile {
   name: string;
   phone?: string;
   role: "OWNER" | "OWNER_A_PLUS" | "OWNER_B_PLUS" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT" | "TRADER";
-  status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "BANNED" | "REVOKED";
+  status: "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "BANNED" | "REVOKED" | "ARCHIVED";
   kyc_status: "VERIFIED" | "PENDING" | "REJECTED" | "NOT_SUBMITTED";
   /** Vrai uniquement pour le compte Super Owner protégé (au plus un seul profil, imposé côté DB). */
   is_primary_owner?: boolean;
@@ -91,7 +91,7 @@ export async function getCurrentSession() {
 
 /**
  * Récupère le profil enrichi de l'utilisateur depuis la table `profiles`.
- * En cas d'absence (ex: retard trigger), tente une insertion de secours sécurisée.
+ * Renvoie null si le profil n'existe pas (compte supprimé).
  */
 export async function getUserProfile(userId: string): Promise<SupabaseUserProfile | null> {
   if (!isSupabaseConfigured) return null;
@@ -106,37 +106,10 @@ export async function getUserProfile(userId: string): Promise<SupabaseUserProfil
     return null;
   }
 
-  if (data) return data as SupabaseUserProfile;
-
-  // Fallback si la ligne n'existait pas encore
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user && user.id === userId) {
-      const fallbackName = user.user_metadata?.name || user.email?.split("@")[0] || "Trader";
-      const fallbackCountry = user.user_metadata?.country || "France";
-      const { data: createdProfile } = await supabase
-        .from("profiles")
-        .upsert({
-          id: userId,
-          email: user.email || "",
-          name: fallbackName,
-          country: fallbackCountry,
-          role: "TRADER",
-          status: "ACTIVE",
-          kyc_status: "PENDING",
-          balance: 0.0,
-          assigned_advisor: "Desk de Conformité & Risque",
-        })
-        .select()
-        .maybeSingle();
-
-      if (createdProfile) return createdProfile as SupabaseUserProfile;
-    }
-  } catch (err) {
-    console.warn("Fallback profil:", err);
-  }
-
-  return null;
+  // Pas de recréation automatique : le profil est créé par le trigger
+  // handle_new_user à l'inscription. Une absence signifie que le compte a été
+  // supprimé par l'administration.
+  return (data as SupabaseUserProfile | null) ?? null;
 }
 
 /**
@@ -619,34 +592,51 @@ export async function findProfileByEmail(email: string): Promise<SupabaseUserPro
 }
 
 /**
- * Supprime définitivement un profil (staff ou client) de Supabase.
- * Bloqué côté DB par la policy `profiles_delete` pour le Super Owner.
+ * Appelle l'Edge Function `manage-account` (suppression, archivage,
+ * restauration). Les droits (Super Owner pour les clients, hiérarchie pour le
+ * staff) sont vérifiés côté serveur, qui écrit
+ * aussi le journal d'audit. Aucun repli sur une écriture directe dans
+ * `profiles` : elle laisserait un compte de connexion orphelin.
  */
-export async function deleteProfile(userId: string) {
+async function callManageAccount(
+  action: "delete" | "archive" | "restore",
+  userId: string
+): Promise<{ success: boolean; simulated?: boolean; error?: string }> {
   if (!isSupabaseConfigured) return { success: true, simulated: true };
 
-  // 1. Tenter la suppression complète et sécurisée (auth.users + profiles) via RPC
   try {
-    const { data, error: rpcError } = await supabase.rpc("delete_user_by_admin", {
-      target_user_id: userId,
+    const { data, error } = await supabase.functions.invoke("manage-account", {
+      body: { action, userId },
     });
-    if (!rpcError && (data as any)?.success) {
+    if (data?.success) {
       return { success: true };
     }
-    if (rpcError) {
-      console.warn("Notice RPC delete_user_by_admin:", rpcError.message);
+    // En cas de réponse HTTP d'erreur, le message JSON est dans error.context.
+    let message = data?.error as string | undefined;
+    if (!message && error) {
+      const ctx = (error as { context?: Response }).context;
+      const payload = ctx ? await ctx.json().catch(() => null) : null;
+      message = payload?.error || error.message;
     }
-  } catch (rpcErr) {
-    console.warn("Exception appel RPC delete_user_by_admin:", rpcErr);
+    return { success: false, error: message || "Échec de l'opération." };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Service de gestion des comptes injoignable." };
   }
+}
 
-  // 2. Suppression de repli dans la table public.profiles
-  const { error } = await supabase.from("profiles").delete().eq("id", userId);
-  if (error) {
-    console.error("Erreur suppression profil Supabase:", error);
-    return { success: false, error };
-  }
-  return { success: true };
+/** Supprime définitivement un compte. */
+export async function deleteProfile(userId: string) {
+  return callManageAccount("delete", userId);
+}
+
+/** Archive un compte : connexion bloquée, données conservées (Super Owner). */
+export async function archiveAccount(userId: string) {
+  return callManageAccount("archive", userId);
+}
+
+/** Restaure un compte archivé (Super Owner). */
+export async function restoreAccount(userId: string) {
+  return callManageAccount("restore", userId);
 }
 
 /* ==========================================================================

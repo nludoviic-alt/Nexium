@@ -28,7 +28,6 @@ import { toast } from "sonner";
 import { supabase, isSupabaseConfigured, getUserProfile } from "@/lib/supabase";
 import { sendWelcomeEmail } from "@/lib/resend";
 import { getUserSlug, getAdminSlug } from "@/lib/user-slug";
-import { isOwnerEmail } from "@/lib/owner";
 import { LanguageSelector } from "@/components/site/LanguageSelector";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -74,7 +73,7 @@ function LoginPage() {
       }
 
       const profile = await getUserProfile(user.id);
-      if (!profile || ["REVOKED", "BANNED", "SUSPENDED"].includes(profile.status || "")) {
+      if (!profile || ["REVOKED", "BANNED", "SUSPENDED", "ARCHIVED"].includes(profile.status || "")) {
         await supabase.auth.signOut();
         toast.error(isFr ? "Accès refusé. Contactez support@nexiummarkets.com" : "Access denied. Contact support@nexiummarkets.com");
         return;
@@ -157,6 +156,15 @@ function LoginPage() {
             setLoading(false);
             return;
           }
+          if (error.code === "user_banned") {
+            toast.error(
+              language === "fr"
+                ? "Ce compte a été archivé. Contactez support@nexiummarkets.com"
+                : "This account has been archived. Contact support@nexiummarkets.com"
+            );
+            setLoading(false);
+            return;
+          }
           toast.error(`Erreur de connexion : ${error.message}`);
           setLoading(false);
           return;
@@ -179,20 +187,13 @@ function LoginPage() {
 
           // Vérification du rôle Administrateur
           if (profile?.role && ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"].includes(profile.role)) {
-            if (isOwnerEmail(data.user.email)) {
-              const userSlug = getUserSlug({ name: profile?.name, email: data.user.email, id: data.user.id });
-              toast.success(`Connexion réussie. Bienvenue, ${profile?.name || data.user.email} !`);
-              navigate({ to: "/portal/$slug", params: { slug: userSlug } });
-              return;
-            }
-
             const adminSlug = getAdminSlug({ name: profile?.name, email: data.user.email, id: data.user.id });
             toast.success(`Connexion Desk confirmée. Bienvenue, ${profile?.name || data.user.email} !`);
             navigate({ to: "/desk/$slug", params: { slug: adminSlug } });
             return;
           }
 
-          if (profile?.status === "REVOKED" || profile?.status === "BANNED" || profile?.status === "SUSPENDED") {
+          if (profile?.status === "REVOKED" || profile?.status === "BANNED" || profile?.status === "SUSPENDED" || profile?.status === "ARCHIVED") {
             toast.error("Votre compte est restreint ou suspendu. Contactez support@nexiummarkets.com");
             await supabase.auth.signOut();
             setLoading(false);

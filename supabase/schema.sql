@@ -52,7 +52,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS profiles_single_primary_owner
 
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_status_check;
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_status_check
-    CHECK (status IN ('PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED', 'BANNED', 'REVOKED'));
+    CHECK (status IN ('PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED', 'BANNED', 'REVOKED', 'ARCHIVED'));
 
 -- Les comptes clients sont actifs dès l'inscription (plus de validation préalable).
 ALTER TABLE public.profiles ALTER COLUMN status SET DEFAULT 'ACTIVE';
@@ -530,6 +530,34 @@ CREATE TRIGGER trg_protect_privileged_profile_fields
     FOR EACH ROW
     EXECUTE FUNCTION public.protect_privileged_profile_fields();
 
+-- 10bis. ARCHIVAGE : seul le Super Owner fait entrer / sortir un compte du
+-- statut ARCHIVED (les appels service_role, auth.uid() NULL, passent).
+CREATE OR REPLACE FUNCTION public.protect_archived_status()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF (COALESCE(OLD.status, '') = 'ARCHIVED') IS DISTINCT FROM (COALESCE(NEW.status, '') = 'ARCHIVED')
+     AND NOT public.am_i_primary_owner() THEN
+    RAISE EXCEPTION 'Seul le Super Owner peut archiver ou restaurer un compte.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_archived_status ON public.profiles;
+CREATE TRIGGER trg_protect_archived_status
+    BEFORE UPDATE OF status ON public.profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION public.protect_archived_status();
+
 -- 11. SÉCURITÉ ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mt5_accounts ENABLE ROW LEVEL SECURITY;
@@ -552,37 +580,38 @@ DROP POLICY IF EXISTS "profiles_delete" ON public.profiles;
 CREATE POLICY "profiles_select" ON public.profiles
     FOR SELECT USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER'));
 
+-- Le profil d'un nouvel inscrit est créé par le trigger handle_new_user
+-- (SECURITY DEFINER) : aucun utilisateur ne peut insérer son propre profil,
+-- sinon un compte supprimé pourrait se recréer avec des montants arbitraires.
 CREATE POLICY "profiles_insert" ON public.profiles
     FOR INSERT WITH CHECK (
         public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN')
-        OR (
-            auth.uid() = id
-            AND role = 'TRADER'
-            AND status IN ('ACTIVE', 'PENDING_APPROVAL')
-            AND kyc_status IN ('PENDING', 'NOT_SUBMITTED')
-            AND balance = 0
-        )
     );
 
 CREATE POLICY "profiles_update" ON public.profiles
     FOR UPDATE USING (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'FINANCE', 'SUPPORT'))
     WITH CHECK (auth.uid() = id OR public.get_my_role() IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS', 'SUPER_ADMIN', 'ADMIN', 'CONSEILLER', 'FINANCE', 'SUPPORT'));
 
--- Suppression : hiérarchie à 3 paliers, jamais le Super Owner.
---   Palier 0 (Super Owner)            : peut supprimer tout le monde.
---   Palier 1 (OWNER_A_PLUS/B_PLUS)    : peut supprimer tout le monde SAUF
---                                        le Super Owner et l'autre A+/B+.
---   Palier 2 (OWNER, SUPER_ADMIN)     : peut supprimer tout le monde SAUF
---                                        le Super Owner, A+/B+, et un autre
---                                        OWNER/SUPER_ADMIN (comportement
---                                        historique, inchangé).
+-- Suppression : jamais le Super Owner.
+--   Clients (TRADER)                  : Super Owner uniquement.
+--   Staff, palier 0 (Super Owner)     : peut supprimer tout le monde.
+--   Staff, palier 1 (OWNER_A_PLUS/B_PLUS) : tout le monde SAUF le Super Owner
+--                                        et l'autre A+/B+.
+--   Staff, palier 2 (OWNER, SUPER_ADMIN)  : tout le monde SAUF le Super Owner,
+--                                        A+/B+ et OWNER.
+-- En pratique, la suppression passe par l'Edge Function manage-account.
 CREATE POLICY "profiles_delete" ON public.profiles
     FOR DELETE USING (
         NOT is_primary_owner
         AND (
             public.am_i_primary_owner()
-            OR (public.get_my_role() IN ('OWNER_A_PLUS', 'OWNER_B_PLUS') AND role NOT IN ('OWNER_A_PLUS', 'OWNER_B_PLUS'))
-            OR (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN') AND role NOT IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS'))
+            OR (
+                role <> 'TRADER'
+                AND (
+                    (public.get_my_role() IN ('OWNER_A_PLUS', 'OWNER_B_PLUS') AND role NOT IN ('OWNER_A_PLUS', 'OWNER_B_PLUS'))
+                    OR (public.get_my_role() IN ('OWNER', 'SUPER_ADMIN') AND role NOT IN ('OWNER', 'OWNER_A_PLUS', 'OWNER_B_PLUS'))
+                )
+            )
         )
     );
 

@@ -152,6 +152,8 @@ import {
   getAllStaffProfiles,
   findProfileByEmail,
   deleteProfile,
+  archiveAccount,
+  restoreAccount,
   getAllTransactions,
   recordTransaction,
   updateTransactionStatus,
@@ -230,7 +232,7 @@ export function CompositionAccessGate({ customAdminSlug }: { customAdminSlug?: s
       if (cancelled) return;
 
       const role = profile?.role;
-      const blockedStatuses = ["REVOKED", "BANNED", "SUSPENDED"];
+      const blockedStatuses = ["REVOKED", "BANNED", "SUSPENDED", "ARCHIVED"];
       if (!profile || !role || !ADMIN_CONSOLE_ROLES.includes(role) || blockedStatuses.includes(profile.status)) {
         setState("denied");
         return;
@@ -351,7 +353,7 @@ export function CompositionAccessGate({ customAdminSlug }: { customAdminSlug?: s
 /* ========================================================================= */
 
 type AdminSystemRole = "OWNER" | "OWNER_A_PLUS" | "OWNER_B_PLUS" | "SUPER_ADMIN" | "ADMIN" | "CONSEILLER" | "SUPPORT" | "FINANCE" | "QUANT";
-type AccountStatus = "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "REVOKED" | "BANNED";
+type AccountStatus = "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "REVOKED" | "BANNED" | "ARCHIVED";
 type KycStatus = "VERIFIED" | "PENDING_REVIEW" | "REJECTED" | "NOT_SUBMITTED";
 
 interface EngineAssignment {
@@ -1312,7 +1314,7 @@ function NexiumAdminDashboard({
   const [pnlAdjustDirection, setPnlAdjustDirection] = useState<"PROFIT" | "LOSS">("PROFIT");
   const [exactPnlInput, setExactPnlInput] = useState("");
 
-  const addAuditLog = (action: string, details: string, targetUser?: string) => {
+  const addAuditLog = (action: string, details: string, targetUser?: string, persist = true) => {
     const entry: AuditEntry = {
       id: `audit-${Date.now()}`,
       timestamp: new Date().toLocaleTimeString("fr-FR"),
@@ -1323,7 +1325,7 @@ function NexiumAdminDashboard({
     };
     setAuditLogs((prev) => [entry, ...prev]);
 
-    if (isSupabaseConfigured) {
+    if (persist && isSupabaseConfigured) {
       recordAuditLog({
         admin_id: sessionUser.id,
         admin_name: sessionUser.name,
@@ -1511,6 +1513,49 @@ function NexiumAdminDashboard({
         );
       });
     }
+  };
+
+  // Confirmation obligatoire avant toute modification d'une fiche client :
+  // la fenêtre récapitule les champs modifiés pour valider le geste.
+  const handleRequestSaveClientProfile = () => {
+    if (!activeClient) return;
+
+    if ((activeClient.status === "ARCHIVED") !== (editStatus === "ARCHIVED")) {
+      toast.error("L'archivage se gère uniquement avec les boutons « Archiver » / « Restaurer » (Super Owner).");
+      return;
+    }
+
+    const changes: string[] = [];
+    const track = (label: string, before: unknown, after: unknown) => {
+      if ((before ?? "") !== (after ?? "")) changes.push(`${label} : ${before || "—"} → ${after || "—"}`);
+    };
+    track("Nom", activeClient.name, editName);
+    track("E-mail", activeClient.email, editEmail);
+    track("Téléphone", activeClient.phone, editPhone);
+    track("Pays", activeClient.country, editCountry);
+    track("Statut", activeClient.status, editStatus);
+    track("KYC", activeClient.kycStatus, editKycStatus);
+    track("Login MT5", activeClient.mt5?.login, mt5Login);
+    track("Courtier MT5", activeClient.mt5?.broker, mt5Broker);
+    track("Serveur MT5", activeClient.mt5?.server, mt5Server);
+    track("Perte journalière max (%)", activeClient.maxDailyLossPercent, editMaxDailyLoss);
+    track("Positions simultanées max", activeClient.maxSimultaneousTrades, editMaxPositions);
+    track("Risk Guard auto", activeClient.riskGuardAutoStop, editRiskGuardAuto);
+    track("Preset Gold actif", activeClient.engines?.aiGold?.active, goldActive);
+    track("Preset FX actif", activeClient.engines?.fxTrend?.active, fxActive);
+    track("Preset Index actif", activeClient.engines?.indexReversion?.active, indexActive);
+    if (mt5InvestorPass && mt5InvestorPass !== activeClient.mt5?.investorPass) changes.push("Mot de passe investisseur MT5 modifié");
+    if (newPasswordInput) changes.push("Nouveau mot de passe de connexion défini");
+
+    requestConfirmation(
+      `Modifier la fiche de ${activeClient.name}`,
+      changes.length > 0
+        ? `Modifications à enregistrer :\n• ${changes.join("\n• ")}`
+        : "Aucun changement détecté sur les champs principaux. Enregistrer quand même les réglages ?",
+      "Confirmer les modifications",
+      "WARNING",
+      handleSaveClientProfile
+    );
   };
 
   const handleSaveClientProfile = async () => {
@@ -2820,12 +2865,13 @@ function NexiumAdminDashboard({
         if (isSupabaseConfigured) {
           const result = await deleteProfile(st.id);
           if (!result.success) {
-            toast.error("Échec de la suppression côté base de données.");
+            toast.error(`Échec de la suppression : ${result.error || "erreur inconnue"}`);
             return;
           }
         }
         setStaffList((prev) => prev.filter((s) => s.id !== st.id));
-        addAuditLog("STAFF_DELETED", `Compte staff ${st.name} (${st.role}) supprimé.`, st.email);
+        // Audit déjà écrit côté serveur par la fonction manage-account
+        addAuditLog("STAFF_DELETED", `Compte staff ${st.name} (${st.role}) supprimé.`, st.email, false);
         toast.success(`Le compte de ${st.name} a été supprimé.`);
       }
     );
@@ -3359,24 +3405,80 @@ function NexiumAdminDashboard({
     toast.success(`Compte de ${activeClient.name} réactivé.`);
   };
 
+  // Suppression et archivage d'un client : réservés au Super Owner (vérifié
+  // aussi côté serveur par l'Edge Function manage-account).
+  const handleArchiveClient = () => {
+    if (!isPrimaryOwner) {
+      toast.error("Seul le Super Owner peut archiver un client.");
+      return;
+    }
+    requestConfirmation(
+      `Archiver le compte de ${activeClient.name}`,
+      `La connexion de ${activeClient.name} (${activeClient.email}) sera bloquée. Toutes ses données (solde, transactions, historique) sont conservées et le compte pourra être restauré.`,
+      "Archiver le Compte",
+      "WARNING",
+      async () => {
+        const result = await archiveAccount(activeClient.id);
+        if (!result.success) {
+          toast.error(`Échec de l'archivage : ${result.error || "erreur inconnue"}`);
+          return;
+        }
+        setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, status: "ARCHIVED" } : c)));
+        setEditStatus("ARCHIVED");
+        // Audit déjà écrit côté serveur par la fonction manage-account
+        addAuditLog("CLIENT_ARCHIVED", `Compte archivé : ${activeClient.name}.`, activeClient.email, false);
+        toast.success(`Compte de ${activeClient.name} archivé.`);
+      }
+    );
+  };
+
+  const handleRestoreClient = () => {
+    if (!isPrimaryOwner) {
+      toast.error("Seul le Super Owner peut restaurer un client archivé.");
+      return;
+    }
+    requestConfirmation(
+      `Restaurer le compte de ${activeClient.name}`,
+      `${activeClient.name} (${activeClient.email}) pourra de nouveau se connecter.`,
+      "Restaurer le Compte",
+      "INFO",
+      async () => {
+        const result = await restoreAccount(activeClient.id);
+        if (!result.success) {
+          toast.error(`Échec de la restauration : ${result.error || "erreur inconnue"}`);
+          return;
+        }
+        setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, status: "ACTIVE" } : c)));
+        setEditStatus("ACTIVE");
+        addAuditLog("CLIENT_RESTORED", `Compte restauré : ${activeClient.name}.`, activeClient.email, false);
+        toast.success(`Compte de ${activeClient.name} restauré.`);
+      }
+    );
+  };
+
   const handleDeleteClient = () => {
+    if (!isPrimaryOwner) {
+      toast.error("Seul le Super Owner peut supprimer un client.");
+      return;
+    }
     requestConfirmation(
       `Supprimer définitivement le compte de ${activeClient.name}`,
-      `Toutes les données de ${activeClient.name} seront supprimées.`,
+      `Le compte de ${activeClient.name} (${activeClient.email}) sera supprimé définitivement : identifiants, solde, transactions et historique. Cette action est irréversible — pour conserver les données, utilisez plutôt « Archiver ».`,
       "Supprimer Définitivement",
       "CRITICAL",
       async () => {
         if (isSupabaseConfigured) {
           const result = await deleteProfile(activeClient.id);
           if (!result.success) {
-            toast.error("Échec de la suppression côté base de données.");
+            toast.error(`Échec de la suppression : ${result.error || "erreur inconnue"}`);
             return;
           }
         }
         const clientName = activeClient.name;
         const clientEmail = activeClient.email;
         setClients((prev) => prev.filter((c) => c.id !== activeClient.id));
-        addAuditLog("CLIENT_DELETED", `Compte supprimé : ${clientName}.`, clientEmail);
+        // Audit déjà écrit côté serveur par la fonction manage-account
+        addAuditLog("CLIENT_DELETED", `Compte supprimé : ${clientName}.`, clientEmail, false);
         toast.error(`Compte ${clientName} supprimé.`);
         setActiveSection("users");
       }
@@ -4141,7 +4243,7 @@ function NexiumAdminDashboard({
               </div>
             </div>
 
-            <p className="text-sm text-slate-300 leading-relaxed">{confirmModal.description}</p>
+            <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line max-h-80 overflow-y-auto">{confirmModal.description}</p>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-700/50">
               <button
@@ -4860,7 +4962,7 @@ function NexiumAdminDashboard({
                   </button>
 
                   <button
-                    onClick={handleSaveClientProfile}
+                    onClick={handleRequestSaveClientProfile}
                     className="admin-btn-primary text-xs py-2 px-4"
                   >
                     <Check className="size-4" />
@@ -4880,7 +4982,7 @@ function NexiumAdminDashboard({
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  {activeClient.status !== "ACTIVE" && (
+                  {activeClient.status !== "ACTIVE" && activeClient.status !== "ARCHIVED" && (
                     <button
                       onClick={handleReactivateClient}
                       className="admin-btn-primary text-xs py-1.5 px-3"
@@ -4900,7 +5002,7 @@ function NexiumAdminDashboard({
                     </button>
                   )}
 
-                  {activeClient.status !== "REVOKED" && (
+                  {activeClient.status !== "REVOKED" && activeClient.status !== "ARCHIVED" && (
                     <button
                       onClick={handleRevokeClient}
                       className="rounded-xl border border-purple-500/40 bg-purple-500/15 hover:bg-purple-500/25 px-3 py-1.5 text-xs font-semibold text-purple-300 transition cursor-pointer flex items-center gap-1.5"
@@ -4910,7 +5012,7 @@ function NexiumAdminDashboard({
                     </button>
                   )}
 
-                  {activeClient.status !== "BANNED" && (
+                  {activeClient.status !== "BANNED" && activeClient.status !== "ARCHIVED" && (
                     <button
                       onClick={handleBanClient}
                       className="rounded-xl border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 px-3 py-1.5 text-xs font-semibold text-rose-400 transition cursor-pointer flex items-center gap-1.5"
@@ -4920,13 +5022,35 @@ function NexiumAdminDashboard({
                     </button>
                   )}
 
-                  <button
-                    onClick={handleDeleteClient}
-                    className="rounded-xl border border-rose-900/80 bg-rose-950/40 hover:bg-rose-900/60 px-3 py-1.5 text-xs font-semibold text-rose-300 transition cursor-pointer flex items-center gap-1.5 ml-auto"
-                  >
-                    <Trash2 className="size-3.5" />
-                    <span>Supprimer</span>
-                  </button>
+                  {isPrimaryOwner && activeClient.status === "ARCHIVED" && (
+                    <button
+                      onClick={handleRestoreClient}
+                      className="admin-btn-primary text-xs py-1.5 px-3 ml-auto"
+                    >
+                      <Unlock className="size-3.5" />
+                      <span>Restaurer</span>
+                    </button>
+                  )}
+
+                  {isPrimaryOwner && activeClient.status !== "ARCHIVED" && (
+                    <button
+                      onClick={handleArchiveClient}
+                      className="rounded-xl border border-slate-500/40 bg-slate-500/15 hover:bg-slate-500/25 px-3 py-1.5 text-xs font-semibold text-slate-200 transition cursor-pointer flex items-center gap-1.5 ml-auto"
+                    >
+                      <Archive className="size-3.5" />
+                      <span>Archiver</span>
+                    </button>
+                  )}
+
+                  {isPrimaryOwner && (
+                    <button
+                      onClick={handleDeleteClient}
+                      className="rounded-xl border border-rose-900/80 bg-rose-950/40 hover:bg-rose-900/60 px-3 py-1.5 text-xs font-semibold text-rose-300 transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Trash2 className="size-3.5" />
+                      <span>Supprimer</span>
+                    </button>
+                  )}
                 </div>
               </section>
 

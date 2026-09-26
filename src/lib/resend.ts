@@ -9,9 +9,6 @@
  * api.resend.com directement depuis le navigateur.
  */
 
-const defaultFromEmail =
-  import.meta.env.VITE_RESEND_FROM_EMAIL || "Nexium Markets <support@nexiummarkets.com>";
-
 export const isResendConfigured = Boolean(
   import.meta.env.VITE_SUPABASE_URL &&
   import.meta.env.VITE_SUPABASE_URL.startsWith("https://") &&
@@ -369,8 +366,7 @@ export interface SendEmailResult {
 export async function sendViaResendHttp(
   to: string,
   subject: string,
-  html: string,
-  from = defaultFromEmail
+  html: string
 ): Promise<SendEmailResult> {
   if (!isResendConfigured) {
     console.info(`[Resend Simulated] Destinataire: ${to} | Sujet: ${subject}`);
@@ -380,7 +376,8 @@ export async function sendViaResendHttp(
   try {
     const { supabase } = await import("@/lib/supabase");
     const { data, error } = await supabase.functions.invoke("send-email", {
-      body: { to, subject, html, from },
+      // L'expéditeur est imposé côté serveur par send-email.
+      body: { to, subject, html },
     });
 
     if (error) {

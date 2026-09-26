@@ -60,13 +60,35 @@ GitHub Actions et de tes `.env` une fois cette fonction déployée et vérifiée
 **régénère la clé côté Resend** (Dashboard Resend → API Keys) puisque l'ancienne a
 circulé publiquement dans le bundle du site déployé.
 
+## Contrôle d'accès
+
+La fonction n'est pas un relais ouvert : elle identifie l'appelant à partir du jeton
+`Authorization` (vérifié avec `SUPABASE_SERVICE_ROLE_KEY`, fourni automatiquement aux
+Edge Functions).
+
+| Appelant | Destinataires autorisés | Limite |
+| :--- | :--- | :--- |
+| Staff actif (OWNER … QUANT, statut `ACTIVE`) | tous | aucune |
+| Client connecté | boîte interne ou sa propre adresse | 10 envois / heure |
+| Visiteur anonyme (clé anon/publishable) | boîte interne uniquement | 10 envois / heure / IP |
+
+- Boîte interne : secret optionnel `INTERNAL_NOTIFICATION_EMAILS` (liste séparée par des
+  virgules), par défaut `support@nexiummarkets.com`.
+- `to` doit être une seule adresse (chaîne), jamais un tableau.
+- L'expéditeur est toujours `RESEND_FROM_EMAIL` (ou le défaut) : le champ `from` envoyé
+  par le client est ignoré.
+- Les compteurs utilisent la table `contact_rate_limits` avec une clé préfixée
+  `send-email:` (hachée), distincte de celle du formulaire de contact.
+
 ## Vérification
 
 ```bash
+# Anonyme vers la boîte interne : autorisé
 curl -X POST "https://<project-ref>.supabase.co/functions/v1/send-email" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <VITE_SUPABASE_ANON_KEY>" \
-  -d '{"to":"toi@example.com","subject":"Test","html":"<p>Test send-email</p>"}'
+  -d '{"to":"support@nexiummarkets.com","subject":"Test","html":"<p>Test send-email</p>"}'
 ```
 
-Réponse attendue : `{"success":true,"id":"..."}`.
+Réponse attendue : `{"success":true,"id":"..."}`. La même requête vers une autre adresse
+doit répondre `403 {"success":false,"error":"recipient_not_allowed"}`.
