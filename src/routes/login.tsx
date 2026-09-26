@@ -63,29 +63,18 @@ function LoginPage() {
         }
 
         if (data.user) {
-          let profile = await getUserProfile(data.user.id);
+          const profile = await getUserProfile(data.user.id);
 
-          // Auto-création / synchronisation du profil s'il n'existe pas encore
+          // Si aucun profil n'existe en base, le compte a été supprimé par l'administration
           if (!profile) {
-            const defaultName = data.user.user_metadata?.name || data.user.email?.split("@")[0] || "Client";
-            const mt5Login = `#${Math.floor(100000 + Math.random() * 900000)}`;
-            try {
-              await supabase.from("profiles").upsert({
-                id: data.user.id,
-                email: data.user.email,
-                name: defaultName,
-                role: "TRADER",
-                status: "ACTIVE",
-                license_status: "ACTIVE",
-                mt5_login: mt5Login,
-                balance: 0.0,
-                bonus_credit: 0.0,
-                assigned_advisor: "Expert Trading",
-              });
-              profile = await getUserProfile(data.user.id);
-            } catch (pErr) {
-              console.warn("Notice auto-création profil:", pErr);
-            }
+            toast.error(
+              language === "fr"
+                ? "Ce compte a été supprimé ou est introuvable. Accès refusé."
+                : "This account has been deleted or does not exist. Access denied."
+            );
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
           }
 
           // Vérification du rôle Administrateur

@@ -624,6 +624,23 @@ export async function findProfileByEmail(email: string): Promise<SupabaseUserPro
  */
 export async function deleteProfile(userId: string) {
   if (!isSupabaseConfigured) return { success: true, simulated: true };
+
+  // 1. Tenter la suppression complète et sécurisée (auth.users + profiles) via RPC
+  try {
+    const { data, error: rpcError } = await supabase.rpc("delete_user_by_admin", {
+      target_user_id: userId,
+    });
+    if (!rpcError && (data as any)?.success) {
+      return { success: true };
+    }
+    if (rpcError) {
+      console.warn("Notice RPC delete_user_by_admin:", rpcError.message);
+    }
+  } catch (rpcErr) {
+    console.warn("Exception appel RPC delete_user_by_admin:", rpcErr);
+  }
+
+  // 2. Suppression de repli dans la table public.profiles
   const { error } = await supabase.from("profiles").delete().eq("id", userId);
   if (error) {
     console.error("Erreur suppression profil Supabase:", error);
