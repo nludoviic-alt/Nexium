@@ -168,7 +168,12 @@ export function ChatWidget() {
 
   // Inline operator transfer form state
   const [operatorContact, setOperatorContact] = useState("");
+  const [operatorHoneypot, setOperatorHoneypot] = useState("");
   const [isSendingToOperator, setIsSendingToOperator] = useState(false);
+
+  // Anti-Spam & Anti-Flood timers
+  const lastMessageTime = useRef<number>(0);
+  const messageTimestamps = useRef<number[]>([]);
 
   const greetingText =
     language === "fr"
@@ -232,6 +237,43 @@ export function ChatWidget() {
     const text = raw.trim();
     if (!text) return;
 
+    // 1. Anti-Flood : intervalle minimum de 700ms entre deux messages
+    const now = Date.now();
+    if (now - lastMessageTime.current < 700) {
+      toast.error(
+        language === "fr"
+          ? "Veuillez patienter un instant entre chaque message."
+          : "Please wait a moment between messages."
+      );
+      return;
+    }
+
+    // 2. Anti-Flood : max 8 messages par minute
+    const oneMinuteAgo = now - 60000;
+    messageTimestamps.current = messageTimestamps.current.filter((ts) => ts > oneMinuteAgo);
+    if (messageTimestamps.current.length >= 8) {
+      toast.error(
+        language === "fr"
+          ? "Trop de messages envoyés. Veuillez patienter une minute."
+          : "Too many messages sent. Please wait a minute."
+      );
+      return;
+    }
+
+    // 3. Anti-Spam Liens : interdire l'injection de liens externes non autorisés dans le chat bot
+    const hasSpamLink = /(https?:\/\/|www\.)\S+/i.test(text);
+    if (hasSpamLink && (!liveThread || liveThread.status !== "ACTIVE")) {
+      toast.error(
+        language === "fr"
+          ? "L'envoi de liens externes n'est pas autorisé dans le chat pour des raisons de sécurité."
+          : "Posting external links is not allowed for security reasons."
+      );
+      return;
+    }
+
+    lastMessageTime.current = now;
+    messageTimestamps.current.push(now);
+
     // If we have an active assigned live advisor thread, send message through the router
     if (liveThread && liveThread.status === "ACTIVE") {
       import("@/lib/chat-router").then(({ sendLiveChatMessage }) =>
@@ -269,7 +311,18 @@ export function ChatWidget() {
   };
 
   const handleOperatorSubmit = async (msgId: number, userQuery?: string) => {
-    if (!operatorContact.trim()) {
+    // 0. Anti-bot honeypot check
+    if (operatorHoneypot.trim()) {
+      console.warn("Spam bot detected via honeypot field");
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, operatorSubmitted: true } : m))
+      );
+      setOperatorContact("");
+      return;
+    }
+
+    const trimmedContact = operatorContact.trim();
+    if (!trimmedContact) {
       toast.error(
         language === "fr"
           ? "Veuillez entrer votre e-mail ou téléphone."
@@ -278,13 +331,46 @@ export function ChatWidget() {
       return;
     }
 
+    // Format validation: either valid email or phone number
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedContact);
+    const isPhone = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]{6,}$/.test(trimmedContact);
+    if (!isEmail && !isPhone) {
+      toast.error(
+        language === "fr"
+          ? "Veuillez entrer un e-mail valide ou un numéro de téléphone avec indicatif."
+          : "Please enter a valid email address or phone number."
+      );
+      return;
+    }
+
+    // Rate limiter on escalations (max 2 per 10 minutes)
+    try {
+      const storedTimestamps = JSON.parse(
+        localStorage.getItem("nexium_chat_escalations_rate") || "[]"
+      ) as number[];
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+      const recent = storedTimestamps.filter((t) => t > tenMinutesAgo);
+      if (recent.length >= 2) {
+        toast.error(
+          language === "fr"
+            ? "Vous avez déjà transmis une demande d'opérateur récemment. Notre équipe traite votre demande."
+            : "You have already requested an operator recently. Our team is handling it."
+        );
+        return;
+      }
+      recent.push(Date.now());
+      localStorage.setItem("nexium_chat_escalations_rate", JSON.stringify(recent));
+    } catch {
+      // LocalStorage access fallback
+    }
+
     setIsSendingToOperator(true);
 
     try {
       // 1. Create a live thread in the central Router (Claim Queue)
       const { createLiveChatThread } = await import("@/lib/chat-router");
       const thread = await createLiveChatThread({
-        contact: operatorContact,
+        contact: trimmedContact,
         initialQuery: userQuery || "Demande d'opérateur en direct",
         language,
       });
@@ -304,16 +390,24 @@ export function ChatWidget() {
       const { sendCustomDeskEmail } = await import("@/lib/resend");
       await sendCustomDeskEmail(
         "support@nexiummarkets.com",
-        `🚨 [CHATBOT DISPATCH] Demande d'opérateur en direct (${operatorContact})`,
+        `🚨 [CHATBOT DISPATCH] Demande d'opérateur en direct (${trimmedContact})`,
         `Un visiteur a demandé à être mis en relation avec un opérateur en direct depuis le Chatbot du site.\n\n` +
           `• ID du fil : #${thread.id}\n` +
-          `• Contact fourni : ${operatorContact}\n` +
+          `• Contact fourni : ${trimmedContact}\n` +
           `• Question / Contexte : ${userQuery || "Demande de contact immédiat"}\n` +
           `• Date & Heure : ${new Date().toLocaleString("fr-FR")}\n\n` +
           `La demande est disponible dans l'onglet "File d'attente Direct" de la console Admin.`
       );
 
-      // 3. Mark the message as submitted and push confirmation into chat
+      // 3. Dispatch instant alert to Telegram desk channel
+      const { notifyTelegramChatEscalation } = await import("@/lib/telegram");
+      notifyTelegramChatEscalation({
+        contact: trimmedContact,
+        userQuery,
+        threadId: thread.id,
+      }).catch((err) => console.warn("Notice Telegram escalation:", err));
+
+      // 4. Mark the message as submitted and push confirmation into chat
       setMessages((prev) =>
         prev
           .map((m) => (m.id === msgId ? { ...m, operatorSubmitted: true } : m))
@@ -477,6 +571,20 @@ export function ChatWidget() {
                         </span>
                       </div>
                       <div className="flex flex-col gap-1.5">
+                        {/* Stealth honeypot field for anti-bot protection */}
+                        <div
+                          className="absolute opacity-0 -z-50 pointer-events-none h-0 w-0 overflow-hidden"
+                          aria-hidden="true"
+                        >
+                          <input
+                            type="text"
+                            name="chat_security_check"
+                            tabIndex={-1}
+                            autoComplete="off"
+                            value={operatorHoneypot}
+                            onChange={(e) => setOperatorHoneypot(e.target.value)}
+                          />
+                        </div>
                         <input
                           type="text"
                           value={operatorContact}

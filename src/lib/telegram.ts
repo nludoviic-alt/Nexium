@@ -164,6 +164,32 @@ export async function notifyTelegramRecoveryDossier(data: {
   return sendTelegramNotification(msg);
 }
 
+/**
+ * 4. ALERTE DEMANDE D'OPÉRATEUR EN DIRECT DEPUIS LE CHATBOT
+ */
+export async function notifyTelegramChatEscalation(data: {
+  contact: string;
+  userQuery?: string;
+  threadId: string;
+}) {
+  const now = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" });
+  const msg = [
+    `💬 <b>DEMANDE D'OPÉRATEUR CHAT LIVE</b>`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `<b>Contact visiteur :</b> <b>${escapeHtml(data.contact)}</b>`,
+    data.userQuery ? `<b>Question initiale :</b> <i>${escapeHtml(data.userQuery.slice(0, 300))}</i>` : null,
+    `<b>ID Fil Desk :</b> <code>#${escapeHtml(data.threadId)}</code>`,
+    `<b>Date :</b> ${now}`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `⚡ <i>Un visiteur attend un conseiller en direct sur le site</i>`,
+    `🔗 <a href="https://nexiummarkets.com/desk">Ouvrir le Chat sur le Desk</a>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return sendTelegramNotification(msg);
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
