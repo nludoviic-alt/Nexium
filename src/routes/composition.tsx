@@ -2603,11 +2603,11 @@ function NexiumAdminDashboard({
   // Rôles que la session courante peut attribuer (même règle que l'Edge
   // Function create-account et le trigger SQL protect_role_changes).
   // @nexium-lock-start staff-role-matrix — voir NEXIUM.md §8
-  const assignableStaffRoles: AdminSystemRole[] = isPrimaryOwner
+  const assignableStaffRoles: AdminSystemRole[] = isPrimaryOwner || currentSessionRole === "OWNER"
     ? ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS", "SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"]
     : currentSessionRole === "OWNER_A_PLUS" || currentSessionRole === "OWNER_B_PLUS"
     ? ["SUPER_ADMIN", "ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"]
-    : currentSessionRole === "OWNER" || currentSessionRole === "SUPER_ADMIN"
+    : currentSessionRole === "SUPER_ADMIN"
     ? ["ADMIN", "CONSEILLER", "SUPPORT", "FINANCE", "QUANT"]
     : [];
   const assignableStaffRoleOptions = STAFF_ROLE_OPTIONS.filter((o) => assignableStaffRoles.includes(o.value));
@@ -2688,7 +2688,7 @@ function NexiumAdminDashboard({
     if (!assignableStaffRoles.includes(newStaffRole)) {
       toast.error(
         ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(newStaffRole)
-          ? "Seul le Super Owner peut attribuer un rôle Owner."
+          ? "Seuls le Super Owner et les Owners peuvent attribuer un rôle Owner."
           : "Votre rôle ne permet pas d'attribuer ce rôle."
       );
       return;
@@ -2762,8 +2762,8 @@ function NexiumAdminDashboard({
       return;
     }
 
-    if (["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(editStaffRole) && editStaffRole !== editingStaffMember.role && !isPrimaryOwner) {
-      toast.error("Seul le Super Owner peut promouvoir un membre du staff à ce rôle.");
+    if (["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(editStaffRole) && editStaffRole !== editingStaffMember.role && !isPrimaryOwner && currentSessionRole !== "OWNER") {
+      toast.error("Seuls le Super Owner et les Owners peuvent promouvoir un membre du staff à ce rôle.");
       return;
     }
 

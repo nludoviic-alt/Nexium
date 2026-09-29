@@ -66,7 +66,9 @@ function jsonResponse(body: unknown, status = 200) {
 function assignableStaffRoles(caller: Profile): string[] {
   if (caller.is_primary_owner) return ALL_ROLES.filter((r) => r !== "TRADER");
   if (caller.role === "OWNER_A_PLUS" || caller.role === "OWNER_B_PLUS") return ["SUPER_ADMIN", ...BASE_STAFF_ROLES];
-  if (caller.role === "OWNER" || caller.role === "SUPER_ADMIN") return [...BASE_STAFF_ROLES];
+  // Owner : mêmes droits d'attribution que le Super Owner (Super Owner lui-même protégé).
+  if (caller.role === "OWNER") return ALL_ROLES.filter((r) => r !== "TRADER");
+  if (caller.role === "SUPER_ADMIN") return [...BASE_STAFF_ROLES];
   return [];
 }
 
@@ -173,7 +175,7 @@ Deno.serve(async (req) => {
       {
         success: false,
         error: ["OWNER", "OWNER_A_PLUS", "OWNER_B_PLUS"].includes(role)
-          ? "Seul le Super Owner peut attribuer un rôle Owner"
+          ? "Seuls le Super Owner et les Owners peuvent attribuer un rôle Owner"
           : "Votre rôle ne permet pas d'attribuer ce rôle",
       },
       403,

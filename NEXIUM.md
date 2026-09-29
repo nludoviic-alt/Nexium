@@ -211,8 +211,8 @@ Si `OLD.is_primary_owner = TRUE`, **aucun** acteur extérieur (même OWNER) ne p
 
 ### F. Création de compte par l'administration (`supabase/functions/create-account`)
 1. Toute invitation (client ou staff) et toute attribution de rôle à un compte existant passent **exclusivement** par l'Edge Function `create-account` (droits et audit côté serveur).
-2. **Seul le Super Owner attribue un rôle Owner** (OWNER, OWNER_A_PLUS, OWNER_B_PLUS).
-3. Rôles attribuables : Super Owner → tous ; Owner A+/B+ → SUPER_ADMIN, ADMIN, CONSEILLER, SUPPORT, FINANCE, QUANT ; Owner / Super Admin → ADMIN, CONSEILLER, SUPPORT, FINANCE, QUANT ; autres rôles → aucun. Pour changer un rôle, il faut avoir autorité sur l'ancien ET le nouveau rôle. Personne ne change son propre rôle.
+2. **Seuls le Super Owner et les Owners (rôle OWNER) attribuent un rôle Owner** (OWNER, OWNER_A_PLUS, OWNER_B_PLUS). Le Super Owner reste intouchable.
+3. Rôles attribuables : Super Owner et Owner → tous ; Owner A+/B+ → SUPER_ADMIN, ADMIN, CONSEILLER, SUPPORT, FINANCE, QUANT ; Super Admin → ADMIN, CONSEILLER, SUPPORT, FINANCE, QUANT ; autres rôles → aucun. Pour changer un rôle, il faut avoir autorité sur l'ancien ET le nouveau rôle. Personne ne change son propre rôle.
 4. Ces règles sont imposées en base par le trigger `protect_role_changes` (migration `20260927_staff_role_hierarchy.sql`), même en cas d'appel API direct.
 5. Compte existant : **jamais de promotion silencieuse**. Confirmation explicite obligatoire, statut inchangé (un compte banni le reste), la personne est prévenue par e-mail.
 6. Le Super Owner n'est révélé qu'à lui-même : les autres membres du staff le voient comme un simple OWNER. Sa fiche n'est modifiable que par lui-même (trigger `protect_role_changes`).
