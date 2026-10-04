@@ -206,7 +206,7 @@ Si `OLD.is_primary_owner = TRUE`, **aucun** acteur extérieur (même OWNER) ne p
 2. Modification d'une fiche client : « Enregistrer Réglages » ouvre une fenêtre récapitulant les champs modifiés ; rien n'est enregistré sans confirmation.
 
 ### E. Compte propriétaire
-1. Le Super Owner (`nludoviic@gmail.com`) est **uniquement** un compte OWNER : pas d'espace client.
+1. Le Super Owner (profil `is_primary_owner = true`) est **uniquement** un compte OWNER : pas d'espace client.
 2. Tout compte du staff qui ouvre l'espace client (`/portal`) est renvoyé vers le Desk (hors « Supervision Live »).
 
 ### F. Création de compte par l'administration (`supabase/functions/create-account`)
