@@ -45,6 +45,7 @@ import {
   Clock,
   Coins,
   Cpu,
+  Copy,
   CreditCard,
   Database,
   DollarSign,
@@ -72,6 +73,7 @@ import {
   Mail,
   Maximize2,
   Megaphone,
+  Menu,
   MessageCircle,
   MessageSquare,
   Mic,
@@ -847,6 +849,7 @@ function NexiumAdminDashboard({
   // Palette de Couleurs Active (Émeraude Institutionnelle & Obsidian par défaut)
   const [adminPalette, setAdminPalette] = useState<"sapphire" | "emerald">("emerald");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Données — plus aucun jeu de données de démonstration : tout démarre vide
   // en attendant le branchement sur les vraies tables Supabase.
@@ -4236,6 +4239,62 @@ function NexiumAdminDashboard({
     );
   }
 
+  const navItems = [
+    {
+      key: "users",
+      label: "Comptes Clients",
+      icon: Users,
+      isActive: activeSection === "users" || activeSection === "user-detail" || activeSection === "create-user",
+      badge: pendingClientsCount > 0 ? pendingClientsCount : undefined,
+      badgeTone: "alert" as const,
+    },
+    {
+      key: "administrators",
+      label: "Administration",
+      icon: ShieldCheck,
+      isActive: activeSection === "administrators",
+    },
+    {
+      key: "messaging",
+      label: "Chat",
+      icon: MessageSquare,
+      isActive: activeSection === "messaging",
+      badge: queueCount > 0 ? queueCount : undefined,
+      badgeTone: "alert" as const,
+    },
+    {
+      key: "emails",
+      label: "E-mails",
+      icon: Inbox,
+      isActive: activeSection === "emails",
+    },
+    { key: "engines", label: "Moteurs & Auto-Trader", icon: Bot, isActive: activeSection === "engines" },
+    ...(hasPermission("can_view_treasury")
+      ? [
+          {
+            key: "finances",
+            label: "Finances & Dépôts",
+            icon: Wallet,
+            isActive: activeSection === "finances",
+            badge: pendingFinanceCount > 0 ? pendingFinanceCount : undefined,
+            badgeTone: "alert" as const,
+          } as const,
+        ]
+      : []),
+    ...(canManageAccessLevels
+      ? [
+          {
+            key: "access-levels",
+            label: "Niveaux d'Accès",
+            icon: Key,
+            isActive: activeSection === "access-levels",
+          } as const,
+        ]
+      : []),
+    { key: "logs", label: "Journal d'Audit", icon: Terminal, isActive: activeSection === "logs" },
+    { key: "analytics", label: "Visiteurs", icon: Eye, isActive: activeSection === "analytics" },
+  ].filter((item) => isPrimaryOwner || !(rolePermissions[currentSessionRole]?.hidden_pages || []).includes(item.key));
+
   return (
     <div className={`min-h-screen bg-[#0a0e17] text-slate-100 font-sans selection:bg-emerald-500/30 flex flex-col antialiased palette-${adminPalette}`}>
       {/* Modale de Confirmation */}
@@ -4244,24 +4303,24 @@ function NexiumAdminDashboard({
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-in fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 sm:p-6 animate-in fade-in overflow-y-auto"
         >
-          <div className="w-full max-w-lg rounded-2xl border border-slate-700/60 bg-[#121a2d] p-6 space-y-5 shadow-2xl animate-in zoom-in-95">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-700/60 bg-[#121a2d] p-5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl animate-in zoom-in-95 my-auto max-h-[90vh] flex flex-col">
             <div className="flex items-center gap-3.5 border-b border-slate-700/50 pb-4">
-              <div className={`grid size-12 place-items-center rounded-xl ${
+              <div className={`grid size-12 place-items-center rounded-xl shrink-0 ${
                 confirmModal.dangerLevel === "CRITICAL" ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
               }`}>
                 <AlertTriangle className="size-6" />
               </div>
-              <div>
-                <h3 id="confirm-modal-title" className="text-xl font-bold text-white tracking-tight">{confirmModal.title}</h3>
+              <div className="min-w-0">
+                <h3 id="confirm-modal-title" className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">{confirmModal.title}</h3>
                 <span className="text-xs font-mono text-slate-400 uppercase tracking-wider font-semibold">Confirmation Requise</span>
               </div>
             </div>
 
-            <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line max-h-80 overflow-y-auto">{confirmModal.description}</p>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line max-h-80 overflow-y-auto">{confirmModal.description}</p>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-700/50">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-700/50 flex-wrap">
               <button
                 type="button"
                 onClick={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
@@ -4283,35 +4342,181 @@ function NexiumAdminDashboard({
       )}
 
 
+      {/* Mobile Drawer Backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm lg:hidden animate-in fade-in duration-200"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Mobile Drawer Aside */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-[84vw] max-w-[320px] bg-gradient-to-b from-[#0c1424] via-[#09101d] to-[#060a14] border-r border-slate-700/60 flex flex-col justify-between overflow-y-auto p-4 sm:p-5 space-y-4 transition-transform duration-300 ease-out lg:hidden shadow-[0_0_50px_rgba(0,0,0,0.85)] ${
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
+        }`}
+        aria-label="Menu de navigation mobile"
+      >
+        <div className="space-y-3.5 flex-1 overflow-y-auto -mr-1 pr-1">
+          {/* Header Drawer */}
+          <div className="flex items-center justify-between pb-3.5 border-b border-slate-800/80">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-slate-950 font-black font-mono text-sm grid place-items-center shadow-md shadow-emerald-500/20">
+                NX
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5 leading-tight">
+                  <span className="font-mono text-base font-black tracking-wider text-white uppercase">
+                    NEXIUM
+                  </span>
+                  <span className="text-[9px] font-bold tracking-widest text-emerald-400 uppercase bg-emerald-500/10 border border-emerald-500/30 px-1 py-0.2 rounded">
+                    ADMIN
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">Console de Gouvernance</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              className="grid size-9 place-items-center rounded-xl text-slate-400 hover:text-white bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 transition cursor-pointer active:scale-95"
+              aria-label="Fermer le menu"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
+
+          {/* Session Profile Card inside Drawer */}
+          <div className="rounded-xl border border-slate-700/60 bg-[#101828]/90 p-3 shadow-inner">
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="size-8.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 grid place-items-center font-bold text-sm shrink-0">
+                  👑
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 leading-tight">
+                    <span className="text-xs font-bold text-white truncate">{sessionUser.name}</span>
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                    {isPrimaryOwner ? "Super Owner" : roleLabel(currentSessionRole)}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSection("administrators");
+                  setMobileMenuOpen(false);
+                }}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition cursor-pointer shrink-0 active:scale-95"
+              >
+                Gérer
+              </button>
+            </div>
+            {currentDeskSignature && (
+              <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>Desk Signature:</span>
+                <span className="text-indigo-300 font-semibold truncate max-w-[140px]">{currentDeskSignature}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation Items */}
+          <AdminSidebarNav
+            items={navItems}
+            onSelect={(key) => {
+              setActiveSection(key as typeof activeSection);
+              setMobileMenuOpen(false);
+            }}
+          />
+        </div>
+
+        {/* Drawer Bottom Actions: Treasury + Portal + Logout */}
+        <div className="space-y-2.5 pt-3 border-t border-slate-800/80 shrink-0">
+          {hasPermission("can_view_treasury") && (
+            <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3 text-xs font-mono space-y-1.5 shadow-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 text-[11px] font-sans">Total Dépôts :</span>
+                <strong className="text-emerald-400 font-bold text-xs">${totalBalance.toLocaleString("fr-FR")} USD</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400 text-[11px] font-sans">Bonus Accordés :</span>
+                <strong className="text-amber-300 font-bold text-xs">+${totalBonus.toLocaleString("fr-FR")} USD</strong>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              to="/portal"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 py-2.5 px-2.5 text-xs font-semibold text-emerald-300 transition cursor-pointer active:scale-95"
+              title="Accéder à l'interface de trading vue par les clients"
+            >
+              <Eye className="size-3.5 shrink-0" />
+              <span className="truncate">Portail Client</span>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleLogout();
+              }}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 py-2.5 px-2.5 text-xs font-semibold text-rose-300 transition cursor-pointer active:scale-95"
+              title="Se déconnecter"
+            >
+              <LogOut className="size-3.5 shrink-0" />
+              <span className="truncate">Déconnexion</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
       {/* TOPBAR */}
-      <header className="sticky top-0 z-40 flex h-20 shrink-0 items-center justify-between border-b border-slate-700/50 bg-[#0d1322]/95 px-6 lg:px-8 backdrop-blur-xl shadow-lg">
-        <div className="flex items-center gap-4">
+      <header className="sticky top-0 z-40 flex h-16 sm:h-20 shrink-0 items-center justify-between border-b border-slate-700/50 bg-[#0d1322]/95 px-3 sm:px-6 lg:px-8 backdrop-blur-xl shadow-lg">
+        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
           <button
             type="button"
-            onClick={() => setSidebarCollapsed((prev) => !prev)}
-            className="grid size-9 shrink-0 place-items-center rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-300 hover:text-white cursor-pointer transition"
-            title={sidebarCollapsed ? "Afficher le menu" : "Masquer le menu"}
-            aria-label={sidebarCollapsed ? "Afficher le menu" : "Masquer le menu"}
+            onClick={() => {
+              if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                setMobileMenuOpen((prev) => !prev);
+              } else {
+                setSidebarCollapsed((prev) => !prev);
+              }
+            }}
+            className={`grid size-9 sm:size-10 shrink-0 place-items-center rounded-xl border transition cursor-pointer active:scale-95 shadow-sm ${
+              mobileMenuOpen
+                ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+                : "border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-300 hover:text-white"
+            }`}
+            title="Menu"
+            aria-label="Menu"
           >
-            {sidebarCollapsed ? <PanelLeftOpen className="size-4.5" /> : <PanelLeftClose className="size-4.5" />}
+            <Menu className="size-5 lg:hidden" />
+            <span className="hidden lg:contents">
+              {sidebarCollapsed ? <PanelLeftOpen className="size-4.5" /> : <PanelLeftClose className="size-4.5" />}
+            </span>
           </button>
-          <Link to="/" className="group flex flex-col justify-center leading-tight cursor-pointer">
-            <div className="flex items-center gap-2.5">
-              <span className="font-mono text-2xl font-black tracking-[0.2em] text-white uppercase group-hover:text-emerald-400 transition-colors">
+          <Link to="/" className="group flex flex-col justify-center leading-tight cursor-pointer min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
+              <span className="font-mono text-xl sm:text-2xl font-black tracking-[0.15em] sm:tracking-[0.2em] text-white uppercase group-hover:text-emerald-400 transition-colors">
                 NEXIUM
               </span>
-              <span className="h-4 w-0.5 bg-gradient-to-b from-emerald-400 to-transparent" />
-              <span className="text-xs font-bold tracking-wider text-emerald-400 uppercase bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+              <span className="h-3.5 sm:h-4 w-0.5 bg-gradient-to-b from-emerald-400 to-transparent" />
+              <span className="text-[10px] sm:text-xs font-bold tracking-wider text-emerald-400 uppercase bg-emerald-500/10 border border-emerald-500/30 px-1.5 sm:px-2 py-0.5 rounded-md">
                 ADMIN
               </span>
             </div>
-            <span className="mt-0.5 font-sans text-[10px] font-bold tracking-[0.25em] text-slate-400 uppercase">
+            <span className="hidden sm:block mt-0.5 font-sans text-[10px] font-bold tracking-[0.25em] text-slate-400 uppercase truncate">
               OPERATIONS &amp; GOVERNANCE CENTER
             </span>
           </Link>
         </div>
 
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-2 sm:gap-3.5 shrink-0">
           {/* Pseudo Desk (Signature) — éditable par son propriétaire, toujours,
               quel que soit son rôle. C'est ce nom qui apparaît au client/visiteur
               dans le chat et les e-mails, jamais le rôle réel du collaborateur. */}
@@ -4386,7 +4591,7 @@ function NexiumAdminDashboard({
           <button
             type="button"
             onClick={() => setActiveSection("administrators")}
-            className="flex items-center gap-2.5 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800/90 px-3.5 py-2 transition cursor-pointer shadow-sm group"
+            className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800/90 p-2 sm:px-3.5 sm:py-2 transition cursor-pointer shadow-sm group"
             title="Gérer les collaborateurs et les niveaux d'accès"
           >
             <div className="size-7 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 grid place-items-center font-bold text-xs">
@@ -4401,14 +4606,14 @@ function NexiumAdminDashboard({
                 {isPrimaryOwner ? "Super Owner" : roleLabel(currentSessionRole)}
               </span>
             </div>
-            <ShieldCheck className="size-4 text-slate-400 group-hover:text-emerald-400 transition-colors ml-1" />
+            <ShieldCheck className="size-4 text-slate-400 group-hover:text-emerald-400 transition-colors hidden sm:block ml-1" />
           </button>
 
           {/* Déconnexion */}
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-rose-500/10 hover:border-rose-500/40 px-3.5 py-2 text-sm font-semibold text-slate-300 hover:text-rose-300 transition cursor-pointer shadow-sm"
+            className="flex items-center gap-2 rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-rose-500/10 hover:border-rose-500/40 p-2 sm:px-3.5 sm:py-2 text-sm font-semibold text-slate-300 hover:text-rose-300 transition cursor-pointer shadow-sm"
             title="Se déconnecter"
           >
             <LogOut className="size-4" />
@@ -4418,7 +4623,7 @@ function NexiumAdminDashboard({
           {/* Lien direct vers le portail client */}
           <Link
             to="/portal"
-            className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-300 hover:text-white transition cursor-pointer shadow-sm"
+            className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 p-2 sm:px-4 sm:py-2 text-sm font-semibold text-emerald-300 hover:text-white transition cursor-pointer shadow-sm"
             title="Accéder à l'interface de trading vue par les clients"
           >
             <Eye className="size-4 text-emerald-400" />
@@ -4429,68 +4634,14 @@ function NexiumAdminDashboard({
 
       {/* CORPS PRINCIPAL */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
+        {/* Desktop Sidebar */}
         <aside
-          className={`shrink-0 border-r border-slate-800/80 bg-[#0c121e]/95 flex flex-col justify-between overflow-y-auto transition-all duration-200 ${
+          className={`hidden lg:flex shrink-0 border-r border-slate-800/80 bg-[#0c121e]/95 flex-col justify-between overflow-y-auto transition-all duration-200 ${
             sidebarCollapsed ? "w-0 p-0 border-r-0 opacity-0 pointer-events-none overflow-hidden" : "w-72 lg:w-80 p-5 space-y-5 opacity-100"
           }`}
         >
           <AdminSidebarNav
-            items={[
-              {
-                key: "users",
-                label: "Comptes Clients",
-                icon: Users,
-                isActive: activeSection === "users" || activeSection === "user-detail" || activeSection === "create-user",
-                badge: pendingClientsCount > 0 ? pendingClientsCount : undefined,
-                badgeTone: "alert" as const,
-              },
-              {
-                key: "administrators",
-                label: "Administration",
-                icon: ShieldCheck,
-                isActive: activeSection === "administrators",
-              },
-              {
-                key: "messaging",
-                label: "Chat",
-                icon: MessageSquare,
-                isActive: activeSection === "messaging",
-                badge: queueCount > 0 ? queueCount : undefined,
-                badgeTone: "alert" as const,
-              },
-              {
-                key: "emails",
-                label: "E-mails",
-                icon: Inbox,
-                isActive: activeSection === "emails",
-              },
-              { key: "engines", label: "Moteurs & Auto-Trader", icon: Bot, isActive: activeSection === "engines" },
-              ...(hasPermission("can_view_treasury")
-                ? [
-                    {
-                      key: "finances",
-                      label: "Finances & Dépôts",
-                      icon: Wallet,
-                      isActive: activeSection === "finances",
-                      badge: pendingFinanceCount > 0 ? pendingFinanceCount : undefined,
-                      badgeTone: "alert" as const,
-                    } as const,
-                  ]
-                : []),
-              ...(canManageAccessLevels
-                ? [
-                    {
-                      key: "access-levels",
-                      label: "Niveaux d'Accès",
-                      icon: Key,
-                      isActive: activeSection === "access-levels",
-                    } as const,
-                  ]
-                : []),
-              { key: "logs", label: "Journal d'Audit", icon: Terminal, isActive: activeSection === "logs" },
-              { key: "analytics", label: "Visiteurs", icon: Eye, isActive: activeSection === "analytics" },
-            ].filter((item) => isPrimaryOwner || !(rolePermissions[currentSessionRole]?.hidden_pages || []).includes(item.key))}
+            items={navItems}
             onSelect={(key) => setActiveSection(key as typeof activeSection)}
           />
 
@@ -4509,7 +4660,7 @@ function NexiumAdminDashboard({
         </aside>
 
         {/* Espace Central */}
-        <main className="flex-1 bg-[#0a0e17] p-6 lg:p-8 overflow-y-auto max-w-[1700px] mx-auto w-full">
+        <main className="flex-1 bg-[#0a0e17] p-3.5 sm:p-6 lg:p-8 overflow-y-auto max-w-[1700px] mx-auto w-full min-w-0">
           {/* ===================================================================== */}
           {/* 🌟 1. SECTION COMPTES CLIENTS (TABLEAU)                                */}
           {/* ===================================================================== */}
@@ -4678,11 +4829,24 @@ function NexiumAdminDashboard({
                     key: "client",
                     header: "CLIENT & MT5",
                     render: (c: UserProfile) => (
-                      <div className="font-sans">
-                        <strong className="text-sm font-semibold text-white block">{c.name}</strong>
-                        <span className="text-xs text-slate-400 font-mono">{c.email}</span>
-                        <span className="text-xs text-emerald-400 font-mono block mt-0.5">MT5 #{c.mt5?.login || "—"} · {c.mt5?.broker || "—"}</span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenClientProfile(c)}
+                        className="text-left font-sans group flex items-start gap-3 hover:opacity-90 transition cursor-pointer max-w-full"
+                      >
+                        <div className="size-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-sm grid place-items-center shrink-0 mt-0.5 group-hover:bg-emerald-500/25 transition">
+                          {c.name ? c.name.charAt(0).toUpperCase() : "C"}
+                        </div>
+                        <div className="min-w-0">
+                          <strong className="text-sm font-semibold text-white group-hover:text-emerald-300 transition block truncate max-w-[170px] sm:max-w-none">
+                            {c.name}
+                          </strong>
+                          <span className="text-xs text-slate-400 font-mono block truncate max-w-[170px] sm:max-w-none">{c.email}</span>
+                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono mt-0.5 whitespace-nowrap">
+                            MT5 #{c.mt5?.login || "—"} · {c.mt5?.broker || "—"}
+                          </span>
+                        </div>
+                      </button>
                     ),
                   },
                   {
@@ -4861,6 +5025,135 @@ function NexiumAdminDashboard({
                 page={clientsTable.page}
                 totalPages={clientsTable.totalPages}
                 onPageChange={clientsTable.setPage}
+                renderCard={(c: UserProfile) => (
+                  <div className="p-4 rounded-2xl border border-slate-700/60 bg-[#121a2d]/95 space-y-3.5 shadow-lg">
+                    {/* Header: Avatar, Identité et Statut */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-base grid place-items-center shrink-0">
+                          {c.name ? c.name.charAt(0).toUpperCase() : "C"}
+                        </div>
+                        <div className="min-w-0">
+                          <strong className="text-sm font-bold text-white block truncate">{c.name}</strong>
+                          <span className="text-xs text-slate-400 font-mono block truncate">{c.email}</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <AdminBadge
+                          variant={
+                            c.status === "PENDING_APPROVAL"
+                              ? "amber"
+                              : c.licenseStatus === "PENDING_PRESET_APPROVAL"
+                              ? "cyan"
+                              : c.status === "ACTIVE"
+                              ? "emerald"
+                              : c.status === "SUSPENDED"
+                              ? "amber"
+                              : "rose"
+                          }
+                          dot={false}
+                        >
+                          {c.status === "PENDING_APPROVAL"
+                            ? "⏳ EN ATTENTE"
+                            : c.licenseStatus === "PENDING_PRESET_APPROVAL"
+                            ? "🎯 PRESET REQUIS"
+                            : c.status}
+                        </AdminBadge>
+                      </div>
+                    </div>
+
+                    {/* Badge MT5 & Détails Techniques */}
+                    <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 font-semibold">
+                        MT5 #{c.mt5?.login || "—"} · {c.mt5?.broker || "—"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.08] text-slate-300">
+                        KYC : {c.kycStatus}
+                      </span>
+                      {c.assignedAdvisor && (
+                        <span className="px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.08] text-slate-400 font-sans">
+                          Conseiller : {c.assignedAdvisor}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Grille Soldes & Performance */}
+                    <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-black/40 border border-white/[0.06] font-mono text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Solde Cash</span>
+                        <strong className="text-sm font-bold text-white block mt-0.5">
+                          {isSuperAdmin ? `$${c.balance.toLocaleString("fr-FR")} USD` : "••••••"}
+                        </strong>
+                        <span className={`text-[11px] font-semibold block ${c.todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {isSuperAdmin
+                            ? `${c.todayPnl >= 0 ? "+" : ""}$${c.todayPnl.toLocaleString("fr-FR")} jour`
+                            : "••••••"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Gain Net Global</span>
+                        <strong className="text-sm font-bold text-emerald-400 block mt-0.5">
+                          {isSuperAdmin ? `+${c.totalNetPnl.toLocaleString("fr-FR")} USD` : "••••••"}
+                        </strong>
+                        <span className="text-[11px] text-slate-400 block">
+                          Win Rate: {isSuperAdmin ? `${c.winRatePercent}%` : "••••••"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions Rapides */}
+                    <div className="pt-1 flex items-center justify-end gap-2 flex-wrap">
+                      {c.status === "PENDING_APPROVAL" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleApprovePendingClient(c)}
+                            className="flex-1 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            <CheckCircle2 className="size-3.5" />
+                            <span>Valider Compte</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRejectPendingClient(c)}
+                            className="py-2 px-3 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-bold transition cursor-pointer"
+                          >
+                            Refuser
+                          </button>
+                        </>
+                      ) : c.licenseStatus === "PENDING_PRESET_APPROVAL" ? (
+                        <>
+                          {isSuperAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleApproveClientPreset(c, c.requestedPresets || [])}
+                              className="flex-1 py-2 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20"
+                            >
+                              <Zap className="size-3.5" />
+                              <span>Valider Preset</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenClientProfile(c)}
+                            className="py-2 px-4 rounded-xl border border-white/[0.1] bg-white/[0.05] hover:bg-white/[0.1] text-slate-200 text-xs font-bold transition cursor-pointer"
+                          >
+                            Fiche Client →
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenClientProfile(c)}
+                          className="w-full py-2.5 px-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <span>Consulter la Fiche Client</span>
+                          <ChevronRight className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               />
             </div>
           )}
@@ -4936,108 +5229,259 @@ function NexiumAdminDashboard({
           {/* ===================================================================== */}
           {activeSection === "user-detail" && activeClient && (
             <div className="space-y-8 animate-in fade-in duration-150">
-              {/* Header Fiche Client */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-700/50 pb-5">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setActiveSection("users")}
-                    aria-label="Retour à la liste des clients"
-                    className="grid size-10 place-items-center rounded-xl border border-slate-700/60 bg-[#121a2d] hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
-                  >
-                    <ArrowLeft className="size-5" />
-                  </button>
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{activeClient.name}</h1>
-                      <AdminBadge
-                        variant={
-                          activeClient.status === "ACTIVE"
-                            ? "emerald"
-                            : activeClient.status === "SUSPENDED"
-                            ? "amber"
-                            : "rose"
-                        }
-                        dot={false}
+              {/* Header Fiche Client — Modern Executive Identity Card */}
+              <div className="rounded-2xl border border-slate-700/60 bg-gradient-to-br from-[#0d1627] via-[#091120] to-[#060a14] p-4 sm:p-6 shadow-2xl relative overflow-hidden space-y-4 sm:space-y-5">
+                {/* Ambient glow accent */}
+                <div className="absolute -top-24 -right-24 size-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 size-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 space-y-4">
+                  {/* Top Bar: Back Button + Avatar + Identity Title + Desktop Actions */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                      <button
+                        onClick={() => setActiveSection("users")}
+                        aria-label="Retour à la liste des clients"
+                        className="grid size-10 sm:size-11 shrink-0 place-items-center rounded-xl border border-slate-700/70 bg-[#10192b] hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer shadow-sm active:scale-95"
                       >
-                        {activeClient.status}
-                      </AdminBadge>
+                        <ArrowLeft className="size-5" />
+                      </button>
+
+                      {/* Avatar Initials with pulse ring */}
+                      <div className="relative shrink-0">
+                        <div className="size-11 sm:size-14 rounded-2xl bg-gradient-to-br from-emerald-500/25 via-teal-500/20 to-indigo-600/30 border border-emerald-500/40 text-emerald-300 font-bold font-mono text-sm sm:text-lg grid place-items-center shadow-md shadow-emerald-500/10">
+                          {(activeClient.name || "CL").split(/\s+/).map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "CL"}
+                        </div>
+                        <span
+                          className={`absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full border-2 border-[#091120] ${
+                            activeClient.status === "ACTIVE"
+                              ? "bg-emerald-400 ring-2 ring-emerald-500/40 animate-pulse"
+                              : activeClient.status === "SUSPENDED"
+                              ? "bg-amber-400 ring-2 ring-amber-500/40"
+                              : "bg-rose-500 ring-2 ring-rose-500/40"
+                          }`}
+                        />
+                      </div>
+
+                      {/* Name & Status */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight truncate max-w-[200px] xs:max-w-[260px] sm:max-w-none">
+                            {activeClient.name}
+                          </h1>
+                          <AdminBadge
+                            variant={
+                              activeClient.status === "ACTIVE"
+                                ? "emerald"
+                                : activeClient.status === "SUSPENDED"
+                                ? "amber"
+                                : "rose"
+                            }
+                            dot={false}
+                          >
+                            {activeClient.status}
+                          </AdminBadge>
+                        </div>
+                        <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate mt-0.5">
+                          Profil Client & Supervision Portefeuille
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs font-mono text-slate-400 mt-1">
-                      ID: {activeClient.id} · MT5 #{activeClient.mt5?.login || "—"} ({activeClient.mt5?.broker || "—"}) · Conseiller: <strong className="text-emerald-400">{activeClient.assignedAdvisor}</strong>
-                    </p>
+
+                    {/* Desktop Actions (hidden on mobile, displayed cleanly top-right on desktop) */}
+                    <div className="hidden lg:flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => handleStartImpersonation(activeClient)}
+                        className="rounded-xl border border-amber-500/50 bg-gradient-to-r from-amber-500/15 to-amber-600/10 hover:from-amber-500/25 hover:to-amber-600/20 text-amber-300 px-4 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-amber-500/10 flex items-center gap-2 active:scale-95"
+                      >
+                        <UserCheck className="size-4 shrink-0" />
+                        <span>Supervision Live</span>
+                      </button>
+
+                      <button
+                        onClick={handleRequestSaveClientProfile}
+                        className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black px-5 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-emerald-500/25 flex items-center gap-2 active:scale-95"
+                      >
+                        <Check className="size-4 stroke-[3] shrink-0" />
+                        <span>Enregistrer Réglages</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    onClick={() => handleStartImpersonation(activeClient)}
-                    className="rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 px-4 py-2 text-xs font-bold uppercase tracking-wider transition cursor-pointer shadow flex items-center gap-2"
-                  >
-                    <UserCheck className="size-4" />
-                    <span>Supervision Live</span>
-                  </button>
+                  {/* Metadata Bento Grid: 2 columns on mobile, 3 columns on tablet/desktop */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 pt-1">
+                    {/* Bento 1: MT5 Terminal */}
+                    <div className="rounded-xl p-2.5 sm:p-3 bg-emerald-500/10 border border-emerald-500/25 flex flex-col justify-between min-w-0">
+                      <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Terminal className="size-3.5 text-emerald-400 shrink-0" />
+                          <span>Terminal MT5</span>
+                        </span>
+                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      </div>
+                      <div className="font-mono font-bold text-white text-xs sm:text-sm truncate">
+                        #{activeClient.mt5?.login || "Non assigné"}
+                      </div>
+                      <div className="text-[10px] sm:text-[11px] text-emerald-300/70 truncate mt-0.5">
+                        {activeClient.mt5?.broker || "Broker Non Configuré"}
+                      </div>
+                    </div>
 
-                  <button
-                    onClick={handleRequestSaveClientProfile}
-                    className="admin-btn-primary text-xs py-2 px-4"
-                  >
-                    <Check className="size-4" />
-                    <span>Enregistrer Réglages</span>
-                  </button>
+                    {/* Bento 2: Identifiant UID */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(activeClient.id);
+                        toast.success("ID Client copié dans le presse-papier !");
+                      }}
+                      title="Cliquer pour copier l'ID Client"
+                      className="rounded-xl p-2.5 sm:p-3 bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/60 hover:border-slate-500 transition-all cursor-pointer flex flex-col justify-between text-left group active:scale-[0.98] min-w-0"
+                    >
+                      <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Copy className="size-3.5 text-slate-400 group-hover:text-emerald-400 transition-colors shrink-0" />
+                          <span>ID Client</span>
+                        </span>
+                        <span className="text-[10px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity font-mono shrink-0">Copier</span>
+                      </div>
+                      <div className="font-mono font-bold text-white text-xs sm:text-sm truncate">
+                        {activeClient.id}
+                      </div>
+                      <div className="text-[10px] sm:text-[11px] text-slate-400 group-hover:text-slate-300 truncate mt-0.5">
+                        Cliquer pour copier
+                      </div>
+                    </button>
+
+                    {/* Bento 3: Conseiller Référent */}
+                    <div className="col-span-2 sm:col-span-1 rounded-xl p-2.5 sm:p-3 bg-indigo-500/10 border border-indigo-500/25 flex flex-col justify-between min-w-0">
+                      <div className="flex items-center justify-between gap-1 text-[11px] font-semibold text-indigo-400 uppercase tracking-wider mb-1">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <ShieldCheck className="size-3.5 text-indigo-400 shrink-0" />
+                          <span>Desk Conseiller</span>
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 shrink-0 font-medium">Assigné</span>
+                      </div>
+                      <div className="font-medium text-white text-xs sm:text-sm truncate">
+                        {activeClient.assignedAdvisor || "Desk de Conformité"}
+                      </div>
+                      <div className="text-[10px] sm:text-[11px] text-indigo-300/70 truncate mt-0.5">
+                        Supervision & Conformité
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mobile Actions: 2-column organized grid (hidden on desktop lg:hidden) */}
+                  <div className="grid grid-cols-2 gap-2.5 lg:hidden pt-2 border-t border-slate-800/80">
+                    <button
+                      onClick={() => handleStartImpersonation(activeClient)}
+                      className="w-full justify-center rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-amber-600/10 hover:from-amber-500/25 text-amber-300 py-2.5 px-2.5 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-amber-500/10 flex items-center gap-1.5 active:scale-95 min-h-[42px]"
+                    >
+                      <UserCheck className="size-4 shrink-0" />
+                      <span className="truncate">Supervision</span>
+                    </button>
+
+                    <button
+                      onClick={handleRequestSaveClientProfile}
+                      className="w-full justify-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black py-2.5 px-2.5 text-xs uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95 min-h-[42px]"
+                    >
+                      <Check className="size-4 stroke-[3] shrink-0" />
+                      <span className="truncate">Enregistrer</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* ── 1. GOUVERNANCE RAPIDE ── */}
-              <section className="admin-card-emerald p-5 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="size-5 text-emerald-400" />
-                  <div>
-                    <h3 className="font-semibold text-sm text-white">Gouvernance Rapide du Compte</h3>
-                    <p className="text-xs text-slate-300 font-mono">Modifiez l'état opérationnel et l'accès du client en direct.</p>
+              <section className="rounded-2xl border border-slate-700/60 bg-gradient-to-br from-[#0c1527] via-[#09101d] to-[#070b14] p-5 sm:p-6 shadow-xl relative overflow-hidden space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800/80 pb-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="size-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center shadow-inner shrink-0">
+                      <ShieldCheck className="size-5.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-base text-white">Gouvernance Rapide du Compte</h3>
+                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-bold text-emerald-300">
+                          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Contrôle Direct
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-300 font-mono mt-0.5">
+                        Modifiez l'état opérationnel et l'accès du client en direct.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="text-xs text-slate-400 font-mono">Statut Actuel :</span>
+                    <AdminBadge
+                      variant={
+                        activeClient.status === "ACTIVE"
+                          ? "emerald"
+                          : activeClient.status === "SUSPENDED"
+                          ? "amber"
+                          : "rose"
+                      }
+                      dot={false}
+                    >
+                      {activeClient.status}
+                    </AdminBadge>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  {activeClient.status !== "ACTIVE" && activeClient.status !== "ARCHIVED" && (
-                    <button
-                      onClick={handleReactivateClient}
-                      className="admin-btn-primary text-xs py-1.5 px-3"
-                    >
-                      <Unlock className="size-3.5" />
-                      <span>Réactiver</span>
-                    </button>
-                  )}
+                <div className="space-y-3 pt-1">
+                  {/* Ligne 1 : Statut du Compte (Suspendre / Révoquer / Bannir) */}
+                  <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                    {activeClient.status !== "ACTIVE" && activeClient.status !== "ARCHIVED" && (
+                      <button
+                        onClick={handleReactivateClient}
+                        className="w-full sm:w-auto justify-center rounded-xl border border-emerald-500/60 bg-gradient-to-r from-emerald-500/25 to-teal-500/20 hover:from-emerald-500/35 hover:to-teal-500/30 text-emerald-300 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-emerald-500/10 active:scale-95"
+                      >
+                        <Unlock className="size-3.5 sm:size-4 text-emerald-400 shrink-0" />
+                        <span className="truncate">Réactiver</span>
+                      </button>
+                    )}
 
-                  {activeClient.status === "ACTIVE" && (
-                    <button
-                      onClick={handleSuspendClient}
-                      className="rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 px-3 py-1.5 text-xs font-semibold text-amber-300 transition cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Pause className="size-3.5" />
-                      <span>Suspendre</span>
-                    </button>
-                  )}
+                    {activeClient.status === "ACTIVE" && (
+                      <button
+                        onClick={handleSuspendClient}
+                        className="w-full sm:w-auto justify-center rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-bold text-amber-300 transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-amber-500/10 active:scale-95"
+                      >
+                        <Pause className="size-3.5 sm:size-4 text-amber-400 shrink-0" />
+                        <span className="truncate">Suspendre</span>
+                      </button>
+                    )}
 
-                  {activeClient.status !== "REVOKED" && activeClient.status !== "ARCHIVED" && (
-                    <button
-                      onClick={handleRevokeClient}
-                      className="rounded-xl border border-purple-500/40 bg-purple-500/15 hover:bg-purple-500/25 px-3 py-1.5 text-xs font-semibold text-purple-300 transition cursor-pointer flex items-center gap-1.5"
-                    >
-                      <MinusCircle className="size-3.5" />
-                      <span>Révoquer</span>
-                    </button>
-                  )}
+                    {activeClient.status !== "REVOKED" && activeClient.status !== "ARCHIVED" && (
+                      <button
+                        onClick={handleRevokeClient}
+                        className="w-full sm:w-auto justify-center rounded-xl border border-purple-500/40 bg-purple-500/15 hover:bg-purple-500/25 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-bold text-purple-300 transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-purple-500/10 active:scale-95"
+                      >
+                        <MinusCircle className="size-3.5 sm:size-4 text-purple-400 shrink-0" />
+                        <span className="truncate">Révoquer</span>
+                      </button>
+                    )}
 
-                  {activeClient.status !== "BANNED" && activeClient.status !== "ARCHIVED" && (
-                    <button
-                      onClick={handleBanClient}
-                      className="rounded-xl border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 px-3 py-1.5 text-xs font-semibold text-rose-400 transition cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Ban className="size-3.5" />
-                      <span>Bannir</span>
-                    </button>
-                  )}
+                    {activeClient.status !== "BANNED" && activeClient.status !== "ARCHIVED" && (
+                      <button
+                        onClick={handleBanClient}
+                        className="w-full sm:w-auto justify-center rounded-xl border border-rose-500/40 bg-rose-500/15 hover:bg-rose-500/25 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-bold text-rose-400 transition cursor-pointer flex items-center gap-1.5 shadow-sm shadow-rose-500/10 active:scale-95"
+                      >
+                        <Ban className="size-3.5 sm:size-4 text-rose-400 shrink-0" />
+                        <span className="truncate">Bannir</span>
+                      </button>
+                    )}
+                  </div>
 
+                  {/* Ligne 2 : Cycle de Vie & Zone Sensible */}
+                  {isPrimaryOwner && (
+                    <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                      <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 shrink-0">
+                        <Trash2 className="size-3.5 text-slate-500" />
+                        <span>Zone sensible :</span>
+                      </span>
+
+                      <div className="flex items-center gap-2 ml-auto">
                   {/* @nexium-lock-start client-archive-delete-buttons — voir NEXIUM.md §8 */}
                   {isPrimaryOwner && activeClient.status === "ARCHIVED" && (
                     <button
@@ -5069,6 +5513,9 @@ function NexiumAdminDashboard({
                     </button>
                   )}
                   {/* @nexium-lock-end client-archive-delete-buttons */}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -5090,22 +5537,22 @@ function NexiumAdminDashboard({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 font-mono text-xs z-10">
-                      <div className="rounded-xl border border-slate-700/60 bg-black/40 px-3 py-1.5 space-y-0.5">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block">1. Solde Cash</span>
-                        <span className="text-xs sm:text-sm font-bold text-white">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 font-mono text-xs z-10">
+                      <div className="rounded-xl border border-slate-700/60 bg-black/40 px-3.5 py-2 space-y-1">
+                        <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">1. Solde Cash</span>
+                        <span className="text-sm sm:text-base font-bold text-white">
                           {isSuperAdmin ? `$${activeClient.balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "••••••"}
                         </span>
                       </div>
-                      <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-3 py-1.5 space-y-0.5">
-                        <span className="text-[10px] text-amber-300/80 font-bold uppercase block">2. Bonus Crédité</span>
-                        <span className="text-xs sm:text-sm font-bold text-amber-300">
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-3.5 py-2 space-y-1">
+                        <span className="text-xs text-amber-300/90 font-bold uppercase tracking-wider block">2. Bonus Crédité</span>
+                        <span className="text-sm sm:text-base font-bold text-amber-300">
                           +{isSuperAdmin ? `$${activeClient.bonusCredit.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "••••••"}
                         </span>
                       </div>
-                      <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 px-3 py-1.5 space-y-0.5">
-                        <span className="text-[10px] text-cyan-300/80 font-bold uppercase block">3. Gains Cumulés</span>
-                        <span className="text-xs sm:text-sm font-bold text-cyan-300">
+                      <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 px-3.5 py-2 space-y-1">
+                        <span className="text-xs text-cyan-300/90 font-bold uppercase tracking-wider block">3. Gains Cumulés</span>
+                        <span className="text-sm sm:text-base font-bold text-cyan-300">
                           +{isSuperAdmin ? `$${(activeClient.grossProfitTotal || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}` : "••••••"}
                         </span>
                       </div>
@@ -5116,113 +5563,113 @@ function NexiumAdminDashboard({
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 font-mono">
                   <div className="admin-card-indigo p-5 space-y-2.5">
                     <div className="flex justify-between items-start">
-                      <span className="text-xs text-slate-300 uppercase font-semibold">Solde du Compte</span>
-                      <div className="grid size-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
-                        <Wallet className="size-4" />
+                      <span className="text-xs sm:text-sm text-slate-300 uppercase font-bold tracking-wider">Solde du Compte</span>
+                      <div className="grid size-8 sm:size-9 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
+                        <Wallet className="size-4 sm:size-4.5" />
                       </div>
                     </div>
-                    <p className="text-2xl font-bold text-white">
+                    <p className="text-2xl sm:text-3xl font-bold text-white">
                       {isSuperAdmin ? `$${activeClient.balance.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
-                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Équité (Solde + Bonus) :</span>
-                      <strong className="text-white">{isSuperAdmin ? `$${activeClient.equity.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
+                      <strong className="text-white font-bold">{isSuperAdmin ? `$${activeClient.equity.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
                     </div>
                   </div>
 
                   <div className="admin-card-amber p-5 space-y-2.5">
                     <div className="flex justify-between items-start">
-                      <span className="text-xs text-slate-300 uppercase font-semibold">Bonus Crédité</span>
-                      <div className="grid size-8 place-items-center rounded-lg bg-amber-500/15 text-amber-300">
-                        <Gift className="size-4" />
+                      <span className="text-xs sm:text-sm text-slate-300 uppercase font-bold tracking-wider">Bonus Crédité</span>
+                      <div className="grid size-8 sm:size-9 place-items-center rounded-lg bg-amber-500/15 text-amber-300">
+                        <Gift className="size-4 sm:size-4.5" />
                       </div>
                     </div>
-                    <p className="text-2xl font-bold text-amber-300">
+                    <p className="text-2xl sm:text-3xl font-bold text-amber-300">
                       {isSuperAdmin ? `$${activeClient.bonusCredit.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
-                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Statut :</span>
-                      <strong className="text-white">{activeClient.bonusCredit > 0 ? "Bonus actif" : "Aucun bonus"}</strong>
+                      <strong className="text-white font-bold">{activeClient.bonusCredit > 0 ? "Bonus actif" : "Aucun bonus"}</strong>
                     </div>
                   </div>
 
                   <div className="admin-card-emerald p-5 space-y-2.5">
                     <div className="flex justify-between items-start">
-                      <span className="text-xs text-slate-300 uppercase font-semibold">Gains Bruts Cumulés</span>
-                      <div className="grid size-8 place-items-center rounded-lg bg-emerald-500/15 text-emerald-400">
-                        <TrendingUp className="size-4" />
+                      <span className="text-xs sm:text-sm text-slate-300 uppercase font-bold tracking-wider">Gains Bruts Cumulés</span>
+                      <div className="grid size-8 sm:size-9 place-items-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                        <TrendingUp className="size-4 sm:size-4.5" />
                       </div>
                     </div>
-                    <p className="text-2xl font-bold text-emerald-400">
+                    <p className="text-2xl sm:text-3xl font-bold text-emerald-400">
                       {isSuperAdmin ? `+$${activeClient.grossProfitTotal.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
-                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Trades Gagnants :</span>
-                      <strong className="text-white">{activeClient.winningTradesCount} / {activeClient.tradesCount}</strong>
+                      <strong className="text-white font-bold">{activeClient.winningTradesCount} / {activeClient.tradesCount}</strong>
                     </div>
-                    <div className="flex justify-between text-xs text-slate-300">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300">
                       <span>Meilleur Trade :</span>
-                      <strong className="text-emerald-400">{isSuperAdmin ? `+$${activeClient.bestTradePnl.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
+                      <strong className="text-emerald-400 font-bold">{isSuperAdmin ? `+$${activeClient.bestTradePnl.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
                     </div>
                   </div>
 
                   <div className="admin-card p-5 space-y-2.5 border-rose-500/30 bg-gradient-to-b from-[#261217]/95 to-[#17090d]/98">
                     <div className="flex justify-between items-start">
-                      <span className="text-xs text-slate-300 uppercase font-semibold">Pertes Brutes Cumulées</span>
-                      <div className="grid size-8 place-items-center rounded-lg bg-rose-500/15 text-rose-400">
-                        <TrendingDown className="size-4" />
+                      <span className="text-xs sm:text-sm text-slate-300 uppercase font-bold tracking-wider">Pertes Brutes Cumulées</span>
+                      <div className="grid size-8 sm:size-9 place-items-center rounded-lg bg-rose-500/15 text-rose-400">
+                        <TrendingDown className="size-4 sm:size-4.5" />
                       </div>
                     </div>
-                    <p className="text-2xl font-bold text-rose-400">
+                    <p className="text-2xl sm:text-3xl font-bold text-rose-400">
                       {isSuperAdmin ? `-$${activeClient.grossLossTotal.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
-                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Trades Perdants :</span>
-                      <strong className="text-white">{activeClient.losingTradesCount} / {activeClient.tradesCount}</strong>
+                      <strong className="text-white font-bold">{activeClient.losingTradesCount} / {activeClient.tradesCount}</strong>
                     </div>
-                    <div className="flex justify-between text-xs text-slate-300">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300">
                       <span>Pire Trade :</span>
-                      <strong className="text-rose-400">{isSuperAdmin ? `$${activeClient.worstTradePnl.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
+                      <strong className="text-rose-400 font-bold">{isSuperAdmin ? `$${activeClient.worstTradePnl.toLocaleString("fr-FR")} USD` : "••••••"}</strong>
                     </div>
                   </div>
 
                   <div className="admin-card-indigo p-5 space-y-2.5">
                     <div className="flex justify-between items-start">
-                      <span className="text-xs text-slate-300 uppercase font-semibold">P&amp;L du Jour (Net)</span>
-                      <div className="grid size-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
-                        <Scale className="size-4" />
+                      <span className="text-xs sm:text-sm text-slate-300 uppercase font-bold tracking-wider">P&amp;L du Jour (Net)</span>
+                      <div className="grid size-8 sm:size-9 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
+                        <Scale className="size-4 sm:size-4.5" />
                       </div>
                     </div>
-                    <p className={`text-2xl font-bold ${activeClient.todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    <p className={`text-2xl sm:text-3xl font-bold ${activeClient.todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                       {isSuperAdmin ? `${activeClient.todayPnl >= 0 ? "+" : ""}$${activeClient.todayPnl.toLocaleString("fr-FR")} USD` : "••••••"}
                     </p>
-                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Gains Jour :</span>
-                      <strong className="text-emerald-400">{isSuperAdmin ? `+$${activeClient.todayGrossGain.toLocaleString("fr-FR")}` : "••••••"}</strong>
+                      <strong className="text-emerald-400 font-bold">{isSuperAdmin ? `+$${activeClient.todayGrossGain.toLocaleString("fr-FR")}` : "••••••"}</strong>
                     </div>
-                    <div className="flex justify-between text-xs text-slate-300">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300">
                       <span>Pertes Jour :</span>
-                      <strong className="text-rose-400">{isSuperAdmin ? `$${activeClient.todayGrossLoss.toLocaleString("fr-FR")}` : "••••••"}</strong>
+                      <strong className="text-rose-400 font-bold">{isSuperAdmin ? `$${activeClient.todayGrossLoss.toLocaleString("fr-FR")}` : "••••••"}</strong>
                     </div>
                   </div>
 
                   <div className="admin-card-amber p-5 space-y-2.5">
                     <div className="flex justify-between items-start">
-                      <span className="text-xs text-slate-300 uppercase font-semibold">Profit Factor &amp; Win Rate</span>
-                      <div className="grid size-8 place-items-center rounded-lg bg-amber-500/15 text-amber-300">
-                        <Award className="size-4" />
+                      <span className="text-xs sm:text-sm text-slate-300 uppercase font-bold tracking-wider">Profit Factor &amp; Win Rate</span>
+                      <div className="grid size-8 sm:size-9 place-items-center rounded-lg bg-amber-500/15 text-amber-300">
+                        <Award className="size-4 sm:size-4.5" />
                       </div>
                     </div>
-                    <p className="text-2xl font-bold text-amber-300">
-                      {isSuperAdmin ? activeClient.profitFactor : "••••"} <span className="text-xs font-normal text-slate-400 font-mono">Factor</span>
+                    <p className="text-2xl sm:text-3xl font-bold text-amber-300">
+                      {isSuperAdmin ? activeClient.profitFactor : "••••"} <span className="text-xs sm:text-sm font-normal text-slate-400 font-mono">Factor</span>
                     </p>
-                    <div className="flex justify-between text-xs text-slate-300 pt-2 border-t border-slate-700/40">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-700/40">
                       <span>Taux de Réussite :</span>
-                      <strong className="text-white">{isSuperAdmin ? `${activeClient.winRatePercent}%` : "••••••"}</strong>
+                      <strong className="text-white font-bold">{isSuperAdmin ? `${activeClient.winRatePercent}%` : "••••••"}</strong>
                     </div>
-                    <div className="flex justify-between text-xs text-slate-300">
+                    <div className="flex justify-between items-center text-xs sm:text-sm text-slate-300">
                       <span>Max Drawdown :</span>
-                      <strong className="text-amber-400">{isSuperAdmin ? `${activeClient.maxDrawdownPercent}%` : "••••••"}</strong>
+                      <strong className="text-amber-400 font-bold">{isSuperAdmin ? `${activeClient.maxDrawdownPercent}%` : "••••••"}</strong>
                     </div>
                   </div>
                 </div>
@@ -5240,7 +5687,63 @@ function NexiumAdminDashboard({
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                {/* Vue Mobile Cartes Retraits */}
+                <div className="sm:hidden space-y-3">
+                  {activeClient.withdrawalRequests.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500 text-sm font-sans rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                      Aucune demande de retrait enregistrée.
+                    </div>
+                  ) : (
+                    activeClient.withdrawalRequests.map((w) => (
+                      <div key={w.id} className="p-4 rounded-xl border border-slate-700/60 bg-[#0c121e] space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs sm:text-sm text-slate-300 font-mono font-medium">{w.date}</span>
+                          <AdminBadge
+                            variant={
+                              w.status === "PENDING"
+                                ? "amber"
+                                : w.status === "APPROVED"
+                                ? "emerald"
+                                : "rose"
+                            }
+                            dot={false}
+                          >
+                            {w.status === "PENDING" ? "EN ATTENTE ⏳" : w.status === "APPROVED" ? "VALIDÉ ✓" : "REJETÉ ✕"}
+                          </AdminBadge>
+                        </div>
+                        <div>
+                          <strong className="text-lg font-bold text-amber-300 font-mono block">
+                            {isSuperAdmin ? `$${w.amount.toLocaleString("fr-FR")} USD` : "••••••"}
+                          </strong>
+                          <span className="text-sm text-white font-semibold block mt-1">{w.method}</span>
+                          <span className="text-xs text-slate-400 font-mono block break-all mt-0.5">{w.destination}</span>
+                        </div>
+                        {w.status === "PENDING" && isSuperAdmin ? (
+                          <div className="flex items-center gap-2 pt-2.5 border-t border-slate-800/80">
+                            <button
+                              onClick={() => handleApproveWithdrawal(w)}
+                              className="flex-1 admin-btn-primary text-xs sm:text-sm py-2.5 px-3.5 font-bold flex items-center justify-center gap-1"
+                            >
+                              Valider ✓
+                            </button>
+                            <button
+                              onClick={() => handleRejectWithdrawal(w)}
+                              className="rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 px-4 py-2.5 text-xs sm:text-sm font-semibold text-rose-400 transition"
+                            >
+                              Rejeter ✕
+                            </button>
+                          </div>
+                        ) : w.processedBy ? (
+                          <div className="pt-2 border-t border-slate-800/80 text-xs text-slate-400 font-mono">
+                            Traité par {w.processedBy}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
                   <table className="w-full text-left font-mono text-sm sm:text-[15px]">
                     <thead className="border-b border-slate-700/50 bg-[#0f1626]/90 text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wider">
                       <tr>
@@ -5264,7 +5767,7 @@ function NexiumAdminDashboard({
                             <AdminBadge
                               variant={
                                 w.status === "PENDING"
-                                  ? "amber"
+                                   ? "amber"
                                   : w.status === "APPROVED"
                                   ? "emerald"
                                   : "rose"
@@ -5324,7 +5827,48 @@ function NexiumAdminDashboard({
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                {/* Vue Mobile Cartes Dépôts */}
+                <div className="sm:hidden space-y-3">
+                  {activeClient.depositRequests.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500 text-sm font-sans rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                      Aucun dépôt enregistré.
+                    </div>
+                  ) : (
+                    activeClient.depositRequests.map((d) => (
+                      <div key={d.id} className="p-4 rounded-xl border border-slate-700/60 bg-[#0c121e] space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs sm:text-sm text-slate-300 font-mono font-medium">{d.date}</span>
+                          <AdminBadge variant={d.status === "PENDING" ? "amber" : "emerald"} dot={false}>
+                            {d.status === "PENDING" ? "EN ATTENTE ⏳" : "CRÉDITÉ ✓"}
+                          </AdminBadge>
+                        </div>
+                        <div>
+                          <strong className="text-lg font-bold text-emerald-400 font-mono block">
+                            {isSuperAdmin ? `+$${d.amount.toLocaleString("fr-FR")} USD` : "••••••"}
+                          </strong>
+                          <span className="text-sm text-white font-semibold block mt-1">{d.method}</span>
+                          <span className="text-xs text-slate-400 font-mono block break-all mt-0.5">Réf: {d.reference}</span>
+                        </div>
+                        {d.status === "PENDING" && isSuperAdmin ? (
+                          <div className="pt-2.5 border-t border-slate-800/80">
+                            <button
+                              onClick={() => handleApproveDeposit(d)}
+                              className="w-full admin-btn-primary text-xs sm:text-sm py-2.5 px-3.5 font-bold flex items-center justify-center gap-1"
+                            >
+                              Valider &amp; Créditer ✓
+                            </button>
+                          </div>
+                        ) : d.creditedBy ? (
+                          <div className="pt-2 border-t border-slate-800/80 text-xs text-slate-400 font-mono">
+                            Crédité par {d.creditedBy}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
                   <table className="w-full text-left font-mono text-sm sm:text-[15px]">
                     <thead className="border-b border-slate-700/50 bg-[#0f1626]/90 text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wider">
                       <tr>
@@ -5383,54 +5927,54 @@ function NexiumAdminDashboard({
 
                 <div className="grid gap-5 sm:grid-cols-3">
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">NOM COMPLET</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider font-mono">NOM COMPLET</label>
                     <input
                       type="text"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">ADRESSE E-MAIL</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider font-mono">ADRESSE E-MAIL</label>
                     <input
                       type="email"
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">N° TÉLÉPHONE</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider font-mono">N° TÉLÉPHONE</label>
                     <input
                       type="text"
                       value={editPhone}
                       onChange={(e) => setEditPhone(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
                     />
                   </div>
                 </div>
 
                 <div className="grid gap-5 sm:grid-cols-3 pt-2">
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">PAYS DE RÉSIDENCE</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider font-mono">PAYS DE RÉSIDENCE</label>
                     <input
                       type="text"
                       value={editCountry}
                       onChange={(e) => setEditCountry(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">MODIFIER MOT DE PASSE</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider font-mono">MODIFIER MOT DE PASSE</label>
                     <input
                       type="text"
                       value={newPasswordInput}
                       onChange={(e) => setNewPasswordInput(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
                     />
                   </div>
 
@@ -5441,7 +5985,7 @@ function NexiumAdminDashboard({
                         setClients((prev) => prev.map((c) => (c.id === activeClient.id ? { ...c, twoFactorEnabled: false } : c)));
                         toast.success("Double authentification réinitialisée pour ce client.");
                       }}
-                      className="admin-btn-secondary py-2.5 text-sm font-semibold"
+                      className="admin-btn-secondary py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-2"
                     >
                       <Lock className="size-4 text-amber-400" />
                       <span>Réinitialiser 2FA</span>
@@ -5462,7 +6006,7 @@ function NexiumAdminDashboard({
                         <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                           Demande d'Accompagnement &amp; Recouvrement
                         </h2>
-                        <p className="text-xs text-blue-300 font-mono">
+                        <p className="text-xs sm:text-sm text-blue-300 font-mono">
                           Dossier soumis depuis l'espace client
                         </p>
                       </div>
@@ -5470,17 +6014,17 @@ function NexiumAdminDashboard({
 
                     <div>
                       {activeClient.recoveryAssistance.status === "PENDING" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-xs font-bold font-mono animate-pulse">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300 text-xs sm:text-sm font-bold font-mono animate-pulse">
                           <span className="size-2 rounded-full bg-amber-400" />
                           EN ATTENTE DE PRISE EN CHARGE
                         </span>
                       ) : activeClient.recoveryAssistance.status === "CONTACTED" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 text-xs font-bold font-mono">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-emerald-500/50 bg-emerald-500/15 text-emerald-300 text-xs sm:text-sm font-bold font-mono">
                           <span className="size-2 rounded-full bg-emerald-400" />
                           DOSSIER EN COURS / CLIENT CONTACTÉ
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-600/50 bg-slate-800/40 text-slate-300 text-xs font-bold font-mono">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-600/50 bg-slate-800/40 text-slate-300 text-xs sm:text-sm font-bold font-mono">
                           <CheckCircle2 className="size-4 text-emerald-400" />
                           DOSSIER CLÔTURÉ (RÉSOLU)
                         </span>
@@ -5488,30 +6032,30 @@ function NexiumAdminDashboard({
                     </div>
                   </div>
 
-                  <div className="grid sm:grid-cols-3 gap-3 text-xs font-mono">
-                    <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Téléphone de rappel</span>
-                      <strong className="text-white text-sm block mt-0.5">
+                  <div className="grid sm:grid-cols-3 gap-3 text-xs sm:text-sm font-mono">
+                    <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06]">
+                      <span className="text-slate-300 block text-xs uppercase font-bold tracking-wider mb-1">Téléphone de rappel</span>
+                      <strong className="text-white text-sm sm:text-base block">
                         {activeClient.recoveryAssistance.phone || activeClient.phone || "Non renseigné"}
                       </strong>
                     </div>
-                    <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Montant estimé</span>
-                      <strong className="text-amber-300 text-sm block mt-0.5">
+                    <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06]">
+                      <span className="text-slate-300 block text-xs uppercase font-bold tracking-wider mb-1">Montant estimé</span>
+                      <strong className="text-amber-300 text-sm sm:text-base block">
                         {activeClient.recoveryAssistance.estimatedAmount || "Non spécifié"}
                       </strong>
                     </div>
-                    <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Date de transmission</span>
-                      <strong className="text-blue-300 text-xs block mt-0.5">
+                    <div className="p-3.5 rounded-xl bg-black/40 border border-white/[0.06]">
+                      <span className="text-slate-300 block text-xs uppercase font-bold tracking-wider mb-1">Date de transmission</span>
+                      <strong className="text-blue-300 text-xs sm:text-sm block">
                         {new Date(activeClient.recoveryAssistance.requestedAt).toLocaleString("fr-FR")}
                       </strong>
                     </div>
                   </div>
 
                   {activeClient.recoveryAssistance.note && (
-                    <div className="p-3.5 rounded-xl bg-black/50 border border-blue-500/20 text-xs">
-                      <span className="text-slate-400 text-[10px] uppercase font-bold font-mono block mb-1">
+                    <div className="p-4 rounded-xl bg-black/50 border border-blue-500/20 text-xs sm:text-sm">
+                      <span className="text-slate-300 text-xs uppercase font-bold font-mono block mb-1.5">
                         Note / Précisions du client :
                       </span>
                       <p className="text-slate-200 leading-relaxed italic">
@@ -5538,7 +6082,7 @@ function NexiumAdminDashboard({
                         }
                         toast.success("Dossier marqué comme Contacté / En cours.");
                       }}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold transition cursor-pointer"
                     >
                       Marquer comme Contacté
                     </button>
@@ -5558,7 +6102,7 @@ function NexiumAdminDashboard({
                         }
                         toast.success("Dossier marqué comme Clôturé (Résolu).");
                       }}
-                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold transition cursor-pointer"
                     >
                       Clôturer (Résolu)
                     </button>
@@ -5579,7 +6123,7 @@ function NexiumAdminDashboard({
                         }
                         toast.info("Demande d'assistance réinitialisée.");
                       }}
-                      className="px-4 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 hover:text-white text-xs sm:text-sm font-bold transition cursor-pointer"
                     >
                       Réinitialiser la demande
                     </button>
@@ -5618,56 +6162,56 @@ function NexiumAdminDashboard({
                       <div className={`admin-subcard p-5 space-y-4 border ${isGoldApproved ? "border-amber-500/40 bg-amber-950/10" : isGoldRequested ? "border-amber-400/50 bg-amber-500/5" : "border-slate-800 bg-[#0b101c]"}`}>
                         <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-3">
                           <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-base text-white">Nexium AI Gold</h4>
+                            <h4 className="font-bold text-base sm:text-lg text-white">Nexium AI Gold</h4>
                           </div>
                           <button
                             type="button"
                             onClick={() => setGoldVisible(!goldVisible)}
                             title={goldVisible ? "Affiché sur l'espace client" : "Masqué sur l'espace client"}
-                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                            className={`rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
                               goldVisible ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
                             }`}
                           >
-                            <Eye className="size-3" />
+                            <Eye className="size-3.5" />
                             <span>{goldVisible ? "VISIBLE CLIENT" : "MASQUÉ CLIENT"}</span>
                           </button>
                         </div>
 
                         {/* STATUT D'APPROBATION DU PRESET & ACTIONS ADMIN */}
-                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3 space-y-2.5">
+                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3.5 space-y-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Statut :</span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Statut :</span>
                             {isGoldApproved ? (
                               isGoldRequested ? (
-                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
-                                  <RefreshCw className="size-3 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
+                                <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300 animate-pulse">
+                                  <RefreshCw className="size-3.5 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-400">
-                                  <CheckCircle2 className="size-3" /> APPROUVÉ &amp; ACTIF
+                                <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-black text-emerald-400">
+                                  <CheckCircle2 className="size-3.5" /> APPROUVÉ &amp; ACTIF
                                 </span>
                               )
                             ) : isGoldRequested ? (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300 animate-pulse">
                                 ⏳ ACTIVATION DEMANDÉE
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-bold text-slate-400">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs font-bold text-slate-400">
                                 🔒 NON ATTRIBUÉ / ARRÊTÉ
                               </span>
                             )}
                           </div>
 
                           {isSuperAdmin && (
-                            <div className="flex flex-col sm:flex-row gap-1.5 pt-1">
+                            <div className="flex flex-col sm:flex-row gap-2 pt-1">
                               {/* 1. Client demande activation initiale */}
                               {!isGoldApproved && isGoldRequested && (
                                 <button
                                   type="button"
                                   onClick={() => handleApproveSinglePreset(activeClient, "AI_GOLD")}
-                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                                 >
-                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <CheckCircle2 className="size-4 text-emerald-400" />
                                   <span>Valider Activation</span>
                                 </button>
                               )}
@@ -5678,17 +6222,17 @@ function NexiumAdminDashboard({
                                   <button
                                     type="button"
                                     onClick={() => handleNewTradingCycle(activeClient, "AI_GOLD")}
-                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
                                   >
-                                    <RefreshCw className="size-3.5 text-emerald-400" />
+                                    <RefreshCw className="size-4 text-emerald-400" />
                                     <span>Valider Prolongation</span>
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleStopSinglePreset(activeClient, "AI_GOLD")}
-                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs sm:text-sm py-2.5 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                   >
-                                    <Power className="size-3.5 text-rose-400" />
+                                    <Power className="size-4 text-rose-400" />
                                     <span>Arrêter</span>
                                   </button>
                                 </>
@@ -5699,9 +6243,9 @@ function NexiumAdminDashboard({
                                 <button
                                   type="button"
                                   onClick={() => handleStopSinglePreset(activeClient, "AI_GOLD")}
-                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                 >
-                                  <Power className="size-3.5 text-rose-400" />
+                                  <Power className="size-4 text-rose-400" />
                                   <span>Arrêter le Preset</span>
                                 </button>
                               )}
@@ -5711,9 +6255,9 @@ function NexiumAdminDashboard({
                                 <button
                                   type="button"
                                   onClick={() => handleApproveSinglePreset(activeClient, "AI_GOLD")}
-                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                 >
-                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <CheckCircle2 className="size-4 text-emerald-400" />
                                   <span>Activer le Preset</span>
                                 </button>
                               )}
@@ -5721,9 +6265,9 @@ function NexiumAdminDashboard({
                           )}
                         </div>
 
-                        <div className="space-y-3 text-xs sm:text-sm font-mono">
+                        <div className="space-y-3.5 text-xs sm:text-sm font-mono">
                           <div>
-                            <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
+                            <label className="block text-slate-300 mb-1.5 uppercase font-bold text-xs sm:text-sm tracking-wider">PRESET ATTRIBUÉ :</label>
                             <AdminDropdown
                               value={goldPreset}
                               onChange={setGoldPreset}
@@ -5732,13 +6276,13 @@ function NexiumAdminDashboard({
                           </div>
 
                           <div className="flex justify-between items-center pt-1">
-                            <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
+                            <span className="text-slate-300 font-bold text-xs sm:text-sm uppercase tracking-wider">LOT MAXIMUM :</span>
                             <input
                               type="number"
                               step="0.05"
                               value={goldMaxLot}
                               onChange={(e) => setGoldMaxLot(parseFloat(e.target.value) || 0.1)}
-                              className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
+                              className="w-24 sm:w-28 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2.5 text-right text-white font-bold text-sm sm:text-base outline-none focus:border-amber-400"
                             />
                           </div>
                         </div>
@@ -5747,55 +6291,55 @@ function NexiumAdminDashboard({
                       {/* CARD 2: NEXIUM FX TREND */}
                       <div className={`admin-subcard p-5 space-y-4 border ${isFxApproved ? "border-indigo-500/40 bg-indigo-950/10" : isFxRequested ? "border-amber-400/50 bg-amber-500/5" : "border-slate-800 bg-[#0b101c]"}`}>
                         <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-3">
-                          <h4 className="font-bold text-base text-white">Nexium FX Trend</h4>
+                          <h4 className="font-bold text-base sm:text-lg text-white">Nexium FX Trend</h4>
                           <button
                             type="button"
                             onClick={() => setFxVisible(!fxVisible)}
                             title={fxVisible ? "Affiché sur l'espace client" : "Masqué sur l'espace client"}
-                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                            className={`rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
                               fxVisible ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
                             }`}
                           >
-                            <Eye className="size-3" />
+                            <Eye className="size-3.5" />
                             <span>{fxVisible ? "VISIBLE CLIENT" : "MASQUÉ CLIENT"}</span>
                           </button>
                         </div>
 
                         {/* STATUT D'APPROBATION DU PRESET & ACTIONS ADMIN */}
-                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3 space-y-2.5">
+                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3.5 space-y-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Statut :</span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Statut :</span>
                             {isFxApproved ? (
                               isFxRequested ? (
-                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
-                                  <RefreshCw className="size-3 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
+                                <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300 animate-pulse">
+                                  <RefreshCw className="size-3.5 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-400">
-                                  <CheckCircle2 className="size-3" /> APPROUVÉ &amp; ACTIF
+                                <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-black text-emerald-400">
+                                  <CheckCircle2 className="size-3.5" /> APPROUVÉ &amp; ACTIF
                                 </span>
                               )
                             ) : isFxRequested ? (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300 animate-pulse">
                                 ⏳ ACTIVATION DEMANDÉE
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-bold text-slate-400">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs font-bold text-slate-400">
                                 🔒 NON ATTRIBUÉ / ARRÊTÉ
                               </span>
                             )}
                           </div>
 
                           {isSuperAdmin && (
-                            <div className="flex flex-col sm:flex-row gap-1.5 pt-1">
+                            <div className="flex flex-col sm:flex-row gap-2 pt-1">
                               {/* 1. Client demande activation initiale */}
                               {!isFxApproved && isFxRequested && (
                                 <button
                                   type="button"
                                   onClick={() => handleApproveSinglePreset(activeClient, "FX_TREND")}
-                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                                 >
-                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <CheckCircle2 className="size-4 text-emerald-400" />
                                   <span>Valider Activation</span>
                                 </button>
                               )}
@@ -5806,17 +6350,17 @@ function NexiumAdminDashboard({
                                   <button
                                     type="button"
                                     onClick={() => handleNewTradingCycle(activeClient, "FX_TREND")}
-                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
                                   >
-                                    <RefreshCw className="size-3.5 text-emerald-400" />
+                                    <RefreshCw className="size-4 text-emerald-400" />
                                     <span>Valider Prolongation</span>
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleStopSinglePreset(activeClient, "FX_TREND")}
-                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs sm:text-sm py-2.5 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                   >
-                                    <Power className="size-3.5 text-rose-400" />
+                                    <Power className="size-4 text-rose-400" />
                                     <span>Arrêter</span>
                                   </button>
                                 </>
@@ -5827,9 +6371,9 @@ function NexiumAdminDashboard({
                                 <button
                                   type="button"
                                   onClick={() => handleStopSinglePreset(activeClient, "FX_TREND")}
-                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                 >
-                                  <Power className="size-3.5 text-rose-400" />
+                                  <Power className="size-4 text-rose-400" />
                                   <span>Arrêter le Preset</span>
                                 </button>
                               )}
@@ -5839,9 +6383,9 @@ function NexiumAdminDashboard({
                                 <button
                                   type="button"
                                   onClick={() => handleApproveSinglePreset(activeClient, "FX_TREND")}
-                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                 >
-                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <CheckCircle2 className="size-4 text-emerald-400" />
                                   <span>Activer le Preset</span>
                                 </button>
                               )}
@@ -5849,9 +6393,9 @@ function NexiumAdminDashboard({
                           )}
                         </div>
 
-                        <div className="space-y-3 text-xs sm:text-sm font-mono">
+                        <div className="space-y-3.5 text-xs sm:text-sm font-mono">
                           <div>
-                            <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
+                            <label className="block text-slate-300 mb-1.5 uppercase font-bold text-xs sm:text-sm tracking-wider">PRESET ATTRIBUÉ :</label>
                             <AdminDropdown
                               value={fxPreset}
                               onChange={setFxPreset}
@@ -5860,13 +6404,13 @@ function NexiumAdminDashboard({
                           </div>
 
                           <div className="flex justify-between items-center pt-1">
-                            <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
+                            <span className="text-slate-300 font-bold text-xs sm:text-sm uppercase tracking-wider">LOT MAXIMUM :</span>
                             <input
                               type="number"
                               step="0.05"
                               value={fxMaxLot}
                               onChange={(e) => setFxMaxLot(parseFloat(e.target.value) || 0.1)}
-                              className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
+                              className="w-24 sm:w-28 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2.5 text-right text-white font-bold text-sm sm:text-base outline-none focus:border-indigo-400"
                             />
                           </div>
                         </div>
@@ -5875,55 +6419,55 @@ function NexiumAdminDashboard({
                       {/* CARD 3: INDEX REVERSION */}
                       <div className={`admin-subcard p-5 space-y-4 border ${isIndexApproved ? "border-purple-500/40 bg-purple-950/10" : isIndexRequested ? "border-amber-400/50 bg-amber-500/5" : "border-slate-800 bg-[#0b101c]"}`}>
                         <div className="flex justify-between items-center gap-2 border-b border-slate-700/40 pb-3">
-                          <h4 className="font-bold text-base text-white">Index Reversion</h4>
+                          <h4 className="font-bold text-base sm:text-lg text-white">Index Reversion</h4>
                           <button
                             type="button"
                             onClick={() => setIndexVisible(!indexVisible)}
                             title={indexVisible ? "Affiché sur l'espace client" : "Masqué sur l'espace client"}
-                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                            className={`rounded-lg px-3 py-1.5 text-xs sm:text-sm font-bold transition cursor-pointer flex items-center gap-1.5 ${
                               indexVisible ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60" : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
                             }`}
                           >
-                            <Eye className="size-3" />
+                            <Eye className="size-3.5" />
                             <span>{indexVisible ? "VISIBLE CLIENT" : "MASQUÉ CLIENT"}</span>
                           </button>
                         </div>
 
                         {/* STATUT D'APPROBATION DU PRESET & ACTIONS ADMIN */}
-                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3 space-y-2.5">
+                        <div className="rounded-xl border border-slate-700/60 bg-black/40 p-3.5 space-y-3">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Statut :</span>
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Statut :</span>
                             {isIndexApproved ? (
                               isIndexRequested ? (
-                                <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
-                                  <RefreshCw className="size-3 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
+                                <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300 animate-pulse">
+                                  <RefreshCw className="size-3.5 text-amber-400 animate-spin" /> PROLONGATION DEMANDÉE
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-400">
-                                  <CheckCircle2 className="size-3" /> APPROUVÉ &amp; ACTIF
+                                <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-black text-emerald-400">
+                                  <CheckCircle2 className="size-3.5" /> APPROUVÉ &amp; ACTIF
                                 </span>
                               )
                             ) : isIndexRequested ? (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/40 bg-amber-400/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 animate-pulse">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/15 px-2.5 py-1 text-xs font-bold text-amber-300 animate-pulse">
                                 ⏳ ACTIVATION DEMANDÉE
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[11px] font-bold text-slate-400">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs font-bold text-slate-400">
                                 🔒 NON ATTRIBUÉ / ARRÊTÉ
                               </span>
                             )}
                           </div>
 
                           {isSuperAdmin && (
-                            <div className="flex flex-col sm:flex-row gap-1.5 pt-1">
+                            <div className="flex flex-col sm:flex-row gap-2 pt-1">
                               {/* 1. Client demande activation initiale */}
                               {!isIndexApproved && isIndexRequested && (
                                 <button
                                   type="button"
                                   onClick={() => handleApproveSinglePreset(activeClient, "INDEX_REVERSION")}
-                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
+                                  className="flex-1 rounded-lg border border-emerald-500/60 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
                                 >
-                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <CheckCircle2 className="size-4 text-emerald-400" />
                                   <span>Valider Activation</span>
                                 </button>
                               )}
@@ -5934,17 +6478,17 @@ function NexiumAdminDashboard({
                                   <button
                                     type="button"
                                     onClick={() => handleNewTradingCycle(activeClient, "INDEX_REVERSION")}
-                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
+                                    className="flex-1 rounded-lg border border-emerald-500 bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95"
                                   >
-                                    <RefreshCw className="size-3.5 text-emerald-400" />
+                                    <RefreshCw className="size-4 text-emerald-400" />
                                     <span>Valider Prolongation</span>
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleStopSinglePreset(activeClient, "INDEX_REVERSION")}
-                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                    className="rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs sm:text-sm py-2.5 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                   >
-                                    <Power className="size-3.5 text-rose-400" />
+                                    <Power className="size-4 text-rose-400" />
                                     <span>Arrêter</span>
                                   </button>
                                 </>
@@ -5955,9 +6499,9 @@ function NexiumAdminDashboard({
                                 <button
                                   type="button"
                                   onClick={() => handleStopSinglePreset(activeClient, "INDEX_REVERSION")}
-                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs py-2 px-2.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  className="flex-1 rounded-lg border border-rose-500/50 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                 >
-                                  <Power className="size-3.5 text-rose-400" />
+                                  <Power className="size-4 text-rose-400" />
                                   <span>Arrêter le Preset</span>
                                 </button>
                               )}
@@ -5967,9 +6511,9 @@ function NexiumAdminDashboard({
                                 <button
                                   type="button"
                                   onClick={() => handleApproveSinglePreset(activeClient, "INDEX_REVERSION")}
-                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs py-2 px-3 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                                  className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold text-xs sm:text-sm py-2.5 px-3.5 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
                                 >
-                                  <CheckCircle2 className="size-3.5 text-emerald-400" />
+                                  <CheckCircle2 className="size-4 text-emerald-400" />
                                   <span>Activer le Preset</span>
                                 </button>
                               )}
@@ -5977,9 +6521,9 @@ function NexiumAdminDashboard({
                           )}
                         </div>
 
-                        <div className="space-y-3 text-xs sm:text-sm font-mono">
+                        <div className="space-y-3.5 text-xs sm:text-sm font-mono">
                           <div>
-                            <label className="block text-slate-400 mb-1.5 uppercase font-bold text-xs">PRESET ATTRIBUÉ :</label>
+                            <label className="block text-slate-300 mb-1.5 uppercase font-bold text-xs sm:text-sm tracking-wider">PRESET ATTRIBUÉ :</label>
                             <AdminDropdown
                               value={indexPreset}
                               onChange={setIndexPreset}
@@ -5988,13 +6532,13 @@ function NexiumAdminDashboard({
                           </div>
 
                           <div className="flex justify-between items-center pt-1">
-                            <span className="text-slate-400 font-bold text-xs uppercase">LOT MAXIMUM :</span>
+                            <span className="text-slate-300 font-bold text-xs sm:text-sm uppercase tracking-wider">LOT MAXIMUM :</span>
                             <input
                               type="number"
                               step="0.05"
                               value={indexMaxLot}
                               onChange={(e) => setIndexMaxLot(parseFloat(e.target.value) || 0.1)}
-                              className="w-24 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2 text-right text-white font-bold text-sm"
+                              className="w-24 sm:w-28 rounded-lg border border-slate-700/60 bg-[#0c121e] p-2.5 text-right text-white font-bold text-sm sm:text-base outline-none focus:border-purple-400"
                             />
                           </div>
                         </div>
@@ -6006,49 +6550,57 @@ function NexiumAdminDashboard({
 
               {/* ── 7. COMPTE MT5 DU CLIENT ── */}
               <section className="admin-card-cyan p-6 sm:p-7 space-y-5">
-                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
-                  <HardDrive className="size-5 text-cyan-400" />
-                  Paramètres du Compte Broker &amp; Terminal MT5
-                </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-cyan-500/20 pb-4">
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
+                    <HardDrive className="size-5 text-cyan-400" />
+                    Paramètres du Compte Broker &amp; Terminal MT5
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-xs sm:text-sm font-mono font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 px-3 py-1.5 rounded-lg">
+                      Passerelle FIX NY4 Active
+                    </span>
+                  </div>
+                </div>
 
-                <div className="grid gap-5 sm:grid-cols-4 font-mono text-sm">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 font-mono text-sm">
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider">LOGIN MT5</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider">LOGIN MT5</label>
                     <input
                       type="text"
                       value={mt5Login}
                       onChange={(e) => setMt5Login(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider">COURTIER (BROKER)</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider">COURTIER (BROKER)</label>
                     <input
                       type="text"
                       value={mt5Broker}
                       onChange={(e) => setMt5Broker(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider">SERVEUR BROKER</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider">SERVEUR BROKER</label>
                     <input
                       type="text"
                       value={mt5Server}
                       onChange={(e) => setMt5Server(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 uppercase tracking-wider">MOT DE PASSE INVESTISSEUR</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider">MOT DE PASSE INVESTISSEUR</label>
                     <input
                       type="text"
                       value={mt5InvestorPass}
                       onChange={(e) => setMt5InvestorPass(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-2.5 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-cyan-400"
                     />
                   </div>
                 </div>
@@ -6071,7 +6623,7 @@ function NexiumAdminDashboard({
 
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">TYPE D'OPÉRATION</label>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 font-mono uppercase">TYPE D'OPÉRATION</label>
                           <AdminDropdown
                             value={creditType}
                             onChange={setCreditType}
@@ -6085,7 +6637,7 @@ function NexiumAdminDashboard({
                         </div>
 
                         <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MONTANT ($ USD)</label>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 font-mono uppercase">MONTANT ($ USD)</label>
                           <input
                             type="number"
                             value={creditAmountInput}
@@ -6096,18 +6648,18 @@ function NexiumAdminDashboard({
                       </div>
 
                       <div>
-                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MOTIF DE L'OPÉRATION</label>
+                        <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 font-mono uppercase">MOTIF DE L'OPÉRATION</label>
                         <input
                           type="text"
                           value={creditNote}
                           onChange={(e) => setCreditNote(e.target.value)}
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-xs sm:text-sm text-white outline-none"
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white outline-none focus:border-amber-400"
                         />
                       </div>
 
                       <button
                         type="submit"
-                        className="w-full admin-btn-primary py-3 text-sm font-bold"
+                        className="w-full admin-btn-primary py-3.5 text-sm sm:text-base font-bold"
                       >
                         Exécuter l'Écriture Financière ($)
                       </button>
@@ -6121,7 +6673,7 @@ function NexiumAdminDashboard({
 
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">DIRECTION</label>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 font-mono uppercase">DIRECTION</label>
                           <AdminDropdown
                             value={pnlAdjustDirection}
                             onChange={setPnlAdjustDirection}
@@ -6133,7 +6685,7 @@ function NexiumAdminDashboard({
                         </div>
 
                         <div>
-                          <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MONTANT ($ USD)</label>
+                          <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 font-mono uppercase">MONTANT ($ USD)</label>
                           <input
                             type="number"
                             value={pnlAdjustAmount}
@@ -6144,18 +6696,18 @@ function NexiumAdminDashboard({
                       </div>
 
                       <div>
-                        <label className="block text-xs sm:text-sm font-bold text-slate-400 mb-1 font-mono uppercase">MOTIF DE L'AJUSTEMENT</label>
+                        <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5 font-mono uppercase">MOTIF DE L'AJUSTEMENT</label>
                         <input
                           type="text"
                           value={pnlAdjustReason}
                           onChange={(e) => setPnlAdjustReason(e.target.value)}
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-xs sm:text-sm text-white outline-none"
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white outline-none focus:border-amber-400"
                         />
                       </div>
 
                       <button
                         type="submit"
-                        className="w-full rounded-xl bg-amber-400 hover:bg-amber-500 py-3 text-sm font-bold text-slate-950 uppercase tracking-wider transition cursor-pointer shadow-md"
+                        className="w-full rounded-xl bg-amber-400 hover:bg-amber-500 py-3.5 text-sm sm:text-base font-bold text-slate-950 uppercase tracking-wider transition cursor-pointer shadow-md"
                       >
                         Appliquer l'Ajustement de P&amp;L
                       </button>
@@ -6185,22 +6737,58 @@ function NexiumAdminDashboard({
                   </h2>
 
                   {isSuperAdmin && (
-                    <form onSubmit={handleSetExactTodayPnl} className="flex items-center gap-2.5 font-mono">
-                      <span className="text-xs sm:text-sm text-slate-400 uppercase font-bold">Fixer P&amp;L ($):</span>
+                    <form onSubmit={handleSetExactTodayPnl} className="flex flex-wrap items-center gap-2.5 font-mono">
+                      <span className="text-xs sm:text-sm text-slate-300 uppercase font-bold">Fixer P&amp;L ($):</span>
                       <input
                         type="number"
                         value={exactPnlInput}
                         onChange={(e) => setExactPnlInput(e.target.value)}
-                        className="w-28 rounded-lg border border-slate-700/60 bg-[#0c121e] px-2.5 py-1.5 text-xs sm:text-sm text-emerald-400 font-bold outline-none"
+                        className="w-28 rounded-xl border border-slate-700/60 bg-[#0c121e] px-3 py-2 text-sm sm:text-base text-emerald-400 font-bold outline-none"
                       />
-                      <button type="submit" className="admin-btn-primary text-xs py-1.5 px-3.5 font-bold">
+                      <button type="submit" className="admin-btn-primary text-xs sm:text-sm py-2 px-4 font-bold">
                         Fixer
                       </button>
                     </form>
                   )}
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                {/* Vue Mobile Cartes Trades */}
+                <div className="sm:hidden space-y-3">
+                  {activeClient.trades.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500 text-sm font-sans rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                      Aucun trade enregistré.
+                    </div>
+                  ) : (
+                    activeClient.trades.map((tr) => (
+                      <div key={tr.id} className="p-4 rounded-xl border border-slate-700/60 bg-[#0c121e] space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <strong className="text-white font-mono text-sm sm:text-base font-bold">#{tr.ticket}</strong>
+                            <span className="text-emerald-400 font-bold font-mono text-sm sm:text-base">{tr.symbol}</span>
+                          </div>
+                          <AdminBadge variant={tr.type === "BUY" ? "emerald" : "rose"} dot={false}>
+                            {tr.type}
+                          </AdminBadge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs sm:text-sm font-mono pt-2 border-t border-slate-800/80">
+                          <div>
+                            <span className="text-slate-400 block text-xs uppercase">Volume / Prix</span>
+                            <span className="text-slate-200 font-semibold">{tr.lots} lot @ {tr.openPrice}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-slate-400 block text-xs uppercase">P&amp;L Net</span>
+                            <strong className={`font-bold text-sm sm:text-base ${tr.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                              {tr.pnl >= 0 ? "+" : ""}${tr.pnl.toLocaleString("fr-FR")} USD
+                            </strong>
+                          </div>
+                        </div>
+                        <div className="text-xs text-slate-400 font-sans pt-1">Moteur : <span className="text-slate-300 font-medium">{tr.engine}</span></div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
                   <table className="w-full text-left font-mono text-sm sm:text-[15px]">
                     <thead className="border-b border-slate-700/50 bg-[#0f1626]/90 text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wider">
                       <tr>
@@ -6246,7 +6834,7 @@ function NexiumAdminDashboard({
                       <Key className="size-5 text-purple-400" />
                       Gestion de la Licence MT5 &amp; Expirations
                     </h2>
-                    <p className="text-xs sm:text-sm text-slate-400 mt-1">Clé active : <strong className="text-white font-mono text-sm sm:text-base">{activeClient.licenseKey}</strong></p>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-1">Clé active : <strong className="text-white font-mono text-sm sm:text-base">{activeClient.licenseKey}</strong></p>
                   </div>
 
                   <div className="text-right font-mono">
@@ -6257,10 +6845,10 @@ function NexiumAdminDashboard({
 
                 <div className="flex flex-wrap items-center gap-2.5">
                   <span className="text-xs sm:text-sm font-mono font-bold text-slate-300 uppercase">Prolonger la licence :</span>
-                  <button onClick={() => handleExtendLicense(1)} className="admin-btn-secondary text-xs sm:text-sm py-2 px-3.5">+1 Mois</button>
-                  <button onClick={() => handleExtendLicense(6)} className="admin-btn-secondary text-xs sm:text-sm py-2 px-3.5">+6 Mois</button>
-                  <button onClick={() => handleExtendLicense(12)} className="admin-btn-secondary text-xs sm:text-sm py-2 px-3.5">+1 An</button>
-                  <button onClick={handleGenerateNewLicenseKey} className="rounded-xl bg-purple-500/20 border border-purple-500/40 hover:bg-purple-500/30 px-4 py-2 text-xs sm:text-sm font-semibold text-purple-300 cursor-pointer ml-auto transition">
+                  <button onClick={() => handleExtendLicense(1)} className="admin-btn-secondary text-xs sm:text-sm py-2.5 px-4 font-bold">+1 Mois</button>
+                  <button onClick={() => handleExtendLicense(6)} className="admin-btn-secondary text-xs sm:text-sm py-2.5 px-4 font-bold">+6 Mois</button>
+                  <button onClick={() => handleExtendLicense(12)} className="admin-btn-secondary text-xs sm:text-sm py-2.5 px-4 font-bold">+1 An</button>
+                  <button onClick={handleGenerateNewLicenseKey} className="rounded-xl bg-purple-500/20 border border-purple-500/40 hover:bg-purple-500/30 px-4 py-2.5 text-xs sm:text-sm font-bold text-purple-300 cursor-pointer ml-auto transition">
                     Générer Nouvelle Clé MT5 🔑
                   </button>
                 </div>
@@ -6274,7 +6862,7 @@ function NexiumAdminDashboard({
                       <FileCheck className="size-5 text-indigo-400" />
                       Conformité KYC &amp; Coupe-Circuit Personnalisé
                     </h2>
-                    <p className="text-xs sm:text-sm text-slate-400 mt-1">Vérification documentaire et plafonds de perte par compte.</p>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-1">Vérification documentaire et plafonds de perte par compte.</p>
                   </div>
 
                   <div className="flex items-center gap-2.5">
@@ -6299,33 +6887,33 @@ function NexiumAdminDashboard({
 
                 <div className="grid gap-4 sm:grid-cols-3 text-xs sm:text-sm font-mono">
                   <div className="p-4 rounded-xl bg-[#0c121e] border border-slate-700/40 space-y-1.5">
-                    <label className="block font-bold text-slate-300 uppercase text-xs">MAX DAILY LOSS (%)</label>
+                    <label className="block font-bold text-slate-200 uppercase text-xs sm:text-sm tracking-wider">MAX DAILY LOSS (%)</label>
                     <input
                       type="number"
                       step="0.5"
                       value={editMaxDailyLoss}
                       onChange={(e) => setEditMaxDailyLoss(parseFloat(e.target.value) || 1.0)}
-                      className="w-full rounded-lg border border-slate-700/60 bg-[#121a2d] p-2.5 text-sm sm:text-base text-white outline-none"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white font-bold outline-none focus:border-indigo-400"
                     />
                   </div>
 
                   <div className="p-4 rounded-xl bg-[#0c121e] border border-slate-700/40 space-y-1.5">
-                    <label className="block font-bold text-slate-300 uppercase text-xs">MAX POSITIONS</label>
+                    <label className="block font-bold text-slate-200 uppercase text-xs sm:text-sm tracking-wider">MAX POSITIONS</label>
                     <input
                       type="number"
                       value={editMaxPositions}
                       onChange={(e) => setEditMaxPositions(parseInt(e.target.value) || 1)}
-                      className="w-full rounded-lg border border-slate-700/60 bg-[#121a2d] p-2.5 text-sm sm:text-base text-white outline-none"
+                      className="w-full rounded-xl border border-slate-700/60 bg-[#121a2d] p-3 text-sm sm:text-base text-white font-bold outline-none focus:border-indigo-400"
                     />
                   </div>
 
                   <div className="p-4 rounded-xl bg-[#0c121e] border border-slate-700/40 flex flex-col justify-between">
-                    <span className="font-bold text-slate-300 uppercase text-xs">AUTO-STOP ROBOTS</span>
+                    <span className="font-bold text-slate-200 uppercase text-xs sm:text-sm tracking-wider mb-1.5">AUTO-STOP ROBOTS</span>
                     <button
                       type="button"
                       onClick={() => setEditRiskGuardAuto(!editRiskGuardAuto)}
-                      className={`rounded-lg py-2.5 text-xs sm:text-sm font-bold uppercase cursor-pointer transition ${
-                        editRiskGuardAuto ? "bg-emerald-500 text-slate-950 font-extrabold" : "bg-slate-800 text-slate-400"
+                      className={`rounded-xl py-3 text-xs sm:text-sm font-bold uppercase cursor-pointer transition ${
+                        editRiskGuardAuto ? "bg-emerald-500 text-slate-950 font-extrabold" : "bg-slate-800 text-slate-300"
                       }`}
                     >
                       {editRiskGuardAuto ? "AUTO-STOP ACTIVÉ ✓" : "DÉSACTIVÉ"}
@@ -6350,10 +6938,10 @@ function NexiumAdminDashboard({
                     {activeClient.sessions.map((s) => (
                       <div key={s.id} className="p-3.5 rounded-xl bg-[#0c121e] flex justify-between items-center border border-slate-800/60">
                         <div>
-                          <strong className="text-white block text-sm font-semibold">{s.device}</strong>
-                          <span className="text-slate-400 text-xs">{s.ip} · {s.location}</span>
+                          <strong className="text-white block text-sm sm:text-base font-semibold">{s.device}</strong>
+                          <span className="text-slate-300 text-xs sm:text-sm">{s.ip} · {s.location}</span>
                         </div>
-                        <span className="text-cyan-400 font-semibold">{s.lastActive}</span>
+                        <span className="text-cyan-400 font-semibold text-xs sm:text-sm">{s.lastActive}</span>
                       </div>
                     ))}
                   </div>
@@ -6369,18 +6957,18 @@ function NexiumAdminDashboard({
                       type="text"
                       value={newCrmNoteText}
                       onChange={(e) => setNewCrmNoteText(e.target.value)}
-                      className="flex-1 rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-white outline-none"
+                      className="flex-1 rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-amber-400"
                     />
-                    <button onClick={handleAddCrmNote} className="admin-btn-primary text-xs sm:text-sm py-2 px-4 font-bold">
+                    <button onClick={handleAddCrmNote} className="admin-btn-primary text-xs sm:text-sm py-2.5 px-4 font-bold">
                       Ajouter
                     </button>
                   </div>
                   <div className="space-y-2.5 font-mono text-xs sm:text-sm max-h-48 overflow-y-auto pr-1">
                     {activeClient.crmNotes.map((n) => (
                       <div key={n.id} className="p-3.5 rounded-xl bg-[#0c121e] space-y-1.5 border border-slate-800/60">
-                        <div className="flex justify-between text-slate-400">
+                        <div className="flex justify-between text-slate-300 text-xs sm:text-sm">
                           <strong className="text-amber-300 font-bold">{n.author}</strong>
-                          <span className="text-xs">{n.date}</span>
+                          <span className="text-xs text-slate-400">{n.date}</span>
                         </div>
                         <p className="text-slate-200 font-sans text-xs sm:text-sm leading-relaxed">{n.text}</p>
                       </div>
@@ -6410,24 +6998,24 @@ function NexiumAdminDashboard({
 
               <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
                 {/* Sélecteur de rôle */}
-                <div className="space-y-2">
+                <div className="flex lg:flex-col gap-2 overflow-x-auto pb-2 lg:pb-0 shrink-0 max-w-full">
                   {ALL_STAFF_ROLES.map((role) => {
                     const count = staffList.filter((s) => s.role === role).length;
                     return (
                       <button
                         key={role}
                         onClick={() => setAccessLevelsSelectedRole(role)}
-                        className={`w-full text-left px-4 py-3.5 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer ${
+                        className={`text-left px-4 py-3 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer shrink-0 min-w-[190px] lg:min-w-0 lg:w-full ${
                           accessLevelsSelectedRole === role
                             ? "border-emerald-500/60 bg-emerald-500/10 shadow-lg shadow-emerald-500/10"
                             : "border-slate-700/60 bg-[#0c121e] hover:border-slate-600"
                         }`}
                       >
-                        <span className={`text-sm font-bold ${accessLevelsSelectedRole === role ? "text-emerald-300" : "text-white"}`}>
+                        <span className={`text-xs sm:text-sm font-bold ${accessLevelsSelectedRole === role ? "text-emerald-300" : "text-white"}`}>
                           {roleLabel(role)}
                         </span>
                         <span className="text-[11px] font-mono text-slate-400">
-                          {count} {count > 1 ? "personnes" : "personne"}
+                          {count} {count > 1 ? "pers." : "pers."}
                         </span>
                       </button>
                     );
@@ -6856,38 +7444,38 @@ function NexiumAdminDashboard({
                       <span className="text-emerald-400">Fiche de Gestion Détaillée</span>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                       <button
                         type="button"
                         onClick={() => {
                           setEditingStaffMember(null);
                           if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "instant" });
                         }}
-                        className="inline-flex items-center gap-2.5 rounded-xl border border-slate-700/70 bg-[#0c121e] hover:bg-slate-800/80 px-4 py-2.5 text-sm font-bold text-slate-200 transition cursor-pointer shadow-sm w-fit"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-700/70 bg-[#0c121e] hover:bg-slate-800/80 px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-200 transition cursor-pointer shadow-sm w-fit"
                       >
                         <ArrowLeft className="size-4 text-emerald-400" />
-                        <span>← Revenir à la liste du Staff &amp; Conseillers</span>
+                        <span>← Revenir à la liste</span>
                       </button>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
                         <button
                           type="button"
                           onClick={() => {
                             setEditingStaffMember(null);
                             if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "instant" });
                           }}
-                          className="admin-btn-secondary py-2.5 px-5 text-xs sm:text-sm font-semibold"
+                          className="admin-btn-secondary py-2 px-3.5 sm:px-5 text-xs sm:text-sm font-semibold flex-1 sm:flex-none justify-center"
                         >
-                          Annuler &amp; Revenir
+                          Annuler
                         </button>
 
                         <button
                           type="button"
                           onClick={(e) => handleSaveEditStaff(e as any)}
-                          className="admin-btn-primary py-2.5 px-6 text-xs sm:text-sm font-bold flex items-center gap-2"
+                          className="admin-btn-primary py-2 px-4 sm:px-6 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 flex-1 sm:flex-none"
                         >
                           <CheckCircle2 className="size-4" />
-                          <span>Enregistrer les Modifications</span>
+                          <span>Enregistrer</span>
                         </button>
                       </div>
                     </div>
@@ -7316,9 +7904,9 @@ function NexiumAdminDashboard({
               {/* ── CORPS PRINCIPAL : Selon l'onglet actif ── */}
               {messagingTab === "WEB_QUEUE" ? (
                 /* ================= FILE D'ATTENTE PROSPECTS DU SITE ================= */
-                <div className="grid gap-5 lg:grid-cols-12" style={{ height: "calc(100vh - 240px)", minHeight: "600px" }}>
+                <div className="grid gap-5 lg:grid-cols-12 min-h-[500px] h-[calc(100dvh-180px)] lg:h-[calc(100vh-240px)]">
                   {/* Colonne gauche : Liste des fils du routeur */}
-                  <div className="lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                  <div className={`lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl min-h-0 ${activeWebThread ? "hidden lg:flex" : "flex"}`}>
                     <div className="p-3.5 border-b border-slate-700/40 bg-[#0f1626]/80 flex items-center justify-between text-xs font-mono shrink-0">
                       <span className="text-slate-400 font-bold uppercase">Fils Entrants Chatbot</span>
                       <div className="flex items-center gap-2.5">
@@ -7426,12 +8014,20 @@ function NexiumAdminDashboard({
                   </div>
 
                   {/* Colonne droite : Chat en direct avec le prospect */}
-                  <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                  <div className={`lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl min-h-0 ${!activeWebThread ? "hidden lg:flex" : "flex"}`}>
                     {activeWebThread ? (
                       <>
                         {/* En-tête fil web */}
                         <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 flex flex-wrap justify-between items-center gap-3 shrink-0">
-                          <div className="flex items-center gap-3.5">
+                          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedWebThreadId(null)}
+                              className="lg:hidden p-2 rounded-xl border border-slate-700/60 bg-[#0c121e] text-slate-300 hover:text-white shrink-0"
+                              aria-label="Retour à la liste des prospects"
+                            >
+                              <ArrowLeft className="size-4" />
+                            </button>
                             <div className="size-11 rounded-xl bg-emerald-600/20 border border-emerald-500/30 grid place-items-center font-bold text-emerald-300 text-base shrink-0">
                               {activeWebThread.visitorName.charAt(0)}
                             </div>
@@ -7588,9 +8184,9 @@ function NexiumAdminDashboard({
                 </div>
               ) : (
                 /* ================= CONTACTS TRADERS MT5 ================= */
-                <div className="grid gap-5 lg:grid-cols-12" style={{ height: "calc(100vh - 240px)", minHeight: "600px" }}>
+                <div className="grid gap-5 lg:grid-cols-12 min-h-[500px] h-[calc(100dvh-180px)] lg:h-[calc(100vh-240px)]">
                   {/* ── COLONNE GAUCHE : Contacts ── */}
-                  <div className="lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                  <div className={`lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl min-h-0 ${selectedUserId ? "hidden lg:flex" : "flex"}`}>
                     <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 shrink-0">
                       <div className="relative">
                         <Search className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -7662,9 +8258,17 @@ function NexiumAdminDashboard({
                   </div>
 
                   {/* ── COLONNE DROITE : Conversation Trader ── */}
-                  <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                  <div className={`lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl min-h-0 ${!selectedUserId ? "hidden lg:flex" : "flex"}`}>
                     <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 flex justify-between items-center shrink-0">
-                      <div className="flex items-center gap-3.5">
+                      <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUserId("")}
+                          className="lg:hidden p-2 rounded-xl border border-slate-700/60 bg-[#0c121e] text-slate-300 hover:text-white shrink-0 mr-1"
+                          aria-label="Retour à la liste des traders"
+                        >
+                          <ArrowLeft className="size-4" />
+                        </button>
                         <div className="size-11 rounded-xl bg-emerald-600/20 border border-emerald-500/30 grid place-items-center font-bold text-emerald-300 text-base shrink-0">
                           {activeClient?.name.charAt(0)}
                         </div>
@@ -7797,11 +8401,11 @@ function NexiumAdminDashboard({
               </div>
 
               {showComposeEmailModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowComposeEmailModal(false)}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4 overflow-y-auto" onClick={() => setShowComposeEmailModal(false)}>
                   <form
                     onSubmit={handleComposeNewEmail}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-full max-w-lg rounded-2xl border border-slate-700/60 bg-[#0f172a] p-6 space-y-5 shadow-2xl"
+                    className="w-full max-w-lg rounded-2xl border border-slate-700/60 bg-[#0f172a] p-5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xl my-auto max-h-[90vh] overflow-y-auto"
                   >
                     <div className="flex items-center justify-between border-b border-slate-700/50 pb-4">
                       <h2 className="text-lg font-bold text-white flex items-center gap-2.5">
@@ -7899,10 +8503,10 @@ function NexiumAdminDashboard({
               </div>
 
               {/* ── CORPS PRINCIPAL : liste emails + panneau conversation (COPIE CONFORME DE MESSAGERIE) ── */}
-              <div className="grid gap-5 lg:grid-cols-12" style={{ height: "calc(100vh - 310px)", minHeight: "540px" }}>
+              <div className="grid gap-5 lg:grid-cols-12 min-h-[500px] h-[calc(100dvh-200px)] lg:h-[calc(100vh-310px)]">
 
                 {/* ── COLONNE GAUCHE : E-mails (Nom du client uniquement) ── */}
-                <div className="lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                <div className={`lg:col-span-4 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl min-h-0 ${selectedEmailConversationId ? "hidden lg:flex" : "flex"}`}>
 
                   {/* Recherche */}
                   <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 shrink-0">
@@ -7970,11 +8574,19 @@ function NexiumAdminDashboard({
                 </div>
 
                 {/* ── COLONNE DROITE : Conversation ── */}
-                <div className="lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl">
+                <div className={`lg:col-span-8 flex flex-col rounded-2xl border border-slate-700/50 bg-gradient-to-b from-[#0f172a]/95 to-[#0b1120]/98 overflow-hidden shadow-xl min-h-0 ${!selectedEmailConversationId ? "hidden lg:flex" : "flex"}`}>
 
                   {/* En-tête contact */}
                   <div className="p-4 border-b border-slate-700/40 bg-[#0f1626]/80 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEmailConversationId(null)}
+                        className="lg:hidden p-2 rounded-xl border border-slate-700/60 bg-[#0c121e] text-slate-300 hover:text-white shrink-0 mr-1"
+                        aria-label="Retour aux e-mails"
+                      >
+                        <ArrowLeft className="size-4" />
+                      </button>
                       <div className="size-11 rounded-xl bg-emerald-600/20 border border-emerald-500/30 grid place-items-center font-bold text-emerald-300 text-base shrink-0">
                         {(emailConversationDetail?.conversation.customerName || emailConversationDetail?.conversation.customerEmail || "N").charAt(0).toUpperCase()}
                       </div>
@@ -8163,20 +8775,20 @@ function NexiumAdminDashboard({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-700/40">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3 border-t border-slate-700/40 text-center sm:text-left">
                       <div>
-                        <span className="text-xs text-slate-400 uppercase font-semibold block">Latence Ping</span>
-                        <strong className="text-xl font-bold text-emerald-400">{g.latencyMs} ms</strong>
+                        <span className="text-[10px] sm:text-xs text-slate-400 uppercase font-semibold block">Latence Ping</span>
+                        <strong className="text-base sm:text-xl font-bold text-emerald-400">{g.latencyMs} ms</strong>
                       </div>
 
                       <div>
-                        <span className="text-xs text-slate-400 uppercase font-semibold block">Comptes Liés</span>
-                        <strong className="text-xl font-bold text-white">{g.connectedAccounts}</strong>
+                        <span className="text-[10px] sm:text-xs text-slate-400 uppercase font-semibold block">Comptes Liés</span>
+                        <strong className="text-base sm:text-xl font-bold text-white">{g.connectedAccounts}</strong>
                       </div>
 
                       <div>
-                        <span className="text-xs text-slate-400 uppercase font-semibold block">Débit Ticks</span>
-                        <strong className="text-xl font-bold text-emerald-400">{g.ticksPerSec} /s</strong>
+                        <span className="text-[10px] sm:text-xs text-slate-400 uppercase font-semibold block">Débit Ticks</span>
+                        <strong className="text-base sm:text-xl font-bold text-emerald-400">{g.ticksPerSec} /s</strong>
                       </div>
                     </div>
                   </AdminPanel>
@@ -8555,7 +9167,7 @@ function NexiumAdminDashboard({
                 )}
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-4 font-mono">
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4 font-mono">
                 <div className="admin-card-amber p-6 space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
@@ -8747,7 +9359,7 @@ function NexiumAdminDashboard({
 
               {/* ── Historique global de toutes les transactions (tous clients) ── */}
               <section className="admin-card-emerald p-6 sm:p-7 space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-700/50 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 border-b border-slate-700/50 pb-4">
                   <div>
                     <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5">
                       <History className="size-5 text-emerald-400" />
@@ -8760,14 +9372,14 @@ function NexiumAdminDashboard({
                   <button
                     onClick={handleExportFinanceTransactions}
                     disabled={financeTransactionRows.length === 0}
-                    className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed px-3.5 py-2 text-xs font-bold text-emerald-300 cursor-pointer transition"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 text-xs font-bold text-emerald-300 cursor-pointer transition w-full sm:w-auto shrink-0"
                   >
                     <Download className="size-3.5" />
-                    Exporter en CSV
+                    <span>Exporter en CSV</span>
                   </button>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-500" />
                     <input
@@ -8810,7 +9422,65 @@ function NexiumAdminDashboard({
                   </select>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                {/* Vue Mobile Cartes Tactiles */}
+                <div className="md:hidden space-y-3">
+                  {financeTransactionRows.length === 0 ? (
+                    <div className="p-6 text-center text-slate-500 text-sm font-sans rounded-xl border border-slate-700/50 bg-[#0c121e]">
+                      Aucune transaction ne correspond à ces filtres.
+                    </div>
+                  ) : (
+                    financeTransactionRows.map(({ tx, client, clientName, clientEmail }) => {
+                      const isPositive = tx.type === "DEPOSIT" || tx.type === "TRADE_PROFIT" || tx.type === "BONUS" || tx.type === "PROFIT_SHARE";
+                      return (
+                        <div
+                          key={tx.id}
+                          onClick={() => client && handleOpenClientProfile(client)}
+                          className={`p-3.5 rounded-xl border border-slate-700/60 bg-[#0c121e] space-y-2.5 transition ${client ? "cursor-pointer hover:border-emerald-500/40 active:bg-slate-800/40" : ""}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-slate-400 font-mono">
+                              {tx.created_at ? new Date(tx.created_at).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-"}
+                            </span>
+                            <AdminBadge
+                              variant={tx.status === "COMPLETED" ? "emerald" : tx.status === "PENDING" ? "amber" : "rose"}
+                              dot={false}
+                            >
+                              {TX_STATUS_LABELS[tx.status] || tx.status}
+                            </AdminBadge>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <strong className="text-sm font-bold text-white block truncate">{clientName}</strong>
+                              <span className="text-xs text-slate-400 font-mono block truncate">{clientEmail}</span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <strong className={`text-base font-bold font-mono ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                                {isPositive ? "+" : "-"}${Math.abs(tx.amount).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                              </strong>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono">
+                            <span className="text-slate-300 bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06]">
+                              {TX_TYPE_LABELS[tx.type] || tx.type}
+                            </span>
+                            <span className="text-slate-400">
+                              {tx.method || "—"}
+                            </span>
+                            {client && (
+                              <span className="text-emerald-400 font-sans font-semibold text-[11px] inline-flex items-center gap-1">
+                                Fiche client →
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-700/50 bg-[#0c121e]">
                   <table className="w-full text-left font-mono text-sm">
                     <thead className="border-b border-slate-700/50 bg-[#0f1626]/90 text-slate-300 text-xs font-bold uppercase tracking-wider">
                       <tr>
@@ -8993,7 +9663,7 @@ function NexiumAdminDashboard({
                 </div>
 
                 {hasPermission("can_approve_finances") && (
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-700/40">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-slate-700/40">
                     {paymentSettings?.updated_at && (
                       <span className="text-[11px] text-slate-500 font-mono">
                         Dernière modification : {new Date(paymentSettings.updated_at).toLocaleString("fr-FR")}
@@ -9003,7 +9673,7 @@ function NexiumAdminDashboard({
                     <button
                       onClick={handleSavePaymentSettings}
                       disabled={savingPaymentSettings}
-                      className="admin-btn-primary text-xs font-bold py-2 px-5 ml-auto disabled:opacity-50"
+                      className="admin-btn-primary text-xs sm:text-sm font-bold py-2.5 px-6 sm:ml-auto w-full sm:w-auto justify-center disabled:opacity-50"
                     >
                       {savingPaymentSettings ? "Enregistrement..." : "Enregistrer les Coordonnées"}
                     </button>

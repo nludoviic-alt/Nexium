@@ -23,6 +23,7 @@ export function AdminDataTable<T>({
   page,
   totalPages,
   onPageChange,
+  renderCard,
 }: {
   columns: AdminDataTableColumn<T>[];
   rows: T[];
@@ -36,6 +37,7 @@ export function AdminDataTable<T>({
   page: number;
   totalPages: number;
   onPageChange: (next: number) => void;
+  renderCard?: (row: T) => ReactNode;
 }) {
   return (
     <div className="space-y-4">
@@ -51,7 +53,23 @@ export function AdminDataTable<T>({
         </span>
       </div>
 
-      <div className="rounded-2xl border border-slate-700/50 bg-[#121a2d]/90 shadow-xl overflow-x-auto backdrop-blur-sm">
+      {renderCard ? (
+        <div className="md:hidden space-y-3">
+          {rows.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 font-sans text-sm rounded-2xl border border-slate-700/50 bg-[#121a2d]/90">
+              {emptyMessage}
+            </div>
+          ) : (
+            rows.map((row) => (
+              <div key={keyFor(row)}>
+                {renderCard(row)}
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      <div className={`rounded-2xl border border-slate-700/50 bg-[#121a2d]/90 shadow-xl overflow-x-auto backdrop-blur-sm ${renderCard ? "hidden md:block" : ""}`}>
         <table className="w-full text-left text-sm sm:text-[15px]">
           <thead className="border-b border-slate-700/50 bg-[#0f1626]/80 text-slate-300 text-xs sm:text-sm font-bold uppercase tracking-wider">
             <tr>

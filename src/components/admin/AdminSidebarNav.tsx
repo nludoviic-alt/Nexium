@@ -12,46 +12,62 @@ export interface AdminNavItem {
 
 export function AdminSidebarNav({ items, onSelect }: { items: AdminNavItem[]; onSelect: (key: string) => void }) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs sm:text-[13px] font-bold tracking-wider text-slate-400 uppercase px-3.5 py-2 font-mono">
-        Gouvernance &amp; Modules
-      </p>
+    <nav className="space-y-1.5" aria-label="Navigation principale">
+      <div className="flex items-center justify-between px-3 py-1.5 mb-1">
+        <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase font-mono">
+          Modules &amp; Gouvernance
+        </span>
+        <span className="text-[10px] font-mono text-slate-500 font-semibold">
+          {items.length} sections
+        </span>
+      </div>
 
-      {items.map((item) => {
-        const Icon = item.icon;
-        return (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => onSelect(item.key)}
-            aria-current={item.isActive ? "page" : undefined}
-            className={`flex w-full items-center justify-between rounded-xl px-4 py-3.5 text-base sm:text-[16px] font-semibold transition-all cursor-pointer ${
-              item.isActive
-                ? "border border-emerald-500/40 bg-gradient-to-r from-emerald-500/15 via-cyan-500/10 to-transparent text-white font-bold shadow-[0_0_16px_rgba(16,185,129,0.15)]"
-                : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
-            }`}
-          >
-            <div className="flex items-center gap-3.5">
-              <Icon className={`size-5.5 ${item.isActive ? "text-emerald-400" : "text-slate-400"}`} />
-              <span className="truncate">{item.label}</span>
-            </div>
-            {item.badge !== undefined && (
-              <span
-                className={`text-xs sm:text-[13px] font-mono px-2.5 py-0.5 rounded-lg font-bold ${
-                  item.badgeTone === "alert"
-                    ? "bg-amber-500 text-black border border-amber-400 animate-pulse"
-                    : item.badgeTone === "brand"
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                    : "bg-slate-800/90 text-slate-300 border border-slate-700/60"
-                }`}
-              >
-                {item.badge}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+      <div className="space-y-1">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onSelect(item.key)}
+              aria-current={item.isActive ? "page" : undefined}
+              className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 sm:px-3.5 sm:py-2.5 text-sm sm:text-[15px] font-semibold transition-all cursor-pointer active:scale-[0.99] min-h-[44px] ${
+                item.isActive
+                  ? "border border-emerald-500/40 bg-gradient-to-r from-emerald-500/20 via-teal-500/10 to-transparent text-white font-bold shadow-[0_0_20px_rgba(16,185,129,0.18)]"
+                  : "border border-transparent text-slate-300 hover:bg-slate-800/60 hover:text-white hover:border-slate-700/50"
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={`size-8 rounded-lg grid place-items-center shrink-0 transition-colors ${
+                    item.isActive
+                      ? "bg-emerald-500/25 text-emerald-300 shadow-sm shadow-emerald-500/20"
+                      : "bg-[#101826] text-slate-400 group-hover:text-slate-200 group-hover:bg-slate-800/80 border border-slate-800"
+                  }`}
+                >
+                  <Icon className="size-4.5" />
+                </div>
+                <span className="truncate">{item.label}</span>
+              </div>
+
+              {item.badge !== undefined && (
+                <span
+                  className={`shrink-0 text-[11px] sm:text-xs font-mono px-2 py-0.5 rounded-full font-bold ml-2 shadow-xs ${
+                    item.badgeTone === "alert"
+                      ? "bg-amber-400 text-slate-950 border border-amber-300 shadow-amber-400/30 animate-pulse"
+                      : item.badgeTone === "brand"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      : "bg-slate-800 text-slate-300 border border-slate-700/70"
+                  }`}
+                >
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 

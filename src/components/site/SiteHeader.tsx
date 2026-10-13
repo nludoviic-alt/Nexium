@@ -197,7 +197,7 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
             </SheetTrigger>
             <SheetContent
               side="right"
-              className="w-80 border-l border-[#00D084]/20 bg-[#070b12] text-white"
+              className="w-[85vw] max-w-xs sm:w-80 border-l border-[#00D084]/20 bg-[#070b12] text-white overflow-y-auto"
             >
               <div className="mt-8 flex flex-col gap-4">
                 {/* Mobile Language Switcher Card */}

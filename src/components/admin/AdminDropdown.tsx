@@ -55,10 +55,13 @@ export function AdminDropdown<T extends string = string>({
 
     const openUp = spaceBelow < MENU_PREFERRED_HEIGHT && spaceAbove > spaceBelow;
     const available = openUp ? spaceAbove : spaceBelow;
+    const targetWidth = Math.min(Math.max(rect.width, 240), window.innerWidth - MENU_MARGIN * 2);
+    const left = Math.max(MENU_MARGIN, Math.min(rect.left, window.innerWidth - targetWidth - MENU_MARGIN));
+
     setMenuStyle({
       top: openUp ? rect.top - MENU_MARGIN : rect.bottom + MENU_MARGIN,
-      left: rect.left,
-      width: rect.width,
+      left,
+      width: targetWidth,
       openUp,
       maxHeight: Math.max(120, Math.min(MENU_PREFERRED_HEIGHT, available)),
     });
@@ -142,10 +145,10 @@ export function AdminDropdown<T extends string = string>({
         createPortal(
           <div
             ref={menuRef}
-            className={`fixed min-w-[240px] rounded-xl border border-slate-700/80 bg-[#0c1424]/95 backdrop-blur-md p-1.5 shadow-2xl shadow-black/80 z-[9999] animate-in fade-in zoom-in-95 duration-150 ${
+            className={`fixed rounded-xl border border-slate-700/80 bg-[#0c1424]/95 backdrop-blur-md p-1.5 shadow-2xl shadow-black/80 z-[9999] animate-in fade-in zoom-in-95 duration-150 ${
               menuStyle.openUp ? "-translate-y-full" : ""
             }`}
-            style={{ top: menuStyle.top, left: menuStyle.left, width: Math.max(menuStyle.width, 240) }}
+            style={{ top: menuStyle.top, left: menuStyle.left, width: menuStyle.width, maxWidth: `calc(100vw - ${MENU_MARGIN * 2}px)` }}
           >
             <div
               className="overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-700"
