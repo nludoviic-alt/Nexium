@@ -434,14 +434,9 @@ interface CrmNote {
 }
 
 export type ClientWalletMethod =
-  | "USDT_TRC20"
   | "USDT_ERC20"
   | "BTC"
-  | "ETH"
-  | "SOL"
-  | "REVOLUT"
-  | "WISE"
-  | "PAYPAL";
+  | "ETH";
 
 export type ClientWalletVerifiedStatus = "UNVERIFIED" | "PENDING" | "VERIFIED";
 
@@ -452,11 +447,6 @@ export interface ClientWallets {
     btc?: string;
     eth?: string;
     sol?: string;
-  };
-  ewallet?: {
-    revolutTag?: string;
-    wiseEmail?: string;
-    paypalEmail?: string;
   };
   preferredMethod?: ClientWalletMethod;
   verifiedStatus?: ClientWalletVerifiedStatus;
@@ -846,9 +836,8 @@ const FALLBACK_CLIENT: any = {
   livePositions: [],
   wallets: {
     crypto: {},
-    ewallet: {},
     verifiedStatus: "UNVERIFIED",
-    preferredMethod: "USDT_TRC20",
+    preferredMethod: "USDT_ERC20",
   },
 };
 
@@ -1344,19 +1333,15 @@ function NexiumAdminDashboard({
   const [mt5Server, setMt5Server] = useState(activeClient?.mt5?.server || "");
   const [mt5InvestorPass, setMt5InvestorPass] = useState(activeClient?.mt5?.investorPass || "");
 
-  // Wallets & Retraits Client
-  const [walletUsdtTrc20, setWalletUsdtTrc20] = useState(activeClient?.wallets?.crypto?.usdtTrc20 || "");
+  // Wallets & Retraits Client (Crypto)
   const [walletUsdtErc20, setWalletUsdtErc20] = useState(activeClient?.wallets?.crypto?.usdtErc20 || "");
   const [walletBtc, setWalletBtc] = useState(activeClient?.wallets?.crypto?.btc || "");
   const [walletEth, setWalletEth] = useState(activeClient?.wallets?.crypto?.eth || "");
-  const [walletSol, setWalletSol] = useState(activeClient?.wallets?.crypto?.sol || "");
-
-  const [walletRevolutTag, setWalletRevolutTag] = useState(activeClient?.wallets?.ewallet?.revolutTag || "");
-  const [walletWiseEmail, setWalletWiseEmail] = useState(activeClient?.wallets?.ewallet?.wiseEmail || "");
-  const [walletPaypalEmail, setWalletPaypalEmail] = useState(activeClient?.wallets?.ewallet?.paypalEmail || "");
 
   const [walletPreferredMethod, setWalletPreferredMethod] = useState<ClientWalletMethod>(
-    activeClient?.wallets?.preferredMethod || "USDT_TRC20"
+    (activeClient?.wallets?.preferredMethod === "BTC" || activeClient?.wallets?.preferredMethod === "ETH")
+      ? activeClient.wallets.preferredMethod
+      : "USDT_ERC20"
   );
   const [walletVerifiedStatus, setWalletVerifiedStatus] = useState<ClientWalletVerifiedStatus>(
     activeClient?.wallets?.verifiedStatus || "UNVERIFIED"
@@ -1552,18 +1537,45 @@ function NexiumAdminDashboard({
     setMt5Server(client.mt5?.server || "");
     setMt5InvestorPass(client.mt5?.investorPass || "");
 
-    // Wallets
-    setWalletUsdtTrc20(client.wallets?.crypto?.usdtTrc20 || "");
-    setWalletUsdtErc20(client.wallets?.crypto?.usdtErc20 || "");
-    setWalletBtc(client.wallets?.crypto?.btc || "");
-    setWalletEth(client.wallets?.crypto?.eth || "");
-    setWalletSol(client.wallets?.crypto?.sol || "");
-    setWalletRevolutTag(client.wallets?.ewallet?.revolutTag || "");
-    setWalletWiseEmail(client.wallets?.ewallet?.wiseEmail || "");
-    setWalletPaypalEmail(client.wallets?.ewallet?.paypalEmail || "");
-    setWalletPreferredMethod(client.wallets?.preferredMethod || "USDT_TRC20");
-    setWalletVerifiedStatus(client.wallets?.verifiedStatus || "UNVERIFIED");
-    setWalletNotes(client.wallets?.notes || "");
+    // Wallets Crypto
+    let clientW = client.wallets;
+    if (!clientW && typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(`nexium_wallets_${client.id}`);
+        if (stored) clientW = JSON.parse(stored);
+      } catch {}
+    }
+    setWalletUsdtErc20(clientW?.crypto?.usdtErc20 || "");
+    setWalletBtc(clientW?.crypto?.btc || "");
+    setWalletEth(clientW?.crypto?.eth || "");
+    setWalletPreferredMethod(
+      (clientW?.preferredMethod === "BTC" || clientW?.preferredMethod === "ETH")
+        ? clientW.preferredMethod
+        : "USDT_ERC20"
+    );
+    setWalletVerifiedStatus(clientW?.verifiedStatus || "UNVERIFIED");
+    setWalletNotes(clientW?.notes || "");
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          "nexium_wallets_active_client",
+          JSON.stringify({ clientId: client.id, email: client.email, wallets: clientW })
+        );
+        if (clientW) {
+          localStorage.setItem("nexium_wallets_local", JSON.stringify(clientW));
+          window.dispatchEvent(
+            new CustomEvent("nexium_wallets_update", {
+              detail: {
+                userId: client.id,
+                email: client.email,
+                wallets: clientW,
+              },
+            })
+          );
+        }
+      } catch {}
+    }
 
     setActiveSection("user-detail");
 
@@ -1734,28 +1746,40 @@ function NexiumAdminDashboard({
   // Synchronisation des champs de formulaires wallet lors du changement de client actif
   useEffect(() => {
     if (!activeClient) return;
-    setWalletUsdtTrc20(activeClient.wallets?.crypto?.usdtTrc20 || "");
-    setWalletUsdtErc20(activeClient.wallets?.crypto?.usdtErc20 || "");
-    setWalletBtc(activeClient.wallets?.crypto?.btc || "");
-    setWalletEth(activeClient.wallets?.crypto?.eth || "");
-    setWalletSol(activeClient.wallets?.crypto?.sol || "");
-    setWalletRevolutTag(activeClient.wallets?.ewallet?.revolutTag || "");
-    setWalletWiseEmail(activeClient.wallets?.ewallet?.wiseEmail || "");
-    setWalletPaypalEmail(activeClient.wallets?.ewallet?.paypalEmail || "");
-    setWalletPreferredMethod(activeClient.wallets?.preferredMethod || "USDT_TRC20");
-    setWalletVerifiedStatus(activeClient.wallets?.verifiedStatus || "UNVERIFIED");
-    setWalletNotes(activeClient.wallets?.notes || "");
+    let initialW = activeClient.wallets;
+    if (
+      !initialW?.crypto?.usdtErc20 &&
+      !initialW?.crypto?.btc &&
+      !initialW?.crypto?.eth &&
+      typeof window !== "undefined"
+    ) {
+      try {
+        const stored =
+          localStorage.getItem(`nexium_wallets_${activeClient.id}`) ||
+          (activeClient.email && localStorage.getItem(`nexium_wallets_${activeClient.email.toLowerCase()}`));
+        if (stored) {
+          initialW = JSON.parse(stored);
+        }
+      } catch {}
+    }
+    setWalletUsdtErc20(initialW?.crypto?.usdtErc20 || "");
+    setWalletBtc(initialW?.crypto?.btc || "");
+    setWalletEth(initialW?.crypto?.eth || "");
+    setWalletPreferredMethod(
+      (initialW?.preferredMethod === "BTC" || initialW?.preferredMethod === "ETH")
+        ? initialW.preferredMethod
+        : "USDT_ERC20"
+    );
+    setWalletVerifiedStatus(initialW?.verifiedStatus || "UNVERIFIED");
+    setWalletNotes(initialW?.notes || "");
   }, [activeClient?.id]);
 
   // Enregistrement des coordonnées de Wallets Client avec confirmation
   const handleRequestSaveClientWallets = () => {
     if (!activeClient) return;
 
-    const prevW = activeClient.wallets || { crypto: {}, ewallet: {} };
+    const prevW = activeClient.wallets || { crypto: {} };
     const changes: string[] = [];
-    if ((prevW.crypto?.usdtTrc20 || "") !== walletUsdtTrc20.trim()) {
-      changes.push(`USDT TRC-20 : ${prevW.crypto?.usdtTrc20 || "—"} → ${walletUsdtTrc20.trim() || "—"}`);
-    }
     if ((prevW.crypto?.usdtErc20 || "") !== walletUsdtErc20.trim()) {
       changes.push(`USDT ERC-20 : ${prevW.crypto?.usdtErc20 || "—"} → ${walletUsdtErc20.trim() || "—"}`);
     }
@@ -1765,20 +1789,8 @@ function NexiumAdminDashboard({
     if ((prevW.crypto?.eth || "") !== walletEth.trim()) {
       changes.push(`ETH : ${prevW.crypto?.eth || "—"} → ${walletEth.trim() || "—"}`);
     }
-    if ((prevW.crypto?.sol || "") !== walletSol.trim()) {
-      changes.push(`SOL : ${prevW.crypto?.sol || "—"} → ${walletSol.trim() || "—"}`);
-    }
-    if ((prevW.ewallet?.revolutTag || "") !== walletRevolutTag.trim()) {
-      changes.push(`Revolut : ${prevW.ewallet?.revolutTag || "—"} → ${walletRevolutTag.trim() || "—"}`);
-    }
-    if ((prevW.ewallet?.wiseEmail || "") !== walletWiseEmail.trim()) {
-      changes.push(`Wise : ${prevW.ewallet?.wiseEmail || "—"} → ${walletWiseEmail.trim() || "—"}`);
-    }
-    if ((prevW.ewallet?.paypalEmail || "") !== walletPaypalEmail.trim()) {
-      changes.push(`PayPal : ${prevW.ewallet?.paypalEmail || "—"} → ${walletPaypalEmail.trim() || "—"}`);
-    }
-    if ((prevW.preferredMethod || "USDT_TRC20") !== walletPreferredMethod) {
-      changes.push(`Méthode prioritaire : ${prevW.preferredMethod || "USDT_TRC20"} → ${walletPreferredMethod}`);
+    if ((prevW.preferredMethod || "USDT_ERC20") !== walletPreferredMethod) {
+      changes.push(`Méthode prioritaire : ${prevW.preferredMethod || "USDT_ERC20"} → ${walletPreferredMethod}`);
     }
     if ((prevW.verifiedStatus || "UNVERIFIED") !== walletVerifiedStatus) {
       changes.push(`Statut vérification : ${prevW.verifiedStatus || "UNVERIFIED"} → ${walletVerifiedStatus}`);
@@ -1788,10 +1800,10 @@ function NexiumAdminDashboard({
     }
 
     requestConfirmation(
-      `Enregistrer les Coordonnées Wallet de ${activeClient.name}`,
+      `Enregistrer les Coordonnées de Transfert de ${activeClient.name}`,
       changes.length > 0
-        ? `Modifications à enregistrer :\n• ${changes.join("\n• ")}`
-        : "Aucune modification détectée sur les coordonnées de wallets. Enregistrer quand même ?",
+        ? `Modifications des coordonnées de transfert Desk à enregistrer :\n• ${changes.join("\n• ")}`
+        : "Aucune modification détectée sur les coordonnées de transfert. Enregistrer quand même ?",
       "Confirmer et Enregistrer",
       "WARNING",
       handleSaveClientWallets
@@ -1803,16 +1815,9 @@ function NexiumAdminDashboard({
 
     const nextWallets: ClientWallets = {
       crypto: {
-        usdtTrc20: walletUsdtTrc20.trim(),
         usdtErc20: walletUsdtErc20.trim(),
         btc: walletBtc.trim(),
         eth: walletEth.trim(),
-        sol: walletSol.trim(),
-      },
-      ewallet: {
-        revolutTag: walletRevolutTag.trim(),
-        wiseEmail: walletWiseEmail.trim(),
-        paypalEmail: walletPaypalEmail.trim(),
       },
       preferredMethod: walletPreferredMethod,
       verifiedStatus: walletVerifiedStatus,
@@ -1835,7 +1840,7 @@ function NexiumAdminDashboard({
         });
 
         if (!result.success) {
-          toast.error("Échec de l'enregistrement des coordonnées wallet sur Supabase.");
+          toast.error("Échec de l'enregistrement des coordonnées de transfert sur Supabase.");
           return;
         }
       }
@@ -1850,20 +1855,90 @@ function NexiumAdminDashboard({
             : c
         )
       );
+      setActiveClient((prev) => (prev ? { ...prev, wallets: nextWallets } : prev));
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`nexium_wallets_${activeClient.id}`, JSON.stringify(nextWallets));
+          if (activeClient.email) {
+            localStorage.setItem(`nexium_wallets_${activeClient.email.toLowerCase()}`, JSON.stringify(nextWallets));
+          }
+          localStorage.setItem("nexium_wallets_local", JSON.stringify(nextWallets));
+          localStorage.setItem(
+            "nexium_wallets_active_client",
+            JSON.stringify({ clientId: activeClient.id, email: activeClient.email, wallets: nextWallets })
+          );
+          window.dispatchEvent(
+            new CustomEvent("nexium_wallets_update", {
+              detail: {
+                userId: activeClient.id,
+                email: activeClient.email,
+                wallets: nextWallets,
+              },
+            })
+          );
+          window.dispatchEvent(new Event("storage"));
+        } catch (storageErr) {
+          console.warn("Erreur synchronisation locale wallets:", storageErr);
+        }
+      }
 
       addAuditLog(
-        "CLIENT_WALLETS_UPDATED",
-        `Coordonnées de wallets mises à jour pour ${activeClient.name} (Statut: ${nextWallets.verifiedStatus}).`,
+        "CLIENT_TRANSFER_COORDINATES_UPDATED",
+        `Coordonnées de transfert Desk mises à jour pour ${activeClient.name} (Canal: ${nextWallets.verifiedStatus}).`,
         activeClient.email
       );
 
-      toast.success("Coordonnées de portefeuilles & wallets enregistrées avec succès !");
+      toast.success("Coordonnées de transfert enregistrées et synchronisées avec succès !");
     } catch (err) {
-      console.error("Erreur enregistrement wallets:", err);
-      toast.error("Une erreur inattendue est survenue lors de l'enregistrement des wallets.");
+      console.error("Erreur enregistrement coordonnées de transfert:", err);
+      toast.error("Une erreur inattendue est survenue lors de l'enregistrement des coordonnées de transfert.");
     } finally {
       setIsSavingWallets(false);
     }
+  };
+
+  // Copie de la fiche de transfert client complète prête à être transmise (WhatsApp, Email, etc.)
+  const handleCopyTransferSummary = () => {
+    if (!activeClient) return;
+
+    const methodLabels: Record<ClientWalletMethod, string> = {
+      USDT_ERC20: "USDT (ERC-20) - Réseau Ethereum (Recommandé)",
+      BTC: "Bitcoin (BTC) - Réseau Natif",
+      ETH: "Ethereum (ETH) - Mainnet",
+    };
+
+    let targetAddr = "";
+    if (walletPreferredMethod === "USDT_ERC20") targetAddr = walletUsdtErc20.trim();
+    else if (walletPreferredMethod === "BTC") targetAddr = walletBtc.trim();
+    else if (walletPreferredMethod === "ETH") targetAddr = walletEth.trim();
+
+    const lines: string[] = [
+      `🏛️ NEXIUM MARKETS — COORDONNÉES OFFICIELLES DE TRANSFERT`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `Client : ${activeClient.name}`,
+      `ID Compte : #${activeClient.id.slice(0, 8).toUpperCase()}`,
+      `Canal Recommandé : ${methodLabels[walletPreferredMethod]}`,
+    ];
+
+    if (targetAddr) {
+      lines.push(`Adresse de Dépôt : ${targetAddr}`);
+    } else {
+      lines.push(`Adresse de Dépôt : (Consultez le Desk pour l'adresse dédiée)`);
+    }
+
+    if (walletNotes.trim()) {
+      lines.push(`Instructions Desk : ${walletNotes.trim()}`);
+    }
+
+    lines.push(
+      `Statut du Canal : ${walletVerifiedStatus === "VERIFIED" ? "Actif & Validé Desk ✓" : "Attribution en cours"}`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `⚠️ Veuillez vérifier attentivement le réseau blockchain sélectionné avant tout envoi. Notifiez votre conseiller dès l'émission des fonds.`
+    );
+
+    navigator.clipboard.writeText(lines.join("\n"));
+    toast.success("Fiche de transfert complète copiée dans le presse-papier !");
   };
 
   // Synchronisation des clients réels depuis Supabase
@@ -6343,21 +6418,21 @@ function NexiumAdminDashboard({
                 </section>
               )}
 
-              {/* ── 5.bis COORDONNÉES WALLETS & DESTINATIONS DE RETRAIT DU CLIENT ── */}
-              <section className="admin-card-emerald p-6 sm:p-7 space-y-6 relative overflow-hidden">
+              {/* ── 5.bis COORDONNÉES DE TRANSFERT & DÉPÔTS (ATTRIBUTION DESK) ── */}
+              <section className="admin-card-emerald p-6 sm:p-8 space-y-7 relative overflow-hidden">
                 {/* Glow décoratif ambient */}
                 <div className="absolute -top-16 -right-16 size-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
                 {/* En-tête de section */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-emerald-500/20 pb-5">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-emerald-500/20 pb-5">
                   <div className="flex items-center gap-3.5">
                     <div className="size-11 sm:size-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center shadow-inner shrink-0">
-                      <Wallet className="size-5.5 sm:size-6" />
+                      <Coins className="size-5.5 sm:size-6" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2.5 flex-wrap">
                         <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                          Coordonnées Portefeuille &amp; Wallets de Retrait
+                          Coordonnées de Transfert &amp; Dépôt (Attribution Desk)
                         </h2>
                         <AdminBadge
                           variant={
@@ -6370,411 +6445,365 @@ function NexiumAdminDashboard({
                           dot={walletVerifiedStatus === "PENDING"}
                         >
                           {walletVerifiedStatus === "VERIFIED"
-                            ? "VÉRIFIÉ & AUTORISÉ ✓"
+                            ? "CANAL DE DÉPÔT ACTIF ✓"
                             : walletVerifiedStatus === "PENDING"
-                            ? "EN COURS D'EXAMEN ⏳"
-                            : "NON VÉRIFIÉ ✕"}
+                            ? "ATTRIBUTION EN COURS ⏳"
+                            : "NON ATTRIBUÉ / EN ATTENTE ✕"}
                         </AdminBadge>
                       </div>
                       <p className="text-xs sm:text-sm text-emerald-300/80 font-mono mt-0.5">
-                        Renseignez et certifiez les adresses blockchain et comptes fintech personnels pour les retraits de {activeClient.name}.
+                        Adresses officielles et coordonnées de réception configurées par le Desk pour les versements de {activeClient.name}.
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  <div className="flex items-center gap-2.5 self-start lg:self-auto shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleCopyTransferSummary}
+                      className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 font-bold px-3.5 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 active:scale-95 shadow-sm"
+                      title="Copier un récapitulatif textuel complet prêt à envoyer au client (WhatsApp, Email, etc.)"
+                    >
+                      <Share2 className="size-4 shrink-0 text-emerald-400" />
+                      <span>Copier Fiche Client</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={handleRequestSaveClientWallets}
                       disabled={isSavingWallets}
-                      className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 text-slate-950 font-black px-4 py-2 text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95"
+                      className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 text-slate-950 font-black px-4 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95"
                     >
                       {isSavingWallets ? (
                         <RefreshCw className="size-4 animate-spin shrink-0" />
                       ) : (
                         <Check className="size-4 stroke-[3] shrink-0" />
                       )}
-                      <span>Enregistrer les Wallets</span>
+                      <span>Enregistrer</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Grille Bento : 1. Crypto Wallets | 2. E-Wallets | 3. Gouvernance & Audit */}
-                <div className="grid gap-6 lg:grid-cols-2">
-                  {/* Bento 1 : Adresses Crypto Blockchain */}
-                  <div className="rounded-xl border border-slate-700/60 bg-[#080e1a]/90 p-5 space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">
-                        <Zap className="size-4 text-emerald-400 shrink-0" />
-                        <span>Adresses Crypto Privées (Blockchain)</span>
-                      </div>
-                      <span className="text-[11px] font-mono text-slate-400">
-                        Réseaux majeurs
+                {/* Volet supérieur : Paramètres Opérationnels du Canal de Transfert Desk */}
+                <div className="rounded-2xl border border-slate-700/60 bg-[#080e1a]/95 p-5 sm:p-6 backdrop-blur space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2.5 text-xs font-bold uppercase tracking-wider text-indigo-400 font-mono">
+                      <ShieldCheck className="size-4.5 text-indigo-400 shrink-0" />
+                      <span>Paramètres du Canal de Transfert Client</span>
+                    </div>
+                    {activeClient.wallets?.verifiedAt && (
+                      <span className="text-[11px] text-emerald-400 font-mono">
+                        ✓ Canal validé par le Desk le {new Date(activeClient.wallets.verifiedAt).toLocaleDateString("fr-FR")}
                       </span>
+                    )}
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider font-mono">
+                        Statut d'Attribution du Canal
+                      </label>
+                      <select
+                        value={walletVerifiedStatus}
+                        onChange={(e) => setWalletVerifiedStatus(e.target.value as ClientWalletVerifiedStatus)}
+                        className="w-full rounded-xl border border-slate-700/70 bg-[#0c121e] px-3.5 py-3 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400 font-mono font-bold transition-all"
+                      >
+                        <option value="VERIFIED">Canal Actif &amp; Ouvert (Prêt pour dépôts)</option>
+                        <option value="PENDING">Attribution en cours (Dossier en traitement)</option>
+                        <option value="UNVERIFIED">Canal Non Attribué / En pause</option>
+                      </select>
                     </div>
 
-                    <div className="space-y-3.5">
-                      {/* USDT TRC-20 */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                            <span className="size-1.5 rounded-full bg-emerald-400" />
-                            <span>USDT (TRC-20) · Tron</span>
-                            {walletPreferredMethod === "USDT_TRC20" && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                Retrait Prioritaire
-                              </span>
-                            )}
-                          </label>
-                          {walletUsdtTrc20 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(walletUsdtTrc20);
-                                toast.success("Adresse USDT (TRC-20) copiée !");
-                              }}
-                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                            >
-                              <Copy className="size-3" />
-                              <span>Copier</span>
-                            </button>
-                          )}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider font-mono">
+                        Réseau Recommandé au Client
+                      </label>
+                      <select
+                        value={walletPreferredMethod}
+                        onChange={(e) => setWalletPreferredMethod(e.target.value as ClientWalletMethod)}
+                        className="w-full rounded-xl border border-slate-700/70 bg-[#0c121e] px-3.5 py-3 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400 font-mono transition-all"
+                      >
+                        <option value="USDT_ERC20">USDT (ERC-20) · Ethereum (Recommandé)</option>
+                        <option value="BTC">Bitcoin (BTC) · Réseau Natif</option>
+                        <option value="ETH">Ethereum (ETH) · Mainnet Layer 1</option>
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-1">
+                      <label className="block text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider font-mono">
+                        Instructions / Motif pour le Client
+                      </label>
+                      <input
+                        type="text"
+                        value={walletNotes}
+                        onChange={(e) => setWalletNotes(e.target.value)}
+                        placeholder={`Ex: Indiquer la réf. #${activeClient.id.slice(0, 8).toUpperCase()} en motif de virement`}
+                        className="w-full rounded-xl border border-slate-700/70 bg-[#0c121e] px-3.5 py-3 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400 transition-all placeholder:text-slate-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Adresses de Transfert : Grille Aérée & Cartes Spacieuses */}
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">
+                      <Zap className="size-4 text-emerald-400 shrink-0" />
+                      <span>Adresses de Dépôt Assignées par le Desk (Blockchain)</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-slate-400">
+                      Coordonnées officielles de réception
+                    </span>
+                  </div>
+
+                  <div className="grid gap-5 md:grid-cols-2">
+                    {/* Carte 1 : USDT ERC-20 */}
+                    <div
+                      className={`rounded-2xl border p-5 sm:p-6 transition-all space-y-3.5 ${
+                        walletPreferredMethod === "USDT_ERC20"
+                          ? "border-emerald-500/50 bg-[#08121a]/90 shadow-lg shadow-emerald-500/5"
+                          : "border-slate-800 bg-[#080e1a]/80 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="size-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-black text-xs font-mono grid place-items-center shrink-0">
+                            ERC
+                          </div>
+                          <div>
+                            <div className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                              USDT · ERC-20
+                            </div>
+                            <div className="text-[11px] text-cyan-400/80 font-mono">
+                              Réseau Ethereum (Standard ERC-20)
+                            </div>
+                          </div>
                         </div>
-                        <input
-                          type="text"
-                          value={walletUsdtTrc20}
-                          onChange={(e) => setWalletUsdtTrc20(e.target.value)}
-                          placeholder="Ex: TXYZ9876543210NexiumTRC20OfficialWallet"
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
-                        />
+                        {walletPreferredMethod === "USDT_ERC20" ? (
+                          <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1 shrink-0">
+                            <Star className="size-3 fill-emerald-400 text-emerald-400" />
+                            Canal Recommandé
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setWalletPreferredMethod("USDT_ERC20")}
+                            className="text-[10px] px-2 py-1 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10 font-mono transition-colors cursor-pointer"
+                          >
+                            Recommander au client
+                          </button>
+                        )}
                       </div>
 
-                      {/* USDT ERC-20 */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                            <span className="size-1.5 rounded-full bg-cyan-400" />
-                            <span>USDT (ERC-20) · Ethereum</span>
-                            {walletPreferredMethod === "USDT_ERC20" && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                Retrait Prioritaire
-                              </span>
-                            )}
-                          </label>
+                        <label className="block text-[11px] font-mono text-slate-400 mb-1.5">
+                          Adresse de réception USDT (Ethereum) à fournir au client :
+                        </label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            value={walletUsdtErc20}
+                            onChange={(e) => setWalletUsdtErc20(e.target.value)}
+                            placeholder="Ex: 0x71C8fb8078b663b909dfc3E595D31D24Ec2A41f3"
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 pr-24 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all placeholder:text-slate-600"
+                          />
                           {walletUsdtErc20 && (
                             <button
                               type="button"
                               onClick={() => {
                                 navigator.clipboard.writeText(walletUsdtErc20);
-                                toast.success("Adresse USDT (ERC-20) copiée !");
+                                toast.success("Adresse USDT (ERC-20) copiée ! Prête pour le client.");
                               }}
-                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                              className="absolute right-2 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 text-xs font-mono flex items-center gap-1 cursor-pointer transition-all border border-slate-700"
+                              title="Copier l'adresse pour l'envoyer au client"
                             >
                               <Copy className="size-3" />
                               <span>Copier</span>
                             </button>
                           )}
                         </div>
-                        <input
-                          type="text"
-                          value={walletUsdtErc20}
-                          onChange={(e) => setWalletUsdtErc20(e.target.value)}
-                          placeholder="Ex: 0x71C8fb8078b663b909dfc3E595D31D24Ec2A41f3"
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
-                        />
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-500 flex items-center justify-between">
+                        <span>Format hexadécimal standard 0x... (42 car.)</span>
+                        <span className="text-slate-400">{walletUsdtErc20 ? `✓ Configurée (${walletUsdtErc20.length} car.)` : "Non assignée"}</span>
+                      </div>
+                    </div>
+
+                    {/* Carte 2 : Bitcoin (BTC) */}
+                    <div
+                      className={`rounded-2xl border p-5 sm:p-6 transition-all space-y-3.5 ${
+                        walletPreferredMethod === "BTC"
+                          ? "border-emerald-500/50 bg-[#08121a]/90 shadow-lg shadow-emerald-500/5"
+                          : "border-slate-800 bg-[#080e1a]/80 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="size-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-xs font-mono grid place-items-center shrink-0">
+                            BTC
+                          </div>
+                          <div>
+                            <div className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                              Bitcoin · BTC
+                            </div>
+                            <div className="text-[11px] text-amber-400/80 font-mono">
+                              Réseau Bitcoin Natif (SegWit / Legacy)
+                            </div>
+                          </div>
+                        </div>
+                        {walletPreferredMethod === "BTC" ? (
+                          <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1 shrink-0">
+                            <Star className="size-3 fill-emerald-400 text-emerald-400" />
+                            Canal Recommandé
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setWalletPreferredMethod("BTC")}
+                            className="text-[10px] px-2 py-1 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 font-mono transition-colors cursor-pointer"
+                          >
+                            Recommander au client
+                          </button>
+                        )}
                       </div>
 
-                      {/* Bitcoin (BTC) */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                            <span className="size-1.5 rounded-full bg-amber-400" />
-                            <span>Bitcoin (BTC) · Réseau Natif</span>
-                            {walletPreferredMethod === "BTC" && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                Retrait Prioritaire
-                              </span>
-                            )}
-                          </label>
+                        <label className="block text-[11px] font-mono text-slate-400 mb-1.5">
+                          Adresse de réception Bitcoin à fournir au client :
+                        </label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            value={walletBtc}
+                            onChange={(e) => setWalletBtc(e.target.value)}
+                            placeholder="Ex: bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 pr-24 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20 transition-all placeholder:text-slate-600"
+                          />
                           {walletBtc && (
                             <button
                               type="button"
                               onClick={() => {
                                 navigator.clipboard.writeText(walletBtc);
-                                toast.success("Adresse Bitcoin (BTC) copiée !");
+                                toast.success("Adresse Bitcoin copiée ! Prête pour le client.");
                               }}
-                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                              className="absolute right-2 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-amber-400 hover:text-amber-300 text-xs font-mono flex items-center gap-1 cursor-pointer transition-all border border-slate-700"
+                              title="Copier l'adresse pour l'envoyer au client"
                             >
                               <Copy className="size-3" />
                               <span>Copier</span>
                             </button>
                           )}
                         </div>
-                        <input
-                          type="text"
-                          value={walletBtc}
-                          onChange={(e) => setWalletBtc(e.target.value)}
-                          placeholder="Ex: bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
-                        />
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-500 flex items-center justify-between">
+                        <span>Format natif : bc1q... ou 1... / 3...</span>
+                        <span className="text-slate-400">{walletBtc ? `✓ Configurée (${walletBtc.length} car.)` : "Non assignée"}</span>
+                      </div>
+                    </div>
+
+                    {/* Carte 3 : Ethereum (ETH) */}
+                    <div
+                      className={`rounded-2xl border p-5 sm:p-6 transition-all space-y-3.5 ${
+                        walletPreferredMethod === "ETH"
+                          ? "border-emerald-500/50 bg-[#08121a]/90 shadow-lg shadow-emerald-500/5"
+                          : "border-slate-800 bg-[#080e1a]/80 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="size-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 font-black text-xs font-mono grid place-items-center shrink-0">
+                            ETH
+                          </div>
+                          <div>
+                            <div className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                              Ethereum · ETH
+                            </div>
+                            <div className="text-[11px] text-indigo-400/80 font-mono">
+                              Mainnet Ethereum (Layer 1)
+                            </div>
+                          </div>
+                        </div>
+                        {walletPreferredMethod === "ETH" ? (
+                          <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1 shrink-0">
+                            <Star className="size-3 fill-emerald-400 text-emerald-400" />
+                            Canal Recommandé
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setWalletPreferredMethod("ETH")}
+                            className="text-[10px] px-2 py-1 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 font-mono transition-colors cursor-pointer"
+                          >
+                            Recommander au client
+                          </button>
+                        )}
                       </div>
 
-                      {/* Ethereum (ETH) */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                            <span className="size-1.5 rounded-full bg-indigo-400" />
-                            <span>Ethereum (ETH) · Mainnet</span>
-                            {walletPreferredMethod === "ETH" && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                Retrait Prioritaire
-                              </span>
-                            )}
-                          </label>
+                        <label className="block text-[11px] font-mono text-slate-400 mb-1.5">
+                          Adresse de réception Ethereum à fournir au client :
+                        </label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            value={walletEth}
+                            onChange={(e) => setWalletEth(e.target.value)}
+                            placeholder="Ex: 0x94B2E920c5d5F9EbD7e2bA6E3F66b96E015e1974"
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 pr-24 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400/20 transition-all placeholder:text-slate-600"
+                          />
                           {walletEth && (
                             <button
                               type="button"
                               onClick={() => {
                                 navigator.clipboard.writeText(walletEth);
-                                toast.success("Adresse Ethereum (ETH) copiée !");
+                                toast.success("Adresse Ethereum copiée ! Prête pour le client.");
                               }}
-                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                              className="absolute right-2 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 text-xs font-mono flex items-center gap-1 cursor-pointer transition-all border border-slate-700"
+                              title="Copier l'adresse pour l'envoyer au client"
                             >
                               <Copy className="size-3" />
                               <span>Copier</span>
                             </button>
                           )}
                         </div>
-                        <input
-                          type="text"
-                          value={walletEth}
-                          onChange={(e) => setWalletEth(e.target.value)}
-                          placeholder="Ex: 0x94B2E920c5d5F9EbD7e2bA6E3F66b96E015e1974"
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
-                        />
                       </div>
-
-                      {/* Solana (SOL) */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                            <span className="size-1.5 rounded-full bg-purple-400" />
-                            <span>Solana (SOL) · SPL</span>
-                            {walletPreferredMethod === "SOL" && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                Retrait Prioritaire
-                              </span>
-                            )}
-                          </label>
-                          {walletSol && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(walletSol);
-                                toast.success("Adresse Solana (SOL) copiée !");
-                              }}
-                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                            >
-                              <Copy className="size-3" />
-                              <span>Copier</span>
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          value={walletSol}
-                          onChange={(e) => setWalletSol(e.target.value)}
-                          placeholder="Ex: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
-                        />
+                      <div className="text-[11px] font-mono text-slate-500 flex items-center justify-between">
+                        <span>Format standard Ethereum : 0x... (42 car.)</span>
+                        <span className="text-slate-400">{walletEth ? `✓ Configurée (${walletEth.length} car.)` : "Non assignée"}</span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Bento 2 : E-Wallets & Fintech + Bento 3 : Conformité & Gouvernance */}
-                  <div className="space-y-6">
-                    {/* E-Wallets */}
-                    <div className="rounded-xl border border-slate-700/60 bg-[#080e1a]/90 p-5 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400 font-mono">
-                          <Wallet className="size-4 text-cyan-400 shrink-0" />
-                          <span>Portefeuilles Électroniques (E-Wallets)</span>
+                    {/* Carte 4 : Rapprochement & Crédit Opérationnel Desk */}
+                    <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-br from-indigo-950/30 via-[#080e1a]/90 to-[#080e1a] p-5 sm:p-6 space-y-3.5 flex flex-col justify-between">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="size-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 grid place-items-center shrink-0">
+                            <Shield className="size-5 text-indigo-400" />
+                          </div>
+                          <div>
+                            <div className="text-xs sm:text-sm font-bold text-white tracking-wide">
+                              Procédure de Réception &amp; Crédit Desk
+                            </div>
+                            <div className="text-[11px] text-indigo-300/80 font-mono">
+                              Protocole Opérationnel NEXIUM
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-[11px] font-mono text-slate-400">
-                          Fintechs partenaires
+
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Dès réception d'un transfert émis par {activeClient.name} sur l'une des adresses assignées ci-dessus, l'opérateur Desk vérifie la confirmation réseau et crédite immédiatement le solde du client via le module <strong>Dépôts</strong> ci-dessus.
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-indigo-500/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[11px] font-mono">
+                        <span className="text-slate-400">Client assigné : <strong className="text-white">{activeClient.name}</strong></span>
+                        <span className="text-indigo-300">
+                          {walletVerifiedStatus === "VERIFIED"
+                            ? "✓ Canal Ouvert & Opérationnel"
+                            : walletVerifiedStatus === "PENDING"
+                            ? "⏳ Attribution en cours"
+                            : "✕ En attente de configuration"}
                         </span>
-                      </div>
-
-                      <div className="space-y-3.5">
-                        {/* Revolut */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                              <span className="size-1.5 rounded-full bg-cyan-400" />
-                              <span>Revolut (Revtag / Email)</span>
-                              {walletPreferredMethod === "REVOLUT" && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                  Retrait Prioritaire
-                                </span>
-                              )}
-                            </label>
-                            {walletRevolutTag && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(walletRevolutTag);
-                                  toast.success("Revtag Revolut copié !");
-                                }}
-                                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                              >
-                                <Copy className="size-3" />
-                                <span>Copier</span>
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={walletRevolutTag}
-                            onChange={(e) => setWalletRevolutTag(e.target.value)}
-                            placeholder="Ex: @revtag ou email@domaine.com"
-                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all placeholder:text-slate-600"
-                          />
-                        </div>
-
-                        {/* Wise */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                              <span className="size-1.5 rounded-full bg-emerald-400" />
-                              <span>Wise (Email de compte)</span>
-                              {walletPreferredMethod === "WISE" && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                  Retrait Prioritaire
-                                </span>
-                              )}
-                            </label>
-                            {walletWiseEmail && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(walletWiseEmail);
-                                  toast.success("Email Wise copié !");
-                                }}
-                                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                              >
-                                <Copy className="size-3" />
-                                <span>Copier</span>
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={walletWiseEmail}
-                            onChange={(e) => setWalletWiseEmail(e.target.value)}
-                            placeholder="Ex: client.wise@domaine.com"
-                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all placeholder:text-slate-600"
-                          />
-                        </div>
-
-                        {/* PayPal */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                              <span className="size-1.5 rounded-full bg-blue-400" />
-                              <span>PayPal (Email bénéficiaire)</span>
-                              {walletPreferredMethod === "PAYPAL" && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                                  Retrait Prioritaire
-                                </span>
-                              )}
-                            </label>
-                            {walletPaypalEmail && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(walletPaypalEmail);
-                                  toast.success("Email PayPal copié !");
-                                }}
-                                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                              >
-                                <Copy className="size-3" />
-                                <span>Copier</span>
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={walletPaypalEmail}
-                            onChange={(e) => setWalletPaypalEmail(e.target.value)}
-                            placeholder="Ex: compte.paypal@domaine.com"
-                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all placeholder:text-slate-600"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Gouvernance & Audit Conformité */}
-                    <div className="rounded-xl border border-slate-700/60 bg-[#080e1a]/90 p-5 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-400 font-mono">
-                          <ShieldCheck className="size-4 text-indigo-400 shrink-0" />
-                          <span>Gouvernance &amp; Conformité Desk</span>
-                        </div>
-                        {activeClient.wallets?.verifiedAt && (
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            Validé le {new Date(activeClient.wallets.verifiedAt).toLocaleDateString("fr-FR")}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">
-                            MÉTHODE PRIORITAIRE
-                          </label>
-                          <select
-                            value={walletPreferredMethod}
-                            onChange={(e) => setWalletPreferredMethod(e.target.value as ClientWalletMethod)}
-                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400 font-mono"
-                          >
-                            <option value="USDT_TRC20">USDT (TRC-20) - Tron</option>
-                            <option value="USDT_ERC20">USDT (ERC-20) - Ethereum</option>
-                            <option value="BTC">Bitcoin (BTC) Natif</option>
-                            <option value="ETH">Ethereum (ETH) Mainnet</option>
-                            <option value="SOL">Solana (SOL)</option>
-                            <option value="REVOLUT">Revolut (Revtag / Email)</option>
-                            <option value="WISE">Wise (Email)</option>
-                            <option value="PAYPAL">PayPal (Email)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">
-                            STATUT DE VÉRIFICATION
-                          </label>
-                          <select
-                            value={walletVerifiedStatus}
-                            onChange={(e) => setWalletVerifiedStatus(e.target.value as ClientWalletVerifiedStatus)}
-                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400 font-mono font-bold"
-                          >
-                            <option value="VERIFIED">Vérifié &amp; Autorisé (Audit OK)</option>
-                            <option value="PENDING">En cours d'examen (Pièces requises)</option>
-                            <option value="UNVERIFIED">Non vérifié (Non audité)</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">
-                          NOTE INTERNE DE CONFORMITÉ WALLET
-                        </label>
-                        <input
-                          type="text"
-                          value={walletNotes}
-                          onChange={(e) => setWalletNotes(e.target.value)}
-                          placeholder="Ex: Justificatif de propriété et selfie de contrôle validés par le Desk."
-                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400"
-                        />
                       </div>
                     </div>
                   </div>
@@ -6786,32 +6815,38 @@ function NexiumAdminDashboard({
                     <span className="size-2 rounded-full bg-emerald-400" />
                     <span>
                       {[
-                        walletUsdtTrc20,
                         walletUsdtErc20,
                         walletBtc,
                         walletEth,
-                        walletSol,
-                        walletRevolutTag,
-                        walletWiseEmail,
-                        walletPaypalEmail,
                       ].filter(Boolean).length}{" "}
-                      coordonnée(s) de paiement renseignée(s)
+                      adresse(s) de transfert assignée(s) pour {activeClient.name}
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleRequestSaveClientWallets}
-                    disabled={isSavingWallets}
-                    className="admin-btn-primary py-2.5 px-5 text-xs sm:text-sm flex items-center justify-center gap-2 self-end sm:self-auto"
-                  >
-                    {isSavingWallets ? (
-                      <RefreshCw className="size-4 animate-spin shrink-0" />
-                    ) : (
-                      <Check className="size-4 stroke-[3] shrink-0" />
-                    )}
-                    <span>Enregistrer les Coordonnées Wallet</span>
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleCopyTransferSummary}
+                      className="px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white text-xs sm:text-sm font-bold font-mono transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <Share2 className="size-3.5 text-emerald-400" />
+                      <span>Copier Fiche Complète</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleRequestSaveClientWallets}
+                      disabled={isSavingWallets}
+                      className="admin-btn-primary py-2.5 px-5 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isSavingWallets ? (
+                        <RefreshCw className="size-4 animate-spin shrink-0" />
+                      ) : (
+                        <Check className="size-4 stroke-[3] shrink-0" />
+                      )}
+                      <span>Enregistrer les Coordonnées</span>
+                    </button>
+                  </div>
                 </div>
               </section>
 

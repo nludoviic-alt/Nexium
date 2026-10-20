@@ -3634,6 +3634,7 @@ function PortfolioTab({
   paymentSettings,
   onOpenDeposit,
   onAddTransaction,
+  wallets,
 }: {
   balance: number;
   bonus?: number;
@@ -3646,9 +3647,109 @@ function PortfolioTab({
   paymentSettings?: PaymentSettings | null;
   onOpenDeposit?: () => void;
   onAddTransaction?: (tx: TransactionItem) => void;
+  wallets?: any;
 }) {
   const [view, setView] = useState<"overview" | "withdraw" | "deposit">("overview");
   const [searchTx, setSearchTx] = useState("");
+  const [isDepositWalletsModalOpen, setIsDepositWalletsModalOpen] = useState(false);
+  const [activeWallets, setActiveWallets] = useState<any>(() => {
+    if (wallets && Object.keys(wallets).length > 0) return wallets;
+    if (typeof window !== "undefined") {
+      try {
+        const rawStored =
+          (currentUserId && localStorage.getItem(`nexium_wallets_${currentUserId}`)) ||
+          localStorage.getItem("nexium_wallets_active_client") ||
+          localStorage.getItem("nexium_wallets_local");
+        if (rawStored) {
+          const parsed = JSON.parse(rawStored);
+          return parsed.wallets || parsed;
+        }
+      } catch {}
+    }
+    return wallets;
+  });
+
+  useEffect(() => {
+    if (wallets) {
+      setActiveWallets(wallets);
+    }
+  }, [wallets]);
+
+  useEffect(() => {
+    const handleSync = (e?: any) => {
+      if (typeof window === "undefined") return;
+      try {
+        const detail = e?.detail;
+        if (detail?.wallets) {
+          if (
+            !detail.userId ||
+            !currentUserId ||
+            detail.userId === currentUserId ||
+            (detail.email && clientName && detail.email.toLowerCase().includes(clientName.toLowerCase())) ||
+            currentUserId === "local" ||
+            !currentUserId
+          ) {
+            setActiveWallets(detail.wallets);
+            return;
+          }
+        }
+        const rawStored =
+          (currentUserId && localStorage.getItem(`nexium_wallets_${currentUserId}`)) ||
+          localStorage.getItem("nexium_wallets_active_client") ||
+          localStorage.getItem("nexium_wallets_local");
+        if (rawStored) {
+          const parsed = JSON.parse(rawStored);
+          setActiveWallets(parsed.wallets || parsed);
+        }
+      } catch {}
+    };
+
+    window.addEventListener("nexium_wallets_update", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("nexium_wallets_update", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, [currentUserId, clientName]);
+
+  const deskWallets = activeWallets?.crypto || {};
+  const rawMethod = activeWallets?.preferredMethod;
+  const activeMethod = rawMethod === "BTC" ? "BTC" : rawMethod === "ETH" ? "ETH" : "USDT_ERC20";
+  const verifiedStatus = activeWallets?.verifiedStatus || "UNVERIFIED";
+  const deskNotes = activeWallets?.notes || "";
+
+  const depositWalletsList = [
+    {
+      id: "USDT_ERC20",
+      symbol: "USDT",
+      badge: "ERC",
+      network: "Ethereum (ERC-20)",
+      description: "Réseau Ethereum Mainnet · Stablecoin officiel de référence",
+      address: (deskWallets.usdtErc20 || "").trim(),
+      badgeColor: "cyan" as const,
+      format: "Format hexadécimal standard 0x... (42 caractères)",
+    },
+    {
+      id: "BTC",
+      symbol: "BTC",
+      badge: "BTC",
+      network: "Bitcoin Natif",
+      description: "Réseau Bitcoin Natif · SegWit & Legacy officiel",
+      address: (deskWallets.btc || "").trim(),
+      badgeColor: "amber" as const,
+      format: "Format natif : bc1q... ou 1... / 3...",
+    },
+    {
+      id: "ETH",
+      symbol: "ETH",
+      badge: "ETH",
+      network: "Ethereum Mainnet",
+      description: "Mainnet Ethereum Layer 1 · Dépôt direct ETH",
+      address: (deskWallets.eth || "").trim(),
+      badgeColor: "indigo" as const,
+      format: "Format hexadécimal standard 0x... (42 caractères)",
+    },
+  ];
 
   // Withdrawal form states
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
@@ -4740,6 +4841,14 @@ function PortfolioTab({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
+              onClick={() => setIsDepositWalletsModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 px-3.5 py-2 text-xs sm:text-sm font-bold text-emerald-300 uppercase tracking-wider transition-all cursor-pointer shadow-sm hover:border-emerald-400 active:scale-95"
+            >
+              <Coins className="size-4 text-emerald-400" />
+              <span>Coordonnées de Dépôt</span>
+            </button>
+            <button
               onClick={() => setView("deposit")}
               className="admin-btn-primary inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer shadow-lg hover:scale-[1.02] transition-all rounded-xl"
             >
@@ -4855,6 +4964,163 @@ function PortfolioTab({
         </article>
       </section>
 
+      {/* ── COORDONNÉES OFFICIELLES DE VERSEMENT DU DESK (CARTES DIRECTES SUR LA PAGE) ── */}
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center shadow-md shrink-0">
+              <Coins className="size-5 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                  Coordonnées Officielles de Versement (Desk Finance)
+                </h3>
+                <span
+                  className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold tracking-wider border ${
+                    verifiedStatus === "VERIFIED"
+                      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                      : verifiedStatus === "PENDING"
+                      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                      : "bg-slate-800 text-slate-400 border-slate-700"
+                  }`}
+                >
+                  {verifiedStatus === "VERIFIED"
+                    ? "CANAL CERTIFIÉ ✓"
+                    : verifiedStatus === "PENDING"
+                    ? "ATTRIBUTION EN COURS ⏳"
+                    : "COORDONNÉES DESK"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Passerelles blockchain de versement configurées par le Desk pour créditer votre solde ECN de trading.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDepositWalletsModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/50 text-emerald-300 hover:text-white text-xs font-mono font-bold transition cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            <Share2 className="size-3.5 text-emerald-400" />
+            <span>Vue Aérée &amp; Récapitulatif</span>
+          </button>
+        </div>
+
+        {/* Consigne personnalisée du Desk si présente */}
+        {deskNotes && (
+          <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 px-4 py-3 flex items-start gap-3">
+            <ShieldCheck className="size-4 text-indigo-400 mt-0.5 shrink-0" />
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300 font-mono block">
+                Instruction personnalisée de votre Chargé de Compte :
+              </span>
+              <p className="text-xs text-slate-200 leading-relaxed font-sans">
+                {deskNotes}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Grille des 3 Cartes Crypto Directes */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {depositWalletsList.map((w) => {
+            const isPreferred = activeMethod === w.id;
+            const isConfigured = Boolean(w.address);
+
+            return (
+              <div
+                key={w.id}
+                className={`rounded-2xl border p-4 sm:p-5 flex flex-col justify-between transition-all space-y-3.5 ${
+                  isPreferred
+                    ? "border-emerald-500/50 bg-[#0c1828]/90 shadow-lg shadow-emerald-500/5 ring-1 ring-emerald-500/20"
+                    : "border-slate-800/80 bg-[#0b1220]/70 hover:border-slate-700/80"
+                }`}
+              >
+                {/* En-tête de la carte */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`size-10 rounded-xl text-xs font-black font-mono grid place-items-center shrink-0 border shadow-sm ${
+                        w.badgeColor === "cyan"
+                          ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400"
+                          : w.badgeColor === "amber"
+                          ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                          : "bg-indigo-500/15 border-indigo-500/30 text-indigo-400"
+                      }`}
+                    >
+                      {w.badge}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>{w.symbol}</span>
+                        <span className="text-xs text-slate-400 font-normal font-mono">({w.network})</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono line-clamp-1 mt-0.5">
+                        {w.description}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isPreferred && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1 shrink-0">
+                      <Star className="size-3 fill-emerald-400 text-emerald-400" />
+                      Recommandé
+                    </span>
+                  )}
+                </div>
+
+                {/* Champ Adresse ou État vide */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
+                    Adresse de Versement Desk :
+                  </span>
+
+                  {isConfigured ? (
+                    <div className="relative flex items-center">
+                      <div className="w-full rounded-xl border border-slate-700/70 bg-[#050913] px-3.5 py-2.5 pr-22 text-xs font-mono text-emerald-300 select-all break-all tracking-wide shadow-inner">
+                        {w.address}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(w.address);
+                          toast.success(`Adresse ${w.symbol} (${w.network}) copiée !`);
+                        }}
+                        className="absolute right-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition border border-emerald-500/30 active:scale-95 shadow-sm"
+                        title="Copier l'adresse"
+                      >
+                        <Copy className="size-3" />
+                        <span>Copier</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full rounded-xl border border-dashed border-slate-700/80 bg-[#050913]/40 px-3.5 py-3 text-xs font-mono text-slate-400 italic flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-amber-400/80 animate-pulse" />
+                        <span>En attente d'attribution Desk</span>
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wider font-bold not-italic px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                        Vide
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bas de carte */}
+                <div className="pt-2 border-t border-white/[0.05] flex items-center justify-between text-[11px] font-mono text-slate-500">
+                  <span>{w.format}</span>
+                  <span className={isConfigured ? "text-emerald-400 font-bold" : "text-slate-500"}>
+                    {isConfigured ? `${w.address.length} car.` : "Non renseignée"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Transactions */}
       <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#10141b] shadow-md">
         <div className="flex flex-col gap-3 border-b border-white/[0.06] p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -4916,6 +5182,228 @@ function PortfolioTab({
           </table>
         </div>
       </section>
+
+      {/* ── MODAL AÉRÉ : COORDONNÉES OFFICIELLES DE DÉPÔT / TRANSFERT DU DESK ── */}
+      {isDepositWalletsModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200"
+          onClick={() => setIsDepositWalletsModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl border border-emerald-500/25 bg-[#090e1d]/95 shadow-2xl p-6 sm:p-10 space-y-8 text-slate-100 ring-1 ring-white/[0.05]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Ambient glow décoratif */}
+            <div className="pointer-events-none absolute -right-20 -top-20 size-80 rounded-full bg-emerald-500/10 blur-3xl" />
+            <div className="pointer-events-none absolute -left-20 -bottom-20 size-80 rounded-full bg-indigo-500/5 blur-3xl" />
+
+            {/* En-tête aéré et élégant */}
+            <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] pb-6 sm:pb-7">
+              <div className="flex items-center gap-4">
+                <div className="size-13 sm:size-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400 grid place-items-center shadow-lg shadow-emerald-950/30 shrink-0">
+                  <Coins className="size-7 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                      Coordonnées Officielles de Dépôt
+                    </h3>
+                    <span
+                      className={`text-[11px] px-3 py-1 rounded-full font-mono font-bold tracking-wider border ${
+                        verifiedStatus === "VERIFIED"
+                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                          : verifiedStatus === "PENDING"
+                          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                          : "bg-slate-800 text-slate-300 border-slate-700"
+                      }`}
+                    >
+                      {verifiedStatus === "VERIFIED"
+                        ? "CANAL DE DÉPÔT ACTIF ✓"
+                        : verifiedStatus === "PENDING"
+                        ? "ATTRIBUTION EN COURS ⏳"
+                        : "COORDONNÉES DESK"}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1.5 leading-relaxed">
+                    Adresses officielles certifiées par le Desk Finance pour créditer votre compte de trading ECN.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsDepositWalletsModalOpen(false)}
+                className="size-10 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center cursor-pointer transition shrink-0 border border-slate-700/60"
+                aria-label="Fermer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Consigne personnalisée du Desk (si présente) */}
+            {deskNotes && (
+              <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/25 p-5 sm:p-6 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-indigo-300 uppercase tracking-wider font-mono">
+                  <ShieldCheck className="size-4.5 text-indigo-400 shrink-0" />
+                  <span>Instruction de votre Chargé de Compte Desk</span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
+                  {deskNotes}
+                </p>
+              </div>
+            )}
+
+            {/* Grille aérée des adresses crypto */}
+            <div className="space-y-5">
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">
+                    Passerelles Blockchain Directes
+                  </span>
+                </div>
+                <span className="text-xs text-emerald-400 font-mono">
+                  Rapprochement &amp; Crédit ECN direct
+                </span>
+              </div>
+
+              <div className="space-y-4 sm:space-y-5">
+                {depositWalletsList.map((w) => {
+                  const isPreferred = activeMethod === w.id;
+                  const isConfigured = Boolean(w.address);
+
+                  return (
+                    <div
+                      key={w.id}
+                      className={`rounded-2xl sm:rounded-3xl border p-5 sm:p-6 space-y-4 transition-all ${
+                        isPreferred
+                          ? "border-emerald-500/50 bg-[#0c1828]/95 shadow-xl shadow-emerald-500/5 ring-1 ring-emerald-500/20"
+                          : "border-slate-800/80 bg-[#0b1220]/75 hover:border-slate-700/80"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3.5">
+                          <div
+                            className={`size-11 sm:size-12 rounded-2xl text-xs sm:text-sm font-black font-mono grid place-items-center shrink-0 border shadow-md ${
+                              w.badgeColor === "cyan"
+                                ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400"
+                                : w.badgeColor === "amber"
+                                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                                : "bg-indigo-500/15 border-indigo-500/30 text-indigo-400"
+                            }`}
+                          >
+                            {w.badge}
+                          </div>
+                          <div>
+                            <div className="text-sm sm:text-base font-bold text-white flex items-center gap-2.5 flex-wrap">
+                              <span>{w.symbol} · {w.network}</span>
+                              {isPreferred && (
+                                <span className="text-[10px] px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1.5 shadow-sm">
+                                  <Star className="size-3 fill-emerald-400 text-emerald-400" />
+                                  Canal Recommandé par le Desk
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-400 font-mono mt-0.5">
+                              {w.description}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Champ adresse ou état vide */}
+                      {isConfigured ? (
+                        <div className="relative flex items-center">
+                          <div className="w-full rounded-xl border border-slate-700/70 bg-[#050913] px-4 sm:px-5 py-3.5 pr-28 text-xs sm:text-sm font-mono text-emerald-300 select-all break-all tracking-wide shadow-inner">
+                            {w.address}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(w.address);
+                              toast.success(`Adresse ${w.symbol} (${w.network}) copiée !`);
+                            }}
+                            className="absolute right-2 sm:right-2.5 px-3.5 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition border border-emerald-500/30 active:scale-95 shadow-sm"
+                          >
+                            <Copy className="size-3.5" />
+                            <span>Copier</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-full rounded-2xl border border-dashed border-slate-700/80 bg-[#050913]/60 px-5 py-4 text-xs sm:text-sm font-mono text-slate-400 italic flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
+                            <span className="text-slate-300">En attente d'attribution par le Desk Finance</span>
+                          </div>
+                          <span className="text-[10px] font-mono uppercase tracking-wider not-italic text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700/60">
+                            Coordonnée non renseignée
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="text-[11px] font-mono text-slate-400 flex items-center justify-between pt-0.5">
+                        <span>{w.format}</span>
+                        <span className={isConfigured ? "text-slate-400" : "text-slate-500"}>
+                          {isConfigured ? `${w.address.length} caractères` : "Statut : Non assignée"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Protocole de sécurité & Crédit */}
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-5 sm:p-6 space-y-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 uppercase tracking-wider font-mono">
+                <ShieldCheck className="size-4.5 text-emerald-400 shrink-0" />
+                <span>Sécurité des Versements &amp; Crédit ECN</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+                Assurez-vous de sélectionner le réseau blockchain correspondant à l'adresse choisie. Dès réception et confirmation sur le réseau, le Desk Finance rapproche et crédite instantanément votre solde ECN de trading.
+              </p>
+              <div className="text-xs text-emerald-400/90 font-mono pt-0.5 flex items-center gap-1.5">
+                <span>💡</span>
+                <span>Conseil : prévenez votre conseiller dès l'émission pour un traitement prioritaire.</span>
+              </div>
+            </div>
+
+            {/* Actions de bas de modale */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-5 border-t border-white/[0.08]">
+              <button
+                type="button"
+                onClick={() => {
+                  const preferredItem = depositWalletsList.find((w) => w.id === activeMethod) || depositWalletsList[0];
+                  const addrDisplay = preferredItem.address || "En attente d'attribution par le Desk Finance";
+                  const summary = [
+                    `🏛️ NEXIUM MARKETS — COORDONNÉES DE DÉPÔT`,
+                    `Client : ${clientName}`,
+                    `Canal Recommandé : ${preferredItem.symbol} (${preferredItem.network})`,
+                    `Adresse : ${addrDisplay}`,
+                    deskNotes ? `Instruction : ${deskNotes}` : "",
+                  ].filter(Boolean).join("\n");
+                  navigator.clipboard.writeText(summary);
+                  toast.success("Récapitulatif de versement copié dans le presse-papier !");
+                }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-700/80 hover:bg-slate-800/80 text-slate-300 hover:text-white text-xs sm:text-sm font-bold font-mono transition cursor-pointer"
+              >
+                <Share2 className="size-4 text-emerald-400" />
+                <span>Copier le Récapitulatif</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDepositWalletsModalOpen(false)}
+                className="px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold uppercase tracking-wider text-xs sm:text-sm transition-all cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7967,6 +8455,20 @@ export function NexiumDashboard({
   const [recoveryAmount, setRecoveryAmount] = useState("");
   const [recoveryNote, setRecoveryNote] = useState("");
   const [submittingRecovery, setSubmittingRecovery] = useState(false);
+  const [clientWallets, setClientWallets] = useState<any>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const activeEntry = localStorage.getItem("nexium_wallets_active_client");
+        if (activeEntry) {
+          const parsed = JSON.parse(activeEntry);
+          if (parsed?.wallets) return parsed.wallets;
+        }
+        const stored = localStorage.getItem("nexium_wallets_local");
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return null;
+  });
   // ── Compte DÉMO (étude de comportement) ──
   // Solde démo et cycles des presets sont conservés par client dans ce
   // Montants de mise alloués par Trade pour chaque Preset ($ USD)
@@ -8266,6 +8768,19 @@ export function NexiumDashboard({
       try {
         const stored = localStorage.getItem(`nexium_recovery_assistance_${profile.id}`) || localStorage.getItem("nexium_recovery_assistance_local");
         if (stored) setRecoveryAssistance(JSON.parse(stored));
+      } catch {}
+    }
+
+    if (cfg?.wallets) {
+      setClientWallets(cfg.wallets);
+      if (typeof window !== "undefined" && profile.id) {
+        localStorage.setItem(`nexium_wallets_${profile.id}`, JSON.stringify(cfg.wallets));
+        localStorage.setItem("nexium_wallets_local", JSON.stringify(cfg.wallets));
+      }
+    } else if (typeof window !== "undefined") {
+      try {
+        const stored = (profile.id && localStorage.getItem(`nexium_wallets_${profile.id}`)) || localStorage.getItem("nexium_wallets_local");
+        if (stored) setClientWallets(JSON.parse(stored));
       } catch {}
     }
     setLicenseStatus(profile.license_status || "NOT_REQUESTED");
@@ -8590,6 +9105,16 @@ export function NexiumDashboard({
             try { localStorage.setItem("nexium_preset_stakes", JSON.stringify(cfg.preset_stakes)); } catch {}
           }
         }
+        if (cfg.wallets) {
+          setClientWallets(cfg.wallets);
+          if (typeof window !== "undefined") {
+            try {
+              if (currentUserId) localStorage.setItem(`nexium_wallets_${currentUserId}`, JSON.stringify(cfg.wallets));
+              localStorage.setItem("nexium_wallets_local", JSON.stringify(cfg.wallets));
+              localStorage.setItem("nexium_wallets_active_client", JSON.stringify({ clientId: currentUserId, email: clientEmail, wallets: cfg.wallets }));
+            } catch {}
+          }
+        }
         setVisibleBotIds(
           [
             (cfg.aiGold?.visible === true || activeList.includes("AI_GOLD")) && "nexium-ai-gold",
@@ -8626,14 +9151,14 @@ export function NexiumDashboard({
     return unsubProfile;
   }, [currentUserId]);
 
-  // Synchronisation instantanée des soldes, bonus et quotas (inter-onglets et événements Desk)
+  // Synchronisation instantanée des soldes, bonus, quotas et wallets (inter-onglets et événements Desk)
   useEffect(() => {
     const handleFinancialSync = (e?: any) => {
       if (typeof window === "undefined") return;
       try {
         const id = currentUserId || "local";
         const detail = e?.detail;
-        if (detail && detail.userId && detail.userId !== id && id !== "local") return;
+        if (detail && detail.userId && detail.userId !== id && id !== "local" && (!clientEmail || !detail.email || detail.email.toLowerCase() !== clientEmail.toLowerCase())) return;
 
         if (detail?.balance !== undefined) {
           setBalance(Number(detail.balance));
@@ -8653,18 +9178,37 @@ export function NexiumDashboard({
         if (storedQuota) {
           setQuotaStats(storedQuota);
         }
+
+        // Synchronisation temps réel des coordonnées Desk
+        if (detail?.wallets !== undefined) {
+          setClientWallets(detail.wallets);
+        } else {
+          const storedWallets =
+            (id && localStorage.getItem(`nexium_wallets_${id}`)) ||
+            (clientEmail && localStorage.getItem(`nexium_wallets_${clientEmail.toLowerCase()}`)) ||
+            localStorage.getItem("nexium_wallets_active_client") ||
+            localStorage.getItem("nexium_wallets_local");
+          if (storedWallets) {
+            try {
+              const parsed = JSON.parse(storedWallets);
+              setClientWallets(parsed.wallets || parsed);
+            } catch {}
+          }
+        }
       } catch {}
     };
 
     window.addEventListener("storage", handleFinancialSync);
     window.addEventListener("nexium_financial_update", handleFinancialSync);
     window.addEventListener("nexium_preset_update", handleFinancialSync);
+    window.addEventListener("nexium_wallets_update", handleFinancialSync);
     return () => {
       window.removeEventListener("storage", handleFinancialSync);
       window.removeEventListener("nexium_financial_update", handleFinancialSync);
       window.removeEventListener("nexium_preset_update", handleFinancialSync);
+      window.removeEventListener("nexium_wallets_update", handleFinancialSync);
     };
-  }, [currentUserId]);
+  }, [currentUserId, clientEmail]);
 
   // Synchronisation temps réel des e-mails du client avec Supabase
   useEffect(() => {
@@ -10864,6 +11408,7 @@ export function NexiumDashboard({
               currentUserId={currentUserId}
               isSupabaseConfigured={isSupabaseConfigured}
               paymentSettings={paymentSettings}
+              wallets={clientWallets}
               onOpenDeposit={openDepositModal}
               onAddTransaction={(tx) => setTransactions((prev) => [tx, ...prev])}
             />
