@@ -205,121 +205,143 @@ function TradingHero({
         </svg>
       </div>
 
-      {/* ── MOBILE HERO SLIDER ONLY (md:hidden) ── */}
-      <div
-        className="relative z-20 flex flex-col justify-between items-center text-center md:hidden w-full px-4 pt-44 pb-10 min-h-[700px] select-none"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full my-auto max-w-md">
-          {/* Top Pill Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/35 bg-[#00D084]/10 px-4 py-1.5 text-xs font-black tracking-[0.16em] text-[#00D084] uppercase shadow-[0_0_15px_rgba(0,208,132,0.15)] backdrop-blur-md mb-4">
-            <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
-            <span>{currentSlide.badge}</span>
-          </div>
-
-          {/* Main Title OUTSIDE the card */}
-          <h1 className="text-[30px] sm:text-3xl font-black uppercase tracking-tight leading-[1.14] text-white">
-            <span className="block text-white mb-1">{currentSlide.titlePrefix}</span>
-            <span className="block text-[#00D084] drop-shadow-[0_0_25px_rgba(0,208,132,0.4)]">
-              {currentSlide.titleHighlight}
-            </span>
-          </h1>
-
-          {/* 💎 Luxury Accent Card with Description & Buttons */}
-          <div className="mt-5 p-6 rounded-3xl border border-[#00D084]/20 bg-gradient-to-b from-[#131922]/95 via-[#0e1319]/95 to-[#0a0d12]/95 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,208,132,0.08),0_25px_60px_rgba(0,0,0,0.8)] w-full flex flex-col items-center relative overflow-hidden">
-            {/* Top Micro Laser Glow */}
-            <div className="absolute top-0 inset-x-12 h-[1px] bg-gradient-to-r from-transparent via-[#00D084]/70 to-transparent" />
-
-            {/* Description text */}
-            <p className="text-[14.5px] font-normal text-gray-200/90 leading-relaxed text-center">
-              {currentSlide.description}
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="mt-6 flex flex-col gap-3 w-full">
-              <Button
-                asChild
-                className="hero-watch-btn w-full h-12.5 rounded-xl text-[14.5px] font-black text-white tracking-wide cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_25px_rgba(0,208,132,0.35)]"
-              >
-                <Link to={currentSlide.primaryCta.to} className="flex items-center justify-center gap-2">
-                  <span>{currentSlide.primaryCta.label}</span>
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                variant="outline"
-                className="w-full h-12.5 rounded-xl border border-white/15 bg-white/[0.04] text-[14.5px] font-bold text-white hover:bg-white/[0.08] backdrop-blur-md cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                <Link to={currentSlide.secondaryCta.to} className="flex items-center justify-center">
-                  {currentSlide.secondaryCta.label}
-                </Link>
-              </Button>
+      {/* Mobile Hero Content Container - Only visible on mobile */}
+      <div className="relative z-20 flex flex-col items-center justify-center text-center px-4 pt-24 pb-6 max-w-sm mx-auto select-none w-full md:hidden">
+        <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full">
+          {/* Animated badge with glow effect */}
+          <div className="relative mb-4">
+            <div className="absolute inset-0 bg-[#00D084]/20 blur-xl rounded-full animate-pulse" />
+            <div className="relative inline-flex items-center gap-2 rounded-full border-2 border-[#00D084] bg-[#00D084]/15 px-4 py-2 text-xs font-black tracking-[0.2em] text-[#00D084] uppercase shadow-[0_0_25px_rgba(0,208,132,0.4)]">
+              <span className="size-2 rounded-full bg-[#00D084] animate-ping" />
+              <span className="relative z-10">{currentSlide.badge}</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ── DESKTOP HERO SLIDER ONLY (hidden md:flex) ── */}
-      <div className="relative z-20 hidden md:flex flex-col items-center justify-center text-center px-4 pt-32 sm:pt-36 md:pt-40 pb-10 sm:pb-14 max-w-5xl mx-auto my-auto select-none w-full">
-        <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full">
-          {/* Eyebrow badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#00D084]/35 bg-[#00D084]/10 px-4 py-1.5 text-xs font-black tracking-[0.16em] text-[#00D084] uppercase shadow-[0_0_15px_rgba(0,208,132,0.15)] backdrop-blur-md">
-            <span className="size-1.5 rounded-full bg-[#00D084] animate-pulse" />
-            {currentSlide.badge}
-          </div>
-
-          {/* Main heading - Clean 2-Line Structure with Harmonized Line Height */}
-          <h1 className="mt-6 sm:mt-8 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-tight leading-[1.18] sm:leading-[1.15]">
-            <span className="block text-white whitespace-normal sm:whitespace-nowrap">
-              {currentSlide.titlePrefix}
-            </span>
-            <span className="block text-[#00D084] drop-shadow-[0_0_25px_rgba(0,208,132,0.4)] mt-2 sm:mt-3 whitespace-nowrap">
-              {currentSlide.titleHighlight}
-            </span>
-          </h1>
-
-          {/* Value proposition paragraph */}
-          <p className="mt-6 sm:mt-7 text-sm sm:text-base md:text-lg text-gray-200/90 font-medium max-w-2xl leading-relaxed sm:leading-[1.75] mx-auto min-h-[48px] sm:min-h-[56px] flex items-center justify-center">
-            {currentSlide.description}
-          </p>
-
-          {/* Call to Actions */}
-          <div className="mt-8 sm:mt-9 flex flex-wrap items-center justify-center gap-4 sm:gap-5">
+          {/* Call to Actions with modern card design - MOVED UP */}
+          <div className="flex flex-col items-center justify-center gap-3 w-full mb-4">
             <Button
               asChild
-              className="hero-watch-btn rounded-full px-8 py-3.5 text-sm sm:text-base font-black text-white tracking-wide cursor-pointer hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,208,132,0.3)]"
+              className="relative w-full rounded-2xl bg-gradient-to-r from-[#00D084] to-[#00ff66] px-6 py-4 text-sm font-black text-black tracking-wide transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_rgba(0,208,132,0.6)] group overflow-hidden"
             >
-              <Link to={currentSlide.primaryCta.to} className="flex items-center gap-2">
-                {currentSlide.primaryCta.label}
-                <ArrowRight className="size-4" />
+              <Link to={currentSlide.primaryCta.to} className="flex items-center justify-center gap-2 relative z-10">
+                <span className="relative z-10">{currentSlide.primaryCta.label}</span>
+                <ArrowRight className="size-4 relative z-10 group-hover:translate-x-1 transition-transform" />
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
               </Link>
             </Button>
             <Button
               asChild
               variant="outline"
-              className="rounded-full border-white/20 bg-black/40 px-7 py-3.5 text-sm sm:text-base font-bold text-white hover:bg-white/10 hover:border-[#00D084]/50 backdrop-blur-md cursor-pointer hover:scale-105 transition-all"
+              className="relative w-full rounded-2xl border-2 border-white/20 bg-black/60 backdrop-blur-xl px-6 py-4 text-sm font-bold text-white transition-all duration-300 hover:border-[#00D084]/50 hover:bg-[#00D084]/10 hover:shadow-[0_0_30px_rgba(0,208,132,0.3)] overflow-hidden"
             >
-              <Link to={currentSlide.secondaryCta.to}>{currentSlide.secondaryCta.label}</Link>
+              <Link to={currentSlide.secondaryCta.to} className="relative z-10">
+                {currentSlide.secondaryCta.label}
+              </Link>
             </Button>
           </div>
-        </div>
 
-        {/* Carousel Indicators */}
-        <div className="mt-10 sm:mt-12 flex items-center justify-center gap-3">
-          <div className="flex items-center gap-2.5">
+          {/* Mobile Carousel Indicators with enhanced design - MOVED UP */}
+          <div className="flex items-center justify-center gap-4 mb-6">
             {slides.map((_, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => onSelect(idx)}
                 aria-label={`Slide ${idx + 1}`}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                className={`relative transition-all duration-300 cursor-pointer ${
                   idx === activeSlide
-                    ? "w-9 bg-[#00D084] shadow-[0_0_10px_#00D084]"
-                    : "w-3 bg-white/25 hover:bg-white/50"
+                    ? "w-10 h-2 bg-[#00D084] rounded-full shadow-[0_0_15px_rgba(0,208,132,0.6)] scale-110"
+                    : "w-2 h-2 bg-white/30 rounded-full hover:bg-white/50 hover:scale-125"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Main heading with gradient text effect */}
+          <h1 className="relative mb-4 text-3xl font-black uppercase tracking-tight leading-[1.1]">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00D084]/20 to-transparent blur-2xl" />
+            <span className="relative block text-white mb-1">
+              {currentSlide.titlePrefix}
+            </span>
+            <span className="relative block bg-gradient-to-r from-[#00D084] via-[#00ff66] to-[#00D084] bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(0,208,132,0.5)]">
+              {currentSlide.titleHighlight}
+            </span>
+          </h1>
+
+          {/* Value proposition with glass effect */}
+          <div className="relative p-4 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl">
+            <p className="text-sm text-gray-200 font-medium leading-relaxed">
+              {currentSlide.description}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Hero Content Container - Only visible on desktop */}
+      <div className="relative z-20 hidden md:flex flex-col items-center justify-center text-center px-4 pt-32 sm:pt-36 md:pt-40 pb-10 sm:pb-14 max-w-5xl mx-auto select-none w-full">
+        <div key={activeSlide} className="animate-hero-fade flex flex-col items-center w-full">
+          {/* Animated badge with glow effect */}
+          <div className="relative mb-8">
+            <div className="absolute inset-0 bg-[#00D084]/20 blur-xl rounded-full animate-pulse" />
+            <div className="relative inline-flex items-center gap-2 rounded-full border-2 border-[#00D084] bg-[#00D084]/15 px-5 py-2 text-xs font-black tracking-[0.2em] text-[#00D084] uppercase shadow-[0_0_25px_rgba(0,208,132,0.4)]">
+              <span className="size-2 rounded-full bg-[#00D084] animate-ping" />
+              <span className="relative z-10">{currentSlide.badge}</span>
+            </div>
+          </div>
+
+          {/* Main heading with gradient text effect */}
+          <h1 className="relative mb-6 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black uppercase tracking-tight leading-[1.1]">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00D084]/20 to-transparent blur-2xl" />
+            <span className="relative block text-white mb-2 whitespace-normal sm:whitespace-nowrap">
+              {currentSlide.titlePrefix}
+            </span>
+            <span className="relative block bg-gradient-to-r from-[#00D084] via-[#00ff66] to-[#00D084] bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(0,208,132,0.5)] whitespace-nowrap">
+              {currentSlide.titleHighlight}
+            </span>
+          </h1>
+
+          {/* Value proposition with glass effect */}
+          <div className="relative mb-8 p-5 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl max-w-2xl">
+            <p className="text-sm sm:text-base md:text-lg text-gray-200 font-medium leading-relaxed sm:leading-[1.75] flex items-center justify-center">
+              {currentSlide.description}
+            </p>
+          </div>
+
+          {/* Call to Actions with modern card design */}
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-5">
+            <Button
+              asChild
+              className="relative rounded-2xl bg-gradient-to-r from-[#00D084] to-[#00ff66] px-8 py-4 text-sm sm:text-base font-black text-black tracking-wide transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_rgba(0,208,132,0.6)] group overflow-hidden"
+            >
+              <Link to={currentSlide.primaryCta.to} className="flex items-center gap-2 relative z-10">
+                <span className="relative z-10">{currentSlide.primaryCta.label}</span>
+                <ArrowRight className="size-4 relative z-10 group-hover:translate-x-1 transition-transform" />
+                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="relative rounded-2xl border-2 border-white/20 bg-black/60 backdrop-blur-xl px-7 py-4 text-sm sm:text-base font-bold text-white transition-all duration-300 hover:border-[#00D084]/50 hover:bg-[#00D084]/10 hover:shadow-[0_0_30px_rgba(0,208,132,0.3)] overflow-hidden"
+            >
+              <Link to={currentSlide.secondaryCta.to} className="relative z-10">
+                {currentSlide.secondaryCta.label}
+              </Link>
+            </Button>
+          </div>
+
+          {/* Desktop Carousel Indicators with enhanced design */}
+          <div className="mt-10 sm:mt-12 flex items-center justify-center gap-4">
+            {slides.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => onSelect(idx)}
+                aria-label={`Slide ${idx + 1}`}
+                className={`relative transition-all duration-300 cursor-pointer ${
+                  idx === activeSlide
+                    ? "w-12 h-2 bg-[#00D084] rounded-full shadow-[0_0_15px_rgba(0,208,132,0.6)] scale-110"
+                    : "w-2 h-2 bg-white/30 rounded-full hover:bg-white/50 hover:scale-125"
                 }`}
               />
             ))}

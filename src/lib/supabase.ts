@@ -68,6 +68,7 @@ export interface SupabaseUserProfile {
   max_daily_loss_percent?: number;
   max_simultaneous_trades?: number;
   risk_guard_auto_stop?: boolean;
+  crypto_wallets?: Record<string, any> | null;
   engines_config?: Record<string, unknown>;
   license_key?: string;
   license_expires?: string;
@@ -156,6 +157,36 @@ export async function updateUserProfile(userId: string, updates: Partial<Supabas
 
       if (!retryError) {
         return { success: true, data: { ...retryData, bonus_credit: bonusVal } };
+      }
+    }
+
+    // Si l'erreur est liée à la colonne crypto_wallets absente dans la table profiles
+    if (
+      updates.crypto_wallets !== undefined &&
+      (error.message?.includes("crypto_wallets") ||
+        (error as any).details?.includes("crypto_wallets") ||
+        (error as any).code === "42703" ||
+        error.message?.includes("schema cache"))
+    ) {
+      console.warn("Colonne crypto_wallets absente, repli sécurisé sur engines_config.wallets...");
+      const fallbackUpdates: any = { ...updates };
+      const walletsVal = fallbackUpdates.crypto_wallets;
+      delete fallbackUpdates.crypto_wallets;
+      const existingCfg = (fallbackUpdates.engines_config || {}) as any;
+      fallbackUpdates.engines_config = {
+        ...existingCfg,
+        wallets: walletsVal,
+      };
+
+      const { data: retryData, error: retryError } = await supabase
+        .from("profiles")
+        .update(fallbackUpdates)
+        .eq("id", userId)
+        .select()
+        .single();
+
+      if (!retryError) {
+        return { success: true, data: { ...retryData, crypto_wallets: walletsVal } };
       }
     }
     return { success: false, error };

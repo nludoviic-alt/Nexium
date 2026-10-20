@@ -81,6 +81,11 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS license_expires DATE;
 -- NULL -> le frontend retombe sur "{name} — @ Nexium Markets".
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS desk_signature TEXT;
 
+-- Coordonnées crypto du client (wallets blockchain) pour les dépôts —
+-- stockées en JSONB pour permettre plusieurs réseaux (BTC, ETH, USDT, etc.)
+-- et synchronisées entre la fiche client (admin) et le dashboard client.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS crypto_wallets JSONB;
+
 -- Notes confidentielles du staff sur un client (CRM) — policy RLS définie
 -- plus bas, section 11, une fois get_my_role() disponible.
 CREATE TABLE IF NOT EXISTS public.crm_notes (

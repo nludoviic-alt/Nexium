@@ -1836,6 +1836,7 @@ function NexiumAdminDashboard({
         };
 
         const result = await updateUserProfile(activeClient.id, {
+          crypto_wallets: nextWallets,
           engines_config: updatedEnginesConfig,
         });
 
@@ -2011,7 +2012,7 @@ function NexiumAdminDashboard({
               totalNetPnl: +(effectiveProfit - grossLoss).toFixed(2),
               engines: (p.engines_config as any) || c.engines,
               recoveryAssistance: (pCfg?.recovery_assistance as any) || c.recoveryAssistance,
-              wallets: (pCfg?.wallets as ClientWallets) || c.wallets || { crypto: {}, ewallet: {}, verifiedStatus: "UNVERIFIED" },
+              wallets: ((p.crypto_wallets && Object.keys(p.crypto_wallets).length > 0 ? p.crypto_wallets : pCfg?.wallets) as ClientWallets) || c.wallets || { crypto: {}, ewallet: {}, verifiedStatus: "UNVERIFIED" },
             } as UserProfile;
           });
 
@@ -2096,7 +2097,7 @@ function NexiumAdminDashboard({
               trades: [],
               notes: [],
               recoveryAssistance: (pCfg?.recovery_assistance as any) || undefined,
-              wallets: (pCfg?.wallets as ClientWallets) || { crypto: {}, ewallet: {}, verifiedStatus: "UNVERIFIED" },
+              wallets: ((p.crypto_wallets && Object.keys(p.crypto_wallets).length > 0 ? p.crypto_wallets : pCfg?.wallets) as ClientWallets) || { crypto: {}, ewallet: {}, verifiedStatus: "UNVERIFIED" },
             };
           });
 

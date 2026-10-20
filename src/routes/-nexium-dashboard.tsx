@@ -3651,7 +3651,6 @@ function PortfolioTab({
 }) {
   const [view, setView] = useState<"overview" | "withdraw" | "deposit">("overview");
   const [searchTx, setSearchTx] = useState("");
-  const [isDepositWalletsModalOpen, setIsDepositWalletsModalOpen] = useState(false);
   const [activeWallets, setActiveWallets] = useState<any>(() => {
     if (wallets && Object.keys(wallets).length > 0) return wallets;
     if (typeof window !== "undefined") {
@@ -3714,19 +3713,11 @@ function PortfolioTab({
 
   const deskWallets = activeWallets?.crypto || {};
   const rawMethod = activeWallets?.preferredMethod;
-  const activeMethod = rawMethod === "BTC" ? "BTC" : rawMethod === "ETH" ? "ETH" : "USDT_ERC20";
+  const activeMethod = rawMethod || "BTC";
   const verifiedStatus = activeWallets?.verifiedStatus || "UNVERIFIED";
   const deskNotes = activeWallets?.notes || "";
 
   const depositWalletsList = [
-    {
-      id: "USDT_ERC20",
-      symbol: "USDT",
-      badge: "ERC",
-      network: "Ethereum ERC-20",
-      address: (deskWallets.usdtErc20 || "").trim(),
-      badgeColor: "cyan" as const,
-    },
     {
       id: "BTC",
       symbol: "BTC",
@@ -3734,6 +3725,14 @@ function PortfolioTab({
       network: "Bitcoin Natif",
       address: (deskWallets.btc || "").trim(),
       badgeColor: "amber" as const,
+    },
+    {
+      id: "USDT_ERC20",
+      symbol: "USDT",
+      badge: "ERC",
+      network: "Ethereum ERC-20",
+      address: (deskWallets.usdtErc20 || "").trim(),
+      badgeColor: "cyan" as const,
     },
     {
       id: "ETH",
@@ -4835,14 +4834,6 @@ function PortfolioTab({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              type="button"
-              onClick={() => setIsDepositWalletsModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 px-3.5 py-2 text-xs sm:text-sm font-bold text-emerald-300 uppercase tracking-wider transition-all cursor-pointer shadow-sm hover:border-emerald-400 active:scale-95"
-            >
-              <Coins className="size-4 text-emerald-400" />
-              <span>Coordonnées de Dépôt</span>
-            </button>
-            <button
               onClick={() => setView("deposit")}
               className="admin-btn-primary inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer shadow-lg hover:scale-[1.02] transition-all rounded-xl"
             >
@@ -4968,7 +4959,7 @@ function PortfolioTab({
             <div>
               <div className="flex items-center gap-3">
                 <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  Coordonnées de Dépôt Crypto
+                  Coordonnées de Dépôt Crypto Blockchain
                 </h3>
                 {verifiedStatus === "VERIFIED" && (
                   <span className="text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
@@ -4982,14 +4973,7 @@ function PortfolioTab({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsDepositWalletsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.1] bg-[#121926] hover:bg-[#182234] hover:border-emerald-500/40 text-slate-200 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shrink-0 self-start sm:self-auto shadow-sm"
-          >
-            <Share2 className="size-3.5 text-emerald-400" />
-            <span>Récapitulatif Détaillé</span>
-          </button>
+
         </div>
 
         {/* Consigne personnalisée du Desk si présente */}
@@ -5045,13 +5029,6 @@ function PortfolioTab({
                       </div>
                     </div>
                   </div>
-
-                  {isPreferred && (
-                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1 shadow-sm">
-                      <Star className="size-3 fill-emerald-400 text-emerald-400" />
-                      Recommandé
-                    </span>
-                  )}
                 </div>
 
                 {/* Champ Adresse ou État vide épuré */}
@@ -5089,6 +5066,45 @@ function PortfolioTab({
               </div>
             );
           })}
+        </div>
+
+        {/* Protocole de sécurité & Crédit */}
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-5 sm:p-6 space-y-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 uppercase tracking-wider font-mono">
+            <ShieldCheck className="size-4.5 text-emerald-400 shrink-0" />
+            <span>Sécurité des Versements & Crédit ECN</span>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+            Assurez-vous de sélectionner le réseau blockchain correspondant à l'adresse choisie. Dès réception et confirmation sur le réseau, le Desk Finance rapproche et crédite instantanément votre solde ECN de trading.
+          </p>
+          <div className="text-xs text-emerald-400/90 font-mono pt-0.5 flex items-center gap-1.5">
+            <span>💡</span>
+            <span>Conseil : prévenez votre conseiller dès l'émission pour un traitement prioritaire.</span>
+          </div>
+        </div>
+
+        {/* Actions de bas de section */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-5 border-t border-white/[0.08]">
+          <button
+            type="button"
+            onClick={() => {
+              const preferredItem = depositWalletsList.find((w) => w.id === activeMethod) || depositWalletsList[0];
+              const addrDisplay = preferredItem.address || "En attente d'attribution par le Desk Finance";
+              const summary = [
+                `🏛️ NEXIUM MARKETS — COORDONNÉES DE DÉPÔT`,
+                `Client : ${clientName}`,
+                `Canal sélectionné : ${preferredItem.symbol} (${preferredItem.network})`,
+                `Adresse : ${addrDisplay}`,
+                deskNotes ? `Instruction : ${deskNotes}` : "",
+              ].filter(Boolean).join("\n");
+              navigator.clipboard.writeText(summary);
+              toast.success("Récapitulatif de versement copié dans le presse-papier !");
+            }}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-700/80 hover:bg-slate-800/80 text-slate-300 hover:text-white text-xs sm:text-sm font-bold font-mono transition cursor-pointer"
+          >
+            <Share2 className="size-4 text-emerald-400" />
+            <span>Copier le Récapitulatif</span>
+          </button>
         </div>
       </section>
 
@@ -5154,217 +5170,6 @@ function PortfolioTab({
         </div>
       </section>
 
-      {/* ── MODAL AÉRÉ : COORDONNÉES OFFICIELLES DE DÉPÔT / TRANSFERT DU DESK ── */}
-      {isDepositWalletsModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200"
-          onClick={() => setIsDepositWalletsModalOpen(false)}
-        >
-          <div
-            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl border border-emerald-500/25 bg-[#090e1d]/95 shadow-2xl p-6 sm:p-10 space-y-8 text-slate-100 ring-1 ring-white/[0.05]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Ambient glow décoratif */}
-            <div className="pointer-events-none absolute -right-20 -top-20 size-80 rounded-full bg-emerald-500/10 blur-3xl" />
-            <div className="pointer-events-none absolute -left-20 -bottom-20 size-80 rounded-full bg-indigo-500/5 blur-3xl" />
-
-            {/* En-tête aéré et élégant */}
-            <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] pb-6 sm:pb-7">
-              <div className="flex items-center gap-4">
-                <div className="size-13 sm:size-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-emerald-400 grid place-items-center shadow-lg shadow-emerald-950/30 shrink-0">
-                  <Coins className="size-7 text-emerald-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                      Coordonnées Officielles de Dépôt
-                    </h3>
-                    <span
-                      className={`text-[11px] px-3 py-1 rounded-full font-mono font-bold tracking-wider border ${
-                        verifiedStatus === "VERIFIED"
-                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                          : verifiedStatus === "PENDING"
-                          ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                          : "bg-slate-800 text-slate-300 border-slate-700"
-                      }`}
-                    >
-                      {verifiedStatus === "VERIFIED"
-                        ? "CANAL DE DÉPÔT ACTIF ✓"
-                        : verifiedStatus === "PENDING"
-                        ? "ATTRIBUTION EN COURS ⏳"
-                        : "COORDONNÉES DESK"}
-                    </span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1.5 leading-relaxed">
-                    Adresses officielles certifiées par le Desk Finance pour créditer votre compte de trading ECN.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsDepositWalletsModalOpen(false)}
-                className="size-10 rounded-2xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center cursor-pointer transition shrink-0 border border-slate-700/60"
-                aria-label="Fermer"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            {/* Consigne personnalisée du Desk (si présente) */}
-            {deskNotes && (
-              <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/25 p-5 sm:p-6 space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-indigo-300 uppercase tracking-wider font-mono">
-                  <ShieldCheck className="size-4.5 text-indigo-400 shrink-0" />
-                  <span>Instruction de votre Chargé de Compte Desk</span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
-                  {deskNotes}
-                </p>
-              </div>
-            )}
-
-            {/* Grille aérée des adresses crypto */}
-            <div className="space-y-5">
-              <div className="flex items-center justify-between pb-1">
-                <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">
-                    Passerelles Blockchain Directes
-                  </span>
-                </div>
-                <span className="text-xs text-emerald-400 font-mono">
-                  Rapprochement &amp; Crédit ECN direct
-                </span>
-              </div>
-
-              <div className="space-y-4 sm:space-y-5">
-                {depositWalletsList.map((w) => {
-                  const isPreferred = activeMethod === w.id;
-                  const isConfigured = Boolean(w.address);
-
-                  return (
-                    <div
-                      key={w.id}
-                      className={`rounded-2xl sm:rounded-3xl border p-5 sm:p-6 space-y-4 transition-all ${
-                        isPreferred
-                          ? "border-emerald-500/50 bg-[#0c1828]/95 shadow-xl shadow-emerald-500/5 ring-1 ring-emerald-500/20"
-                          : "border-slate-800/80 bg-[#0b1220]/75 hover:border-slate-700/80"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3.5">
-                          <div
-                            className={`size-11 sm:size-12 rounded-2xl text-xs sm:text-sm font-black font-mono grid place-items-center shrink-0 border shadow-md ${
-                              w.badgeColor === "cyan"
-                                ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400"
-                                : w.badgeColor === "amber"
-                                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                                : "bg-indigo-500/15 border-indigo-500/30 text-indigo-400"
-                            }`}
-                          >
-                            {w.badge}
-                          </div>
-                          <div>
-                            <div className="text-sm sm:text-base font-bold text-white flex items-center gap-2.5 flex-wrap">
-                              <span>{w.symbol} · {w.network}</span>
-                              {isPreferred && (
-                                <span className="text-[10px] px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1.5 shadow-sm">
-                                  <Star className="size-3 fill-emerald-400 text-emerald-400" />
-                                  Canal Recommandé par le Desk
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Champ adresse ou état vide */}
-                      {isConfigured ? (
-                        <div className="relative flex items-center">
-                          <div className="w-full rounded-xl border border-slate-700/70 bg-[#050913] px-4 sm:px-5 py-3.5 pr-28 text-xs sm:text-sm font-mono text-emerald-300 select-all break-all tracking-wide shadow-inner">
-                            {w.address}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(w.address);
-                              toast.success(`Adresse ${w.symbol} (${w.network}) copiée !`);
-                            }}
-                            className="absolute right-2 sm:right-2.5 px-3.5 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition border border-emerald-500/30 active:scale-95 shadow-sm"
-                          >
-                            <Copy className="size-3.5" />
-                            <span>Copier</span>
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="w-full rounded-2xl border border-dashed border-slate-700/80 bg-[#050913]/60 px-5 py-4 text-xs sm:text-sm font-mono text-slate-400 italic flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <span className="size-2 rounded-full bg-amber-400 animate-pulse" />
-                            <span className="text-slate-300">En attente d'attribution par le Desk Finance</span>
-                          </div>
-                          <span className="text-[10px] font-mono uppercase tracking-wider not-italic text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700/60">
-                            Coordonnée non renseignée
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Protocole de sécurité & Crédit */}
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-5 sm:p-6 space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 uppercase tracking-wider font-mono">
-                <ShieldCheck className="size-4.5 text-emerald-400 shrink-0" />
-                <span>Sécurité des Versements &amp; Crédit ECN</span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
-                Assurez-vous de sélectionner le réseau blockchain correspondant à l'adresse choisie. Dès réception et confirmation sur le réseau, le Desk Finance rapproche et crédite instantanément votre solde ECN de trading.
-              </p>
-              <div className="text-xs text-emerald-400/90 font-mono pt-0.5 flex items-center gap-1.5">
-                <span>💡</span>
-                <span>Conseil : prévenez votre conseiller dès l'émission pour un traitement prioritaire.</span>
-              </div>
-            </div>
-
-            {/* Actions de bas de modale */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-5 border-t border-white/[0.08]">
-              <button
-                type="button"
-                onClick={() => {
-                  const preferredItem = depositWalletsList.find((w) => w.id === activeMethod) || depositWalletsList[0];
-                  const addrDisplay = preferredItem.address || "En attente d'attribution par le Desk Finance";
-                  const summary = [
-                    `🏛️ NEXIUM MARKETS — COORDONNÉES DE DÉPÔT`,
-                    `Client : ${clientName}`,
-                    `Canal Recommandé : ${preferredItem.symbol} (${preferredItem.network})`,
-                    `Adresse : ${addrDisplay}`,
-                    deskNotes ? `Instruction : ${deskNotes}` : "",
-                  ].filter(Boolean).join("\n");
-                  navigator.clipboard.writeText(summary);
-                  toast.success("Récapitulatif de versement copié dans le presse-papier !");
-                }}
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-700/80 hover:bg-slate-800/80 text-slate-300 hover:text-white text-xs sm:text-sm font-bold font-mono transition cursor-pointer"
-              >
-                <Share2 className="size-4 text-emerald-400" />
-                <span>Copier le Récapitulatif</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsDepositWalletsModalOpen(false)}
-                className="px-8 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold uppercase tracking-wider text-xs sm:text-sm transition-all cursor-pointer shadow-lg shadow-emerald-500/20 active:scale-95"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -8732,11 +8537,15 @@ export function NexiumDashboard({
       } catch {}
     }
 
-    if (cfg?.wallets) {
-      setClientWallets(cfg.wallets);
+    const resolvedWallets = (profile.crypto_wallets && Object.keys(profile.crypto_wallets).length > 0)
+      ? profile.crypto_wallets
+      : cfg?.wallets;
+
+    if (resolvedWallets) {
+      setClientWallets(resolvedWallets);
       if (typeof window !== "undefined" && profile.id) {
-        localStorage.setItem(`nexium_wallets_${profile.id}`, JSON.stringify(cfg.wallets));
-        localStorage.setItem("nexium_wallets_local", JSON.stringify(cfg.wallets));
+        localStorage.setItem(`nexium_wallets_${profile.id}`, JSON.stringify(resolvedWallets));
+        localStorage.setItem("nexium_wallets_local", JSON.stringify(resolvedWallets));
       }
     } else if (typeof window !== "undefined") {
       try {
@@ -9029,6 +8838,18 @@ export function NexiumDashboard({
           try {
             if (currentUserId) localStorage.setItem(`nexium_recovery_assistance_${currentUserId}`, JSON.stringify(nextRec));
             localStorage.setItem("nexium_recovery_assistance_local", JSON.stringify(nextRec));
+          } catch {}
+        }
+      }
+
+      // Synchronisation en direct des adresses crypto du client (colonne dédiée)
+      if (updatedProfile.crypto_wallets && Object.keys(updatedProfile.crypto_wallets).length > 0) {
+        setClientWallets(updatedProfile.crypto_wallets);
+        if (typeof window !== "undefined") {
+          try {
+            if (currentUserId) localStorage.setItem(`nexium_wallets_${currentUserId}`, JSON.stringify(updatedProfile.crypto_wallets));
+            localStorage.setItem("nexium_wallets_local", JSON.stringify(updatedProfile.crypto_wallets));
+            localStorage.setItem("nexium_wallets_active_client", JSON.stringify({ clientId: currentUserId, email: clientEmail, wallets: updatedProfile.crypto_wallets }));
           } catch {}
         }
       }
