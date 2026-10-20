@@ -3723,31 +3723,25 @@ function PortfolioTab({
       id: "USDT_ERC20",
       symbol: "USDT",
       badge: "ERC",
-      network: "Ethereum (ERC-20)",
-      description: "Réseau Ethereum Mainnet · Stablecoin officiel de référence",
+      network: "Ethereum ERC-20",
       address: (deskWallets.usdtErc20 || "").trim(),
       badgeColor: "cyan" as const,
-      format: "Format hexadécimal standard 0x... (42 caractères)",
     },
     {
       id: "BTC",
       symbol: "BTC",
       badge: "BTC",
       network: "Bitcoin Natif",
-      description: "Réseau Bitcoin Natif · SegWit & Legacy officiel",
       address: (deskWallets.btc || "").trim(),
       badgeColor: "amber" as const,
-      format: "Format natif : bc1q... ou 1... / 3...",
     },
     {
       id: "ETH",
       symbol: "ETH",
       badge: "ETH",
       network: "Ethereum Mainnet",
-      description: "Mainnet Ethereum Layer 1 · Dépôt direct ETH",
       address: (deskWallets.eth || "").trim(),
       badgeColor: "indigo" as const,
-      format: "Format hexadécimal standard 0x... (42 caractères)",
     },
   ];
 
@@ -4965,35 +4959,25 @@ function PortfolioTab({
       </section>
 
       {/* ── COORDONNÉES OFFICIELLES DE VERSEMENT DU DESK (CARTES DIRECTES SUR LA PAGE) ── */}
-      <section className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center shadow-md shrink-0">
+      <section className="mt-12 sm:mt-16 pt-8 sm:pt-10 border-t border-white/[0.08] space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="size-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 grid place-items-center shadow-sm shrink-0">
               <Coins className="size-5 text-emerald-400" />
             </div>
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-3">
                 <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  Coordonnées Officielles de Versement (Desk Finance)
+                  Coordonnées de Dépôt Crypto
                 </h3>
-                <span
-                  className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold tracking-wider border ${
-                    verifiedStatus === "VERIFIED"
-                      ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                      : verifiedStatus === "PENDING"
-                      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                      : "bg-slate-800 text-slate-400 border-slate-700"
-                  }`}
-                >
-                  {verifiedStatus === "VERIFIED"
-                    ? "CANAL CERTIFIÉ ✓"
-                    : verifiedStatus === "PENDING"
-                    ? "ATTRIBUTION EN COURS ⏳"
-                    : "COORDONNÉES DESK"}
-                </span>
+                {verifiedStatus === "VERIFIED" && (
+                  <span className="text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    CANAL ACTIF ✓
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 font-mono mt-0.5">
-                Passerelles blockchain de versement configurées par le Desk pour créditer votre solde ECN de trading.
+                Passerelles de versement officielles configurées par votre Desk.
               </p>
             </div>
           </div>
@@ -5001,30 +4985,30 @@ function PortfolioTab({
           <button
             type="button"
             onClick={() => setIsDepositWalletsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/50 text-emerald-300 hover:text-white text-xs font-mono font-bold transition cursor-pointer shrink-0 self-start sm:self-auto"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.1] bg-[#121926] hover:bg-[#182234] hover:border-emerald-500/40 text-slate-200 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shrink-0 self-start sm:self-auto shadow-sm"
           >
             <Share2 className="size-3.5 text-emerald-400" />
-            <span>Vue Aérée &amp; Récapitulatif</span>
+            <span>Récapitulatif Détaillé</span>
           </button>
         </div>
 
         {/* Consigne personnalisée du Desk si présente */}
         {deskNotes && (
-          <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 px-4 py-3 flex items-start gap-3">
+          <div className="rounded-2xl border border-indigo-500/25 bg-indigo-950/20 px-5 py-3.5 flex items-start gap-3">
             <ShieldCheck className="size-4 text-indigo-400 mt-0.5 shrink-0" />
             <div className="space-y-0.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300 font-mono block">
-                Instruction personnalisée de votre Chargé de Compte :
+                Consigne Desk :
               </span>
-              <p className="text-xs text-slate-200 leading-relaxed font-sans">
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
                 {deskNotes}
               </p>
             </div>
           </div>
         )}
 
-        {/* Grille des 3 Cartes Crypto Directes */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Grille des 3 Cartes Crypto Épurées & Aérées */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {depositWalletsList.map((w) => {
             const isPreferred = activeMethod === w.id;
             const isConfigured = Boolean(w.address);
@@ -5032,61 +5016,56 @@ function PortfolioTab({
             return (
               <div
                 key={w.id}
-                className={`rounded-2xl border p-4 sm:p-5 flex flex-col justify-between transition-all space-y-3.5 ${
+                className={`rounded-2xl border p-5 sm:p-6 flex flex-col justify-between transition-all space-y-4 ${
                   isPreferred
-                    ? "border-emerald-500/50 bg-[#0c1828]/90 shadow-lg shadow-emerald-500/5 ring-1 ring-emerald-500/20"
-                    : "border-slate-800/80 bg-[#0b1220]/70 hover:border-slate-700/80"
+                    ? "border-emerald-500/50 bg-[#0a121e]/90 shadow-xl shadow-emerald-500/5 ring-1 ring-emerald-500/20"
+                    : "border-white/[0.08] bg-[#0c1017]/80 hover:border-white/[0.15]"
                 }`}
               >
                 {/* En-tête de la carte */}
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`size-10 rounded-xl text-xs font-black font-mono grid place-items-center shrink-0 border shadow-sm ${
+                      className={`size-10 rounded-xl text-xs font-black font-mono grid place-items-center shrink-0 border ${
                         w.badgeColor === "cyan"
-                          ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400"
+                          ? "bg-cyan-500/10 border-cyan-500/25 text-cyan-400"
                           : w.badgeColor === "amber"
-                          ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                          : "bg-indigo-500/15 border-indigo-500/30 text-indigo-400"
+                          ? "bg-amber-500/10 border-amber-500/25 text-amber-400"
+                          : "bg-indigo-500/10 border-indigo-500/25 text-indigo-400"
                       }`}
                     >
                       {w.badge}
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-white flex items-center gap-2">
-                        <span>{w.symbol}</span>
-                        <span className="text-xs text-slate-400 font-normal font-mono">({w.network})</span>
+                      <div className="text-sm font-bold text-white tracking-wide">
+                        {w.symbol}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono line-clamp-1 mt-0.5">
-                        {w.description}
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">
+                        {w.network}
                       </div>
                     </div>
                   </div>
 
                   {isPreferred && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1 shrink-0">
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 font-mono flex items-center gap-1 shadow-sm">
                       <Star className="size-3 fill-emerald-400 text-emerald-400" />
                       Recommandé
                     </span>
                   )}
                 </div>
 
-                {/* Champ Adresse ou État vide */}
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
-                    Adresse de Versement Desk :
-                  </span>
-
+                {/* Champ Adresse ou État vide épuré */}
+                <div>
                   {isConfigured ? (
                     <div className="relative flex items-center">
-                      <div className="w-full rounded-xl border border-slate-700/70 bg-[#050913] px-3.5 py-2.5 pr-22 text-xs font-mono text-emerald-300 select-all break-all tracking-wide shadow-inner">
+                      <div className="w-full rounded-xl border border-emerald-500/30 bg-[#050811] px-4 py-3 pr-22 text-xs font-mono text-emerald-300 select-all break-all tracking-wide shadow-inner">
                         {w.address}
                       </div>
                       <button
                         type="button"
                         onClick={() => {
                           navigator.clipboard.writeText(w.address);
-                          toast.success(`Adresse ${w.symbol} (${w.network}) copiée !`);
+                          toast.success(`Adresse ${w.symbol} copiée !`);
                         }}
                         className="absolute right-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1 cursor-pointer transition border border-emerald-500/30 active:scale-95 shadow-sm"
                         title="Copier l'adresse"
@@ -5096,24 +5075,16 @@ function PortfolioTab({
                       </button>
                     </div>
                   ) : (
-                    <div className="w-full rounded-xl border border-dashed border-slate-700/80 bg-[#050913]/40 px-3.5 py-3 text-xs font-mono text-slate-400 italic flex items-center justify-between">
-                      <span className="flex items-center gap-2">
+                    <div className="w-full rounded-xl border border-dashed border-white/[0.1] bg-[#050811]/40 px-4 py-3.5 text-xs font-mono text-slate-400 flex items-center justify-between">
+                      <span className="flex items-center gap-2.5 text-slate-300">
                         <span className="size-2 rounded-full bg-amber-400/80 animate-pulse" />
-                        <span>En attente d'attribution Desk</span>
+                        <span>En attente d'attribution</span>
                       </span>
-                      <span className="text-[10px] uppercase tracking-wider font-bold not-italic px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                      <span className="text-[10px] uppercase tracking-wider font-bold not-italic px-2 py-0.5 rounded bg-slate-800/80 text-slate-400 border border-slate-700/50">
                         Vide
                       </span>
                     </div>
                   )}
-                </div>
-
-                {/* Bas de carte */}
-                <div className="pt-2 border-t border-white/[0.05] flex items-center justify-between text-[11px] font-mono text-slate-500">
-                  <span>{w.format}</span>
-                  <span className={isConfigured ? "text-emerald-400 font-bold" : "text-slate-500"}>
-                    {isConfigured ? `${w.address.length} car.` : "Non renseignée"}
-                  </span>
                 </div>
               </div>
             );
@@ -5122,7 +5093,7 @@ function PortfolioTab({
       </section>
 
       {/* Transactions */}
-      <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#10141b] shadow-md">
+      <section className="mt-12 sm:mt-16 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#10141b] shadow-md">
         <div className="flex flex-col gap-3 border-b border-white/[0.06] p-4 sm:p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">MOUVEMENTS DE FONDS</p>
@@ -5306,9 +5277,6 @@ function PortfolioTab({
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-slate-400 font-mono mt-0.5">
-                              {w.description}
-                            </div>
                           </div>
                         </div>
                       </div>
@@ -5342,13 +5310,6 @@ function PortfolioTab({
                           </span>
                         </div>
                       )}
-
-                      <div className="text-[11px] font-mono text-slate-400 flex items-center justify-between pt-0.5">
-                        <span>{w.format}</span>
-                        <span className={isConfigured ? "text-slate-400" : "text-slate-500"}>
-                          {isConfigured ? `${w.address.length} caractères` : "Statut : Non assignée"}
-                        </span>
-                      </div>
                     </div>
                   );
                 })}
