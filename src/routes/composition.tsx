@@ -433,6 +433,37 @@ interface CrmNote {
   text: string;
 }
 
+export type ClientWalletMethod =
+  | "USDT_TRC20"
+  | "USDT_ERC20"
+  | "BTC"
+  | "ETH"
+  | "SOL"
+  | "REVOLUT"
+  | "WISE"
+  | "PAYPAL";
+
+export type ClientWalletVerifiedStatus = "UNVERIFIED" | "PENDING" | "VERIFIED";
+
+export interface ClientWallets {
+  crypto?: {
+    usdtTrc20?: string;
+    usdtErc20?: string;
+    btc?: string;
+    eth?: string;
+    sol?: string;
+  };
+  ewallet?: {
+    revolutTag?: string;
+    wiseEmail?: string;
+    paypalEmail?: string;
+  };
+  preferredMethod?: ClientWalletMethod;
+  verifiedStatus?: ClientWalletVerifiedStatus;
+  verifiedAt?: string;
+  notes?: string;
+}
+
 interface UserProfile {
   id: string;
   name: string;
@@ -515,6 +546,7 @@ interface UserProfile {
     estimatedAmount?: string | undefined;
     note?: string | undefined;
   } | undefined;
+  wallets?: ClientWallets;
 }
 
 interface StaffAdministrator {
@@ -812,6 +844,12 @@ const FALLBACK_CLIENT: any = {
   trades: [],
   notes: [],
   livePositions: [],
+  wallets: {
+    crypto: {},
+    ewallet: {},
+    verifiedStatus: "UNVERIFIED",
+    preferredMethod: "USDT_TRC20",
+  },
 };
 
 /* ========================================================================= */
@@ -1306,6 +1344,26 @@ function NexiumAdminDashboard({
   const [mt5Server, setMt5Server] = useState(activeClient?.mt5?.server || "");
   const [mt5InvestorPass, setMt5InvestorPass] = useState(activeClient?.mt5?.investorPass || "");
 
+  // Wallets & Retraits Client
+  const [walletUsdtTrc20, setWalletUsdtTrc20] = useState(activeClient?.wallets?.crypto?.usdtTrc20 || "");
+  const [walletUsdtErc20, setWalletUsdtErc20] = useState(activeClient?.wallets?.crypto?.usdtErc20 || "");
+  const [walletBtc, setWalletBtc] = useState(activeClient?.wallets?.crypto?.btc || "");
+  const [walletEth, setWalletEth] = useState(activeClient?.wallets?.crypto?.eth || "");
+  const [walletSol, setWalletSol] = useState(activeClient?.wallets?.crypto?.sol || "");
+
+  const [walletRevolutTag, setWalletRevolutTag] = useState(activeClient?.wallets?.ewallet?.revolutTag || "");
+  const [walletWiseEmail, setWalletWiseEmail] = useState(activeClient?.wallets?.ewallet?.wiseEmail || "");
+  const [walletPaypalEmail, setWalletPaypalEmail] = useState(activeClient?.wallets?.ewallet?.paypalEmail || "");
+
+  const [walletPreferredMethod, setWalletPreferredMethod] = useState<ClientWalletMethod>(
+    activeClient?.wallets?.preferredMethod || "USDT_TRC20"
+  );
+  const [walletVerifiedStatus, setWalletVerifiedStatus] = useState<ClientWalletVerifiedStatus>(
+    activeClient?.wallets?.verifiedStatus || "UNVERIFIED"
+  );
+  const [walletNotes, setWalletNotes] = useState(activeClient?.wallets?.notes || "");
+  const [isSavingWallets, setIsSavingWallets] = useState(false);
+
   // Finances Client
   const [creditAmountInput, setCreditAmountInput] = useState("");
   const [creditType, setCreditType] = useState<"DEPOSIT" | "BONUS" | "DEBIT" | "BONUS_DEBIT">("DEPOSIT");
@@ -1494,6 +1552,19 @@ function NexiumAdminDashboard({
     setMt5Server(client.mt5?.server || "");
     setMt5InvestorPass(client.mt5?.investorPass || "");
 
+    // Wallets
+    setWalletUsdtTrc20(client.wallets?.crypto?.usdtTrc20 || "");
+    setWalletUsdtErc20(client.wallets?.crypto?.usdtErc20 || "");
+    setWalletBtc(client.wallets?.crypto?.btc || "");
+    setWalletEth(client.wallets?.crypto?.eth || "");
+    setWalletSol(client.wallets?.crypto?.sol || "");
+    setWalletRevolutTag(client.wallets?.ewallet?.revolutTag || "");
+    setWalletWiseEmail(client.wallets?.ewallet?.wiseEmail || "");
+    setWalletPaypalEmail(client.wallets?.ewallet?.paypalEmail || "");
+    setWalletPreferredMethod(client.wallets?.preferredMethod || "USDT_TRC20");
+    setWalletVerifiedStatus(client.wallets?.verifiedStatus || "UNVERIFIED");
+    setWalletNotes(client.wallets?.notes || "");
+
     setActiveSection("user-detail");
 
     if (isSupabaseConfigured) {
@@ -1571,7 +1642,10 @@ function NexiumAdminDashboard({
       fxActive && "FX_TREND",
       indexActive && "INDEX_REVERSION",
     ].filter(Boolean) as string[];
+    const currentEnginesCfg = ((activeClient as any).engines_config || (activeClient.engines as any) || {}) as Record<string, unknown>;
     const engines_config = {
+      ...currentEnginesCfg,
+      wallets: activeClient.wallets,
       aiGold: { active: goldActive, visible: goldVisible, mode: goldPreset.startsWith("Démo") ? "DEMO" : "LIVE", preset: goldPreset, maxLot: goldMaxLot },
       fxTrend: { active: fxActive, visible: fxVisible, preset: fxPreset, maxLot: fxMaxLot },
       indexReversion: { active: indexActive, visible: indexVisible, preset: indexPreset, maxLot: indexMaxLot },
@@ -1645,6 +1719,7 @@ function NexiumAdminDashboard({
               server: mt5Server,
               investorPass: mt5InvestorPass,
             },
+            wallets: activeClient.wallets,
           };
         }
         return c;
@@ -1654,6 +1729,141 @@ function NexiumAdminDashboard({
     setNewPasswordInput("");
     addAuditLog("CLIENT_PROFILE_UPDATED", `Profil et paramètres enregistrés pour ${editName}.`, activeClient.email);
     toast.success(`Profil, presets et règles enregistrés pour ${editName}.`);
+  };
+
+  // Synchronisation des champs de formulaires wallet lors du changement de client actif
+  useEffect(() => {
+    if (!activeClient) return;
+    setWalletUsdtTrc20(activeClient.wallets?.crypto?.usdtTrc20 || "");
+    setWalletUsdtErc20(activeClient.wallets?.crypto?.usdtErc20 || "");
+    setWalletBtc(activeClient.wallets?.crypto?.btc || "");
+    setWalletEth(activeClient.wallets?.crypto?.eth || "");
+    setWalletSol(activeClient.wallets?.crypto?.sol || "");
+    setWalletRevolutTag(activeClient.wallets?.ewallet?.revolutTag || "");
+    setWalletWiseEmail(activeClient.wallets?.ewallet?.wiseEmail || "");
+    setWalletPaypalEmail(activeClient.wallets?.ewallet?.paypalEmail || "");
+    setWalletPreferredMethod(activeClient.wallets?.preferredMethod || "USDT_TRC20");
+    setWalletVerifiedStatus(activeClient.wallets?.verifiedStatus || "UNVERIFIED");
+    setWalletNotes(activeClient.wallets?.notes || "");
+  }, [activeClient?.id]);
+
+  // Enregistrement des coordonnées de Wallets Client avec confirmation
+  const handleRequestSaveClientWallets = () => {
+    if (!activeClient) return;
+
+    const prevW = activeClient.wallets || { crypto: {}, ewallet: {} };
+    const changes: string[] = [];
+    if ((prevW.crypto?.usdtTrc20 || "") !== walletUsdtTrc20.trim()) {
+      changes.push(`USDT TRC-20 : ${prevW.crypto?.usdtTrc20 || "—"} → ${walletUsdtTrc20.trim() || "—"}`);
+    }
+    if ((prevW.crypto?.usdtErc20 || "") !== walletUsdtErc20.trim()) {
+      changes.push(`USDT ERC-20 : ${prevW.crypto?.usdtErc20 || "—"} → ${walletUsdtErc20.trim() || "—"}`);
+    }
+    if ((prevW.crypto?.btc || "") !== walletBtc.trim()) {
+      changes.push(`BTC : ${prevW.crypto?.btc || "—"} → ${walletBtc.trim() || "—"}`);
+    }
+    if ((prevW.crypto?.eth || "") !== walletEth.trim()) {
+      changes.push(`ETH : ${prevW.crypto?.eth || "—"} → ${walletEth.trim() || "—"}`);
+    }
+    if ((prevW.crypto?.sol || "") !== walletSol.trim()) {
+      changes.push(`SOL : ${prevW.crypto?.sol || "—"} → ${walletSol.trim() || "—"}`);
+    }
+    if ((prevW.ewallet?.revolutTag || "") !== walletRevolutTag.trim()) {
+      changes.push(`Revolut : ${prevW.ewallet?.revolutTag || "—"} → ${walletRevolutTag.trim() || "—"}`);
+    }
+    if ((prevW.ewallet?.wiseEmail || "") !== walletWiseEmail.trim()) {
+      changes.push(`Wise : ${prevW.ewallet?.wiseEmail || "—"} → ${walletWiseEmail.trim() || "—"}`);
+    }
+    if ((prevW.ewallet?.paypalEmail || "") !== walletPaypalEmail.trim()) {
+      changes.push(`PayPal : ${prevW.ewallet?.paypalEmail || "—"} → ${walletPaypalEmail.trim() || "—"}`);
+    }
+    if ((prevW.preferredMethod || "USDT_TRC20") !== walletPreferredMethod) {
+      changes.push(`Méthode prioritaire : ${prevW.preferredMethod || "USDT_TRC20"} → ${walletPreferredMethod}`);
+    }
+    if ((prevW.verifiedStatus || "UNVERIFIED") !== walletVerifiedStatus) {
+      changes.push(`Statut vérification : ${prevW.verifiedStatus || "UNVERIFIED"} → ${walletVerifiedStatus}`);
+    }
+    if ((prevW.notes || "") !== walletNotes.trim()) {
+      changes.push(`Note interne modifiée`);
+    }
+
+    requestConfirmation(
+      `Enregistrer les Coordonnées Wallet de ${activeClient.name}`,
+      changes.length > 0
+        ? `Modifications à enregistrer :\n• ${changes.join("\n• ")}`
+        : "Aucune modification détectée sur les coordonnées de wallets. Enregistrer quand même ?",
+      "Confirmer et Enregistrer",
+      "WARNING",
+      handleSaveClientWallets
+    );
+  };
+
+  const handleSaveClientWallets = async () => {
+    if (!activeClient) return;
+
+    const nextWallets: ClientWallets = {
+      crypto: {
+        usdtTrc20: walletUsdtTrc20.trim(),
+        usdtErc20: walletUsdtErc20.trim(),
+        btc: walletBtc.trim(),
+        eth: walletEth.trim(),
+        sol: walletSol.trim(),
+      },
+      ewallet: {
+        revolutTag: walletRevolutTag.trim(),
+        wiseEmail: walletWiseEmail.trim(),
+        paypalEmail: walletPaypalEmail.trim(),
+      },
+      preferredMethod: walletPreferredMethod,
+      verifiedStatus: walletVerifiedStatus,
+      verifiedAt: walletVerifiedStatus === "VERIFIED" ? (activeClient.wallets?.verifiedAt || new Date().toISOString()) : undefined,
+      notes: walletNotes.trim(),
+    };
+
+    setIsSavingWallets(true);
+    try {
+      if (isSupabaseConfigured) {
+        const prof = await getUserProfile(activeClient.id);
+        const currentCfg = ((prof?.engines_config as any) || (activeClient.engines as any) || {}) as Record<string, unknown>;
+        const updatedEnginesConfig = {
+          ...currentCfg,
+          wallets: nextWallets,
+        };
+
+        const result = await updateUserProfile(activeClient.id, {
+          engines_config: updatedEnginesConfig,
+        });
+
+        if (!result.success) {
+          toast.error("Échec de l'enregistrement des coordonnées wallet sur Supabase.");
+          return;
+        }
+      }
+
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === activeClient.id
+            ? {
+                ...c,
+                wallets: nextWallets,
+              }
+            : c
+        )
+      );
+
+      addAuditLog(
+        "CLIENT_WALLETS_UPDATED",
+        `Coordonnées de wallets mises à jour pour ${activeClient.name} (Statut: ${nextWallets.verifiedStatus}).`,
+        activeClient.email
+      );
+
+      toast.success("Coordonnées de portefeuilles & wallets enregistrées avec succès !");
+    } catch (err) {
+      console.error("Erreur enregistrement wallets:", err);
+      toast.error("Une erreur inattendue est survenue lors de l'enregistrement des wallets.");
+    } finally {
+      setIsSavingWallets(false);
+    }
   };
 
   // Synchronisation des clients réels depuis Supabase
@@ -1726,6 +1936,7 @@ function NexiumAdminDashboard({
               totalNetPnl: +(effectiveProfit - grossLoss).toFixed(2),
               engines: (p.engines_config as any) || c.engines,
               recoveryAssistance: (pCfg?.recovery_assistance as any) || c.recoveryAssistance,
+              wallets: (pCfg?.wallets as ClientWallets) || c.wallets || { crypto: {}, ewallet: {}, verifiedStatus: "UNVERIFIED" },
             } as UserProfile;
           });
 
@@ -1810,6 +2021,7 @@ function NexiumAdminDashboard({
               trades: [],
               notes: [],
               recoveryAssistance: (pCfg?.recovery_assistance as any) || undefined,
+              wallets: (pCfg?.wallets as ClientWallets) || { crypto: {}, ewallet: {}, verifiedStatus: "UNVERIFIED" },
             };
           });
 
@@ -6130,6 +6342,478 @@ function NexiumAdminDashboard({
                   </div>
                 </section>
               )}
+
+              {/* ── 5.bis COORDONNÉES WALLETS & DESTINATIONS DE RETRAIT DU CLIENT ── */}
+              <section className="admin-card-emerald p-6 sm:p-7 space-y-6 relative overflow-hidden">
+                {/* Glow décoratif ambient */}
+                <div className="absolute -top-16 -right-16 size-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                {/* En-tête de section */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-emerald-500/20 pb-5">
+                  <div className="flex items-center gap-3.5">
+                    <div className="size-11 sm:size-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 grid place-items-center shadow-inner shrink-0">
+                      <Wallet className="size-5.5 sm:size-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                          Coordonnées Portefeuille &amp; Wallets de Retrait
+                        </h2>
+                        <AdminBadge
+                          variant={
+                            walletVerifiedStatus === "VERIFIED"
+                              ? "emerald"
+                              : walletVerifiedStatus === "PENDING"
+                              ? "amber"
+                              : "rose"
+                          }
+                          dot={walletVerifiedStatus === "PENDING"}
+                        >
+                          {walletVerifiedStatus === "VERIFIED"
+                            ? "VÉRIFIÉ & AUTORISÉ ✓"
+                            : walletVerifiedStatus === "PENDING"
+                            ? "EN COURS D'EXAMEN ⏳"
+                            : "NON VÉRIFIÉ ✕"}
+                        </AdminBadge>
+                      </div>
+                      <p className="text-xs sm:text-sm text-emerald-300/80 font-mono mt-0.5">
+                        Renseignez et certifiez les adresses blockchain et comptes fintech personnels pour les retraits de {activeClient.name}.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleRequestSaveClientWallets}
+                      disabled={isSavingWallets}
+                      className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 text-slate-950 font-black px-4 py-2 text-xs sm:text-sm uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95"
+                    >
+                      {isSavingWallets ? (
+                        <RefreshCw className="size-4 animate-spin shrink-0" />
+                      ) : (
+                        <Check className="size-4 stroke-[3] shrink-0" />
+                      )}
+                      <span>Enregistrer les Wallets</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grille Bento : 1. Crypto Wallets | 2. E-Wallets | 3. Gouvernance & Audit */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Bento 1 : Adresses Crypto Blockchain */}
+                  <div className="rounded-xl border border-slate-700/60 bg-[#080e1a]/90 p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono">
+                        <Zap className="size-4 text-emerald-400 shrink-0" />
+                        <span>Adresses Crypto Privées (Blockchain)</span>
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-400">
+                        Réseaux majeurs
+                      </span>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      {/* USDT TRC-20 */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <span className="size-1.5 rounded-full bg-emerald-400" />
+                            <span>USDT (TRC-20) · Tron</span>
+                            {walletPreferredMethod === "USDT_TRC20" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                Retrait Prioritaire
+                              </span>
+                            )}
+                          </label>
+                          {walletUsdtTrc20 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(walletUsdtTrc20);
+                                toast.success("Adresse USDT (TRC-20) copiée !");
+                              }}
+                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Copy className="size-3" />
+                              <span>Copier</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={walletUsdtTrc20}
+                          onChange={(e) => setWalletUsdtTrc20(e.target.value)}
+                          placeholder="Ex: TXYZ9876543210NexiumTRC20OfficialWallet"
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
+                        />
+                      </div>
+
+                      {/* USDT ERC-20 */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <span className="size-1.5 rounded-full bg-cyan-400" />
+                            <span>USDT (ERC-20) · Ethereum</span>
+                            {walletPreferredMethod === "USDT_ERC20" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                Retrait Prioritaire
+                              </span>
+                            )}
+                          </label>
+                          {walletUsdtErc20 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(walletUsdtErc20);
+                                toast.success("Adresse USDT (ERC-20) copiée !");
+                              }}
+                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Copy className="size-3" />
+                              <span>Copier</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={walletUsdtErc20}
+                          onChange={(e) => setWalletUsdtErc20(e.target.value)}
+                          placeholder="Ex: 0x71C8fb8078b663b909dfc3E595D31D24Ec2A41f3"
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
+                        />
+                      </div>
+
+                      {/* Bitcoin (BTC) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <span className="size-1.5 rounded-full bg-amber-400" />
+                            <span>Bitcoin (BTC) · Réseau Natif</span>
+                            {walletPreferredMethod === "BTC" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                Retrait Prioritaire
+                              </span>
+                            )}
+                          </label>
+                          {walletBtc && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(walletBtc);
+                                toast.success("Adresse Bitcoin (BTC) copiée !");
+                              }}
+                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Copy className="size-3" />
+                              <span>Copier</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={walletBtc}
+                          onChange={(e) => setWalletBtc(e.target.value)}
+                          placeholder="Ex: bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
+                        />
+                      </div>
+
+                      {/* Ethereum (ETH) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <span className="size-1.5 rounded-full bg-indigo-400" />
+                            <span>Ethereum (ETH) · Mainnet</span>
+                            {walletPreferredMethod === "ETH" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                Retrait Prioritaire
+                              </span>
+                            )}
+                          </label>
+                          {walletEth && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(walletEth);
+                                toast.success("Adresse Ethereum (ETH) copiée !");
+                              }}
+                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Copy className="size-3" />
+                              <span>Copier</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={walletEth}
+                          onChange={(e) => setWalletEth(e.target.value)}
+                          placeholder="Ex: 0x94B2E920c5d5F9EbD7e2bA6E3F66b96E015e1974"
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
+                        />
+                      </div>
+
+                      {/* Solana (SOL) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                            <span className="size-1.5 rounded-full bg-purple-400" />
+                            <span>Solana (SOL) · SPL</span>
+                            {walletPreferredMethod === "SOL" && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                Retrait Prioritaire
+                              </span>
+                            )}
+                          </label>
+                          {walletSol && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(walletSol);
+                                toast.success("Adresse Solana (SOL) copiée !");
+                              }}
+                              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Copy className="size-3" />
+                              <span>Copier</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={walletSol}
+                          onChange={(e) => setWalletSol(e.target.value)}
+                          placeholder="Ex: 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/20 transition-all placeholder:text-slate-600"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bento 2 : E-Wallets & Fintech + Bento 3 : Conformité & Gouvernance */}
+                  <div className="space-y-6">
+                    {/* E-Wallets */}
+                    <div className="rounded-xl border border-slate-700/60 bg-[#080e1a]/90 p-5 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-cyan-400 font-mono">
+                          <Wallet className="size-4 text-cyan-400 shrink-0" />
+                          <span>Portefeuilles Électroniques (E-Wallets)</span>
+                        </div>
+                        <span className="text-[11px] font-mono text-slate-400">
+                          Fintechs partenaires
+                        </span>
+                      </div>
+
+                      <div className="space-y-3.5">
+                        {/* Revolut */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                              <span className="size-1.5 rounded-full bg-cyan-400" />
+                              <span>Revolut (Revtag / Email)</span>
+                              {walletPreferredMethod === "REVOLUT" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                  Retrait Prioritaire
+                                </span>
+                              )}
+                            </label>
+                            {walletRevolutTag && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(walletRevolutTag);
+                                  toast.success("Revtag Revolut copié !");
+                                }}
+                                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Copy className="size-3" />
+                                <span>Copier</span>
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={walletRevolutTag}
+                            onChange={(e) => setWalletRevolutTag(e.target.value)}
+                            placeholder="Ex: @revtag ou email@domaine.com"
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all placeholder:text-slate-600"
+                          />
+                        </div>
+
+                        {/* Wise */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                              <span className="size-1.5 rounded-full bg-emerald-400" />
+                              <span>Wise (Email de compte)</span>
+                              {walletPreferredMethod === "WISE" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                  Retrait Prioritaire
+                                </span>
+                              )}
+                            </label>
+                            {walletWiseEmail && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(walletWiseEmail);
+                                  toast.success("Email Wise copié !");
+                                }}
+                                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Copy className="size-3" />
+                                <span>Copier</span>
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={walletWiseEmail}
+                            onChange={(e) => setWalletWiseEmail(e.target.value)}
+                            placeholder="Ex: client.wise@domaine.com"
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all placeholder:text-slate-600"
+                          />
+                        </div>
+
+                        {/* PayPal */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                              <span className="size-1.5 rounded-full bg-blue-400" />
+                              <span>PayPal (Email bénéficiaire)</span>
+                              {walletPreferredMethod === "PAYPAL" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                                  Retrait Prioritaire
+                                </span>
+                              )}
+                            </label>
+                            {walletPaypalEmail && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(walletPaypalEmail);
+                                  toast.success("Email PayPal copié !");
+                                }}
+                                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Copy className="size-3" />
+                                <span>Copier</span>
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={walletPaypalEmail}
+                            onChange={(e) => setWalletPaypalEmail(e.target.value)}
+                            placeholder="Ex: compte.paypal@domaine.com"
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 font-mono outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/20 transition-all placeholder:text-slate-600"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gouvernance & Audit Conformité */}
+                    <div className="rounded-xl border border-slate-700/60 bg-[#080e1a]/90 p-5 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-400 font-mono">
+                          <ShieldCheck className="size-4 text-indigo-400 shrink-0" />
+                          <span>Gouvernance &amp; Conformité Desk</span>
+                        </div>
+                        {activeClient.wallets?.verifiedAt && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Validé le {new Date(activeClient.wallets.verifiedAt).toLocaleDateString("fr-FR")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">
+                            MÉTHODE PRIORITAIRE
+                          </label>
+                          <select
+                            value={walletPreferredMethod}
+                            onChange={(e) => setWalletPreferredMethod(e.target.value as ClientWalletMethod)}
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400 font-mono"
+                          >
+                            <option value="USDT_TRC20">USDT (TRC-20) - Tron</option>
+                            <option value="USDT_ERC20">USDT (ERC-20) - Ethereum</option>
+                            <option value="BTC">Bitcoin (BTC) Natif</option>
+                            <option value="ETH">Ethereum (ETH) Mainnet</option>
+                            <option value="SOL">Solana (SOL)</option>
+                            <option value="REVOLUT">Revolut (Revtag / Email)</option>
+                            <option value="WISE">Wise (Email)</option>
+                            <option value="PAYPAL">PayPal (Email)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">
+                            STATUT DE VÉRIFICATION
+                          </label>
+                          <select
+                            value={walletVerifiedStatus}
+                            onChange={(e) => setWalletVerifiedStatus(e.target.value as ClientWalletVerifiedStatus)}
+                            className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400 font-mono font-bold"
+                          >
+                            <option value="VERIFIED">Vérifié &amp; Autorisé (Audit OK)</option>
+                            <option value="PENDING">En cours d'examen (Pièces requises)</option>
+                            <option value="UNVERIFIED">Non vérifié (Non audité)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider font-mono">
+                          NOTE INTERNE DE CONFORMITÉ WALLET
+                        </label>
+                        <input
+                          type="text"
+                          value={walletNotes}
+                          onChange={(e) => setWalletNotes(e.target.value)}
+                          placeholder="Ex: Justificatif de propriété et selfie de contrôle validés par le Desk."
+                          className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 outline-none focus:border-indigo-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer action bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-slate-800">
+                  <div className="text-xs font-mono text-slate-400 flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-400" />
+                    <span>
+                      {[
+                        walletUsdtTrc20,
+                        walletUsdtErc20,
+                        walletBtc,
+                        walletEth,
+                        walletSol,
+                        walletRevolutTag,
+                        walletWiseEmail,
+                        walletPaypalEmail,
+                      ].filter(Boolean).length}{" "}
+                      coordonnée(s) de paiement renseignée(s)
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleRequestSaveClientWallets}
+                    disabled={isSavingWallets}
+                    className="admin-btn-primary py-2.5 px-5 text-xs sm:text-sm flex items-center justify-center gap-2 self-end sm:self-auto"
+                  >
+                    {isSavingWallets ? (
+                      <RefreshCw className="size-4 animate-spin shrink-0" />
+                    ) : (
+                      <Check className="size-4 stroke-[3] shrink-0" />
+                    )}
+                    <span>Enregistrer les Coordonnées Wallet</span>
+                  </button>
+                </div>
+              </section>
 
               {/* ── 6. ATTRIBUTION DES 3 MOTEURS & PRESETS ── */}
               <section className="admin-card-purple p-6 sm:p-7 space-y-5">
