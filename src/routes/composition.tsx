@@ -134,6 +134,7 @@ import {
   sendWelcomeEmail,
   sendDepositConfirmedEmail,
   sendCustomDeskEmail,
+  sendAdminPasswordChangedEmail,
   isResendConfigured,
 } from "@/lib/resend";
 import {
@@ -1309,6 +1310,7 @@ function NexiumAdminDashboard({
   const [editRiskGuardAuto, setEditRiskGuardAuto] = useState(activeClient?.riskGuardAutoStop ?? true);
   const [newCrmNoteText, setNewCrmNoteText] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [sendPasswordByEmail, setSendPasswordByEmail] = useState(true);
 
   // Presets Client
   const [goldActive, setGoldActive] = useState(activeClient?.engines?.aiGold?.active ?? false);
@@ -1509,6 +1511,7 @@ function NexiumAdminDashboard({
     setEditMaxPositions(client.maxSimultaneousTrades);
     setEditRiskGuardAuto(client.riskGuardAutoStop);
     setNewPasswordInput("");
+    setSendPasswordByEmail(true);
     setNewCrmNoteText("");
     setExactPnlInput(client.todayPnl.toString());
 
@@ -1648,6 +1651,10 @@ function NexiumAdminDashboard({
 
   const handleSaveClientProfile = async () => {
     if (!activeClient) return;
+    if (newPasswordInput && newPasswordInput.length < 8) {
+      toast.error("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
 
     const activePresetKeys = [
       goldActive && "AI_GOLD",
@@ -1699,6 +1706,17 @@ function NexiumAdminDashboard({
         if (!passResult.success) {
           toast.error(passResult.error || "Échec de la définition du mot de passe.");
           return;
+        }
+        if (sendPasswordByEmail) {
+          const recipient = editEmail || activeClient.email;
+          const mailResult = await sendAdminPasswordChangedEmail(recipient, editName || activeClient.name, newPasswordInput);
+          if (mailResult.success) {
+            toast.success(`Nouveau mot de passe envoyé par e-mail à ${recipient}.`);
+          } else {
+            toast.error(`Mot de passe modifié, mais l'e-mail n'a pas pu être envoyé (${mailResult.error || "erreur inconnue"}). Communiquez-le au client autrement.`);
+          }
+        } else {
+          toast.success("Nouveau mot de passe défini (non envoyé au client).");
         }
       }
     }
@@ -6258,12 +6276,40 @@ function NexiumAdminDashboard({
 
                   <div>
                     <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 uppercase tracking-wider font-mono">MODIFIER MOT DE PASSE</label>
-                    <input
-                      type="text"
-                      value={newPasswordInput}
-                      onChange={(e) => setNewPasswordInput(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newPasswordInput}
+                        onChange={(e) => setNewPasswordInput(e.target.value)}
+                        placeholder="8 caractères minimum"
+                        autoComplete="off"
+                        className="min-w-0 flex-1 rounded-xl border border-slate-700/60 bg-[#0c121e] px-4 py-3 text-sm sm:text-base text-white outline-none focus:border-indigo-400"
+                      />
+                      <button
+                        type="button"
+                        title="Générer un mot de passe aléatoire"
+                        onClick={() => {
+                          // Sans caractères ambigus (0/O, 1/l/I) pour une lecture facile dans l'e-mail.
+                          const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+                          const bytes = crypto.getRandomValues(new Uint32Array(12));
+                          setNewPasswordInput(Array.from(bytes, (b) => alphabet[b % alphabet.length]).join(""));
+                        }}
+                        className="admin-btn-secondary shrink-0 px-3 text-xs font-bold"
+                      >
+                        Générer
+                      </button>
+                    </div>
+                    {newPasswordInput && (
+                      <label className="mt-2 flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={sendPasswordByEmail}
+                          onChange={(e) => setSendPasswordByEmail(e.target.checked)}
+                          className="size-4 accent-indigo-500"
+                        />
+                        <span>Envoyer le mot de passe au client par e-mail</span>
+                      </label>
+                    )}
                   </div>
 
                   <div className="flex flex-col justify-end">

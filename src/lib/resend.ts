@@ -538,6 +538,80 @@ export function renderPasswordResetEmailHtml(clientName: string, resetUrl: strin
   );
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * E-mail envoyé au client quand l'administration lui définit un nouveau mot de passe.
+ */
+export function renderAdminPasswordChangedEmailHtml(
+  clientName: string,
+  email: string,
+  newPassword: string,
+  lang: "fr" | "en" = "fr"
+): string {
+  const isFr = lang === "fr";
+  const name = escapeHtml(clientName);
+  const content = `
+    ${renderIntroSection(
+      "🔒",
+      isFr ? "Votre nouveau mot de passe" : "Your New Password",
+      isFr
+        ? `Bonjour <strong style="color:#17212B;font-size:18px;">${name}</strong>,<br>à votre demande, notre équipe a défini un nouveau mot de passe pour votre compte Nexium Markets.`
+        : `Hello <strong style="color:#17212B;font-size:18px;">${name}</strong>,<br>as requested, our team has set a new password for your Nexium Markets account.`
+    )}
+
+    ${renderRecapSection(isFr ? "Vos identifiants de connexion" : "Your Login Details", [
+      { label: isFr ? "E-mail" : "Email", value: escapeHtml(email) },
+      { label: isFr ? "Mot de passe" : "Password", value: escapeHtml(newPassword) },
+    ])}
+
+    ${renderCalloutSection(
+      isFr ? "Conseil de sécurité" : "Security Tip",
+      isFr
+        ? "Pour votre sécurité, changez ce mot de passe depuis votre espace client après votre connexion, et ne le communiquez à personne."
+        : "For your security, change this password from your client area once logged in, and never share it with anyone.",
+      "#FFF7ED",
+      "#FED7AA",
+      "#C2410C"
+    )}
+
+    ${renderCtaSection(
+      "https://nexiummarkets.com/login",
+      isFr ? "Me connecter" : "Log In",
+      isFr
+        ? "Vous n'êtes pas à l'origine de cette demande ? Contactez immédiatement le support."
+        : "Didn't request this change? Contact support immediately."
+    )}
+  `;
+
+  return getEmailWrapper(
+    isFr ? "Nexium Markets — Nouveau mot de passe" : "Nexium Markets — New Password",
+    isFr ? "Votre nouveau mot de passe Nexium Markets." : "Your new Nexium Markets password.",
+    content,
+    { kicker: isFr ? "Sécurité" : "Security", lang }
+  );
+}
+
+export async function sendAdminPasswordChangedEmail(
+  to: string,
+  clientName: string,
+  newPassword: string,
+  lang: "fr" | "en" = "fr"
+): Promise<SendEmailResult> {
+  const subject = lang === "fr"
+    ? "🔒 Votre nouveau mot de passe — Nexium Markets"
+    : "🔒 Your New Password — Nexium Markets";
+  const html = renderAdminPasswordChangedEmailHtml(clientName, to, newPassword, lang);
+  return sendViaResendHttp(to, subject, html);
+}
+
 export async function sendPasswordResetEmail(to: string, clientName: string, resetUrl: string, lang: "fr" | "en" = "fr"): Promise<SendEmailResult> {
   const subject = lang === "fr"
     ? "🔒 Réinitialisation de votre mot de passe — Nexium Markets"
