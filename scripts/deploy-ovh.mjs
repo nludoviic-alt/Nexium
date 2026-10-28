@@ -94,7 +94,9 @@ async function deploy() {
 
     console.log(`📤 Téléversement des fichiers compilés depuis dist/ vers OVH /${serverDir}...`);
     const startTime = Date.now();
-    await client.uploadFromDir(distDir, serverDir);
+    // ensureDir() s'est déjà placé dans serverDir : on téléverse dans le
+    // dossier courant, sinon les fichiers atterrissent dans /www/www.
+    await client.uploadFromDir(distDir);
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
     console.log(`\n✅ SUCCÈS : Déploiement terminé en ${duration}s !`);
