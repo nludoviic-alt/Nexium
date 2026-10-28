@@ -50,11 +50,17 @@ function ForgotPasswordPage() {
       // "Reset password" à la charte Nexium Markets. On n'envoie plus de
       // second e-mail Resend en parallèle — celui-ci n'avait jamais de jeton
       // réel et son lien ne fonctionnait jamais.
-      if (isSupabaseConfigured) {
-        await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: "https://nexiummarkets.com/reset-password",
-        });
+      if (!isSupabaseConfigured) {
+        throw new Error("Supabase non configuré");
       }
+
+      // resetPasswordForEmail ne lève pas d'exception : il renvoie { error }.
+      // Une adresse sans compte renvoie volontairement un succès (anti-énumération),
+      // donc toute erreur ici est un vrai échec d'envoi à signaler au client.
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: "https://nexiummarkets.com/reset-password",
+      });
+      if (error) throw error;
 
       setSubmitted(true);
       toast.success(
@@ -63,12 +69,16 @@ function ForgotPasswordPage() {
           : "If an account exists for this address, a reset email was just sent."
       );
     } catch (err: any) {
-      console.warn("Notice resetPassword Supabase:", err);
-      setSubmitted(true);
-      toast.success(
-        language === "fr"
-          ? "Si un compte existe pour cette adresse, un e-mail de réinitialisation vient d'être envoyé."
-          : "If an account exists for this address, a reset email was just sent."
+      console.error("resetPasswordForEmail:", err);
+      const tooMany = err?.status === 429 || /rate limit|security purposes/i.test(err?.message ?? "");
+      toast.error(
+        tooMany
+          ? language === "fr"
+            ? "Trop de demandes. Patientez une minute avant de réessayer."
+            : "Too many requests. Please wait a minute and try again."
+          : language === "fr"
+          ? "L'e-mail n'a pas pu être envoyé. Réessayez dans quelques instants ou contactez le support."
+          : "The email could not be sent. Please try again shortly or contact support."
       );
     } finally {
       setLoading(false);
@@ -182,11 +192,13 @@ function ForgotPasswordPage() {
                   <p className="text-xs sm:text-sm text-emerald-900 font-medium leading-normal">
                     {language === "fr" ? (
                       <>
-                        Lien expédié à <strong>{email}</strong>.
+                        Si un compte est associé à <strong>{email}</strong>, un lien vient d'y être envoyé.
+                        Rien reçu ? Vérifiez l'orthographe de l'adresse utilisée à l'inscription.
                       </>
                     ) : (
                       <>
-                        Reset link sent to <strong>{email}</strong>.
+                        If an account is linked to <strong>{email}</strong>, a reset link was just sent.
+                        Nothing received? Check that this is the address you signed up with.
                       </>
                     )}
                   </p>
